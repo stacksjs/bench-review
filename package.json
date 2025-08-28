@@ -55,20 +55,20 @@
     "stx": "./buddy"
   },
   "dependencies": {
-    "@tiptap/core": "^2.13.0",
-    "@tiptap/extension-blockquote": "^2.13.0",
-    "@tiptap/extension-bold": "^2.13.0",
-    "@tiptap/extension-bullet-list": "^2.13.0",
-    "@tiptap/extension-document": "^2.13.0",
-    "@tiptap/extension-highlight": "^2.13.0",
-    "@tiptap/extension-italic": "^2.13.0",
-    "@tiptap/extension-list-item": "^2.13.0",
-    "@tiptap/extension-ordered-list": "^2.13.0",
-    "@tiptap/extension-paragraph": "^2.13.0",
-    "@tiptap/extension-text": "^2.13.0",
-    "@tiptap/pm": "^2.13.0",
-    "@tiptap/starter-kit": "^2.13.0",
-    "@tiptap/vue-3": "^2.13.0",
+    "@tiptap/core": "^2.26.1",
+    "@tiptap/extension-blockquote": "^2.26.1",
+    "@tiptap/extension-bold": "^2.26.1",
+    "@tiptap/extension-bullet-list": "^2.26.1",
+    "@tiptap/extension-document": "^2.26.1",
+    "@tiptap/extension-highlight": "^2.26.1",
+    "@tiptap/extension-italic": "^2.26.1",
+    "@tiptap/extension-list-item": "^2.26.1",
+    "@tiptap/extension-ordered-list": "^2.26.1",
+    "@tiptap/extension-paragraph": "^2.26.1",
+    "@tiptap/extension-text": "^2.26.1",
+    "@tiptap/pm": "^2.26.1",
+    "@tiptap/starter-kit": "^2.26.1",
+    "@tiptap/vue-3": "^2.26.1",
     "stacks": "workspace:*"
   },
   "config": {
@@ -91,7 +91,7 @@
     "storage/framework/server"
   ],
   "devDependencies": {
-    "typescript": "5.8.3"
+    "typescript": "5.9.2"
   },
   "overrides": {
     "unconfig": "0.3.10"
