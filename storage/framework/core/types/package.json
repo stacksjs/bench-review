@@ -58,7 +58,7 @@
     "@types/nprogress": "^0.2.3",
     "@vinejs/vine": "^3.0.1",
     "aws-cdk-lib": "^2.200.1",
-    "cac": "^6.7.14",
+    "@stacksjs/clapp": "^0.2.0",
     "markdown-it": "^14.1.0",
     "meilisearch": "^0.50.0",
     "neverthrow": "^8.2.0",

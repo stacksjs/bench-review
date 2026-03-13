@@ -64,7 +64,7 @@
     "@stacksjs/validation": "workspace:*",
     "@types/prompts": "^2.4.9",
     "ansi-escapes": "^7.0.0",
-    "cac": "^6.7.14",
+    "@stacksjs/clapp": "^0.2.0",
     "consola": "^3.4.2",
     "kolorist": "1.8.0",
     "ora": "^8.2.0",
