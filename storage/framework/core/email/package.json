@@ -41,7 +41,7 @@
     "@stacksjs/development": "workspace:*",
     "@stacksjs/error-handling": "workspace:*",
     "@stacksjs/types": "workspace:*",
-    "aws-sdk": "^2.1692.0",
+    "aws-sdk": "^2.1693.0",
     "vue-email": "^0.8.11"
   }
 }
