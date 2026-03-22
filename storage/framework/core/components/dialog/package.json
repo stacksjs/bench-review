@@ -4,7 +4,9 @@
   "version": "0.70.23",
   "description": "A modern dialog component.",
   "author": "Chris Breuer",
-  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "contributors": [
+    "Chris Breuer <chris@stacksjs.org>"
+  ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
   "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/components/dialog#readme",
@@ -16,7 +18,12 @@
   "bugs": {
     "url": "https://github.com/stacksjs/stacks/issues"
   },
-  "keywords": ["dialog", "components", "library", "stacks"],
+  "keywords": [
+    "dialog",
+    "components",
+    "library",
+    "stacks"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -25,7 +32,10 @@
   },
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["README.md", "dist"],
+  "files": [
+    "README.md",
+    "dist"
+  ],
   "scripts": {
     "dev": "bunx --bun vite -c ./vite.config.ts",
     "build": "bunx --bun vite build --mode lib && bun run build:types",
@@ -43,7 +53,6 @@
     "@stacksjs/alias": "workspace:*",
     "@stacksjs/development": "workspace:*",
     "@vue/tsconfig": "^0.7.0",
-    "unocss": "66.1.3",
     "unplugin-icons": "^22.1.0"
   },
   "overrides": {
