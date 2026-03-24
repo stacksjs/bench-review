@@ -59,7 +59,7 @@
     "@stacksjs/strings": "workspace:*",
     "@stacksjs/utils": "workspace:*",
     "@stacksjs/validation": "workspace:*",
-    "markdown-it": "^14.1.0",
-    "vue-component-meta": "^2.2.10"
+    "markdown-it": "^14.1.1",
+    "vue-component-meta": "^2.2.12"
   }
 }

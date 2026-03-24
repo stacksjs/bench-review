@@ -35,8 +35,8 @@
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "pusher": "^5.2.0",
-    "socket.io": "^4.8.1"
+    "pusher": "^5.3.3",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "@stacksjs/development": "workspace:*"
