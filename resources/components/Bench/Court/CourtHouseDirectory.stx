@@ -59,8 +59,9 @@
 
     <!-- Court Houses Grid -->
     <div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-      <template x-for="court in filteredCourtHouses" :key="court.id">
-        <StxLink
+      <StxLink
+          x-for="court in filteredCourtHouses"
+          :key="court.id"
           :to="`courts/${court.id}/profile`"
           class="group relative bg-white rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden border border-gray-100 hover:border-softBrown"
         >
@@ -87,7 +88,6 @@
             </div>
           </div>
         </StxLink>
-      </template>
     </div>
 
     <!-- Pagination -->

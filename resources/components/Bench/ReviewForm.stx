@@ -56,13 +56,12 @@
     }
   }"
 >
-  <template x-if="!judge">
+  <div x-if="!judge">
     @include('components/Bench/ReviewJudgeSearch')
-  </template>
+  </div>
 
   <!-- Review Form - Only shown when judge is selected -->
-  <template x-if="judge">
-    <div>
+  <div x-if="judge">
       <!-- Review Header -->
       <div class="pb-12">
         <div>
@@ -75,7 +74,7 @@
         </div>
       </div>
     </div>
-  </template>
+  </div>
 
   <div class="border-b border-gray-900/10 pb-12">
     <h2 class="text-base/7 font-semibold text-gray-800">Judge's Performance</h2>
