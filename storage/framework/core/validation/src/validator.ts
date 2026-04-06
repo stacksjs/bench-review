@@ -1,9 +1,10 @@
-import type { ValidationInstance } from '@stacksjs/ts-validation'
-import type { Model, VineType } from '@stacksjs/types'
+import type { ValidationType, Validator } from '@stacksjs/ts-validation'
+import type { Model } from '@stacksjs/types'
 import { HttpError } from '@stacksjs/error-handling'
 import { path } from '@stacksjs/path'
 import { globSync } from '@stacksjs/storage'
 import { snakeCase } from '@stacksjs/strings'
+import { MessageProvider, setCustomMessages } from '@stacksjs/ts-validation'
 import { reportError, schema } from './'
 
 interface RequestData {
@@ -11,7 +12,7 @@ interface RequestData {
 }
 
 interface ValidationField {
-  rule: VineType
+  rule: ValidationType
   message: Record<string, string>
 }
 
@@ -27,25 +28,32 @@ export function isObjectNotEmpty(obj: object | undefined): boolean {
 }
 
 export async function validateField(modelFile: string, params: RequestData): Promise<any> {
-  const modelFiles = globSync([path.userModelsPath('*.ts'), path.storagePath('framework/defaults/models/**/*.ts')], { absolute: true })
+  const modelFiles = globSync([path.userModelsPath('*.ts'), path.storagePath('framework/defaults/app/Models/**/*.ts')], { absolute: true })
   const modelPath = modelFiles.find(file => file.endsWith(`${modelFile}.ts`))
 
   if (!modelPath)
-    throw new HttpError(500, `Model ${modelFile} not found`)
+    throw new HttpError(404, `Model ${modelFile} not found`)
 
   const model = (await import(modelPath)).default as Model
   const attributes = model.attributes
 
-  const ruleObject: Record<string, ValidationInstance> = {}
+  const ruleObject: Record<string, Validator<any>> = {}
   const messageObject: Record<string, string> = {}
 
   for (const key in attributes) {
     if (Object.prototype.hasOwnProperty.call(attributes, key)) {
-      // Skip validation if the attribute has a default value or is required
-      if (attributes[key]?.default !== undefined || attributes[key]?.required === false)
+      const attributeKey = attributes[key]
+
+      const isRequired = 'isRequired' in (attributeKey.validation?.rule ?? {})
+        ? (attributeKey.validation?.rule as Validator<any>).isRequired
+        : false
+
+      // Skip validation if the attribute has a default value and is not required
+      if (attributeKey.default !== undefined && isRequired === false)
         continue
 
-      ruleObject[snakeCase(key)] = attributes[key]?.validation?.rule
+      ruleObject[snakeCase(key)] = attributeKey.validation?.rule as Validator<any>
+
       const validatorMessages = attributes[key]?.validation?.message
 
       if (validatorMessages) {
@@ -58,11 +66,13 @@ export async function validateField(modelFile: string, params: RequestData): Pro
   }
 
   try {
-    const validator = schema.object().shape(ruleObject)
+    setCustomMessages(new MessageProvider(messageObject))
+
+    const validator = schema.object(ruleObject)
     const result = await validator.validate(params)
 
     if (!result.valid) {
-      reportError(result.errors)
+      reportError(result.errors as any)
       throw new HttpError(422, JSON.stringify(result.errors))
     }
 
@@ -71,18 +81,111 @@ export async function validateField(modelFile: string, params: RequestData): Pro
   catch (error: any) {
     if (error instanceof HttpError)
       throw error
+
+    throw new HttpError(500, error?.message || 'An unexpected validation error occurred')
   }
 }
 
+/**
+ * Async validation rule type.
+ * Return true if valid, or a string error message if invalid.
+ */
+export type AsyncValidator = (value: unknown, params: RequestData) => Promise<boolean | string>
+
+// Custom rule registry
+const customRuleRegistry = new Map<string, AsyncValidator>()
+
+/**
+ * Register a custom validation rule that can be referenced by name.
+ */
+export function registerRule(name: string, rule: AsyncValidator): void {
+  customRuleRegistry.set(name, rule)
+}
+
+/**
+ * Get a registered custom rule by name.
+ */
+export function getCustomRule(name: string): AsyncValidator | undefined {
+  return customRuleRegistry.get(name)
+}
+
+/**
+ * Built-in async rule: checks that a value is unique in a database table.
+ */
+export function unique(table: string, column: string, exceptId?: number): AsyncValidator {
+  return async (value: unknown): Promise<boolean | string> => {
+    try {
+      const { db } = await import('@stacksjs/database')
+      let query = db.selectFrom(table as any).where(column as any, '=', value as any)
+      if (exceptId) query = query.where('id' as any, '!=', exceptId as any)
+      const existing = await (query as any).selectAll().executeTakeFirst()
+      return existing ? `The ${column} has already been taken` : true
+    }
+    catch {
+      // If database is not available, skip async validation
+      return true
+    }
+  }
+}
+
+/**
+ * Built-in async rule: checks that a value exists in a database table.
+ */
+export function exists(table: string, column: string): AsyncValidator {
+  return async (value: unknown): Promise<boolean | string> => {
+    try {
+      const { db } = await import('@stacksjs/database')
+      const existing = await (db.selectFrom(table as any).where(column as any, '=', value as any) as any).selectAll().executeTakeFirst()
+      return existing ? true : `The selected ${column} does not exist`
+    }
+    catch {
+      return true
+    }
+  }
+}
+
+/**
+ * Validate fields with both sync rules (from model) and async rules.
+ * Runs sync validation first, then async rules, combining all errors.
+ */
+export async function validateFieldAsync(
+  modelFile: string,
+  params: RequestData,
+  asyncRules?: Record<string, AsyncValidator>,
+): Promise<any> {
+  // Run sync validation first
+  const syncResult = await validateField(modelFile, params)
+
+  // Then run async rules if provided
+  if (asyncRules && Object.keys(asyncRules).length > 0) {
+    const asyncErrors: Record<string, string> = {}
+
+    await Promise.all(
+      Object.entries(asyncRules).map(async ([field, validator]) => {
+        const result = await validator(params[field], params)
+        if (result !== true) {
+          asyncErrors[field] = typeof result === 'string' ? result : `${field} validation failed`
+        }
+      }),
+    )
+
+    if (Object.keys(asyncErrors).length > 0) {
+      throw new HttpError(422, JSON.stringify(asyncErrors))
+    }
+  }
+
+  return syncResult
+}
+
 export async function customValidate(attributes: CustomAttributes, params: RequestData): Promise<any> {
-  const ruleObject: Record<string, ValidationInstance> = {}
+  const ruleObject: Record<string, Validator<any>> = {}
   const messageObject: Record<string, string> = {}
 
   for (const key in attributes) {
     if (Object.prototype.hasOwnProperty.call(attributes, key)) {
       const rule = attributes[key]?.rule
       if (rule)
-        ruleObject[key] = rule as ValidationInstance
+        ruleObject[key] = rule as Validator<any>
 
       const validatorMessages = attributes[key]?.message
 
@@ -105,5 +208,7 @@ export async function customValidate(attributes: CustomAttributes, params: Reque
   catch (error: any) {
     if (error instanceof HttpError)
       throw error
+
+    throw new HttpError(500, error?.message || 'An unexpected validation error occurred')
   }
 }

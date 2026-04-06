@@ -5,17 +5,11 @@ import type {
   GetModelCustomizationJobCommandOutput,
   ListFoundationModelsCommandInput,
   ListFoundationModelsCommandOutput,
-} from '@aws-sdk/client-bedrock'
+} from '@stacksjs/ts-cloud/aws'
 import process from 'node:process'
-import {
-  BedrockClient,
-  CreateModelCustomizationJobCommand,
-  GetModelCustomizationJobCommand,
-  ListFoundationModelsCommand,
-} from '@aws-sdk/client-bedrock'
+import { BedrockClient } from '@stacksjs/ts-cloud/aws'
 
-const client = new BedrockClient({ region: process.env.REGION || 'us-east-1' })
-const logger = console // import your own logger
+const client = new BedrockClient(process.env.REGION || 'us-east-1')
 
 /*
  * Create Model Customization Job
@@ -26,11 +20,7 @@ const logger = console // import your own logger
 export async function createModelCustomizationJob(
   param: CreateModelCustomizationJobCommandInput,
 ): Promise<CreateModelCustomizationJobCommandOutput> {
-  logger.debug(param)
-  const command = new CreateModelCustomizationJobCommand(param)
-  const res = await client.send(command)
-  logger.debug('Successfully create model customization job')
-  logger.debug(res)
+  const res = await client.createModelCustomizationJob(param)
   return res
 }
 
@@ -43,11 +33,7 @@ export async function createModelCustomizationJob(
 export async function getModelCustomizationJob(
   params: GetModelCustomizationJobCommandInput,
 ): Promise<GetModelCustomizationJobCommandOutput> {
-  logger.debug(params)
-  const command = new GetModelCustomizationJobCommand(params)
-  const res = await client.send(command)
-  logger.debug('Successfully get model customization job')
-  logger.debug(res)
+  const res = await client.getModelCustomizationJob(params)
   return res
 }
 
@@ -60,11 +46,7 @@ export async function getModelCustomizationJob(
 export async function listFoundationModels(
   params: ListFoundationModelsCommandInput,
 ): Promise<ListFoundationModelsCommandOutput> {
-  logger.debug(params)
-  const command = new ListFoundationModelsCommand(params)
-  const res = await client.send(command)
-  logger.debug('Successfully list foundation models')
-  logger.debug(res)
+  const res = await client.listFoundationModels(params)
   return res
 }
 

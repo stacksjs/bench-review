@@ -1,5 +1,7 @@
-import type { CustomerJsonResponse, NewCustomer } from '@stacksjs/orm'
+type CustomerJsonResponse = ModelRow<typeof Customer>
+type NewCustomer = NewModelData<typeof Customer>
 import { db } from '@stacksjs/database'
+import { fetchById } from './fetch'
 
 /**
  * Create a new customer
@@ -9,16 +11,24 @@ import { db } from '@stacksjs/database'
  */
 export async function store(data: NewCustomer): Promise<CustomerJsonResponse> {
   try {
+    const customerData = {
+      ...data,
+      avatar: data.avatar ?? 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&fit=crop&q=60',
+    }
+
     const result = await db
       .insertInto('customers')
-      .values(data)
-      .returningAll()
+      .values(customerData)
       .executeTakeFirst()
 
     if (!result)
       throw new Error('Failed to create customer')
 
-    return result
+    const insertId = result.insertId || Number(result.numInsertedOrUpdatedRows)
+
+    const customerResult = await fetchById(Number(insertId)) as CustomerJsonResponse
+
+    return customerResult
   }
   catch (error) {
     if (error instanceof Error) {

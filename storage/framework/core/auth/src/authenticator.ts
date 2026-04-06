@@ -1,35 +1,39 @@
-import { handleError } from '@stacksjs/error-handling'
-import { authenticator } from 'otplib'
-import qrcode from 'qrcode'
+import { generateTOTP, generateTOTPSecret, totpKeyUri, verifyTOTP } from '@stacksjs/ts-auth'
 
 export function generateTwoFactorSecret(): string {
-  const secret = authenticator.generateSecret()
-
-  return secret
+  return generateTOTPSecret()
 }
 
 export type Token = string
 export type Secret = string
-export function generateTwoFactorToken(): Token {
-  return authenticator.generate(generateTwoFactorSecret())
+
+export async function generateTwoFactorToken(secret: Secret): Promise<Token> {
+  return generateTOTP({ secret })
 }
 
-export function verifyTwoFactorCode(token: Token, secret: Secret): boolean {
-  const isValid = authenticator.verify({ token, secret })
-
-  return isValid
+export async function verifyTwoFactorCode(token: Token, secret: Secret): Promise<boolean> {
+  return verifyTOTP(token, { secret })
 }
 
-export function generateQrCode(): void {
-  const user = 'johndoe@example.com'
-  const service = 'StacksJS 2fa'
-  const secret = generateTwoFactorSecret()
-  const otpauth = authenticator.keyuri(user, service, secret)
+/**
+ * Generate an otpauth:// URI for two-factor authentication
+ *
+ * This URI can be used with any QR code library to generate a scannable
+ * QR code for authenticator apps.
+ *
+ * @param user - User identifier (email or username)
+ * @param service - Service name (e.g., 'StacksJS 2FA')
+ * @param secret - Optional secret (will be generated if not provided)
+ * @returns The otpauth:// URI string
+ */
+export function generateTwoFactorUri(
+  user?: string,
+  service?: string,
+  secret?: Secret,
+): string {
+  const userIdentifier = user || 'johndoe@example.com'
+  const serviceName = service || 'StacksJS 2fa'
+  const otpSecret = secret || generateTwoFactorSecret()
 
-  qrcode.toDataURL(otpauth, (err: any) => {
-    // qrcode.toDataURL(otpauth, (err: any, imageUrl: any) => {
-    if (err) {
-      handleError('Error with QR', err)
-    }
-  })
+  return totpKeyUri(userIdentifier, serviceName, otpSecret)
 }

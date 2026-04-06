@@ -1,9 +1,15 @@
+import type { AuthToken } from '@stacksjs/types'
+export type { AuthToken } from '@stacksjs/types'
 import { Buffer } from 'node:buffer'
-import { randomBytes } from 'node:crypto'
+import { createHmac, randomBytes } from 'node:crypto'
+import process from 'node:process'
 import { db, sql } from '@stacksjs/database'
 import { HttpError } from '@stacksjs/error-handling'
 
-export type AuthToken = string
+/** Type-safe helper to brand a plain string as an AuthToken */
+function toAuthToken(value: string): AuthToken {
+  return value as AuthToken
+}
 
 export class TokenManager {
   static async createAccessToken(user: { id: number }): Promise<AuthToken> {
@@ -26,7 +32,7 @@ export class TokenManager {
     if (!result?.insertId)
       throw new HttpError(500, 'Failed to create access token')
 
-    return token
+    return toAuthToken(token)
   }
 
   static async validateToken(token: string): Promise<boolean> {
@@ -39,7 +45,7 @@ export class TokenManager {
       return false
 
     // Check if token is expired
-    if (accessToken.expires_at && new Date(accessToken.expires_at) < new Date()) {
+    if (accessToken.expires_at && new Date(String(accessToken.expires_at)) < new Date()) {
       // Automatically delete expired tokens
       await db.deleteFrom('oauth_access_tokens')
         .where('id', '=', accessToken.id)
@@ -52,7 +58,7 @@ export class TokenManager {
       return false
 
     // Rotate token if it's been used for more than 24 hours
-    const lastUsed = accessToken.updated_at ? new Date(accessToken.updated_at) : new Date()
+    const lastUsed = accessToken.updated_at ? new Date(String(accessToken.updated_at)) : new Date()
     const now = new Date()
     const hoursSinceLastUse = (now.getTime() - lastUsed.getTime()) / (1000 * 60 * 60)
 
@@ -93,7 +99,7 @@ export class TokenManager {
       .where('id', '=', accessToken.id)
       .execute()
 
-    return newToken
+    return toAuthToken(newToken)
   }
 
   static async revokeToken(token: string): Promise<void> {
@@ -106,11 +112,16 @@ export class TokenManager {
       .execute()
   }
 
-  static async generateLongJWT(userId: number): Promise<string> {
-    // Generate a long random string for the token
-    const randomPart = randomBytes(64).toString('base64')
+  /**
+   * Generate a JWT-like token with embedded metadata
+   * Contains user ID, timestamps, and random signature for security
+   */
+  static generateJWT(userId: number): string {
+    const appKey = process.env.APP_KEY
+    if (!appKey) {
+      throw new Error('APP_KEY is not set. JWT tokens cannot be generated without a secure application key.')
+    }
 
-    // Create JWT-like structure with header and payload
     const header = {
       alg: 'HS256',
       typ: 'JWT',
@@ -123,11 +134,12 @@ export class TokenManager {
       jti: randomBytes(16).toString('hex'),
     }
 
-    // Convert header and payload to base64
-    const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64')
-    const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64')
+    const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url')
+    const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url')
+    const signature = createHmac('sha256', appKey)
+      .update(`${encodedHeader}.${encodedPayload}`)
+      .digest('base64url')
 
-    // Combine all parts to create a JWT-like token
-    return `${encodedHeader}.${encodedPayload}.${randomPart}`
+    return `${encodedHeader}.${encodedPayload}.${signature}`
   }
 }

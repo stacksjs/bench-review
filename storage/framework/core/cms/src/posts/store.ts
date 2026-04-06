@@ -1,4 +1,5 @@
-import type { NewPost, PostJsonResponse } from '@stacksjs/orm'
+type PostJsonResponse = ModelRow<typeof Post>
+type NewPost = NewModelData<typeof Post>
 import { randomUUIDv7 } from 'bun'
 import { db } from '@stacksjs/database'
 import { formatDate } from '@stacksjs/orm'
@@ -13,18 +14,28 @@ export const POST_STATUS_ARCHIVED = 'Archived'
  * @param data The post data to create
  * @returns The created post record
  */
-export async function store(data: NewPost): Promise<PostJsonResponse> {
+export async function store(data: NewPost & { body?: string, category?: string }): Promise<PostJsonResponse & { body?: string, category?: string }> {
   try {
-    const postData = {
-      author_id: data.author_id,
+    if (!data.title || (typeof data.title === 'string' && data.title.trim() === '')) {
+      throw new Error('Post title is required')
+    }
+
+    // Map body -> content if body is provided and content is not
+    const content = data.content || data.body
+
+    const d = data as Record<string, unknown>
+    const postData: Record<string, unknown> = {
+      author_id: d.author_id,
       uuid: randomUUIDv7(),
       title: data.title,
       poster: data.poster,
-      content: data.content,
+      content,
+      body: data.body,
+      category: data.category,
       excerpt: data.excerpt,
-      is_featured: data.is_featured ? Date.now() : undefined,
+      is_featured: d.is_featured ? Date.now() : undefined,
       views: data.views || 0,
-      published_at: data.published_at || Date.now(),
+      published_at: d.published_at || Date.now(),
       status: data.status || POST_STATUS_DRAFT,
     }
 
@@ -37,7 +48,7 @@ export async function store(data: NewPost): Promise<PostJsonResponse> {
     if (!result)
       throw new Error('Failed to create post')
 
-    return result
+    return result as PostJsonResponse & { body?: string, category?: string }
   }
   catch (error) {
     if (error instanceof Error)
@@ -110,12 +121,16 @@ export async function detach(
     const postTypeField = tableName === 'categorizable_models' ? 'categorizable_type' : 'taggable_type'
 
     // Build the delete query
-    await db
+    let query = db
       .deleteFrom(tableName)
       .where(postForeignKey, '=', postId)
       .where(postTypeField, '=', 'posts')
-      .where('id', 'in', ids)
-      .execute()
+
+    if (ids) {
+      query = query.where('id', 'in', ids)
+    }
+
+    await query.execute()
   }
   catch (error) {
     if (error instanceof Error)
@@ -147,12 +162,12 @@ export async function sync(
     // Get existing relationships
     const existingRelations = await db
       .selectFrom(tableName)
-      .select('id')
+      .select(['id'])
       .where(postForeignKey, '=', postId)
       .where(postTypeField, '=', 'posts')
       .execute()
 
-    const existingIds = existingRelations.map((rel: { id: number }) => rel.id)
+    const existingIds = existingRelations.map((rel: Record<string, unknown>) => rel.id as number)
 
     // Find IDs to remove (in existing but not in new set)
     const idsToRemove = existingIds.filter((id: number) => !ids.includes(id))

@@ -1,6 +1,7 @@
-import type { ShippingRateJsonResponse, ShippingRateUpdate } from '@stacksjs/orm'
 import { db } from '@stacksjs/database'
 import { formatDate } from '@stacksjs/orm'
+type ShippingRateJsonResponse = ModelRow<typeof ShippingRate>
+type ShippingRateUpdate = UpdateModelData<typeof ShippingRate>
 
 /**
  * Update a shipping rate
@@ -27,7 +28,7 @@ export async function update(id: number, data: ShippingRateUpdate): Promise<Ship
     if (!result)
       throw new Error('Failed to update shipping rate')
 
-    return result
+    return result as ShippingRateJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
@@ -86,7 +87,7 @@ export async function bulkUpdate(updates: Array<{
  * @param data The update data to apply
  * @returns Number of shipping rates updated
  */
-export async function updateByZone(zone: string, data: ShippingRateUpdate): Promise<number> {
+export async function updateByZone(zone: number, data: ShippingRateUpdate): Promise<number> {
   try {
     const result = await db
       .updateTable('shipping_rates')
@@ -94,7 +95,7 @@ export async function updateByZone(zone: string, data: ShippingRateUpdate): Prom
         ...data,
         updated_at: formatDate(new Date()),
       })
-      .where('zone', '=', zone)
+      .where('zone_id', '=', zone)
       .executeTakeFirst()
 
     return Number(result.numUpdatedRows)

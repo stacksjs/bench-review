@@ -1,0 +1,137 @@
+<script>
+interface StepperDemoProps {
+  currentStep?: number
+  steps?: string
+}
+
+const { currentStep = 0, steps = [ } = defineProps<StepperDemoProps>()
+
+{ title: 'Step 1', description: 'First step', icon: 'i-heroicons-check' },
+  { title: 'Step 2', description: 'Second step', icon: 'i-heroicons-check' },
+  { title: 'Step 3', description: 'Third step', icon: 'i-heroicons-check' },
+]
+
+function getStepContent(step) {
+  switch (step) {
+    case 0:
+      return { title: 'Personal Information', description: 'Please provide your basic details' }
+    case 1:
+      return { title: 'Account Setup', description: 'Configure your account settings' }
+    case 2:
+      return { title: 'Final Review', description: 'Review your information before submitting' }
+    default:
+      return { title: '', description: '' }
+  }
+}
+</script>
+<div class="max-w-4xl">
+  <DocsPlayground>
+    <div class="p-8 max-w-3xl mx-auto">
+      <!-- Stepper indicator -->
+      <div class="flex items-center justify-between mb-12">
+        @foreach(steps as step)
+          <div class="flex items-center {{ loop.last ? '' : 'flex-1' }}">
+            <div class="flex flex-col items-center">
+              <div class="flex items-center justify-center w-8 h-8 rounded-full {{ loop.index <= currentStep ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500' }} {{ loop.index == currentStep ? 'ring-2 ring-blue-600 ring-offset-2' : '' }}">
+                @if(loop.index < currentStep)
+                  <div class="i-heroicons-check w-5 h-5"></div>
+                @else
+                  {{ loop.index + 1 }}
+                @endif
+              </div>
+              <span class="mt-2 text-sm {{ loop.index == currentStep ? 'text-blue-600 font-medium' : 'text-gray-500' }}">{{ step.title }}</span>
+            </div>
+            @if(!loop.last)
+              <div class="flex-1 h-0.5 mx-4 {{ loop.index < currentStep ? 'bg-blue-500' : 'bg-gray-200' }}"></div>
+            @endif
+          </div>
+        @endforeach
+      </div>
+
+      <!-- Content Section -->
+      <div class="mb-8 rounded-lg bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
+        <h2 class="text-xl font-semibold text-gray-900 mb-2">
+          {{ getStepContent(currentStep).title }}
+        </h2>
+        <p class="text-gray-600 mb-6">
+          {{ getStepContent(currentStep).description }}
+        </p>
+
+        <!-- Step 1 Content -->
+        @if(currentStep == 0)
+          <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+              <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700">First Name</label>
+                <input type="text" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+              </div>
+              <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700">Last Name</label>
+                <input type="text" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+              </div>
+            </div>
+            <div class="space-y-2">
+              <label class="block text-sm font-medium text-gray-700">Email</label>
+              <input type="email" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+            </div>
+          </div>
+        @endif
+
+        <!-- Step 2 Content -->
+        @if(currentStep == 1)
+          <div class="space-y-4">
+            <div class="space-y-2">
+              <label class="block text-sm font-medium text-gray-700">Username</label>
+              <input type="text" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+            </div>
+            <div class="space-y-2">
+              <label class="block text-sm font-medium text-gray-700">Password</label>
+              <input type="password" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+            </div>
+          </div>
+        @endif
+
+        <!-- Step 3 Content -->
+        @if(currentStep == 2)
+          <div class="space-y-4">
+            <div class="rounded-lg bg-gray-50 p-4">
+              <h3 class="text-sm font-medium text-gray-900 mb-2">Review Your Information</h3>
+              <p class="text-sm text-gray-600">Please review all the information you've entered. Once you submit, you won't be able to make changes.</p>
+            </div>
+            <div class="flex items-center space-x-2">
+              <input type="checkbox" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+              <label class="text-sm text-gray-700">I confirm that all the information provided is correct</label>
+            </div>
+          </div>
+        @endif
+      </div>
+
+      <div class="flex justify-center gap-4">
+        <button
+          class="rounded-md bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {{ currentStep == 0 ? 'opacity-50 cursor-not-allowed' : '' }}"
+          data-action="previous-step"
+          {{ currentStep == 0 ? 'disabled' : '' }}
+        >
+          Previous
+        </button>
+        <button
+          class="rounded-md bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {{ currentStep == steps.length - 1 ? 'opacity-50 cursor-not-allowed' : '' }}"
+          data-action="next-step"
+          {{ currentStep == steps.length - 1 ? 'disabled' : '' }}
+        >
+          Next
+        </button>
+        <button
+          class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          data-action="reset-stepper"
+        >
+          Reset
+        </button>
+      </div>
+    </div>
+
+    <div slot="code">
+      <!-- StepperCode component would be rendered here -->
+    </div>
+  </DocsPlayground>
+</div>

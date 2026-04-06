@@ -1,4 +1,7 @@
-import type { PaymentMethod, Product, Subscription, TransactionHistory } from '../types/billing'
+type PaymentMethod = any
+type Product = any
+type Subscription = any
+type TransactionHistory = any
 
 const apiUrl = `http://localhost:3008`
 
@@ -42,6 +45,10 @@ export const usePaymentStore = defineStore('payment', () => {
       },
     })
 
+    if (!response.ok) {
+      throw new Error(`Failed to fetch setup intent: ${response.status}`)
+    }
+
     const client: any = await response.json()
     const clientSecret = client.client_secret
 
@@ -61,6 +68,10 @@ export const usePaymentStore = defineStore('payment', () => {
       },
       body: JSON.stringify(body),
     })
+
+    if (!response.ok) {
+      throw new Error(`Failed to create payment intent: ${response.status}`)
+    }
 
     const client: any = await response.json()
     const clientSecret = client.client_secret
@@ -82,6 +93,10 @@ export const usePaymentStore = defineStore('payment', () => {
       body: JSON.stringify(body),
     })
 
+    if (!response.ok) {
+      throw new Error(`Failed to store transaction: ${response.status}`)
+    }
+
     const client: any = await response.json()
     const clientSecret = client.client_secret
 
@@ -102,7 +117,7 @@ export const usePaymentStore = defineStore('payment', () => {
 
     const client: any = await response.json()
 
-    dispatch('subscription:created')
+    ;(globalThis as any).dispatch('subscription:created')
 
     return client
   }
@@ -250,7 +265,7 @@ export const usePaymentStore = defineStore('payment', () => {
 
     removeLoadingState('fetchUserPaymentMethods')
 
-    dispatch('paymentMethods:fetched')
+    ;(globalThis as any).dispatch('paymentMethods:fetched')
   }
 
   async function fetchTransactionHistory(id: number): Promise<void> {
@@ -402,7 +417,7 @@ export const usePaymentStore = defineStore('payment', () => {
 
     removeLoadingState('fetchActivePlan')
 
-    dispatch('subscription:fetched')
+    ;(globalThis as any).dispatch('subscription:fetched')
   }
 
   function setLoadingState(statusKey: string): void {

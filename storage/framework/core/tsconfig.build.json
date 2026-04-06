@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "target": "esnext",
     "lib": ["esnext"],
     "moduleDetection": "force",
@@ -7,7 +8,8 @@
     "moduleResolution": "bundler",
     "paths": {
       "~/*": ["../../../*"],
-      "@stacksjs/*": ["./*/src"]
+      "@stacksjs/*": ["./*/src"],
+      "*": ["../../../pantry/*"]
     },
     "resolveJsonModule": true,
     "types": ["bun"],

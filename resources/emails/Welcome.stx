@@ -1,0 +1,100 @@
+<script server>
+const userFirstName = props?.userFirstName || 'Chris'
+const loginDevice = props?.loginDevice || 'Chrome on Mac OS X'
+const loginLocation = props?.loginLocation || 'Playa Vista, California, United States'
+const loginIp = props?.loginIp || '12.123.45.123'
+const loginDate = props?.loginDate || new Date('February 8, 2024, 8:24 am')
+
+const formattedDate = new Intl.DateTimeFormat('en', {
+  dateStyle: 'long',
+  timeStyle: 'short',
+}).format(loginDate)
+</script>
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="background-color: #fff; font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen-Sans,Ubuntu,Cantarell,'Helvetica Neue',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+    <tr>
+      <td align="center">
+        <table width="620" cellpadding="0" cellspacing="0" role="presentation">
+          <!-- Logo -->
+          <tr>
+            <td style="padding: 30px 20px;">
+              <img src="https://vue-email-demo.vercel.app/static/yelp-logo.png" alt="Logo" />
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="border: 1px solid rgb(0,0,0, 0.1); border-radius: 3px; overflow: hidden;">
+              <img width="620" src="https://vue-email-demo.vercel.app/static/yelp-header.png" alt="" />
+
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                <tr>
+                  <td style="padding: 20px 40px; padding-bottom: 0;">
+                    <h1 style="font-size: 32px; font-weight: bold; text-align: center;">
+                      Hi {{ userFirstName }},
+                    </h1>
+                    <h2 style="font-size: 26px; font-weight: bold; text-align: center;">
+                      We noticed a recent login to your Yelp account.
+                    </h2>
+
+                    <p style="font-size: 16px;">
+                      <b>Time: </b>
+                      {{ formattedDate }}
+                    </p>
+                    <p style="font-size: 16px; margin-top: -5px;">
+                      <b>Device: </b>
+                      {{ loginDevice }}
+                    </p>
+                    <p style="font-size: 16px; margin-top: -5px;">
+                      <b>Location: </b>
+                      {{ loginLocation }}
+                    </p>
+                    <p style="color: rgb(0,0,0, 0.5); font-size: 14px; margin-top: -5px;">
+                      *Approximate geographic location based on IP address: {{ loginIp }}
+                    </p>
+
+                    <p style="font-size: 16px;">
+                      If this was you, there's nothing else you need to do.
+                    </p>
+                    <p style="font-size: 16px; margin-top: -5px;">
+                      If this wasn't you or if you have additional questions, please see our support page.
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 20px 40px; padding-top: 0; text-align: center;">
+                    <span style="background-color: #e00707; padding: 12px 30px; border-radius: 3px; color: #FFF; font-weight: bold; border: 1px solid rgb(0,0,0, 0.1); cursor: pointer; display: inline-block;">
+                      Learn More
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer Image -->
+          <tr>
+            <td style="padding: 45px 0 0 0;">
+              <img width="620" src="https://vue-email-demo.vercel.app/static/yelp-footer.png" alt="" />
+            </td>
+          </tr>
+
+          <!-- Copyright -->
+          <tr>
+            <td style="text-align: center; font-size: 12px; color: rgb(0,0,0, 0.7);">
+              © 2022 | Yelp Inc., 350 Mission Street, San Francisco, CA 94105, U.S.A. | www.yelp.com
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

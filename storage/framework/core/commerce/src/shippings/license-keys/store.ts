@@ -1,7 +1,9 @@
 // Import dependencies
-import type { LicenseKeyJsonResponse, NewLicenseKey } from '@stacksjs/orm'
+type LicenseKeyJsonResponse = ModelRow<typeof LicenseKey>
+type NewLicenseKey = NewModelData<typeof LicenseKey>
 import { randomUUIDv7 } from 'bun'
 import { db } from '@stacksjs/database'
+import { fetchById } from './fetch'
 
 /**
  * Create a new license key
@@ -19,13 +21,19 @@ export async function store(data: NewLicenseKey): Promise<LicenseKeyJsonResponse
     const result = await db
       .insertInto('license_keys')
       .values(licenseData)
-      .returningAll()
       .executeTakeFirst()
 
     if (!result)
       throw new Error('Failed to create license key')
 
-    return result
+    const insertedId = Number(result.insertId) || Number(result.numInsertedOrUpdatedRows)
+
+    const licenseKey = await fetchById(insertedId)
+
+    if (!licenseKey)
+      throw new Error('Failed to create license key')
+
+    return licenseKey
   }
   catch (error) {
     if (error instanceof Error) {

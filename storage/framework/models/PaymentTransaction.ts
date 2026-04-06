@@ -1,9 +1,9 @@
-import type { Model } from '@stacksjs/types'
+import { defineModel } from '@stacksjs/orm'
 import { collect } from '@stacksjs/collections'
 
 import { schema } from '@stacksjs/validation'
 
-export default {
+export default defineModel({
   name: 'PaymentTransaction', // defaults to the sanitized file name
   table: 'payment_transactions', // defaults to the lowercase, plural name of the model name (or the name of the model file)
   primaryKey: 'id', // defaults to `id`
@@ -17,10 +17,9 @@ export default {
   },
   attributes: {
     name: {
-      required: true,
       fillable: true,
       validation: {
-        rule: schema.string().max(255),
+        rule: schema.string().required().max(255),
         message: {
           string: 'name must be a string',
           required: 'name is required',
@@ -42,10 +41,9 @@ export default {
     },
 
     amount: {
-      required: true,
       fillable: true,
       validation: {
-        rule: schema.number(),
+        rule: schema.number().required(),
         message: {
           number: 'amount must be a number',
           required: 'amount is required',
@@ -55,13 +53,12 @@ export default {
     },
 
     type: {
-      required: true,
       fillable: true,
       validation: {
-        rule: schema.string().max(50),
+        rule: schema.string().required().max(50),
         message: {
           string: 'type must be a string',
-          max: 'type must have a maximum of 512 characters',
+          max: 'type must have a maximum of 50 characters',
         },
       },
       factory: () => collect(['one-time', 'subscription']).random().first(),
@@ -71,11 +68,10 @@ export default {
       validation: {
         rule: schema.string().max(255),
         message: {
-          string: 'provider_id must be a number',
-          required: 'provider_id is required',
+          string: 'provider_id must be a string',
         },
       },
       factory: faker => faker.string.alphanumeric(10),
     },
   },
-} satisfies Model
+} as const)

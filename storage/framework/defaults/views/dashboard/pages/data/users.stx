@@ -1,0 +1,115 @@
+@extends('layouts/default')
+
+@section('content')
+<script server>
+const { User } = await import('@stacksjs/orm')
+
+let users = []
+let totalCount = 0
+let activeCount = 0
+let adminCount = 0
+let newCount = 0
+
+try {
+  const allUsers = await User.orderBy('created_at', 'desc').get()
+  users = allUsers.map(u => ({
+    id: String(u.get('id') || ''),
+    name: String(u.get('name') || ''),
+    email: String(u.get('email') || ''),
+    role: String(u.get('role') || 'User'),
+    status: String(u.get('status') || 'Active'),
+    lastLogin: String(u.get('last_login_at') || u.get('updated_at') || ''),
+  }))
+  totalCount = allUsers.length
+  activeCount = allUsers.filter(u => String(u.get('status') || '').toLowerCase() === 'active').length
+  adminCount = allUsers.filter(u => String(u.get('role') || '').toLowerCase() === 'admin').length
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+  newCount = allUsers.filter(u => new Date(String(u.get('created_at') || '')).getTime() > weekAgo).length
+} catch (e) { /* DB not seeded */ }
+
+function statusVariant(s) {
+  s = String(s || '').toLowerCase()
+  if (['active', 'success', 'healthy'].includes(s)) return 'success'
+  if (['pending', 'scheduled', 'warning'].includes(s)) return 'warning'
+  if (['failed', 'error', 'inactive'].includes(s)) return 'danger'
+  return 'default'
+}
+
+const roles = ['All Roles', 'Admin', 'Editor', 'Author', 'Subscriber', 'User']
+</script>
+<div class="p-6 space-y-6">
+
+  <PageHeader title="Users" description="Manage user accounts">
+    <template #actions>
+      <Button variant="secondary">Import</Button>
+      <Button variant="primary">
+        <div class="i-hugeicons-plus-sign h-4 w-4"></div>
+        Add User
+      </Button>
+    </template>
+  </PageHeader>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <StatsCard title="Total Users" value="{{ totalCount }}" icon="i-hugeicons-user-group" iconBg="primary" />
+    <StatsCard title="Active" value="{{ activeCount }}" icon="i-hugeicons-checkmark-circle-02" iconBg="success" />
+    <StatsCard title="Admins" value="{{ adminCount }}" icon="i-hugeicons-user-star-02" iconBg="warning" />
+    <StatsCard title="New (7d)" value="{{ newCount }}" icon="i-hugeicons-user-add-01" iconBg="info" />
+  </div>
+
+  <!-- Users Table -->
+  <div class="bg-white dark:bg-neutral-800/90 rounded-xl border border-black/5 dark:border-white/5">
+    <div class="p-4 border-b border-neutral-200/60 dark:border-white/5">
+      <FilterBar searchPlaceholder="Search users...">
+        <Select
+          placeholder="All Roles"
+          :options="{{ JSON.stringify(roles.map(r => ({ value: r, label: r }))) }}"
+          size="sm"
+        />
+      </FilterBar>
+    </div>
+
+    <DataTable
+      :columns="{{ JSON.stringify([
+        { key: 'name', label: 'User' },
+        { key: 'email', label: 'Email' },
+        { key: 'role', label: 'Role' },
+        { key: 'status', label: 'Status' },
+        { key: 'lastLogin', label: 'Last Login' },
+        { key: 'actions', label: '' }
+      ]) }}"
+      :data="users"
+      emptyTitle="No users found"
+      emptyDescription="Users will appear here once they register"
+      emptyIcon="i-hugeicons-user-group"
+    >
+      @foreach(users as user)
+        <tr class="hover:bg-neutral-50 dark:hover:bg-white/[0.02] transition-colors">
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-[11px] font-semibold flex-shrink-0">
+                {{ user.name.charAt(0).toUpperCase() }}
+              </div>
+              <span class="text-[13px] font-medium text-neutral-900 dark:text-white">{{ user.name }}</span>
+            </div>
+          </td>
+          <td class="px-4 py-3 text-[13px] text-neutral-600 dark:text-neutral-300">{{ user.email }}</td>
+          <td class="px-4 py-3">
+            <Badge variant="default" size="xs">{{ user.role }}</Badge>
+          </td>
+          <td class="px-4 py-3">
+            <Badge variant="{{ statusVariant(user.status) }}" size="xs" dot>{{ user.status }}</Badge>
+          </td>
+          <td class="px-4 py-3 text-[12px] text-neutral-500 dark:text-neutral-400">{{ user.lastLogin }}</td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-1">
+              <Button variant="ghost" size="xs" iconOnly><div class="i-hugeicons-edit-01 w-4 h-4"></div></Button>
+              <Button variant="ghost" size="xs" iconOnly><div class="i-hugeicons-waste w-4 h-4 text-red-500"></div></Button>
+            </div>
+          </td>
+        </tr>
+      @endforeach
+    </DataTable>
+  </div>
+</div>
+@endsection

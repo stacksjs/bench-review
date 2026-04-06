@@ -1,4 +1,5 @@
-import type { ManufacturerJsonResponse, NewManufacturer } from '@stacksjs/orm'
+type ManufacturerJsonResponse = ModelRow<typeof Manufacturer>
+type NewManufacturer = NewModelData<typeof Manufacturer>
 import { randomUUIDv7 } from 'bun'
 import { db } from '@stacksjs/database'
 
@@ -25,7 +26,7 @@ export async function store(data: NewManufacturer): Promise<ManufacturerJsonResp
     if (!result)
       throw new Error('Failed to create manufacturer')
 
-    return result
+    return result as ManufacturerJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
@@ -53,22 +54,20 @@ export async function bulkStore(data: NewManufacturer[]): Promise<number> {
   let createdCount = 0
 
   try {
-    await db.transaction().execute(async (trx) => {
-      for (const manufacturer of data) {
-        const manufacturerData = {
-          ...manufacturer,
-          uuid: randomUUIDv7(),
-          featured: manufacturer.featured ?? false,
-        }
-
-        await trx
-          .insertInto('manufacturers')
-          .values(manufacturerData)
-          .execute()
-
-        createdCount++
+    for (const manufacturer of data) {
+      const manufacturerData = {
+        ...manufacturer,
+        uuid: randomUUIDv7(),
+        featured: manufacturer.featured ?? false,
       }
-    })
+
+      await db
+        .insertInto('manufacturers')
+        .values(manufacturerData)
+        .execute()
+
+      createdCount++
+    }
 
     return createdCount
   }

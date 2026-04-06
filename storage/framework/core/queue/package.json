@@ -2,9 +2,11 @@
   "name": "@stacksjs/queue",
   "type": "module",
   "version": "0.70.23",
-  "description": "The Stacks Queue system.",
+  "description": "The Stacks Queue system powered by bun-queue.",
   "author": "Chris Breuer",
-  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "contributors": [
+    "Chris Breuer <chris@stacksjs.com>"
+  ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
   "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/queue#readme",
@@ -18,9 +20,10 @@
   },
   "keywords": [
     "queue",
-    "bee-queue",
+    "bun-queue",
     "redis",
-    "upstash",
+    "job",
+    "worker",
     "stacks",
     "framework",
     "typescript",
@@ -28,22 +31,30 @@
   ],
   "exports": {
     ".": {
+      "bun": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./*": {
+      "bun": "./src/*",
       "import": "./dist/*"
     }
   },
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["README.md", "dist"],
+  "files": [
+    "README.md",
+    "dist"
+  ],
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "bun tsc --noEmit",
     "prepublishOnly": "bun run build"
   },
+  "dependencies": {
+    "@stacksjs/bun-queue": "^0.1.0"
+  },
   "devDependencies": {
-    "@stacksjs/development": "workspace:*"
+    "better-dx": "^0.2.5"
   }
 }

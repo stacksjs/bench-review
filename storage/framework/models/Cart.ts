@@ -1,7 +1,7 @@
-import type { Model } from '@stacksjs/types'
+import { defineModel } from '@stacksjs/orm'
 import { schema } from '@stacksjs/validation'
 
-export default {
+export default defineModel({
   name: 'Cart',
   table: 'carts',
   primaryKey: 'id',
@@ -37,7 +37,7 @@ export default {
       order: 1,
       fillable: true,
       validation: {
-        rule: schema.enum(['active', 'abandoned', 'converted', 'expired'] as const),
+        rule: schema.enum(['active', 'abandoned', 'converted', 'expired']),
       },
       factory: faker => faker.helpers.arrayElement(['active', 'abandoned', 'converted', 'expired']),
     },
@@ -59,7 +59,7 @@ export default {
       validation: {
         rule: schema.number().min(0),
       },
-      factory: faker => Number.parseFloat(faker.commerce.price({ min: 0, max: 1000, dec: 2 })),
+      factory: faker => faker.number.int({ min: 0, max: 1000 }),
     },
 
     taxAmount: {
@@ -69,7 +69,7 @@ export default {
       validation: {
         rule: schema.number().min(0),
       },
-      factory: faker => Number.parseFloat(faker.commerce.price({ min: 0, max: 200, dec: 2 })),
+      factory: faker => faker.number.int({ min: 0, max: 200 }),
     },
 
     discountAmount: {
@@ -79,7 +79,7 @@ export default {
       validation: {
         rule: schema.number().min(0),
       },
-      factory: faker => Number.parseFloat(faker.commerce.price({ min: 0, max: 100, dec: 2 })),
+      factory: faker => faker.number.int({ min: 0, max: 100 }),
     },
 
     total: {
@@ -89,17 +89,19 @@ export default {
       validation: {
         rule: schema.number().min(0),
       },
-      factory: faker => Number.parseFloat(faker.commerce.price({ min: 0, max: 1200, dec: 2 })),
+      factory: faker => faker.number.int({ min: 0, max: 1200 }),
     },
 
     expiresAt: {
-      required: true,
       order: 7,
       fillable: true,
       validation: {
-        rule: schema.timestamp(),
+        rule: schema.timestamp().required(),
       },
-      factory: faker => faker.date.past().getTime(),
+      factory: (faker) => {
+        const date = faker.date.past()
+        return date.toISOString().slice(0, 19).replace('T', ' ')
+      },
     },
 
     currency: {
@@ -113,27 +115,25 @@ export default {
     },
 
     notes: {
-      required: false,
       order: 9,
       fillable: true,
       validation: {
         rule: schema.string().max(1000),
       },
-      factory: faker => faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.3 }),
+      factory: faker => faker.lorem.sentence(),
     },
 
     appliedCouponId: {
-      required: false,
       order: 10,
       fillable: true,
       validation: {
-        rule: schema.string(),
+        rule: schema.string().optional(),
       },
-      factory: faker => faker.helpers.maybe(() => faker.string.uuid(), { probability: 0.2 }),
+      factory: () => null,
     },
   },
 
   dashboard: {
     highlight: true,
   },
-} satisfies Model
+} as const)

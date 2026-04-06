@@ -1,6 +1,6 @@
 import type { Err, Ok } from '@stacksjs/error-handling'
 import type { Model } from '@stacksjs/types'
-import { ok } from '@stacksjs/error-handling'
+import { err, ok } from '@stacksjs/error-handling'
 import { log } from '@stacksjs/logging'
 import { getModelName, getTableName } from '@stacksjs/orm'
 import { path } from '@stacksjs/path'
@@ -9,7 +9,7 @@ import { globSync } from '@stacksjs/storage'
 
 export async function importModelDocuments(modelOption?: string): Promise<Ok<string, never> | Err<string, any>> {
   try {
-    const modelFiles = globSync([path.userModelsPath('*.ts'), path.storagePath('framework/defaults/models/**/*.ts')], { absolute: true })
+    const modelFiles = globSync([path.userModelsPath('*.ts'), path.storagePath('framework/defaults/app/Models/**/*.ts')], { absolute: true })
     const { addDocument } = useSearchEngine()
 
     for (const model of modelFiles) {
@@ -33,11 +33,11 @@ export async function importModelDocuments(modelOption?: string): Promise<Ok<str
     }
 
     log.info(modelOption)
-    return ok('Successfully imported models to search engine!')
+    return ok('Successfully imported models to search engine!') as any
   }
-  catch (err: any) {
-    log.error(err)
+  catch (error: any) {
+    log.error(error)
 
-    return err(err)
+    return err(error?.message || String(error)) as any
   }
 }

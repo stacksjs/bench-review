@@ -1,4 +1,4 @@
-import type { OrderJsonResponse } from '@stacksjs/orm'
+type OrderJsonResponse = ModelRow<typeof Order>
 import type {
   OrderStats,
   OrderTypeCount,
@@ -23,7 +23,7 @@ export async function fetchAll(limit?: number): Promise<OrderJsonResponse[]> {
   const orders = await query.execute()
 
   // Fetch items for each order
-  return await Promise.all(orders.map(async (order) => {
+  return await Promise.all(orders.map(async (order: any) => {
     const items = await db
       .selectFrom('order_items')
       .where('order_id', '=', order.id)
@@ -55,7 +55,7 @@ export async function fetchById(id: number): Promise<OrderJsonResponse | undefin
     .selectAll()
     .executeTakeFirst()
 
-  return order
+  return order as OrderJsonResponse | undefined
 }
 
 /**
@@ -65,22 +65,22 @@ export async function fetchStats(): Promise<OrderStats> {
   // Total orders
   const totalOrders = await db
     .selectFrom('orders')
-    .select(eb => eb.fn.count('id').as('count'))
-    .executeTakeFirst()
+    .select(((eb: any) => eb.fn.count('id').as('count')) as any)
+    .executeTakeFirst() as { count: number } | undefined
 
   // Orders by status
   const ordersByStatus = await db
     .selectFrom('orders')
-    .select(['status', eb => eb.fn.count('id').as('count')])
+    .select(['status', (eb: any) => eb.fn.count('id').as('count')] as any)
     .groupBy('status')
-    .execute() as StatusCount[]
+    .execute() as unknown as StatusCount[]
 
   // Orders by type
   const ordersByType = await db
     .selectFrom('orders')
-    .select(['order_type', eb => eb.fn.count('id').as('count')])
+    .select(['order_type', (eb: any) => eb.fn.count('id').as('count')] as any)
     .groupBy('order_type')
-    .execute() as OrderTypeCount[]
+    .execute() as unknown as OrderTypeCount[]
 
   // Recent orders with their items
   const recentOrdersRaw = await db
@@ -91,7 +91,7 @@ export async function fetchStats(): Promise<OrderStats> {
     .execute()
 
   // Fetch items for each recent order
-  const recentOrders = await Promise.all(recentOrdersRaw.map(async (order) => {
+  const recentOrders = await Promise.all(recentOrdersRaw.map(async (order: any) => {
     const items = await db
       .selectFrom('order_items')
       .where('order_id', '=', order.id)
@@ -107,8 +107,8 @@ export async function fetchStats(): Promise<OrderStats> {
   // Total revenue
   const revenue = await db
     .selectFrom('orders')
-    .select(eb => eb.fn.sum('total_amount').as('total'))
-    .executeTakeFirst()
+    .select(((eb: any) => eb.fn.sum('total_amount').as('total')) as any)
+    .executeTakeFirst() as { total: number } | undefined
 
   return {
     total: Number(totalOrders?.count || 0),
@@ -123,7 +123,7 @@ export async function fetchStats(): Promise<OrderStats> {
  * Compare orders between different time periods
  * @param daysRange Number of days to look back (7, 30, 60, etc.)
  */
-export async function compareOrdersByPeriod(daysRange: number = 30): Promise<{
+export async function compareOrdersByPeriod(_daysRange: number = 30): Promise<{
   current_period: number
   previous_period: number
   difference: number
@@ -134,30 +134,30 @@ export async function compareOrdersByPeriod(daysRange: number = 30): Promise<{
 
   // Current period (last N days)
   const currentPeriodStart = new Date(today)
-  currentPeriodStart.setDate(today.getDate() - daysRange)
+  currentPeriodStart.setDate(today.getDate() - _daysRange)
 
   // Previous period (N days before the current period)
   const previousPeriodEnd = new Date(currentPeriodStart)
   previousPeriodEnd.setDate(previousPeriodEnd.getDate() - 1)
 
   const previousPeriodStart = new Date(previousPeriodEnd)
-  previousPeriodStart.setDate(previousPeriodEnd.getDate() - daysRange)
+  previousPeriodStart.setDate(previousPeriodEnd.getDate() - _daysRange)
 
   // Get orders for current period
   const currentPeriodOrders = await db
     .selectFrom('orders')
-    .select(db.fn.count('id').as('count'))
+    .select(((eb: any) => eb.fn.count('id').as('count')) as any)
     .where('created_at', '>=', currentPeriodStart.toISOString())
     .where('created_at', '<=', today.toISOString())
-    .executeTakeFirst()
+    .executeTakeFirst() as { count: number } | undefined
 
   // Get orders for previous period
   const previousPeriodOrders = await db
     .selectFrom('orders')
-    .select(db.fn.count('id').as('count'))
+    .select(((eb: any) => eb.fn.count('id').as('count')) as any)
     .where('created_at', '>=', previousPeriodStart.toISOString())
     .where('created_at', '<=', previousPeriodEnd.toISOString())
-    .executeTakeFirst()
+    .executeTakeFirst() as { count: number } | undefined
 
   const currentCount = Number(currentPeriodOrders?.count || 0)
   const previousCount = Number(previousPeriodOrders?.count || 0)
@@ -173,7 +173,7 @@ export async function compareOrdersByPeriod(daysRange: number = 30): Promise<{
     previous_period: previousCount,
     difference,
     percentage_change: percentageChange,
-    days_range: daysRange,
+    days_range: _daysRange,
   }
 }
 
@@ -181,7 +181,7 @@ export async function compareOrdersByPeriod(daysRange: number = 30): Promise<{
  * Calculate order values and metrics for different time periods
  * @param daysRange Number of days to look back (7, 30, 60, etc.)
  */
-export async function calculateOrderMetrics(daysRange: number = 30): Promise<{
+export async function calculateOrderMetrics(_daysRange: number = 30): Promise<{
   current_period: {
     total_orders: number
     total_revenue: number
@@ -217,54 +217,54 @@ export async function calculateOrderMetrics(daysRange: number = 30): Promise<{
 
   // Current period (last N days)
   const currentPeriodStart = new Date(today)
-  currentPeriodStart.setDate(today.getDate() - daysRange)
+  currentPeriodStart.setDate(today.getDate() - _daysRange)
 
   // Previous period (N days before the current period)
   const previousPeriodEnd = new Date(currentPeriodStart)
   previousPeriodEnd.setDate(previousPeriodEnd.getDate() - 1)
 
   const previousPeriodStart = new Date(previousPeriodEnd)
-  previousPeriodStart.setDate(previousPeriodEnd.getDate() - daysRange)
+  previousPeriodStart.setDate(previousPeriodEnd.getDate() - _daysRange)
 
   // Get values for current period
   const currentPeriodValues = await db
     .selectFrom('orders')
-    .select([
-      db.fn.count('id').as('total_orders'),
-      db.fn.sum('total_amount').as('total_revenue'),
-    ])
+    .select(((eb: any) => [
+      eb.fn.count('id').as('total_orders'),
+      eb.fn.sum('total_amount').as('total_revenue'),
+    ]) as any)
     .where('created_at', '>=', currentPeriodStart.toISOString())
     .where('created_at', '<=', today.toISOString())
-    .executeTakeFirst()
+    .executeTakeFirst() as { total_orders: number, total_revenue: number } | undefined
 
   // Get values for previous period
   const previousPeriodValues = await db
     .selectFrom('orders')
-    .select([
-      db.fn.count('id').as('total_orders'),
-      db.fn.sum('total_amount').as('total_revenue'),
-    ])
+    .select(((eb: any) => [
+      eb.fn.count('id').as('total_orders'),
+      eb.fn.sum('total_amount').as('total_revenue'),
+    ]) as any)
     .where('created_at', '>=', previousPeriodStart.toISOString())
     .where('created_at', '<=', previousPeriodEnd.toISOString())
-    .executeTakeFirst()
+    .executeTakeFirst() as { total_orders: number, total_revenue: number } | undefined
 
   // Get orders by status for current period
   const ordersByStatus = await db
     .selectFrom('orders')
-    .select(['status', db.fn.count('id').as('count')])
+    .select(['status', (eb: any) => eb.fn.count('id').as('count')] as any)
     .where('created_at', '>=', currentPeriodStart.toISOString())
     .where('created_at', '<=', today.toISOString())
     .groupBy('status')
-    .execute()
+    .execute() as { status: string, count: number }[]
 
   // Get orders by type for current period
   const ordersByType = await db
     .selectFrom('orders')
-    .select(['order_type', db.fn.count('id').as('count')])
+    .select(['order_type', (eb: any) => eb.fn.count('id').as('count')] as any)
     .where('created_at', '>=', currentPeriodStart.toISOString())
     .where('created_at', '<=', today.toISOString())
     .groupBy('order_type')
-    .execute()
+    .execute() as { order_type: string, count: number }[]
 
   // Calculate values for current period
   const currentTotalOrders = Number(currentPeriodValues?.total_orders || 0)
@@ -303,11 +303,11 @@ export async function calculateOrderMetrics(daysRange: number = 30): Promise<{
       total_orders: currentTotalOrders,
       total_revenue: currentTotalRevenue,
       average_order_value: currentAverageOrderValue,
-      orders_by_status: ordersByStatus.map(item => ({
+      orders_by_status: ordersByStatus.map((item: any) => ({
         status: item.status,
         count: Number(item.count),
       })),
-      orders_by_type: ordersByType.map(item => ({
+      orders_by_type: ordersByType.map((item: any) => ({
         order_type: item.order_type,
         count: Number(item.count),
       })),
@@ -334,7 +334,7 @@ export async function calculateOrderMetrics(daysRange: number = 30): Promise<{
         is_increase: aovDifference >= 0,
       },
     },
-    days_range: daysRange,
+    days_range: _daysRange,
   }
 }
 
@@ -342,33 +342,37 @@ export async function calculateOrderMetrics(daysRange: number = 30): Promise<{
  * Get daily order counts for a time period
  * @param daysRange Number of days to look back
  */
-export async function fetchDailyOrderTrends(daysRange: number = 30): Promise<{
+export async function fetchDailyOrderTrends(_daysRange: number = 30): Promise<{
   date: string
   order_count: number
   revenue: number
 }[]> {
   const today = new Date()
   const startDate = new Date(today)
-  startDate.setDate(today.getDate() - daysRange)
+  startDate.setDate(today.getDate() - _daysRange)
 
-  // Query to get daily order counts and revenue
-  const dailyOrders = await db
+  // Query all orders in the range, then aggregate in JS by date
+  const orders = await db
     .selectFrom('orders')
-    .select([
-      db.fn.count('id').as('order_count'),
-      db.fn.sum('total_amount').as('revenue'),
-      // Extract just the date part in ISO format (YYYY-MM-DD)
-      'created_at',
-    ])
+    .select(['created_at', 'total_amount'] as any)
     .where('created_at', '>=', startDate.toISOString())
     .where('created_at', '<=', today.toISOString())
-    .groupBy('created_at')
     .orderBy('created_at', 'asc')
-    .execute()
+    .execute() as { created_at: string, total_amount: number }[]
 
-  return dailyOrders.map(day => ({
-    date: day.created_at!,
-    order_count: Number(day.order_count || 0),
-    revenue: Number(day.revenue || 0),
+  // Group by date (YYYY-MM-DD)
+  const dailyMap = new Map<string, { order_count: number, revenue: number }>()
+  for (const order of orders) {
+    const date = (order.created_at || '').split('T')[0] || 'unknown'
+    const entry = dailyMap.get(date) || { order_count: 0, revenue: 0 }
+    entry.order_count++
+    entry.revenue += Number(order.total_amount || 0)
+    dailyMap.set(date, entry)
+  }
+
+  return Array.from(dailyMap.entries()).map(([date, stats]) => ({
+    date,
+    order_count: stats.order_count,
+    revenue: stats.revenue,
   }))
 }

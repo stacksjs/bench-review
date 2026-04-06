@@ -4,7 +4,7 @@
   "version": "0.70.23",
   "description": "The Stacks cloud/serverless integration & implementation.",
   "author": "Chris Breuer",
-  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "contributors": ["Chris Breuer <chris@stacksjs.com>"],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
   "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/cloud#readme",
@@ -37,25 +37,10 @@
   "types": "dist/index.d.ts",
   "files": ["README.md", "dist"],
   "scripts": {
-    "bootstrap": "bunx --bun cdk bootstrap",
-    "deploy": "cd .. && bun run build && cd ./docs && bun run build && cd ../cloud && bunx --bun cdk deploy --require-approval never",
+    "deploy": "bun deploy.ts",
     "dev": "./dev local"
   },
   "dependencies": {
-    "@aws-sdk/client-bedrock": "^3.823.0",
-    "@aws-sdk/client-cloudformation": "^3.823.0",
-    "@aws-sdk/client-cloudfront": "^3.823.0",
-    "@aws-sdk/client-cloudwatch-logs": "^3.823.0",
-    "@aws-sdk/client-dynamodb": "3.823.0",
-    "@aws-sdk/client-ec2": "^3.823.0",
-    "@aws-sdk/client-efs": "^3.823.0",
-    "@aws-sdk/client-iam": "^3.823.0",
-    "@aws-sdk/client-lambda": "^3.823.0",
-    "@aws-sdk/client-route-53-domains": "^3.823.0",
-    "@aws-sdk/client-s3": "^3.824.0",
-    "@aws-sdk/client-ses": "^3.823.0",
-    "@aws-sdk/client-sesv2": "^3.824.0",
-    "@aws-sdk/client-ssm": "^3.823.0",
     "@stacksjs/config": "workspace:*",
     "@stacksjs/dns": "workspace:*",
     "@stacksjs/logging": "workspace:*",
@@ -64,17 +49,11 @@
     "@stacksjs/router": "workspace:*",
     "@stacksjs/storage": "workspace:*",
     "@stacksjs/utils": "workspace:*",
-    "@stacksjs/validation": "workspace:*",
-    "aws-cdk": "^3.0.0",
-    "aws-cdk-lib": "^2.200.1",
-    "aws4fetch": "^1.0.20",
-    "constructs": "^10.4.2"
+    "@stacksjs/validation": "workspace:*"
   },
   "devDependencies": {
     "@stacksjs/cli": "workspace:*",
-    "@stacksjs/development": "workspace:*",
-    "@stacksjs/env": "workspace:*",
-    "source-map-support": "^0.5.21"
-  },
-  "workspaces": ["core/*"]
+    "better-dx": "^0.2.7",
+    "@stacksjs/env": "workspace:*"
+  }
 }

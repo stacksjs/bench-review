@@ -1,9 +1,21 @@
-import type { LogEvent } from 'kysely'
 import { memoryUsage } from 'node:process'
 import { config } from '@stacksjs/config'
 import { log } from '@stacksjs/logging'
+import { trackQuery } from '@stacksjs/router'
 import { parseQuery } from './query-parser'
-import { db as kysely } from './utils'
+import { db } from './utils'
+
+/**
+ * Query log event type - compatible with bun-query-builder hooks
+ */
+interface LogEvent {
+  query?: {
+    sql?: string
+    parameters?: unknown[]
+  }
+  queryDurationMillis?: number
+  error?: Error | unknown
+}
 
 interface QueryLogRecord {
   query: string
@@ -30,17 +42,31 @@ interface QueryLogRecord {
   optimization_suggestions?: string
 }
 
+// Re-entrancy guard to prevent infinite recursion (logQuery → storeQueryLog → INSERT → logQuery)
+let isLogging = false
+
 /**
  * Process an executed query and store it in the database
  */
 export async function logQuery(event: LogEvent): Promise<void> {
-  try {
-    // Skip if database logging is disabled
-    if (!config.database?.queryLogging?.enabled)
-      return
+  // Prevent infinite recursion: skip logging our own query_logs INSERT
+  if (isLogging) return
 
+  try {
     // Extract basic information from the event
     const { query, durationMs, error, bindings } = extractQueryInfo(event)
+
+    // Always track query for error page context (even if logging is disabled)
+    try {
+      trackQuery(query, durationMs, config.database?.default || 'unknown')
+    }
+    catch {
+      // Ignore if router not available
+    }
+
+    // Skip database logging if disabled
+    if (!config.database?.queryLogging?.enabled)
+      return
 
     // Determine query status based on duration and error
     const status = determineQueryStatus(durationMs, error)
@@ -53,8 +79,14 @@ export async function logQuery(event: LogEvent): Promise<void> {
       await enhanceWithQueryAnalysis(logRecord)
     }
 
-    // Store the query log in the database
-    await storeQueryLog(logRecord)
+    // Store the query log in the database (with re-entrancy guard)
+    isLogging = true
+    try {
+      await storeQueryLog(logRecord)
+    }
+    finally {
+      isLogging = false
+    }
 
     // Log slow or failed queries to the application log
     if (status !== 'completed') {
@@ -240,26 +272,11 @@ async function enhanceWithQueryAnalysis(logRecord: QueryLogRecord): Promise<void
  * Get EXPLAIN plan for a query
  * Note: This is a simplified implementation
  */
-async function getExplainPlan(query: string): Promise<any> {
-  log.info('Getting explain plan for query:', query)
-  try {
-    // This should be implemented based on the specific database driver
-    // For demonstration, we'll return a mock result
-    return {
-      plan: 'MOCK EXPLAIN PLAN',
-      indexesUsed: ['primary_key'],
-      missingIndexes: [],
-    }
-
-    // In a real implementation, you would:
-    // 1. Run EXPLAIN on the query
-    // 2. Parse the output to identify indexes used
-    // 3. Identify potential missing indexes
-  }
-  catch (error) {
-    log.debug('Error getting explain plan:', error)
-    return null
-  }
+async function getExplainPlan(_query: string): Promise<any> {
+  // EXPLAIN plan analysis is not yet implemented.
+  // A real implementation would run EXPLAIN on the query, parse the output
+  // to identify indexes used, and identify potential missing indexes.
+  return null
 }
 
 /**
@@ -296,7 +313,7 @@ function generateOptimizationSuggestions(explainResult: any, logRecord: QueryLog
  */
 async function storeQueryLog(logRecord: QueryLogRecord): Promise<void> {
   try {
-    await kysely.insertInto('query_logs').values(logRecord).execute()
+    await db.insertInto('query_logs').values(logRecord as unknown as Record<string, unknown>).execute()
   }
   catch (error) {
     log.error('Failed to store query log:', error)

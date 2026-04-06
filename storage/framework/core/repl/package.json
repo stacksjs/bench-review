@@ -2,9 +2,11 @@
   "name": "@stacksjs/repl",
   "type": "module",
   "version": "0.70.23",
-  "description": "A Stacks optimized TS & Vue REPL.",
+  "description": "A Stacks optimized TypeScript REPL.",
   "author": "Chris Breuer",
-  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "contributors": [
+    "Chris Breuer <chris@stacksjs.com>"
+  ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
   "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/repl#readme",
@@ -16,25 +18,37 @@
   "bugs": {
     "url": "https://github.com/stacksjs/stacks/issues"
   },
-  "keywords": ["ts", "repl", "tsx", "vue", "sfc", "functions", "stacks"],
+  "keywords": [
+    "ts",
+    "repl",
+    "stx",
+    "tinker",
+    "interactive",
+    "stacks"
+  ],
   "exports": {
     ".": {
+      "bun": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./*": {
+      "bun": "./src/*",
       "import": "./dist/*"
     }
   },
   "module": "dist/index.js",
-  "files": ["README.md", "dist"],
+  "files": [
+    "README.md",
+    "dist"
+  ],
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "bun tsc --noEmit",
     "prepublishOnly": "bun run build"
   },
   "devDependencies": {
-    "@stacksjs/development": "workspace:*",
+    "better-dx": "^0.2.5",
     "@stacksjs/tinker": "workspace:*"
   }
 }

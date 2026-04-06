@@ -4,7 +4,7 @@
   "version": "0.70.23",
   "description": "Your custom ORM.",
   "author": "Chris Breuer",
-  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "contributors": ["Chris Breuer <chris@stacksjs.com>"],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
   "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/validation#readme",
@@ -16,7 +16,7 @@
   "bugs": {
     "url": "https://github.com/stacksjs/stacks/issues"
   },
-  "keywords": ["orm", "kysely", "functions", "stacks"],
+  "keywords": ["orm", "functions", "stacks"],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -41,6 +41,6 @@
     "@stacksjs/error-handling": "workspace:*"
   },
   "devDependencies": {
-    "@stacksjs/development": "workspace:*"
+    "better-dx": "^0.2.5"
   }
 }

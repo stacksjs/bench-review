@@ -1,7 +1,7 @@
-import type { Model } from '@stacksjs/types'
+import { defineModel } from '@stacksjs/orm'
 import { schema } from '@stacksjs/validation'
 
-export default {
+export default defineModel({
   name: 'GiftCard',
   table: 'gift_cards',
   primaryKey: 'id',
@@ -33,12 +33,11 @@ export default {
 
   attributes: {
     code: {
-      required: true,
       unique: true,
       order: 1,
       fillable: true,
       validation: {
-        rule: schema.string().max(50),
+        rule: schema.string().required().max(50),
         message: {
           max: 'Code must have a maximum of 50 characters',
         },
@@ -47,27 +46,24 @@ export default {
     },
 
     initialBalance: {
-      required: true,
       order: 2,
       fillable: true,
       validation: {
-        rule: schema.number().min(0.01),
+        rule: schema.number().required().min(1),
       },
-      factory: faker => Number.parseFloat(faker.commerce.price({ min: 10, max: 200, dec: 2 })),
+      factory: faker => faker.number.int({ min: 100, max: 2000 }),
     },
 
     currentBalance: {
-      required: true,
       order: 3,
       fillable: true,
       validation: {
-        rule: schema.number().min(0),
+        rule: schema.number().required().min(0),
       },
       factory: () => 1,
     },
 
     currency: {
-      required: false,
       order: 4,
       fillable: true,
       validation: {
@@ -77,17 +73,15 @@ export default {
     },
 
     status: {
-      required: true,
       order: 5,
       fillable: true,
       validation: {
-        rule: schema.string(),
+        rule: schema.string().required(),
       },
       factory: faker => faker.helpers.arrayElement(['ACTIVE', 'USED', 'EXPIRED', 'DEACTIVATED']),
     },
 
-    purchaser_id: {
-      required: false,
+    purchaserId: {
       order: 6,
       fillable: true,
       validation: {
@@ -96,8 +90,7 @@ export default {
       factory: faker => faker.string.uuid(),
     },
 
-    recipient_email: {
-      required: false,
+    recipientEmail: {
       order: 7,
       fillable: true,
       validation: {
@@ -107,7 +100,6 @@ export default {
     },
 
     recipientName: {
-      required: false,
       order: 8,
       fillable: true,
       validation: {
@@ -117,7 +109,6 @@ export default {
     },
 
     personalMessage: {
-      required: false,
       order: 9,
       fillable: true,
       validation: {
@@ -127,7 +118,6 @@ export default {
     },
 
     isDigital: {
-      required: false,
       order: 10,
       fillable: true,
       validation: {
@@ -137,7 +127,6 @@ export default {
     },
 
     isReloadable: {
-      required: false,
       order: 11,
       fillable: true,
       validation: {
@@ -147,7 +136,6 @@ export default {
     },
 
     isActive: {
-      required: false,
       order: 12,
       fillable: true,
       default: true,
@@ -158,7 +146,6 @@ export default {
     },
 
     expiryDate: {
-      required: false,
       order: 13,
       fillable: true,
       validation: {
@@ -167,11 +154,13 @@ export default {
           timestamp: 'Expiry date must be a valid timestamp',
         },
       },
-      factory: faker => faker.date.future().getTime(),
+      factory: (faker) => {
+        const date = faker.date.future()
+        return date.toISOString().slice(0, 19).replace('T', ' ')
+      },
     },
 
     lastUsedDate: {
-      required: false,
       order: 14,
       fillable: true,
       validation: {
@@ -180,11 +169,13 @@ export default {
           timestamp: 'Last used date must be a valid timestamp',
         },
       },
-      factory: faker => faker.date.future().getTime(),
+      factory: (faker) => {
+        const date = faker.date.future()
+        return date.toISOString().slice(0, 19).replace('T', ' ')
+      },
     },
 
     templateId: {
-      required: false,
       order: 15,
       fillable: true,
       validation: {
@@ -197,4 +188,4 @@ export default {
   dashboard: {
     highlight: true,
   },
-} satisfies Model
+} as const)

@@ -1,0 +1,5 @@
+@extends('layouts/default')
+@section('title', 'Court Houses')
+@section('content')
+  @include('components/court-house-directory')
+@endsection

@@ -1,0 +1,7 @@
+@include('partials/bench-header')
+
+<main class="bg-off-white py-16">
+  @slot('content')
+</main>
+
+@include('partials/bench-footer')

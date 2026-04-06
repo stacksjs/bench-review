@@ -19,10 +19,24 @@ export function clean(buddy: CLI): void {
     .action(async (options: CleanOptions) => {
       log.debug('Running `buddy clean` ...', options)
 
+      // Check if confirmation is needed (not forced and not no-interaction mode)
+      if (!(buddy as unknown as Record<string, unknown>).isForce && !(buddy as unknown as Record<string, unknown>).isNoInteraction) {
+        const { confirm } = await import('@stacksjs/cli')
+        const confirmed = await confirm({
+          message: 'This will remove all node_modules and lock files. Continue?',
+          initial: false,
+        })
+
+        if (!confirmed) {
+          log.info('Clean cancelled')
+          process.exit(ExitCode.Success)
+        }
+      }
+
       const perf = await intro('buddy clean')
       const result = await runAction(Action.Clean, options)
 
-      if (result.isErr()) {
+      if (result.isErr) {
         await outro(
           'While running the clean command, there was an issue',
           { startTime: perf, useSeconds: true },

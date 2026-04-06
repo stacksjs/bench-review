@@ -1,4 +1,5 @@
-import type { GiftCardJsonResponse, NewGiftCard } from '@stacksjs/orm'
+type GiftCardJsonResponse = ModelRow<typeof GiftCard>
+type NewGiftCard = NewModelData<typeof GiftCard>
 import { randomUUIDv7 } from 'bun'
 import { db } from '@stacksjs/database'
 
@@ -9,11 +10,12 @@ import { db } from '@stacksjs/database'
  * @returns The newly created gift card record
  */
 export async function store(data: NewGiftCard): Promise<GiftCardJsonResponse | undefined> {
-  const giftCardData: NewGiftCard = {
+  const d = data as Record<string, unknown>
+  const giftCardData = {
     ...data,
-    current_balance: data.initial_balance, // Initially set to same as initial balance
+    current_balance: d.current_balance ?? d.initial_balance,
     status: data.status || 'ACTIVE',
-    is_active: data.is_active ?? true,
+    is_active: d.is_active ?? true,
     uuid: randomUUIDv7(),
   }
 
@@ -34,7 +36,7 @@ export async function store(data: NewGiftCard): Promise<GiftCardJsonResponse | u
         .selectAll()
         .executeTakeFirst()
 
-      return giftCard
+      return giftCard as GiftCardJsonResponse
     }
 
     return undefined

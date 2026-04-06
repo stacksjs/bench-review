@@ -1,9 +1,10 @@
-import type { Attributes, Model } from '@stacksjs/types'
+import type { Attributes } from '@stacksjs/types'
+import { defineModel } from '@stacksjs/orm'
 import { makeHash } from '@stacksjs/security'
 // soon, these will be auto-imported
 import { schema } from '@stacksjs/validation'
 
-export default {
+export default defineModel({
   name: 'User', // defaults to the sanitized file name
   table: 'users', // defaults to the lowercase, plural name of the model name (or the name of the model file)
   primaryKey: 'id', // defaults to `id`
@@ -23,6 +24,7 @@ export default {
     },
     useUuid: true,
     useTimestamps: true, // defaults to true, `timestampable` used as an alias
+    useSocials: ['github'],
     useSearch: {
       displayable: ['id', 'name', 'email'], // the fields to become d (defaults to all fields)
       searchable: ['name', 'email'], // the fields to become searchable (defaults to all fields)
@@ -41,32 +43,23 @@ export default {
 
       routes: ['index', 'store', 'show'],
     },
-
-    observe: true,
   },
 
-  hasOne: ['Driver', 'Author'],
-  hasMany: [
-    {
-      model: 'PersonalAccessToken',
-      foreignKey: 'user_id',
-    },
-    {
-      model: 'OauthAccessToken',
-      foreignKey: 'user_id',
-    },
-  ],
+  hasOne: ['Subscriber', 'Driver', 'Author'],
 
+  hasMany: [
+    'PersonalAccessToken',
+    'Customer',
+  ],
   attributes: {
     name: {
-      required: true,
       order: 2,
       fillable: true,
       validation: {
-        rule: schema.string().min(5).max(255),
+        rule: schema.string().required().min(5).max(100),
         message: {
-          min: 'Name must have a minimum of 3 characters',
-          max: 'Name must have a maximum of 255 characters',
+          min: 'Name must have a minimum of 5 characters',
+          max: 'Name must have a maximum of 100 characters',
         },
       },
 
@@ -75,12 +68,12 @@ export default {
 
     email: {
       unique: true,
-      required: true,
       order: 1,
       fillable: true,
       validation: {
-        rule: schema.string().email(),
+        rule: schema.string().email().required(),
         message: {
+          required: 'Email is required',
           email: 'Email must be a valid email address',
         },
       },
@@ -88,19 +81,19 @@ export default {
       factory: faker => faker.internet.email(),
     },
     password: {
-      required: true,
       order: 3,
       hidden: true,
       fillable: true,
       validation: {
-        rule: schema.string().min(6).max(255),
+        rule: schema.string().required().min(6).max(255),
         message: {
+          required: 'Password is required',
           min: 'Password must have a minimum of 6 characters',
           max: 'Password must have a maximum of 255 characters',
         },
       },
 
-      factory: faker => faker.internet.password(),
+      factory: () => '123456',
     },
   },
   get: {
@@ -117,4 +110,4 @@ export default {
   dashboard: {
     highlight: true,
   },
-} satisfies Model
+} as const)

@@ -47,13 +47,13 @@ export function search(buddy: CLI): void {
       const perf = await intro(introString)
       const result = await runAction(actionString, options)
 
-      if (result.isErr()) {
+      if (result.isErr) {
         await outro(
-          'While running the stripe:setup command, there was an issue',
+          'While running the search-engine:update command, there was an issue',
           { startTime: perf, useSeconds: true },
           result.error,
         )
-        process.exit()
+        process.exit(ExitCode.FatalError)
       }
 
       await outro(`Successfully imported model data to search engine.`, {
@@ -77,13 +77,13 @@ export function search(buddy: CLI): void {
       const perf = await intro('search-engine:settings')
       const result = await runAction(Action.SearchEngineListSettings, options)
 
-      if (result.isErr()) {
+      if (result.isErr) {
         await outro(
-          'While running the stripe:setup command, there was an issue',
+          'While running the search-engine:settings command, there was an issue',
           { startTime: perf, useSeconds: true },
           result.error,
         )
-        process.exit()
+        process.exit(ExitCode.FatalError)
       }
 
       await outro(`Successfully listed search engine index settings.`, {

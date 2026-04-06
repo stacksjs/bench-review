@@ -1,6 +1,7 @@
-import type { ReceiptJsonResponse, ReceiptUpdate } from '@stacksjs/orm'
 import { db } from '@stacksjs/database'
 import { formatDate } from '@stacksjs/orm'
+type ReceiptJsonResponse = ModelRow<typeof Receipt>
+type ReceiptUpdate = UpdateModelData<typeof Receipt>
 
 /**
  * Update a receipt
@@ -27,7 +28,7 @@ export async function update(id: number, data: ReceiptUpdate): Promise<ReceiptJs
     if (!result)
       throw new Error('Failed to update receipt')
 
-    return result
+    return result as ReceiptJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
@@ -63,7 +64,7 @@ export async function updateStatus(
     if (!result)
       throw new Error('Failed to update receipt status')
 
-    return result
+    return result as ReceiptJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
@@ -111,7 +112,7 @@ export async function updatePrintJob(
     if (!result)
       throw new Error('Failed to update receipt job information')
 
-    return result
+    return result as ReceiptJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {

@@ -4,6 +4,7 @@ import { runAction } from '@stacksjs/actions'
 import { intro, log, outro } from '@stacksjs/cli'
 import { Action } from '@stacksjs/enums'
 import { projectPath } from '@stacksjs/path'
+import { ExitCode } from '@stacksjs/types'
 
 export function test(buddy: CLI): void {
   const descriptions = {
@@ -34,13 +35,13 @@ export function test(buddy: CLI): void {
           cwd: projectPath(),
         })
 
-        if (result.isErr()) {
+        if (result.isErr) {
           await outro(
             'While running `buddy test`, there was an issue',
             { startTime: perf, useSeconds: true },
             result.error,
           )
-          process.exit()
+          process.exit(ExitCode.FatalError)
         }
       }
 
@@ -52,13 +53,13 @@ export function test(buddy: CLI): void {
           cwd: projectPath(),
         })
 
-        if (result.isErr()) {
+        if (result.isErr) {
           await outro(
             'While running `buddy test`, there was an issue',
             { startTime: perf, useSeconds: true },
             result.error,
           )
-          process.exit()
+          process.exit(ExitCode.FatalError)
         }
       }
 
@@ -70,13 +71,13 @@ export function test(buddy: CLI): void {
           cwd: projectPath(),
         })
 
-        if (result.isErr()) {
+        if (result.isErr) {
           await outro(
             'While running `buddy test`, there was an issue',
             { startTime: perf, useSeconds: true },
             result.error,
           )
-          process.exit()
+          process.exit(ExitCode.FatalError)
         }
       }
 
@@ -86,13 +87,13 @@ export function test(buddy: CLI): void {
           cwd: projectPath(),
         })
 
-        if (result.isErr()) {
+        if (result.isErr) {
           await outro(
             'While running `buddy test`, there was an issue',
             { startTime: perf, useSeconds: true },
             result.error,
           )
-          process.exit()
+          process.exit(ExitCode.FatalError)
         }
       }
 
@@ -113,13 +114,13 @@ export function test(buddy: CLI): void {
         cwd: projectPath(),
       })
 
-      if (result.isErr()) {
+      if (result.isErr) {
         await outro(
           'While running `buddy test:unit`, there was an issue',
           { startTime: perf, useSeconds: true },
           result.error,
         )
-        process.exit()
+        process.exit(ExitCode.FatalError)
       }
 
       await outro('Finished running unit tests', {
@@ -139,13 +140,13 @@ export function test(buddy: CLI): void {
         cwd: projectPath(),
       })
 
-      if (result.isErr()) {
+      if (result.isErr) {
         await outro(
           'While running `buddy test:feature`, there was an issue',
           { startTime: perf, useSeconds: true },
           result.error,
         )
-        process.exit()
+        process.exit(ExitCode.FatalError)
       }
 
       await outro('Finished running feature tests', {
@@ -165,13 +166,13 @@ export function test(buddy: CLI): void {
         cwd: projectPath(),
       })
 
-      if (result.isErr()) {
+      if (result.isErr) {
         await outro(
           'While running `buddy test:ui`, there was an issue',
           { startTime: perf, useSeconds: true },
           result.error,
         )
-        process.exit()
+        process.exit(ExitCode.FatalError)
       }
 
       await outro('Finished running tests in the browser', {
@@ -192,13 +193,13 @@ export function test(buddy: CLI): void {
         cwd: projectPath(),
       })
 
-      if (result.isErr()) {
+      if (result.isErr) {
         await outro(
           'While running `buddy test:types`, there was an issue',
           { startTime: perf, useSeconds: true },
           result.error,
         )
-        process.exit()
+        process.exit(ExitCode.FatalError)
       }
 
       await outro('Finished running typecheck', {

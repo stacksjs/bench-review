@@ -6,7 +6,7 @@
 // biome-ignore lint: disable
 export {}
 declare global {
-  const EffectScope: typeof import('vue')['EffectScope']
+  const EffectScope: typeof import('@stacksjs/stx')['EffectScope']
   const Fetch: typeof import('../core/browser/src/utils/fetch')['Fetch']
   const Head: typeof import('../core/browser/src/utils/vendors')['Head']
   const HeadVuePlugin: typeof import('../core/browser/src/utils/vendors')['HeadVuePlugin']
@@ -14,9 +14,9 @@ declare global {
   const and: typeof import('../core/browser/src/utils/math')['and']
   const anyOf: typeof import('../core/browser/src/utils/regex')['anyOf']
   const asyncComputed: typeof import('../core/browser/src/utils/vendors')['asyncComputed']
+  const authGuard: typeof import('../core/browser/src/composables/useAuth')['authGuard']
   const autoResetRef: typeof import('../core/browser/src/utils/vendors')['autoResetRef']
   const batchInvoke: typeof import('../core/browser/src/utils/function')['batchInvoke']
-  const blogPosts: typeof import('../../../resources/functions/sample')['blogPosts']
   const breakpointsAntDesign: typeof import('../core/browser/src/utils/vendors')['breakpointsAntDesign']
   const breakpointsBootstrapV5: typeof import('../core/browser/src/utils/vendors')['breakpointsBootstrapV5']
   const breakpointsMasterCss: typeof import('../core/browser/src/utils/vendors')['breakpointsMasterCss']
@@ -27,13 +27,12 @@ declare global {
   const calculateDelay: typeof import('../core/browser/src/utils/retry')['calculateDelay']
   const carriageReturn: typeof import('../core/browser/src/utils/regex')['carriageReturn']
   const caseInsensitive: typeof import('../core/browser/src/utils/regex')['caseInsensitive']
-  const categories: typeof import('../../../resources/functions/sample')['categories']
   const char: typeof import('../core/browser/src/utils/regex')['char']
   const charIn: typeof import('../core/browser/src/utils/regex')['charIn']
   const charNotIn: typeof import('../core/browser/src/utils/regex')['charNotIn']
   const clamp: typeof import('../core/browser/src/utils/math')['clamp']
   const cloneFnJSON: typeof import('../core/browser/src/utils/vendors')['cloneFnJSON']
-  const computed: typeof import('vue')['computed']
+  const computed: typeof import('@stacksjs/stx')['computed']
   const computedAsync: typeof import('../core/browser/src/utils/vendors')['computedAsync']
   const computedEager: typeof import('../core/browser/src/utils/vendors')['computedEager']
   const computedInject: typeof import('../core/browser/src/utils/vendors')['computedInject']
@@ -44,8 +43,7 @@ declare global {
   const controlledComputed: typeof import('../core/browser/src/utils/vendors')['controlledComputed']
   const controlledRef: typeof import('../core/browser/src/utils/vendors')['controlledRef']
   const count: typeof import('../../../resources/functions/counter')['count']
-  const courtHouses: typeof import('../../../resources/functions/sample')['courtHouses']
-  const createApp: typeof import('vue')['createApp']
+  const createApp: typeof import('@stacksjs/stx')['createApp']
   const createControlledPromise: typeof import('../core/browser/src/utils/promise')['createControlledPromise']
   const createEventHook: typeof import('../core/browser/src/utils/vendors')['createEventHook']
   const createFetch: typeof import('../core/browser/src/utils/vendors')['createFetch']
@@ -66,7 +64,7 @@ declare global {
   const createUnrefFn: typeof import('../core/browser/src/utils/vendors')['createUnrefFn']
   const customAlphabet: typeof import('../core/browser/src/utils/random')['customAlphabet']
   const customRandom: typeof import('../core/browser/src/utils/random')['customRandom']
-  const customRef: typeof import('vue')['customRef']
+  const customRef: typeof import('@stacksjs/stx')['customRef']
   const customStorageEventName: typeof import('../core/browser/src/utils/vendors')['customStorageEventName']
   const dateFormat: typeof import('../core/datetime/dist/index.js')['dateFormat']
   const debounce: typeof import('../core/browser/src/utils/debounce')['debounce']
@@ -76,14 +74,14 @@ declare global {
   const defaultLocation: typeof import('../core/browser/src/utils/vendors')['defaultLocation']
   const defaultNavigator: typeof import('../core/browser/src/utils/vendors')['defaultNavigator']
   const defaultWindow: typeof import('../core/browser/src/utils/vendors')['defaultWindow']
-  const defineAsyncComponent: typeof import('vue')['defineAsyncComponent']
-  const defineComponent: typeof import('vue')['defineComponent']
+  const defineAsyncComponent: typeof import('@stacksjs/stx')['defineAsyncComponent']
+  const defineComponent: typeof import('@stacksjs/stx')['defineComponent']
   const defineStore: typeof import('pinia')['defineStore']
   const delay: typeof import('../core/browser/src/utils/sleep')['delay']
   const digit: typeof import('../core/browser/src/utils/regex')['digit']
   const dotAll: typeof import('../core/browser/src/utils/regex')['dotAll']
   const eagerComputed: typeof import('../core/browser/src/utils/vendors')['eagerComputed']
-  const effectScope: typeof import('vue')['effectScope']
+  const effectScope: typeof import('@stacksjs/stx')['effectScope']
   const exactly: typeof import('../core/browser/src/utils/regex')['exactly']
   const executeTransition: typeof import('../core/browser/src/utils/vendors')['executeTransition']
   const extendRef: typeof import('../core/browser/src/utils/vendors')['extendRef']
@@ -91,24 +89,23 @@ declare global {
   const formatTimeAgo: typeof import('../core/browser/src/utils/vendors')['formatTimeAgo']
   const getActiveHead: typeof import('@unhead/vue')['getActiveHead']
   const getActivePinia: typeof import('pinia')['getActivePinia']
-  const getCurrentInstance: typeof import('vue')['getCurrentInstance']
-  const getCurrentScope: typeof import('vue')['getCurrentScope']
+  const getCurrentInstance: typeof import('@stacksjs/stx')['getCurrentInstance']
+  const getCurrentScope: typeof import('@stacksjs/stx')['getCurrentScope']
   const getSSRHandler: typeof import('../core/browser/src/utils/vendors')['getSSRHandler']
   const global: typeof import('../core/browser/src/utils/regex')['global']
-  const h: typeof import('vue')['h']
+  const h: typeof import('@stacksjs/stx')['h']
   const ignorableWatch: typeof import('../core/browser/src/utils/vendors')['ignorableWatch']
   const increment: typeof import('../../../resources/functions/counter')['increment']
-  const inject: typeof import('vue')['inject']
+  const inject: typeof import('@stacksjs/stx')['inject']
   const injectHead: typeof import('@unhead/vue')['injectHead']
   const injectLocal: typeof import('../core/browser/src/utils/vendors')['injectLocal']
   const isDark: typeof import('../../../resources/functions/dark')['isDark']
   const isDefined: typeof import('../core/browser/src/utils/vendors')['isDefined']
-  const isProxy: typeof import('vue')['isProxy']
-  const isReactive: typeof import('vue')['isReactive']
-  const isReadonly: typeof import('vue')['isReadonly']
-  const isRef: typeof import('vue')['isRef']
+  const isProxy: typeof import('@stacksjs/stx')['isProxy']
+  const isReactive: typeof import('@stacksjs/stx')['isReactive']
+  const isReadonly: typeof import('@stacksjs/stx')['isReadonly']
+  const isRef: typeof import('@stacksjs/stx')['isRef']
   const isTruthy: typeof import('../core/browser/src/utils/guards')['isTruthy']
-  const judges: typeof import('../../../resources/functions/sample')['judges']
   const lazy: typeof import('../core/browser/src/utils/lazy')['lazy']
   const letter: typeof import('../core/browser/src/utils/regex')['letter']
   const linefeed: typeof import('../core/browser/src/utils/regex')['linefeed']
@@ -124,44 +121,44 @@ declare global {
   const mapState: typeof import('pinia')['mapState']
   const mapStores: typeof import('pinia')['mapStores']
   const mapWritableState: typeof import('pinia')['mapWritableState']
-  const markRaw: typeof import('vue')['markRaw']
+  const markRaw: typeof import('@stacksjs/stx')['markRaw']
   const maybe: typeof import('../core/browser/src/utils/regex')['maybe']
   const multiline: typeof import('../core/browser/src/utils/regex')['multiline']
-  const nextTick: typeof import('vue')['nextTick']
+  const nextTick: typeof import('@stacksjs/stx')['nextTick']
   const noNull: typeof import('../core/browser/src/utils/guards')['noNull']
   const not: typeof import('../core/browser/src/utils/regex')['not']
   const notNullish: typeof import('../core/browser/src/utils/guards')['notNullish']
   const notUndefined: typeof import('../core/browser/src/utils/guards')['notUndefined']
   const now: typeof import('../core/datetime/dist/index.js')['now']
-  const onActivated: typeof import('vue')['onActivated']
-  const onBeforeMount: typeof import('vue')['onBeforeMount']
+  const onActivated: typeof import('@stacksjs/stx')['onActivated']
+  const onBeforeMount: typeof import('@stacksjs/stx')['onBeforeMount']
   const onBeforeRouteLeave: typeof import('vue-router')['onBeforeRouteLeave']
   const onBeforeRouteUpdate: typeof import('vue-router')['onBeforeRouteUpdate']
-  const onBeforeUnmount: typeof import('vue')['onBeforeUnmount']
-  const onBeforeUpdate: typeof import('vue')['onBeforeUpdate']
+  const onBeforeUnmount: typeof import('@stacksjs/stx')['onBeforeUnmount']
+  const onBeforeUpdate: typeof import('@stacksjs/stx')['onBeforeUpdate']
   const onClickOutside: typeof import('../core/browser/src/utils/vendors')['onClickOutside']
-  const onDeactivated: typeof import('vue')['onDeactivated']
-  const onErrorCaptured: typeof import('vue')['onErrorCaptured']
+  const onDeactivated: typeof import('@stacksjs/stx')['onDeactivated']
+  const onErrorCaptured: typeof import('@stacksjs/stx')['onErrorCaptured']
   const onKeyDown: typeof import('../core/browser/src/utils/vendors')['onKeyDown']
   const onKeyPressed: typeof import('../core/browser/src/utils/vendors')['onKeyPressed']
   const onKeyStroke: typeof import('../core/browser/src/utils/vendors')['onKeyStroke']
   const onKeyUp: typeof import('../core/browser/src/utils/vendors')['onKeyUp']
   const onLongPress: typeof import('../core/browser/src/utils/vendors')['onLongPress']
-  const onMounted: typeof import('vue')['onMounted']
-  const onRenderTracked: typeof import('vue')['onRenderTracked']
-  const onRenderTriggered: typeof import('vue')['onRenderTriggered']
-  const onScopeDispose: typeof import('vue')['onScopeDispose']
-  const onServerPrefetch: typeof import('vue')['onServerPrefetch']
+  const onMounted: typeof import('@stacksjs/stx')['onMounted']
+  const onRenderTracked: typeof import('@stacksjs/stx')['onRenderTracked']
+  const onRenderTriggered: typeof import('@stacksjs/stx')['onRenderTriggered']
+  const onScopeDispose: typeof import('@stacksjs/stx')['onScopeDispose']
+  const onServerPrefetch: typeof import('@stacksjs/stx')['onServerPrefetch']
   const onStartTyping: typeof import('../core/browser/src/utils/vendors')['onStartTyping']
-  const onUnmounted: typeof import('vue')['onUnmounted']
-  const onUpdated: typeof import('vue')['onUpdated']
-  const onWatcherCleanup: typeof import('vue')['onWatcherCleanup']
+  const onUnmounted: typeof import('@stacksjs/stx')['onUnmounted']
+  const onUpdated: typeof import('@stacksjs/stx')['onUpdated']
+  const onWatcherCleanup: typeof import('@stacksjs/stx')['onWatcherCleanup']
   const oneOrMore: typeof import('../core/browser/src/utils/regex')['oneOrMore']
   const or: typeof import('../core/browser/src/utils/math')['or']
   const parse: typeof import('../core/datetime/dist/index.js')['parse']
   const pausableWatch: typeof import('../core/browser/src/utils/vendors')['pausableWatch']
   const preferredDark: typeof import('../../../resources/functions/dark')['preferredDark']
-  const provide: typeof import('vue')['provide']
+  const provide: typeof import('@stacksjs/stx')['provide']
   const provideLocal: typeof import('../core/browser/src/utils/vendors')['provideLocal']
   const publishableKey: typeof import('../core/browser/src/utils/billable')['publishableKey']
   const rand: typeof import('../core/browser/src/utils/math')['rand']
@@ -169,32 +166,29 @@ declare global {
   const randomNonSecure: typeof import('../core/browser/src/utils/random')['randomNonSecure']
   const reactify: typeof import('../core/browser/src/utils/vendors')['reactify']
   const reactifyObject: typeof import('../core/browser/src/utils/vendors')['reactifyObject']
-  const reactive: typeof import('vue')['reactive']
+  const reactive: typeof import('@stacksjs/stx')['reactive']
   const reactiveComputed: typeof import('../core/browser/src/utils/vendors')['reactiveComputed']
   const reactiveOmit: typeof import('../core/browser/src/utils/vendors')['reactiveOmit']
   const reactivePick: typeof import('../core/browser/src/utils/vendors')['reactivePick']
   const readableSize: typeof import('../core/browser/src/utils/vendors')['readableSize']
-  const readonly: typeof import('vue')['readonly']
-  const recentActivity: typeof import('../../../resources/functions/sample')['recentActivity']
-  const ref: typeof import('vue')['ref']
+  const readonly: typeof import('@stacksjs/stx')['readonly']
+  const ref: typeof import('@stacksjs/stx')['ref']
   const refAutoReset: typeof import('../core/browser/src/utils/vendors')['refAutoReset']
   const refDebounced: typeof import('../core/browser/src/utils/vendors')['refDebounced']
   const refDefault: typeof import('../core/browser/src/utils/vendors')['refDefault']
   const refThrottled: typeof import('../core/browser/src/utils/vendors')['refThrottled']
   const refWithControl: typeof import('../core/browser/src/utils/vendors')['refWithControl']
   const renderHeadToString: typeof import('../core/browser/src/utils/vendors')['renderHeadToString']
-  const resolveComponent: typeof import('vue')['resolveComponent']
+  const resolveComponent: typeof import('@stacksjs/stx')['resolveComponent']
   const resolveRef: typeof import('../core/browser/src/utils/vendors')['resolveRef']
-  const resolveUnref: typeof import('../core/browser/src/utils/vendors')['resolveUnref']
   const retry: typeof import('../core/browser/src/utils/retry')['retry']
-  const reviews: typeof import('../../../resources/functions/sample')['reviews']
   const saas: typeof import('../core/browser/src/utils/plans')['saas']
   const setActivePinia: typeof import('pinia')['setActivePinia']
   const setMapStoreSuffix: typeof import('pinia')['setMapStoreSuffix']
   const setSSRHandler: typeof import('../core/browser/src/utils/vendors')['setSSRHandler']
-  const shallowReactive: typeof import('vue')['shallowReactive']
-  const shallowReadonly: typeof import('vue')['shallowReadonly']
-  const shallowRef: typeof import('vue')['shallowRef']
+  const shallowReactive: typeof import('@stacksjs/stx')['shallowReactive']
+  const shallowReadonly: typeof import('@stacksjs/stx')['shallowReadonly']
+  const shallowRef: typeof import('@stacksjs/stx')['shallowRef']
   const sleep: typeof import('../core/browser/src/utils/sleep')['sleep']
   const sticky: typeof import('../core/browser/src/utils/regex')['sticky']
   const storeToRefs: typeof import('pinia')['storeToRefs']
@@ -206,22 +200,21 @@ declare global {
   const throttle: typeof import('../core/browser/src/utils/throttle')['throttle']
   const throttledRef: typeof import('../core/browser/src/utils/vendors')['throttledRef']
   const throttledWatch: typeof import('../core/browser/src/utils/vendors')['throttledWatch']
-  const toRaw: typeof import('vue')['toRaw']
+  const toRaw: typeof import('@stacksjs/stx')['toRaw']
   const toReactive: typeof import('../core/browser/src/utils/vendors')['toReactive']
-  const toRef: typeof import('vue')['toRef']
-  const toRefs: typeof import('vue')['toRefs']
+  const toRef: typeof import('@stacksjs/stx')['toRef']
+  const toRefs: typeof import('@stacksjs/stx')['toRefs']
   const toString: typeof import('../core/browser/src/utils/base')['toString']
-  const toValue: typeof import('vue')['toValue']
+  const toValue: typeof import('@stacksjs/stx')['toValue']
   const toggleDark: typeof import('../../../resources/functions/dark')['toggleDark']
-  const trendingJudges: typeof import('../../../resources/functions/sample')['trendingJudges']
-  const triggerRef: typeof import('vue')['triggerRef']
+  const triggerRef: typeof import('@stacksjs/stx')['triggerRef']
   const tryOnBeforeMount: typeof import('../core/browser/src/utils/vendors')['tryOnBeforeMount']
   const tryOnBeforeUnmount: typeof import('../core/browser/src/utils/vendors')['tryOnBeforeUnmount']
   const tryOnMounted: typeof import('../core/browser/src/utils/vendors')['tryOnMounted']
   const tryOnScopeDispose: typeof import('../core/browser/src/utils/vendors')['tryOnScopeDispose']
   const tryOnUnmounted: typeof import('../core/browser/src/utils/vendors')['tryOnUnmounted']
   const unicode: typeof import('../core/browser/src/utils/regex')['unicode']
-  const unref: typeof import('vue')['unref']
+  const unref: typeof import('@stacksjs/stx')['unref']
   const unrefElement: typeof import('../core/browser/src/utils/vendors')['unrefElement']
   const until: typeof import('../core/browser/src/utils/vendors')['until']
   const useAbs: typeof import('../core/browser/src/utils/math')['useAbs']
@@ -239,8 +232,8 @@ declare global {
   const useArrayUnique: typeof import('../core/browser/src/utils/vendors')['useArrayUnique']
   const useAsyncQueue: typeof import('../core/browser/src/utils/vendors')['useAsyncQueue']
   const useAsyncState: typeof import('../core/browser/src/utils/vendors')['useAsyncState']
-  const useAttrs: typeof import('vue')['useAttrs']
-  const useAuth: typeof import('../../../resources/functions/auth')['useAuth']
+  const useAttrs: typeof import('@stacksjs/stx')['useAttrs']
+  const useAuth: typeof import('../core/browser/src/composables/useAuth')['useAuth']
   const useAverage: typeof import('../core/browser/src/utils/math')['useAverage']
   const useBase64: typeof import('../core/browser/src/utils/vendors')['useBase64']
   const useBattery: typeof import('../core/browser/src/utils/vendors')['useBattery']
@@ -257,9 +250,9 @@ declare global {
   const useColorMode: typeof import('../core/browser/src/utils/vendors')['useColorMode']
   const useConfirmDialog: typeof import('../core/browser/src/utils/vendors')['useConfirmDialog']
   const useCounter: typeof import('../core/browser/src/utils/vendors')['useCounter']
-  const useCssModule: typeof import('vue')['useCssModule']
+  const useCssModule: typeof import('@stacksjs/stx')['useCssModule']
   const useCssVar: typeof import('../core/browser/src/utils/vendors')['useCssVar']
-  const useCssVars: typeof import('vue')['useCssVars']
+  const useCssVars: typeof import('@stacksjs/stx')['useCssVars']
   const useCurrentElement: typeof import('../core/browser/src/utils/vendors')['useCurrentElement']
   const useCycleList: typeof import('../core/browser/src/utils/vendors')['useCycleList']
   const useDark: typeof import('../core/browser/src/utils/vendors')['useDark']
@@ -299,7 +292,7 @@ declare global {
   const useHead: typeof import('@unhead/vue')['useHead']
   const useHeadSafe: typeof import('@unhead/vue')['useHeadSafe']
   const useI18n: typeof import('vue-i18n')['useI18n']
-  const useId: typeof import('vue')['useId']
+  const useId: typeof import('@stacksjs/stx')['useId']
   const useIdle: typeof import('../core/browser/src/utils/vendors')['useIdle']
   const useImage: typeof import('../core/browser/src/utils/vendors')['useImage']
   const useInfiniteScroll: typeof import('../core/browser/src/utils/vendors')['useInfiniteScroll']
@@ -319,7 +312,7 @@ declare global {
   const useMemoize: typeof import('../core/browser/src/utils/vendors')['useMemoize']
   const useMemory: typeof import('../core/browser/src/utils/vendors')['useMemory']
   const useMin: typeof import('../core/browser/src/utils/math')['useMin']
-  const useModel: typeof import('vue')['useModel']
+  const useModel: typeof import('@stacksjs/stx')['useModel']
   const useMounted: typeof import('../core/browser/src/utils/vendors')['useMounted']
   const useMouse: typeof import('../core/browser/src/utils/vendors')['useMouse']
   const useMouseInElement: typeof import('../core/browser/src/utils/vendors')['useMouseInElement']
@@ -366,7 +359,7 @@ declare global {
   const useServerSeoMeta: typeof import('@unhead/vue')['useServerSeoMeta']
   const useSessionStorage: typeof import('../core/browser/src/utils/vendors')['useSessionStorage']
   const useShare: typeof import('../core/browser/src/utils/vendors')['useShare']
-  const useSlots: typeof import('vue')['useSlots']
+  const useSlots: typeof import('@stacksjs/stx')['useSlots']
   const useSorted: typeof import('../core/browser/src/utils/vendors')['useSorted']
   const useSpeechRecognition: typeof import('../core/browser/src/utils/vendors')['useSpeechRecognition']
   const useSpeechSynthesis: typeof import('../core/browser/src/utils/vendors')['useSpeechSynthesis']
@@ -377,7 +370,7 @@ declare global {
   const useSum: typeof import('../core/browser/src/utils/math')['useSum']
   const useSupported: typeof import('../core/browser/src/utils/vendors')['useSupported']
   const useSwipe: typeof import('../core/browser/src/utils/vendors')['useSwipe']
-  const useTemplateRef: typeof import('vue')['useTemplateRef']
+  const useTemplateRef: typeof import('@stacksjs/stx')['useTemplateRef']
   const useTemplateRefsList: typeof import('../core/browser/src/utils/vendors')['useTemplateRefsList']
   const useTextDirection: typeof import('../core/browser/src/utils/vendors')['useTextDirection']
   const useTextSelection: typeof import('../core/browser/src/utils/vendors')['useTextSelection']
@@ -414,18 +407,18 @@ declare global {
   const wait: typeof import('../core/browser/src/utils/sleep')['wait']
   const waitUntil: typeof import('../core/browser/src/utils/sleep')['waitUntil']
   const waitWhile: typeof import('../core/browser/src/utils/sleep')['waitWhile']
-  const watch: typeof import('vue')['watch']
+  const watch: typeof import('@stacksjs/stx')['watch']
   const watchArray: typeof import('../core/browser/src/utils/vendors')['watchArray']
   const watchAtMost: typeof import('../core/browser/src/utils/vendors')['watchAtMost']
   const watchDebounced: typeof import('../core/browser/src/utils/vendors')['watchDebounced']
   const watchDeep: typeof import('../core/browser/src/utils/vendors')['watchDeep']
-  const watchEffect: typeof import('vue')['watchEffect']
+  const watchEffect: typeof import('@stacksjs/stx')['watchEffect']
   const watchIgnorable: typeof import('../core/browser/src/utils/vendors')['watchIgnorable']
   const watchImmediate: typeof import('../core/browser/src/utils/vendors')['watchImmediate']
   const watchOnce: typeof import('../core/browser/src/utils/vendors')['watchOnce']
   const watchPausable: typeof import('../core/browser/src/utils/vendors')['watchPausable']
-  const watchPostEffect: typeof import('vue')['watchPostEffect']
-  const watchSyncEffect: typeof import('vue')['watchSyncEffect']
+  const watchPostEffect: typeof import('@stacksjs/stx')['watchPostEffect']
+  const watchSyncEffect: typeof import('@stacksjs/stx')['watchSyncEffect']
   const watchThrottled: typeof import('../core/browser/src/utils/vendors')['watchThrottled']
   const watchTriggerable: typeof import('../core/browser/src/utils/vendors')['watchTriggerable']
   const watchWithFilter: typeof import('../core/browser/src/utils/vendors')['watchWithFilter']
@@ -439,11 +432,11 @@ declare global {
 // for type re-export
 declare global {
   // @ts-ignore
-  export type { Component, Slot, Slots, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
-  import('vue')
+  export type { Component, Slot, Slots, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from '@stacksjs/stx'
+  import('@stacksjs/stx')
   // @ts-ignore
-  export type { Customers, Coupons, GiftCards, Orders, StorePost, Posts, Payments, TaxRates, Categories, Units, ProductItems, Reviews, Drivers, DeliveryRoutes, DigitalDeliveries, ShippingMethods, ShippingRates, ShippingZones, ProductVariants, Taggables, PostTaggable, Categorizables, PostCategorizable, Pages, Websockets, StoreWebsocket } from '../defaults/functions/types'
-  import('../defaults/functions/types')
+  export type { AuthComposable } from '../defaults/functions/auth'
+  import('../defaults/functions/auth')
   // @ts-ignore
   export type { SingletonPromiseReturn, ControlledPromise } from '../core/browser/src/utils/promise'
   import('../core/browser/src/utils/promise')
@@ -461,12 +454,12 @@ declare global {
   import('../core/browser/src/utils/vendors')
 }
 
-// for vue template auto import
-import { UnwrapRef } from 'vue'
-declare module 'vue' {
+// for stx template auto import
+import { UnwrapRef } from '@stacksjs/stx'
+declare module '@stacksjs/stx' {
   interface GlobalComponents {}
   interface ComponentCustomProperties {
-    readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
+    readonly EffectScope: UnwrapRef<typeof import('@stacksjs/stx')['EffectScope']>
     readonly Fetch: UnwrapRef<typeof import('../core/browser/src/utils/fetch')['Fetch']>
     readonly Head: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['Head']>
     readonly HeadVuePlugin: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['HeadVuePlugin']>
@@ -474,8 +467,8 @@ declare module 'vue' {
     readonly and: UnwrapRef<typeof import('../core/browser/src/utils/math')['and']>
     readonly anyOf: UnwrapRef<typeof import('../core/browser/src/utils/regex')['anyOf']>
     readonly asyncComputed: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['asyncComputed']>
+    readonly authGuard: UnwrapRef<typeof import('../core/browser/src/composables/useAuth')['authGuard']>
     readonly autoResetRef: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['autoResetRef']>
-    readonly blogPosts: UnwrapRef<typeof import('../../../resources/functions/sample')['blogPosts']>
     readonly breakpointsAntDesign: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['breakpointsAntDesign']>
     readonly breakpointsBootstrapV5: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['breakpointsBootstrapV5']>
     readonly breakpointsMasterCss: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['breakpointsMasterCss']>
@@ -486,13 +479,12 @@ declare module 'vue' {
     readonly calculateDelay: UnwrapRef<typeof import('../core/browser/src/utils/retry')['calculateDelay']>
     readonly carriageReturn: UnwrapRef<typeof import('../core/browser/src/utils/regex')['carriageReturn']>
     readonly caseInsensitive: UnwrapRef<typeof import('../core/browser/src/utils/regex')['caseInsensitive']>
-    readonly categories: UnwrapRef<typeof import('../../../resources/functions/sample')['categories']>
     readonly char: UnwrapRef<typeof import('../core/browser/src/utils/regex')['char']>
     readonly charIn: UnwrapRef<typeof import('../core/browser/src/utils/regex')['charIn']>
     readonly charNotIn: UnwrapRef<typeof import('../core/browser/src/utils/regex')['charNotIn']>
     readonly clamp: UnwrapRef<typeof import('../core/browser/src/utils/math')['clamp']>
     readonly cloneFnJSON: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['cloneFnJSON']>
-    readonly computed: UnwrapRef<typeof import('vue')['computed']>
+    readonly computed: UnwrapRef<typeof import('@stacksjs/stx')['computed']>
     readonly computedAsync: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['computedAsync']>
     readonly computedEager: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['computedEager']>
     readonly computedInject: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['computedInject']>
@@ -502,8 +494,8 @@ declare module 'vue' {
     readonly confirmPayment: UnwrapRef<typeof import('../core/browser/src/utils/billable')['confirmPayment']>
     readonly controlledComputed: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['controlledComputed']>
     readonly controlledRef: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['controlledRef']>
-    readonly courtHouses: UnwrapRef<typeof import('../../../resources/functions/sample')['courtHouses']>
-    readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
+    readonly count: UnwrapRef<typeof import('../../../resources/functions/counter')['count']>
+    readonly createApp: UnwrapRef<typeof import('@stacksjs/stx')['createApp']>
     readonly createControlledPromise: UnwrapRef<typeof import('../core/browser/src/utils/promise')['createControlledPromise']>
     readonly createEventHook: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['createEventHook']>
     readonly createFetch: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['createFetch']>
@@ -524,7 +516,7 @@ declare module 'vue' {
     readonly createUnrefFn: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['createUnrefFn']>
     readonly customAlphabet: UnwrapRef<typeof import('../core/browser/src/utils/random')['customAlphabet']>
     readonly customRandom: UnwrapRef<typeof import('../core/browser/src/utils/random')['customRandom']>
-    readonly customRef: UnwrapRef<typeof import('vue')['customRef']>
+    readonly customRef: UnwrapRef<typeof import('@stacksjs/stx')['customRef']>
     readonly customStorageEventName: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['customStorageEventName']>
     readonly dateFormat: UnwrapRef<typeof import('../core/datetime/dist/index.js')['dateFormat']>
     readonly debounce: UnwrapRef<typeof import('../core/browser/src/utils/debounce')['debounce']>
@@ -534,37 +526,37 @@ declare module 'vue' {
     readonly defaultLocation: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['defaultLocation']>
     readonly defaultNavigator: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['defaultNavigator']>
     readonly defaultWindow: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['defaultWindow']>
-    readonly defineAsyncComponent: UnwrapRef<typeof import('vue')['defineAsyncComponent']>
-    readonly defineComponent: UnwrapRef<typeof import('vue')['defineComponent']>
+    readonly defineAsyncComponent: UnwrapRef<typeof import('@stacksjs/stx')['defineAsyncComponent']>
+    readonly defineComponent: UnwrapRef<typeof import('@stacksjs/stx')['defineComponent']>
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
     readonly delay: UnwrapRef<typeof import('../core/browser/src/utils/sleep')['delay']>
     readonly digit: UnwrapRef<typeof import('../core/browser/src/utils/regex')['digit']>
     readonly dotAll: UnwrapRef<typeof import('../core/browser/src/utils/regex')['dotAll']>
     readonly eagerComputed: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['eagerComputed']>
-    readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
+    readonly effectScope: UnwrapRef<typeof import('@stacksjs/stx')['effectScope']>
     readonly exactly: UnwrapRef<typeof import('../core/browser/src/utils/regex')['exactly']>
     readonly executeTransition: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['executeTransition']>
     readonly extendRef: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['extendRef']>
     readonly format: UnwrapRef<typeof import('../core/datetime/dist/index.js')['format']>
     readonly formatTimeAgo: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['formatTimeAgo']>
     readonly getActivePinia: UnwrapRef<typeof import('pinia')['getActivePinia']>
-    readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
-    readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
+    readonly getCurrentInstance: UnwrapRef<typeof import('@stacksjs/stx')['getCurrentInstance']>
+    readonly getCurrentScope: UnwrapRef<typeof import('@stacksjs/stx')['getCurrentScope']>
     readonly getSSRHandler: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['getSSRHandler']>
     readonly global: UnwrapRef<typeof import('../core/browser/src/utils/regex')['global']>
-    readonly h: UnwrapRef<typeof import('vue')['h']>
+    readonly h: UnwrapRef<typeof import('@stacksjs/stx')['h']>
     readonly ignorableWatch: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['ignorableWatch']>
-    readonly inject: UnwrapRef<typeof import('vue')['inject']>
+    readonly increment: UnwrapRef<typeof import('../../../resources/functions/counter')['increment']>
+    readonly inject: UnwrapRef<typeof import('@stacksjs/stx')['inject']>
     readonly injectHead: UnwrapRef<typeof import('@unhead/vue')['injectHead']>
     readonly injectLocal: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['injectLocal']>
     readonly isDark: UnwrapRef<typeof import('../../../resources/functions/dark')['isDark']>
     readonly isDefined: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['isDefined']>
-    readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>
-    readonly isReactive: UnwrapRef<typeof import('vue')['isReactive']>
-    readonly isReadonly: UnwrapRef<typeof import('vue')['isReadonly']>
-    readonly isRef: UnwrapRef<typeof import('vue')['isRef']>
+    readonly isProxy: UnwrapRef<typeof import('@stacksjs/stx')['isProxy']>
+    readonly isReactive: UnwrapRef<typeof import('@stacksjs/stx')['isReactive']>
+    readonly isReadonly: UnwrapRef<typeof import('@stacksjs/stx')['isReadonly']>
+    readonly isRef: UnwrapRef<typeof import('@stacksjs/stx')['isRef']>
     readonly isTruthy: UnwrapRef<typeof import('../core/browser/src/utils/guards')['isTruthy']>
-    readonly judges: UnwrapRef<typeof import('../../../resources/functions/sample')['judges']>
     readonly lazy: UnwrapRef<typeof import('../core/browser/src/utils/lazy')['lazy']>
     readonly letter: UnwrapRef<typeof import('../core/browser/src/utils/regex')['letter']>
     readonly linefeed: UnwrapRef<typeof import('../core/browser/src/utils/regex')['linefeed']>
@@ -580,44 +572,44 @@ declare module 'vue' {
     readonly mapState: UnwrapRef<typeof import('pinia')['mapState']>
     readonly mapStores: UnwrapRef<typeof import('pinia')['mapStores']>
     readonly mapWritableState: UnwrapRef<typeof import('pinia')['mapWritableState']>
-    readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
+    readonly markRaw: UnwrapRef<typeof import('@stacksjs/stx')['markRaw']>
     readonly maybe: UnwrapRef<typeof import('../core/browser/src/utils/regex')['maybe']>
     readonly multiline: UnwrapRef<typeof import('../core/browser/src/utils/regex')['multiline']>
-    readonly nextTick: UnwrapRef<typeof import('vue')['nextTick']>
+    readonly nextTick: UnwrapRef<typeof import('@stacksjs/stx')['nextTick']>
     readonly noNull: UnwrapRef<typeof import('../core/browser/src/utils/guards')['noNull']>
     readonly not: UnwrapRef<typeof import('../core/browser/src/utils/regex')['not']>
     readonly notNullish: UnwrapRef<typeof import('../core/browser/src/utils/guards')['notNullish']>
     readonly notUndefined: UnwrapRef<typeof import('../core/browser/src/utils/guards')['notUndefined']>
     readonly now: UnwrapRef<typeof import('../core/datetime/dist/index.js')['now']>
-    readonly onActivated: UnwrapRef<typeof import('vue')['onActivated']>
-    readonly onBeforeMount: UnwrapRef<typeof import('vue')['onBeforeMount']>
+    readonly onActivated: UnwrapRef<typeof import('@stacksjs/stx')['onActivated']>
+    readonly onBeforeMount: UnwrapRef<typeof import('@stacksjs/stx')['onBeforeMount']>
     readonly onBeforeRouteLeave: UnwrapRef<typeof import('vue-router')['onBeforeRouteLeave']>
     readonly onBeforeRouteUpdate: UnwrapRef<typeof import('vue-router')['onBeforeRouteUpdate']>
-    readonly onBeforeUnmount: UnwrapRef<typeof import('vue')['onBeforeUnmount']>
-    readonly onBeforeUpdate: UnwrapRef<typeof import('vue')['onBeforeUpdate']>
+    readonly onBeforeUnmount: UnwrapRef<typeof import('@stacksjs/stx')['onBeforeUnmount']>
+    readonly onBeforeUpdate: UnwrapRef<typeof import('@stacksjs/stx')['onBeforeUpdate']>
     readonly onClickOutside: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['onClickOutside']>
-    readonly onDeactivated: UnwrapRef<typeof import('vue')['onDeactivated']>
-    readonly onErrorCaptured: UnwrapRef<typeof import('vue')['onErrorCaptured']>
+    readonly onDeactivated: UnwrapRef<typeof import('@stacksjs/stx')['onDeactivated']>
+    readonly onErrorCaptured: UnwrapRef<typeof import('@stacksjs/stx')['onErrorCaptured']>
     readonly onKeyDown: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['onKeyDown']>
     readonly onKeyPressed: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['onKeyPressed']>
     readonly onKeyStroke: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['onKeyStroke']>
     readonly onKeyUp: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['onKeyUp']>
     readonly onLongPress: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['onLongPress']>
-    readonly onMounted: UnwrapRef<typeof import('vue')['onMounted']>
-    readonly onRenderTracked: UnwrapRef<typeof import('vue')['onRenderTracked']>
-    readonly onRenderTriggered: UnwrapRef<typeof import('vue')['onRenderTriggered']>
-    readonly onScopeDispose: UnwrapRef<typeof import('vue')['onScopeDispose']>
-    readonly onServerPrefetch: UnwrapRef<typeof import('vue')['onServerPrefetch']>
+    readonly onMounted: UnwrapRef<typeof import('@stacksjs/stx')['onMounted']>
+    readonly onRenderTracked: UnwrapRef<typeof import('@stacksjs/stx')['onRenderTracked']>
+    readonly onRenderTriggered: UnwrapRef<typeof import('@stacksjs/stx')['onRenderTriggered']>
+    readonly onScopeDispose: UnwrapRef<typeof import('@stacksjs/stx')['onScopeDispose']>
+    readonly onServerPrefetch: UnwrapRef<typeof import('@stacksjs/stx')['onServerPrefetch']>
     readonly onStartTyping: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['onStartTyping']>
-    readonly onUnmounted: UnwrapRef<typeof import('vue')['onUnmounted']>
-    readonly onUpdated: UnwrapRef<typeof import('vue')['onUpdated']>
-    readonly onWatcherCleanup: UnwrapRef<typeof import('vue')['onWatcherCleanup']>
+    readonly onUnmounted: UnwrapRef<typeof import('@stacksjs/stx')['onUnmounted']>
+    readonly onUpdated: UnwrapRef<typeof import('@stacksjs/stx')['onUpdated']>
+    readonly onWatcherCleanup: UnwrapRef<typeof import('@stacksjs/stx')['onWatcherCleanup']>
     readonly oneOrMore: UnwrapRef<typeof import('../core/browser/src/utils/regex')['oneOrMore']>
     readonly or: UnwrapRef<typeof import('../core/browser/src/utils/math')['or']>
     readonly parse: UnwrapRef<typeof import('../core/datetime/dist/index.js')['parse']>
     readonly pausableWatch: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['pausableWatch']>
     readonly preferredDark: UnwrapRef<typeof import('../../../resources/functions/dark')['preferredDark']>
-    readonly provide: UnwrapRef<typeof import('vue')['provide']>
+    readonly provide: UnwrapRef<typeof import('@stacksjs/stx')['provide']>
     readonly provideLocal: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['provideLocal']>
     readonly publishableKey: UnwrapRef<typeof import('../core/browser/src/utils/billable')['publishableKey']>
     readonly rand: UnwrapRef<typeof import('../core/browser/src/utils/math')['rand']>
@@ -625,32 +617,29 @@ declare module 'vue' {
     readonly randomNonSecure: UnwrapRef<typeof import('../core/browser/src/utils/random')['randomNonSecure']>
     readonly reactify: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['reactify']>
     readonly reactifyObject: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['reactifyObject']>
-    readonly reactive: UnwrapRef<typeof import('vue')['reactive']>
+    readonly reactive: UnwrapRef<typeof import('@stacksjs/stx')['reactive']>
     readonly reactiveComputed: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['reactiveComputed']>
     readonly reactiveOmit: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['reactiveOmit']>
     readonly reactivePick: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['reactivePick']>
     readonly readableSize: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['readableSize']>
-    readonly readonly: UnwrapRef<typeof import('vue')['readonly']>
-    readonly recentActivity: UnwrapRef<typeof import('../../../resources/functions/sample')['recentActivity']>
-    readonly ref: UnwrapRef<typeof import('vue')['ref']>
+    readonly readonly: UnwrapRef<typeof import('@stacksjs/stx')['readonly']>
+    readonly ref: UnwrapRef<typeof import('@stacksjs/stx')['ref']>
     readonly refAutoReset: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['refAutoReset']>
     readonly refDebounced: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['refDebounced']>
     readonly refDefault: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['refDefault']>
     readonly refThrottled: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['refThrottled']>
     readonly refWithControl: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['refWithControl']>
     readonly renderHeadToString: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['renderHeadToString']>
-    readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
+    readonly resolveComponent: UnwrapRef<typeof import('@stacksjs/stx')['resolveComponent']>
     readonly resolveRef: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['resolveRef']>
-    readonly resolveUnref: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['resolveUnref']>
     readonly retry: UnwrapRef<typeof import('../core/browser/src/utils/retry')['retry']>
-    readonly reviews: UnwrapRef<typeof import('../../../resources/functions/sample')['reviews']>
     readonly saas: UnwrapRef<typeof import('../core/browser/src/utils/plans')['saas']>
     readonly setActivePinia: UnwrapRef<typeof import('pinia')['setActivePinia']>
     readonly setMapStoreSuffix: UnwrapRef<typeof import('pinia')['setMapStoreSuffix']>
     readonly setSSRHandler: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['setSSRHandler']>
-    readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
-    readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
-    readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
+    readonly shallowReactive: UnwrapRef<typeof import('@stacksjs/stx')['shallowReactive']>
+    readonly shallowReadonly: UnwrapRef<typeof import('@stacksjs/stx')['shallowReadonly']>
+    readonly shallowRef: UnwrapRef<typeof import('@stacksjs/stx')['shallowRef']>
     readonly sleep: UnwrapRef<typeof import('../core/browser/src/utils/sleep')['sleep']>
     readonly sticky: UnwrapRef<typeof import('../core/browser/src/utils/regex')['sticky']>
     readonly storeToRefs: UnwrapRef<typeof import('pinia')['storeToRefs']>
@@ -661,22 +650,21 @@ declare module 'vue' {
     readonly throttle: UnwrapRef<typeof import('../core/browser/src/utils/throttle')['throttle']>
     readonly throttledRef: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['throttledRef']>
     readonly throttledWatch: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['throttledWatch']>
-    readonly toRaw: UnwrapRef<typeof import('vue')['toRaw']>
+    readonly toRaw: UnwrapRef<typeof import('@stacksjs/stx')['toRaw']>
     readonly toReactive: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['toReactive']>
-    readonly toRef: UnwrapRef<typeof import('vue')['toRef']>
-    readonly toRefs: UnwrapRef<typeof import('vue')['toRefs']>
+    readonly toRef: UnwrapRef<typeof import('@stacksjs/stx')['toRef']>
+    readonly toRefs: UnwrapRef<typeof import('@stacksjs/stx')['toRefs']>
     readonly toString: UnwrapRef<typeof import('../core/browser/src/utils/base')['toString']>
-    readonly toValue: UnwrapRef<typeof import('vue')['toValue']>
+    readonly toValue: UnwrapRef<typeof import('@stacksjs/stx')['toValue']>
     readonly toggleDark: UnwrapRef<typeof import('../../../resources/functions/dark')['toggleDark']>
-    readonly trendingJudges: UnwrapRef<typeof import('../../../resources/functions/sample')['trendingJudges']>
-    readonly triggerRef: UnwrapRef<typeof import('vue')['triggerRef']>
+    readonly triggerRef: UnwrapRef<typeof import('@stacksjs/stx')['triggerRef']>
     readonly tryOnBeforeMount: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['tryOnBeforeMount']>
     readonly tryOnBeforeUnmount: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['tryOnBeforeUnmount']>
     readonly tryOnMounted: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['tryOnMounted']>
     readonly tryOnScopeDispose: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['tryOnScopeDispose']>
     readonly tryOnUnmounted: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['tryOnUnmounted']>
     readonly unicode: UnwrapRef<typeof import('../core/browser/src/utils/regex')['unicode']>
-    readonly unref: UnwrapRef<typeof import('vue')['unref']>
+    readonly unref: UnwrapRef<typeof import('@stacksjs/stx')['unref']>
     readonly unrefElement: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['unrefElement']>
     readonly until: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['until']>
     readonly useAbs: UnwrapRef<typeof import('../core/browser/src/utils/math')['useAbs']>
@@ -694,8 +682,8 @@ declare module 'vue' {
     readonly useArrayUnique: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useArrayUnique']>
     readonly useAsyncQueue: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useAsyncQueue']>
     readonly useAsyncState: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useAsyncState']>
-    readonly useAttrs: UnwrapRef<typeof import('vue')['useAttrs']>
-    readonly useAuth: UnwrapRef<typeof import('../../../resources/functions/auth')['useAuth']>
+    readonly useAttrs: UnwrapRef<typeof import('@stacksjs/stx')['useAttrs']>
+    readonly useAuth: UnwrapRef<typeof import('../core/browser/src/composables/useAuth')['useAuth']>
     readonly useAverage: UnwrapRef<typeof import('../core/browser/src/utils/math')['useAverage']>
     readonly useBase64: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useBase64']>
     readonly useBattery: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useBattery']>
@@ -712,9 +700,9 @@ declare module 'vue' {
     readonly useColorMode: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useColorMode']>
     readonly useConfirmDialog: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useConfirmDialog']>
     readonly useCounter: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useCounter']>
-    readonly useCssModule: UnwrapRef<typeof import('vue')['useCssModule']>
+    readonly useCssModule: UnwrapRef<typeof import('@stacksjs/stx')['useCssModule']>
     readonly useCssVar: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useCssVar']>
-    readonly useCssVars: UnwrapRef<typeof import('vue')['useCssVars']>
+    readonly useCssVars: UnwrapRef<typeof import('@stacksjs/stx')['useCssVars']>
     readonly useCurrentElement: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useCurrentElement']>
     readonly useCycleList: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useCycleList']>
     readonly useDark: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useDark']>
@@ -754,7 +742,7 @@ declare module 'vue' {
     readonly useHead: UnwrapRef<typeof import('@unhead/vue')['useHead']>
     readonly useHeadSafe: UnwrapRef<typeof import('@unhead/vue')['useHeadSafe']>
     readonly useI18n: UnwrapRef<typeof import('vue-i18n')['useI18n']>
-    readonly useId: UnwrapRef<typeof import('vue')['useId']>
+    readonly useId: UnwrapRef<typeof import('@stacksjs/stx')['useId']>
     readonly useIdle: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useIdle']>
     readonly useImage: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useImage']>
     readonly useInfiniteScroll: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useInfiniteScroll']>
@@ -774,7 +762,7 @@ declare module 'vue' {
     readonly useMemoize: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useMemoize']>
     readonly useMemory: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useMemory']>
     readonly useMin: UnwrapRef<typeof import('../core/browser/src/utils/math')['useMin']>
-    readonly useModel: UnwrapRef<typeof import('vue')['useModel']>
+    readonly useModel: UnwrapRef<typeof import('@stacksjs/stx')['useModel']>
     readonly useMounted: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useMounted']>
     readonly useMouse: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useMouse']>
     readonly useMouseInElement: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useMouseInElement']>
@@ -821,7 +809,7 @@ declare module 'vue' {
     readonly useServerSeoMeta: UnwrapRef<typeof import('@unhead/vue')['useServerSeoMeta']>
     readonly useSessionStorage: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useSessionStorage']>
     readonly useShare: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useShare']>
-    readonly useSlots: UnwrapRef<typeof import('vue')['useSlots']>
+    readonly useSlots: UnwrapRef<typeof import('@stacksjs/stx')['useSlots']>
     readonly useSorted: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useSorted']>
     readonly useSpeechRecognition: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useSpeechRecognition']>
     readonly useSpeechSynthesis: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useSpeechSynthesis']>
@@ -832,7 +820,7 @@ declare module 'vue' {
     readonly useSum: UnwrapRef<typeof import('../core/browser/src/utils/math')['useSum']>
     readonly useSupported: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useSupported']>
     readonly useSwipe: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useSwipe']>
-    readonly useTemplateRef: UnwrapRef<typeof import('vue')['useTemplateRef']>
+    readonly useTemplateRef: UnwrapRef<typeof import('@stacksjs/stx')['useTemplateRef']>
     readonly useTemplateRefsList: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useTemplateRefsList']>
     readonly useTextDirection: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useTextDirection']>
     readonly useTextSelection: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['useTextSelection']>
@@ -869,18 +857,18 @@ declare module 'vue' {
     readonly wait: UnwrapRef<typeof import('../core/browser/src/utils/sleep')['wait']>
     readonly waitUntil: UnwrapRef<typeof import('../core/browser/src/utils/sleep')['waitUntil']>
     readonly waitWhile: UnwrapRef<typeof import('../core/browser/src/utils/sleep')['waitWhile']>
-    readonly watch: UnwrapRef<typeof import('vue')['watch']>
+    readonly watch: UnwrapRef<typeof import('@stacksjs/stx')['watch']>
     readonly watchArray: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['watchArray']>
     readonly watchAtMost: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['watchAtMost']>
     readonly watchDebounced: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['watchDebounced']>
     readonly watchDeep: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['watchDeep']>
-    readonly watchEffect: UnwrapRef<typeof import('vue')['watchEffect']>
+    readonly watchEffect: UnwrapRef<typeof import('@stacksjs/stx')['watchEffect']>
     readonly watchIgnorable: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['watchIgnorable']>
     readonly watchImmediate: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['watchImmediate']>
     readonly watchOnce: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['watchOnce']>
     readonly watchPausable: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['watchPausable']>
-    readonly watchPostEffect: UnwrapRef<typeof import('vue')['watchPostEffect']>
-    readonly watchSyncEffect: UnwrapRef<typeof import('vue')['watchSyncEffect']>
+    readonly watchPostEffect: UnwrapRef<typeof import('@stacksjs/stx')['watchPostEffect']>
+    readonly watchSyncEffect: UnwrapRef<typeof import('@stacksjs/stx')['watchSyncEffect']>
     readonly watchThrottled: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['watchThrottled']>
     readonly watchTriggerable: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['watchTriggerable']>
     readonly watchWithFilter: UnwrapRef<typeof import('../core/browser/src/utils/vendors')['watchWithFilter']>

@@ -80,7 +80,7 @@ export function waitUntil(condition: () => boolean, options: WaitOptions = {}): 
 
 function normalizeOptions(options: WaitOptions): { interval: number, timeout: number } {
   if (typeof options === 'number') {
-    return { interval: 100, timeout: options }
+    return { interval: options, timeout: 0 }
   }
   return {
     interval: options.interval ?? 100,
@@ -93,7 +93,7 @@ function normalizeOptions(options: WaitOptions): { interval: number, timeout: nu
  */
 export function waitWhile(condition: () => boolean, options: WaitOptions = {}): Promise<void> {
   return new Promise((resolve) => {
-    const { interval = 100, timeout = 0 } = options
+    const { interval = 100, timeout = 0 } = options as any
 
     // Immediately resolve if the condition is initially false
     if (!condition()) {

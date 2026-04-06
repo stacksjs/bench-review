@@ -4,7 +4,9 @@
   "version": "0.70.23",
   "description": "The Stacks actions.",
   "author": "Chris Breuer",
-  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "contributors": [
+    "Chris Breuer <chris@stacksjs.com>"
+  ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
   "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/actions#readme",
@@ -22,32 +24,45 @@
     "framework",
     "typescript",
     "javascript",
-    "bun",
-    "vite"
+    "bun"
   ],
   "exports": {
     ".": {
+      "bun": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./run-action": {
+      "bun": "./src/run-action.ts",
+      "types": "./dist/run-action.d.ts",
+      "import": "./dist/run-action.js"
+    },
     "./*": {
+      "bun": "./src/*",
       "import": "./dist/*"
     }
   },
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["README.md", "dist"],
+  "files": [
+    "README.md",
+    "dist"
+  ],
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "bun tsc --noEmit",
     "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "@stacksjs/ts-cloud": "^0.2.1"
   },
   "devDependencies": {
     "@stacksjs/api": "workspace:*",
     "@stacksjs/cli": "workspace:*",
     "@stacksjs/config": "workspace:*",
     "@stacksjs/database": "workspace:*",
-    "@stacksjs/development": "workspace:*",
+    "@stacksjs/tlsx": "^0.13.0",
+    "better-dx": "^0.2.5",
     "@stacksjs/dns": "workspace:*",
     "@stacksjs/enums": "workspace:*",
     "@stacksjs/env": "workspace:*",
@@ -58,8 +73,6 @@
     "@stacksjs/storage": "workspace:*",
     "@stacksjs/strings": "workspace:*",
     "@stacksjs/utils": "workspace:*",
-    "@stacksjs/validation": "workspace:*",
-    "markdown-it": "^14.1.0",
-    "vue-component-meta": "^2.2.10"
+    "@stacksjs/validation": "workspace:*"
   }
 }

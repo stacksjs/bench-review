@@ -1,6 +1,7 @@
-import type { CouponJsonResponse, CouponUpdate } from '@stacksjs/orm'
 import { db } from '@stacksjs/database'
 import { formatDate } from '@stacksjs/orm'
+type CouponJsonResponse = ModelRow<typeof Coupon>
+type CouponUpdate = UpdateModelData<typeof Coupon>
 import { fetchById } from './fetch'
 
 /**
@@ -29,7 +30,15 @@ export async function update(id: number, data: Omit<CouponUpdate, 'id'>): Promis
       .execute()
 
     // Fetch and return the updated coupon
-    return await fetchById(id)
+    const updatedCoupon = await fetchById(id)
+
+    if (updatedCoupon) {
+      // Convert SQLite integer boolean to actual boolean
+      const c = updatedCoupon as Record<string, unknown>
+      c.is_active = Boolean(c.is_active)
+    }
+
+    return updatedCoupon
   }
   catch (error) {
     if (error instanceof Error) {

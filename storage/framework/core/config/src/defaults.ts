@@ -5,16 +5,14 @@ export const defaults: StacksOptions = {
   ai: {
     deploy: false,
     models: [
-      'amazon.titan-embed-text-v1',
-      'amazon.titan-text-express-v1',
-      'amazon.titan-embed-image-v1',
-      'amazon.titan-image-generator-v1',
-      'anthropic.claude-v1',
-      'anthropic.claude-v2',
-      'anthropic.claude-v2:1',
-      'anthropic.claude-instant-v1',
-      'meta.llama2-13b-chat-v1',
-      'meta.llama2-70b-chat-v1',
+      'anthropic.claude-sonnet-4-20250514-v1:0',
+      'anthropic.claude-haiku-4-20250514-v1:0',
+      'anthropic.claude-3-5-sonnet-20241022-v2:0',
+      'amazon.titan-embed-text-v2:0',
+      'amazon.titan-text-premier-v1:0',
+      'amazon.titan-image-generator-v2:0',
+      'meta.llama3-1-70b-instruct-v1:0',
+      'meta.llama3-1-8b-instruct-v1:0',
     ],
   },
 
@@ -72,17 +70,25 @@ export const defaults: StacksOptions = {
   },
 
   cache: {
-    driver: 'redis',
+    driver: 'memory',
     prefix: 'stx',
     ttl: 3600,
+    maxKeys: -1,
+    useClones: true,
 
     drivers: {
       redis: {
-        connection: 'default',
         host: 'localhost',
         port: 6379,
         username: '',
         password: '',
+        database: 0,
+        tls: false,
+      },
+      memory: {
+        maxKeys: -1,
+        checkPeriod: 600,
+        deleteOnExpire: true,
       },
     },
   },
@@ -184,18 +190,19 @@ export const defaults: StacksOptions = {
       //   code: '',
       //   placement: '',
       // },
-    },
-  },
+    } as any,
+  } as any,
 
   email: {
     from: {
       name: 'Stacks',
-      address: 'no-reply@stacksjs.org',
+      address: 'no-reply@stacksjs.com',
     },
 
     mailboxes: [],
 
     server: {
+      enabled: true,
       scan: true,
     },
   },
@@ -288,7 +295,7 @@ export const defaults: StacksOptions = {
       'union': 'Invalid value provided for {{ field }} field',
       'unionGroup': 'Invalid value provided for {{ field }} field',
       'unionOfTypes': 'Invalid value provided for {{ field }} field',
-    },
+    } as any,
   },
 
   git: {
@@ -407,17 +414,16 @@ export const defaults: StacksOptions = {
   },
 
   hashing: {
-    driver: 'argon2',
+    driver: 'bcrypt', // Laravel default
 
     bcrypt: {
-      rounds: 10,
-      cost: 4, // number between 4-31
+      rounds: 12, // Laravel default is 10-12, higher = more secure but slower
     },
 
     argon2: {
       memory: 65536, // memory usage in kibibytes
       // threads: 1,
-      time: 1, // the number of iterations
+      time: 2, // the number of iterations
     },
   },
 
@@ -427,26 +433,8 @@ export const defaults: StacksOptions = {
     repository: 'stacksjs/stacks',
     license: 'MIT',
     author: 'Chris Breuer',
-    contributors: ['Chris Breuer <chris@stacksjs.org>'],
+    contributors: ['Chris Breuer <chris@stacksjs.com>'],
     defaultLanguage: 'en',
-
-    vueComponents: {
-      name: 'hello-world-vue',
-      description: 'Your Vue component library description',
-      keywords: ['component', 'library', 'vue', 'vite', 'typescript', 'javascript'],
-      tags: [
-        {
-          name: ['HelloWorld', 'AppHelloWorld'],
-          description: 'The Hello World custom element, built via this framework.',
-          attributes: [
-            {
-              name: 'greeting',
-              description: 'The greeting.',
-            },
-          ],
-        },
-      ],
-    },
 
     webComponents: {
       name: 'hello-world-elements',
@@ -515,14 +503,13 @@ export const defaults: StacksOptions = {
         driver: 'database',
         table: 'jobs',
         queue: 'default',
-        retry_after: 90,
+        retryAfter: 90,
       },
 
       redis: {
         driver: 'redis',
-        connection: 'default',
         queue: 'default',
-        retry_after: 90,
+        retryAfter: 90,
       },
 
       sqs: {
@@ -535,7 +522,7 @@ export const defaults: StacksOptions = {
         region: 'us-east-1',
       },
     },
-  },
+  } as any,
 
   saas: {
     plans: [
@@ -646,19 +633,19 @@ export const defaults: StacksOptions = {
     },
 
     stripe: {
-      secretKey: '',
-      publicKey: '',
+      appId: '',
+      apiKey: '',
     },
-  },
+  } as any,
 
-  storage: {
+  filesystems: {
     driver: 's3',
   },
 
   team: {
     name: 'Stacks',
     members: {
-      'Chris Breuer': 'chris@stacksjs.org',
+      'Chris Breuer': 'chris@stacksjs.com',
     },
   },
 

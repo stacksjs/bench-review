@@ -1,5 +1,4 @@
 import type { StacksOptions } from '@stacksjs/types'
-import { initializeDbConfig } from '../../database/src/utils'
 import { defaults } from './defaults'
 import { overrides } from './overrides'
 
@@ -9,8 +8,8 @@ export const config: StacksOptions = {
   ...overrides,
 }
 
-// Initialize the database config to avoid circular dependencies
-initializeDbConfig(config)
+// Database config is now initialized lazily in database/utils.ts when first accessed
+// This avoids circular dependency issues between config and database packages
 
 export function getConfig(): StacksOptions {
   return config
@@ -41,7 +40,7 @@ export const security: StacksOptions['security'] = config.security
 export const saas: StacksOptions['saas'] = config.saas
 export const searchEngine: StacksOptions['searchEngine'] = config.searchEngine
 export const services: StacksOptions['services'] = config.services
-export const storage: StacksOptions['storage'] = config.storage
+export const filesystems: StacksOptions['filesystems'] = config.filesystems
 export const team: StacksOptions['team'] = config.team
 export const ui: StacksOptions['ui'] = config.ui
 

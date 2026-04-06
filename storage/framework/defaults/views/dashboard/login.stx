@@ -1,0 +1,51 @@
+@extends('layouts/guest')
+
+@section('content')
+<script server>
+definePageMeta({
+  middleware: [],
+  layout: 'guest'
+})
+
+import Login from '../../components/Dashboard/Auth/Login.stx'
+import { useAuth } from '../../functions/auth'
+
+const router = useRouter()
+
+const { login } = useAuth()
+
+// Form state
+const isLoading = false
+const error = ''
+
+async function handleLogin(credentials) {
+  isLoading = true
+  error = ''
+
+  try {
+    const result = await login(credentials)
+
+    if (result && 'errors' in result) {
+      error = result.message || 'Invalid credentials'
+      return
+    }
+
+    router.push('/')
+  }
+  catch (err) {
+    error = err.message || 'An error occurred during login'
+  }
+  finally {
+    isLoading = false
+  }
+}
+</script>
+
+@title('Login - Stacks Dashboard')
+<Login
+  @submit="handleLogin"
+  isLoading="{{ isLoading }}"
+  error="{{ error }}"
+/>
+
+@endsection

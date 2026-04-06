@@ -1,37 +1,73 @@
-import type { UserJsonResponse, UserModel } from '@stacksjs/orm'
+
+type UserModel = InstanceType<typeof User>
+type UserJsonResponse = ModelRow<typeof User>
 import { request } from '@stacksjs/router'
 import { Auth } from './authentication'
 
 export type AuthUser = UserJsonResponse
 
-let currentUser: UserModel | undefined
+/**
+ * Get the currently authenticated user
+ *
+ * This is the primary way to get the authenticated user in your application.
+ * It first checks if the user was already set by the auth middleware,
+ * then falls back to validating the bearer token.
+ *
+ * @example
+ * import { authUser } from '@stacksjs/auth'
+ *
+ * const user = await authUser()
+ * if (user) {
+ *   console.log('Logged in as:', user.email)
+ * }
+ */
+export async function authUser(): Promise<UserModel | undefined> {
+  // First check if already set by middleware (fastest path)
+  const middlewareUser = (request as any)?._authenticatedUser
+  if (middlewareUser) {
+    return middlewareUser
+  }
 
-export async function getCurrentUser(): Promise<UserModel | undefined> {
-  if (currentUser)
-    return currentUser
+  // Fall back to token validation
+  let token = request.bearerToken?.()
 
-  const token = request.bearerToken()
-  if (!token)
+  // Fallback: get directly from Authorization header
+  if (!token) {
+    const authHeader = request.headers?.get?.('authorization') || request.headers?.get?.('Authorization')
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7)
+    }
+  }
+
+  if (!token) {
     return undefined
+  }
 
-  currentUser = await Auth.getUserFromToken(token)
-  return currentUser
+  return await Auth.getUserFromToken(token)
+}
+
+/**
+ * Alias for authUser() - for backwards compatibility
+ * @deprecated Use authUser() instead
+ */
+export async function getCurrentUser(): Promise<UserModel | undefined> {
+  return authUser()
 }
 
 export async function check(): Promise<boolean> {
-  return !!(await getCurrentUser())
+  return !!(await authUser())
 }
 
 export async function id(): Promise<number | undefined> {
-  return (await getCurrentUser())?.id
+  return (await authUser())?.id
 }
 
 export async function email(): Promise<string | undefined> {
-  return (await getCurrentUser())?.email
+  return (await authUser())?.email
 }
 
 export async function name(): Promise<string | undefined> {
-  return (await getCurrentUser())?.name
+  return (await authUser())?.name
 }
 
 export async function isAuthenticated(): Promise<boolean> {
@@ -40,10 +76,11 @@ export async function isAuthenticated(): Promise<boolean> {
 
 export async function logout(): Promise<void> {
   await Auth.logout()
-  currentUser = undefined
 }
 
 export async function refresh(): Promise<void> {
-  currentUser = undefined
-  await getCurrentUser()
+  // Clear the cached user on the request to force re-fetch
+  if ((request as any)?._authenticatedUser) {
+    (request as any)._authenticatedUser = undefined
+  }
 }

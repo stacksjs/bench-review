@@ -1,10 +1,10 @@
-import type { Pages } from '../types'
-import { useFetch, useStorage } from '@vueuse/core'
+import type { Pages } from '../../types/defaults'
+import { useFetch, useStorage } from '@stacksjs/browser'
 
 // Create a persistent pages array using VueUse's useStorage
 const pages = useStorage<Pages[]>('pages', [])
 
-const baseURL = 'http://localhost:3008'
+const baseURL = process.env.VITE_API_URL || `http://localhost:${process.env.PORT_API || '3008'}`
 
 // Basic fetch function to get all pages
 async function fetchPages() {

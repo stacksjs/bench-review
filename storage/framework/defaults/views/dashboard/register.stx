@@ -1,0 +1,53 @@
+@extends('layouts/guest')
+
+@section('content')
+<script server>
+definePageMeta({
+  middleware: [],
+  layout: 'guest'
+})
+
+import Register from '../../components/Dashboard/Auth/Register.stx'
+import { useAuth } from '../../functions/auth'
+
+const router = useRouter()
+
+const { register } = useAuth()
+
+// Form state
+const isLoading = false
+const error = ''
+
+async function handleRegister(credentials) {
+  isLoading = true
+  error = ''
+
+  try {
+    const result = await register(credentials)
+
+    if (result && 'errors' in result) {
+      error = result.message || 'Registration failed'
+      return
+    }
+
+    // Redirect to dashboard on success
+    router.push('/')
+  }
+  catch (err) {
+    error = err.message || 'An error occurred during registration'
+    console.error(err)
+  }
+  finally {
+    isLoading = false
+  }
+}
+</script>
+
+@title('Register - Stacks Dashboard')
+<Register
+  @submit="handleRegister"
+  :isLoading="isLoading"
+  :error="error"
+/>
+
+@endsection

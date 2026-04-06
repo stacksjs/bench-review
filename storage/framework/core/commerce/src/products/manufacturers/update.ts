@@ -1,6 +1,7 @@
-import type { ManufacturerJsonResponse, ManufacturerUpdate } from '@stacksjs/orm'
 import { db } from '@stacksjs/database'
 import { formatDate } from '@stacksjs/orm'
+type ManufacturerJsonResponse = ModelRow<typeof Manufacturer>
+type ManufacturerUpdate = UpdateModelData<typeof Manufacturer>
 
 /**
  * Update a manufacturer
@@ -25,13 +26,13 @@ export async function update(id: number, data: ManufacturerUpdate): Promise<Manu
       .executeTakeFirst()
 
     if (!result)
-      throw new Error('Failed to update manufacturer')
+      throw new Error(`Manufacturer with ID ${id} not found`)
 
-    return result
+    return result as ManufacturerJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
-      if (error.message.includes('Duplicate entry') && error.message.includes('manufacturer')) {
+      if ((error.message.includes('Duplicate entry') || error.message.includes('UNIQUE constraint failed')) && error.message.includes('manufacturer')) {
         throw new Error('A manufacturer with this name already exists')
       }
 
@@ -67,7 +68,7 @@ export async function updateFeaturedStatus(
     if (!result)
       throw new Error('Failed to update manufacturer featured status')
 
-    return result
+    return result as ManufacturerJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
@@ -100,7 +101,7 @@ export async function updateByUuid(uuid: string, data: Omit<ManufacturerUpdate, 
     if (!result)
       throw new Error('Failed to update manufacturer')
 
-    return result
+    return result as ManufacturerJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {

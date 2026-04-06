@@ -5,7 +5,7 @@
   "description": "Meet Buddy. The Stacks runtime.",
   "author": "Chris Breuer",
   "contributors": [
-    "Chris Breuer <chris@stacksjs.org>"
+    "Chris Breuer <chris@stacksjs.com>"
   ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
@@ -22,7 +22,6 @@
     "stacks",
     "buddy",
     "runtime",
-    "vite",
     "component",
     "composables",
     "functions",
@@ -40,10 +39,12 @@
   ],
   "exports": {
     ".": {
+      "bun": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./cli": {
+      "bun": "./src/cli.ts",
       "types": "./dist/cli.d.ts",
       "import": "./dist/cli.js"
     },
@@ -96,15 +97,15 @@
     "@stacksjs/config": "^0.70.23",
     "@stacksjs/database": "^0.70.23",
     "@stacksjs/desktop": "^0.70.23",
-    "@stacksjs/development": "^0.70.23",
     "@stacksjs/dns": "^0.70.23",
     "@stacksjs/email": "^0.70.23",
     "@stacksjs/enums": "^0.70.23",
     "@stacksjs/error-handling": "^0.70.23",
     "@stacksjs/events": "^0.70.23",
-    "@stacksjs/faker": "^0.70.23",
     "@stacksjs/git": "^0.70.23",
     "@stacksjs/health": "^0.70.23",
+    "@stacksjs/dnsx": "^0.2.2",
+    "@stacksjs/httx": "^0.1.7",
     "@stacksjs/lint": "^0.70.23",
     "@stacksjs/logging": "^0.70.23",
     "@stacksjs/notifications": "^0.70.23",
@@ -114,6 +115,7 @@
     "@stacksjs/payments": "^0.70.23",
     "@stacksjs/realtime": "^0.70.23",
     "@stacksjs/router": "^0.70.23",
+    "@stacksjs/rpx": "^0.11.2",
     "@stacksjs/search-engine": "^0.70.23",
     "@stacksjs/security": "^0.70.23",
     "@stacksjs/server": "^0.70.23",
@@ -124,15 +126,12 @@
     "@stacksjs/types": "^0.70.23",
     "@stacksjs/ui": "^0.70.23",
     "@stacksjs/utils": "^0.70.23",
-    "@stacksjs/validation": "^0.70.23"
+    "@stacksjs/validation": "^0.70.23",
+    "@stacksjs/ts-cloud": "^0.2.3",
+    "better-dx": "^0.2.5"
   },
   "devDependencies": {
-    "@stacksjs/development": "^0.70.23"
-  },
-  "config": {
-    "commitizen": {
-      "path": "node_modules/cz-git"
-    }
+    "better-dx": "^0.2.5"
   },
   "web-types": "./web-types.json"
 }

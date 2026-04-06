@@ -16,7 +16,18 @@ import {
   toNamespacedPath,
 } from 'node:path'
 import process from 'node:process'
-import { log } from '@stacksjs/logging'
+
+// Lazy import logging to avoid circular dependency (logging imports path)
+async function debugLog(message: string) {
+  try {
+    const { log } = await import('@stacksjs/logging')
+    log.debug(message)
+  }
+  catch {
+    // Logging not available, silently ignore
+    console.debug(message)
+  }
+}
 
 /**
  * Returns the path to the `actions` directory. The `actions` directory
@@ -83,6 +94,16 @@ export function userFunctionsPath(path?: string): string {
  */
 export function userJobsPath(path?: string): string {
   return appPath(`Jobs/${path || ''}`)
+}
+
+/**
+ * Returns the path to the user-defined `Controllers` directory.
+ *
+ * @param path - The relative path to the file or directory within the `Controllers` directory.
+ * @returns The absolute path to the specified file or directory within the user-defined `Controllers` directory.
+ */
+export function userControllersPath(path?: string): string {
+  return appPath(`Controllers/${path || ''}`)
 }
 
 /**
@@ -313,6 +334,28 @@ export function appPath(path?: string, options?: { relative?: boolean, cwd?: str
     return relative(options.cwd || process.cwd(), absolutePath)
 
   return absolutePath
+}
+
+/**
+ * Returns the path to the defaults `app` directory within the framework directory.
+ * This is where default Actions, Controllers, etc. are stored.
+ *
+ * @param path - The relative path to the file or directory within the defaults app directory.
+ * @returns The absolute path to the specified file or directory within the defaults app directory.
+ */
+export function defaultsAppPath(path?: string): string {
+  return frameworkPath(`defaults/app/${path || ''}`)
+}
+
+/**
+ * Returns the path to the defaults `resources` directory within the framework directory.
+ * This is where default views, components, layouts, etc. are stored.
+ *
+ * @param path - The relative path to the file or directory within the defaults resources directory.
+ * @returns The absolute path to the specified file or directory within the defaults resources directory.
+ */
+export function defaultsResourcesPath(path?: string): string {
+  return frameworkPath(`defaults/resources/${path || ''}`)
 }
 
 /**
@@ -635,10 +678,10 @@ export function coreEnvPath(path?: string): string {
 /**
  * Returns the path to the `examples` directory within the framework directory, filtered by type.
  *
- * @param type - The type of examples to filter by ('vue-components' or 'web-components').
+ * @param type - The type of examples to filter by ('web-components').
  * @returns The absolute path to the specified type of examples within the `examples` directory.
  */
-export function examplesPath(type?: 'vue-components' | 'web-components'): string {
+export function examplesPath(type?: 'web-components'): string {
   return frameworkPath(`examples/${type || ''}`)
 }
 
@@ -732,7 +775,7 @@ export function langPath(path?: string): string {
 export function layoutsPath(path?: string, options?: { relative?: boolean, defaults?: boolean }): string {
   let absolutePath
   if (options?.defaults)
-    absolutePath = frameworkPath(`defaults/layouts/${path || ''}`)
+    absolutePath = frameworkPath(`defaults/resources/layouts/${path || ''}`)
   else
     absolutePath = resourcesPath(`layouts/${path || ''}`)
 
@@ -745,10 +788,10 @@ export function layoutsPath(path?: string, options?: { relative?: boolean, defau
 /**
  * Returns the path to the library entry file, filtered by library type.
  *
- * @param type - The type of library ('vue-components', 'web-components', or 'functions').
+ * @param type - The type of library ('web-components', or 'functions').
  * @returns The absolute path to the specified library entry file.
  */
-export type LibraryType = 'vue-components' | 'web-components' | 'functions'
+export type LibraryType = 'web-components' | 'functions'
 export function libraryEntryPath(type: LibraryType): string {
   return libsEntriesPath(`${type}.ts`)
 }
@@ -866,12 +909,10 @@ export function onboardingPath(path?: string): string {
 /**
  * Returns the path to the `package.json` file of a specified library type within the framework directory.
  *
- * @param type - The type of the library ('vue-components', 'web-components', or 'functions') for which to return the package.json path.
+ * @param type - The type of the library ('web-components', or 'functions') for which to return the package.json path.
  * @returns The absolute path to the specified package.json file within the framework directory.
  */
 export function packageJsonPath(type: LibraryType): string {
-  if (type === 'vue-components')
-    return frameworkPath('libs/components/vue/package.json')
   if (type === 'web-components')
     return frameworkPath('libs/components/web/package.json')
 
@@ -917,7 +958,11 @@ export function paymentsPath(path?: string): string {
 export function projectPath(filePath = '', options?: { relative: boolean }): string {
   let path = process.cwd()
 
-  while (path.includes('storage')) path = resolve(path, '..')
+  while (path.includes('storage')) {
+    const parent = resolve(path, '..')
+    if (parent === path) break
+    path = parent
+  }
 
   const finalPath = resolve(path, filePath)
 
@@ -937,7 +982,7 @@ export function projectPath(filePath = '', options?: { relative: boolean }): str
  */
 export async function findProjectPath(project: string): Promise<string> {
   const projectList = Bun.spawnSync(['buddy', 'projects:list', '--quiet']).stdout.toString()
-  log.debug(`ProjectList in findProjectPath ${projectList}`)
+  await debugLog(`ProjectList in findProjectPath ${projectList}`)
 
   // get the list of all Stacks project paths (on the system)
   const projects = projectList
@@ -945,7 +990,7 @@ export async function findProjectPath(project: string): Promise<string> {
     .filter((line: string) => line.startsWith('   - '))
     .map((line: string) => line.trim().substring(4))
 
-  log.debug(`Projects in findProjectPath ${projects}`)
+  await debugLog(`Projects in findProjectPath ${projects}`)
 
   // since we are targeting a specific project, find its path
   const projectPath = projects.find((proj: string) => proj.includes(project))
@@ -1204,6 +1249,14 @@ export function stacksPath(path?: string): string {
   return frameworkPath(`src/${path || ''}`)
 }
 
+export function stacksLockPath(): string {
+  return storagePath('framework/stacks.lock.json')
+}
+
+export function stacksBackupPath(stackName?: string): string {
+  return storagePath(`framework/stacks/backups/${stackName || ''}`)
+}
+
 /**
  * Returns the path to the `shell` directory within the core directory.
  *
@@ -1363,6 +1416,8 @@ export interface Path {
   analyticsPath: (path?: string) => string
   arraysPath: (path?: string) => string
   appPath: (path?: string) => string
+  defaultsAppPath: (path?: string) => string
+  defaultsResourcesPath: (path?: string) => string
   authPath: (path?: string) => string
   coreApiPath: (path?: string) => string
   buddyPath: (path?: string) => string
@@ -1394,7 +1449,7 @@ export interface Path {
   eventsPath: (path?: string) => string
   coreEnvPath: (path?: string) => string
   healthPath: (path?: string) => string
-  examplesPath: (type?: 'vue-components' | 'web-components') => string
+  examplesPath: (type?: 'web-components') => string
   fakerPath: (path?: string) => string
   frameworkPath: (path?: string) => string
   browserPath: (path?: string) => string
@@ -1444,6 +1499,8 @@ export interface Path {
   userServerPath: (path?: string) => string
   serverlessPath: (path?: string) => string
   stacksPath: (path?: string) => string
+  stacksLockPath: () => string
+  stacksBackupPath: (stackName?: string) => string
   stringsPath: (path?: string) => string
   shellPath: (path?: string) => string
   storesPath: (path?: string) => string
@@ -1495,6 +1552,8 @@ export const path: Path = {
   analyticsPath,
   arraysPath,
   appPath,
+  defaultsAppPath,
+  defaultsResourcesPath,
   authPath,
   coreApiPath,
   buddyPath,
@@ -1576,6 +1635,8 @@ export const path: Path = {
   userServerPath,
   serverlessPath,
   stacksPath,
+  stacksLockPath,
+  stacksBackupPath,
   stringsPath,
   shellPath,
   socialsPath,

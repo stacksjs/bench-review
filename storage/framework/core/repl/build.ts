@@ -10,12 +10,11 @@ const result = await Bun.build({
   outdir: './dist',
   format: 'esm',
   target: 'bun',
-  // sourcemap: 'linked',
   minify: true,
   external: ['@stacksjs/tinker'],
   plugins: [
     dts({
-      root: './src',
+      root: '.',
       outdir: './dist',
     }),
   ],

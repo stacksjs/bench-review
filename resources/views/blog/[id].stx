@@ -1,0 +1,10 @@
+<script server>
+import { blogPosts } from '../../functions/sample'
+const post = blogPosts.find(p => p.id === parseInt(params.id))
+</script>
+
+@extends('layouts/default')
+@section('content')
+  @include('components/blog-header')
+  @include('components/blog')
+@endsection

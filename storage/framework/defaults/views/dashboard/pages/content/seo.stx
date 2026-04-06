@@ -1,0 +1,66 @@
+@extends('layouts/default')
+
+@section('content')
+<script server>
+/**
+ * SEO Settings Page
+ *
+ * Configure search engine optimization.
+ */
+
+let seoData = { title: '', description: '', keywords: [], ogImage: '' }
+
+try {
+  const fs = await import('fs')
+  const path = await import('path')
+  const pkgPath = path.resolve(process.cwd(), 'package.json')
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
+  seoData = {
+    title: String(pkg.name || ''),
+    description: String(pkg.description || ''),
+    keywords: pkg.keywords && Array.isArray(pkg.keywords) ? pkg.keywords : [],
+    ogImage: '',
+  }
+} catch (e) {
+  // package.json not found
+}
+</script>
+<div class="p-6 space-y-6">
+
+  <PageHeader title="SEO Settings" description="Configure search engine optimization">
+    <template #actions>
+      <Button variant="primary">Save Changes</Button>
+    </template>
+  </PageHeader>
+
+  @if (seoData.title || seoData.description || seoData.keywords.length > 0 || seoData.ogImage)
+  <Card title="Default Meta Tags">
+    <div class="p-4 space-y-4">
+      <div>
+        <label class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-1.5">Site Title</label>
+        <input type="text" class="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value="{{ seoData.title }}" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-1.5">Meta Description</label>
+        <textarea class="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">{{ seoData.description }}</textarea>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-1.5">Keywords</label>
+        <input type="text" class="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value="{{ seoData.keywords.join(', ') }}" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-1.5">OG Image URL</label>
+        <input type="text" class="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value="{{ seoData.ogImage }}" />
+      </div>
+    </div>
+  </Card>
+  @else
+  <EmptyState
+    icon="i-hugeicons-search-01"
+    title="No SEO data yet"
+    description="SEO insights will appear once your site has indexed pages."
+  />
+  @endif
+
+</div>
+@endsection

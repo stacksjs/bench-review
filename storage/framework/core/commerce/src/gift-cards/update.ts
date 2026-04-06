@@ -1,6 +1,7 @@
-import type { GiftCardJsonResponse, GiftCardUpdate } from '@stacksjs/orm'
 import { db } from '@stacksjs/database'
-import { formatDate, toTimestamp } from '@stacksjs/orm'
+import { formatDate } from '@stacksjs/orm'
+type GiftCardJsonResponse = ModelRow<typeof GiftCard>
+type GiftCardUpdate = UpdateModelData<typeof GiftCard>
 import { fetchById } from './fetch'
 
 /**
@@ -60,12 +61,12 @@ export async function updateBalance(id: number, amount: number): Promise<GiftCar
     throw new Error(`Gift card with ID ${id} not found`)
   }
 
-  if (!giftCard.is_active || giftCard.status !== 'ACTIVE') {
+  if (!(giftCard as Record<string, unknown>).is_active || giftCard.status !== 'ACTIVE') {
     throw new Error(`Gift card is not active`)
   }
 
   // Calculate new balance
-  const newBalance = giftCard.current_balance + amount
+  const newBalance = ((giftCard as Record<string, unknown>).current_balance as number) + amount
 
   // Make sure balance doesn't go below zero
   if (newBalance < 0) {
@@ -78,7 +79,7 @@ export async function updateBalance(id: number, amount: number): Promise<GiftCar
       .updateTable('gift_cards')
       .set({
         current_balance: newBalance,
-        last_used_date: toTimestamp(new Date()),
+        last_used_date: formatDate(new Date()),
         status: newBalance === 0 ? 'USED' : 'ACTIVE',
         updated_at: formatDate(new Date()),
       })

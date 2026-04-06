@@ -1,21 +1,22 @@
 import type { Action } from '@stacksjs/actions'
-import type { Request } from '@stacksjs/router'
-import type { VineType } from '@stacksjs/types'
+type Request = any
+import type { ValidationType } from '@stacksjs/ts-validation'
+import type { HttpMethod } from './request'
 
 type ActionPath = string
 // need to refactor before, after, view to be a part of some other type
-export type RouteCallback = ((params?: Record<string, any>) => any | string | object) | ((req: any, res: any) => Promise<void>)
+export type RouteCallback = ((_params?: Record<string, any>) => any | string | object) | ((req: any, res: any) => Promise<void>)
 
 export interface RequestData {
   [key: string]: any
 }
 
 export interface ValidationField {
-  rule: VineType
+  rule: ValidationType
   message: Record<string, string>
 }
 
-export type AuthToken = `${number}:${number}:${string}`
+export type RouterAuthToken = `${number}:${number}:${string}`
 
 export interface CustomAttributes {
   [key: string]: ValidationField
@@ -62,7 +63,7 @@ export type RedirectCode = Extract<StatusCode, 301 | 302>
 
 export interface RouteParam { [key: string]: string | number }
 
-export type MiddlewareFn = (request: Request) => Promise<void>
+export type MiddlewareFn = (_request: Request) => Promise<void>
 
 export interface Middlewares {
   logger: MiddlewareFn
@@ -114,7 +115,7 @@ export interface RouterInstance {
   Header: (headerParam: string) => string | number | boolean | null
   getParam: <T>(key: string) => T
   route: (key: string) => number | string | null
-  bearerToken: () => string | null | AuthToken
+  bearerToken: () => string | null | RouterAuthToken
   getParams: () => RouteParams
   getParamAsInt: (key: string) => number | null
   browser: () => string | null

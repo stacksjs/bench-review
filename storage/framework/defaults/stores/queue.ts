@@ -1,5 +1,5 @@
-import type { Ref } from 'vue'
-import { ref } from 'vue'
+import type { Ref } from '@stacksjs/stx'
+import { ref } from '@stacksjs/stx'
 
 interface Queue {
   id?: number
@@ -25,6 +25,11 @@ export const useQueueStore = defineStore('queue', () => {
         'Accept': 'application/json',
       },
     })
+
+    if (!response.ok) {
+      console.error(`Failed to fetch queues: ${response.status}`)
+      return
+    }
 
     const res = await response.json() as Queue[]
 

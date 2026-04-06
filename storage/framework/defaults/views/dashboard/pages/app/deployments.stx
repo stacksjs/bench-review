@@ -1,0 +1,65 @@
+@extends('layouts/default')
+
+@section('content')
+<script server>
+// Data available when full dev server runs (buddy dev)
+let deployments = []
+
+function statusVariant(s) {
+  s = String(s || '').toLowerCase()
+  if (['active', 'success', 'healthy', 'completed', 'running', 'published'].includes(s)) return 'success'
+  if (['pending', 'scheduled', 'warning', 'draft'].includes(s)) return 'warning'
+  if (['failed', 'error', 'inactive', 'cancelled'].includes(s)) return 'danger'
+  if (['processing', 'info'].includes(s)) return 'primary'
+  return 'default'
+}
+</script>
+<div class="p-6 space-y-6">
+
+  <PageHeader title="Deployments" description="Monitor and manage deployments">
+    <Button variant="primary" size="sm">Deploy Now</Button>
+  </PageHeader>
+
+    @if (deployments.length > 0)
+    <div class="bg-white dark:bg-neutral-800/90 rounded-xl border border-black/5 dark:border-white/5">
+      <DataTable
+        :columns="{{ JSON.stringify([
+          { key: 'id', label: 'Deployment' },
+          { key: 'status', label: 'Status' },
+          { key: 'branch', label: 'Branch' },
+          { key: 'commit', label: 'Commit' },
+          { key: 'author', label: 'Author' },
+          { key: 'duration', label: 'Duration' },
+          { key: 'time', label: 'Time' }
+        ]) }}"
+        :data="deployments"
+        emptyTitle="No deployments yet"
+        emptyDescription="Deploy your application using buddy deploy to see deployment history."
+        emptyIcon="i-hugeicons-rocket-01"
+      >
+        @foreach (deployments as deploy)
+          <tr class="hover:bg-neutral-50 dark:hover:bg-white/[0.02] transition-colors">
+            <td class="px-4 py-3 text-[13px] font-medium text-neutral-900 dark:text-white">{{ deploy.id }}</td>
+            <td class="px-4 py-3">
+              <Badge variant="{{ statusVariant(deploy.status) }}" size="sm" dot>{{ deploy.status }}</Badge>
+            </td>
+            <td class="px-4 py-3"><code class="text-xs font-mono px-1.5 py-0.5 bg-neutral-100 dark:bg-neutral-700 rounded">{{ deploy.branch }}</code></td>
+            <td class="px-4 py-3"><code class="text-xs font-mono px-1.5 py-0.5 bg-neutral-100 dark:bg-neutral-700 rounded">{{ deploy.commit }}</code></td>
+            <td class="px-4 py-3 text-[13px] text-neutral-600 dark:text-neutral-300">{{ deploy.author }}</td>
+            <td class="px-4 py-3 text-[12px] font-mono text-neutral-500 dark:text-neutral-400">{{ deploy.duration }}</td>
+            <td class="px-4 py-3 text-[12px] text-neutral-500 dark:text-neutral-400">{{ deploy.time }}</td>
+          </tr>
+        @endforeach
+      </DataTable>
+    </div>
+    @else
+    <div class="flex flex-col items-center justify-center py-16 px-4">
+      <div class="w-16 h-16 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mb-4">
+        <span class="text-2xl text-neutral-400">&#x1F680;</span>
+      </div>
+      <h3 class="text-lg font-semibold text-neutral-900 dark:text-white mb-2">No deployments yet</h3>
+      <p class="text-sm text-neutral-500 dark:text-neutral-400 text-center max-w-sm">Deploy your application using buddy deploy to see deployment history.</p>
+    </div>
+    @endif
+</div>
+@endsection

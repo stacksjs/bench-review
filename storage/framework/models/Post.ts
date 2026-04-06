@@ -1,7 +1,7 @@
-import type { Model } from '@stacksjs/types'
+import { defineModel } from '@stacksjs/orm'
 import { schema } from '@stacksjs/validation'
 
-export default {
+export default defineModel({
   name: 'Post',
   table: 'posts',
   primaryKey: 'id',
@@ -55,7 +55,7 @@ export default {
           url: 'Poster must be a valid URL',
         },
       },
-      factory: faker => faker.image.url(),
+      factory: faker => faker.image.url().substring(0, 255),
     },
 
     content: {
@@ -63,12 +63,13 @@ export default {
       order: 5,
       fillable: true,
       validation: {
-        rule: schema.string().min(10),
+        rule: schema.string().min(10).max(1000),
         message: {
           min: 'Post body must have a minimum of 10 characters',
+          max: 'Post body must have a maximum of 1000 characters',
         },
       },
-      factory: faker => faker.lorem.paragraphs(3),
+      factory: faker => faker.lorem.paragraphs(1),
     },
 
     excerpt: {
@@ -109,7 +110,10 @@ export default {
           timestamp: 'Published timestamp must be a valid timestamp',
         },
       },
-      factory: faker => faker.date.past().getTime(),
+      factory: (faker) => {
+        const date = faker.date.past()
+        return date.toISOString().slice(0, 19).replace('T', ' ')
+      },
     },
 
     status: {
@@ -139,4 +143,4 @@ export default {
       factory: faker => faker.number.int({ min: 0, max: 1 }),
     },
   },
-} satisfies Model
+} as const)

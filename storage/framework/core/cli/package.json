@@ -4,7 +4,9 @@
   "version": "0.70.23",
   "description": "TypeScript framework for CLI artisans. Build beautiful console apps with ease.",
   "author": "Chris Breuer",
-  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "contributors": [
+    "Chris Breuer <chris@stacksjs.com>"
+  ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
   "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/cli#readme",
@@ -34,41 +36,39 @@
   ],
   "exports": {
     ".": {
+      "bun": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./*": {
+      "bun": "./src/*",
       "import": "./dist/*"
     }
   },
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["README.md", "dist"],
+  "files": [
+    "README.md",
+    "dist"
+  ],
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "bun tsc --noEmit",
     "test": "bun test",
     "prepublishOnly": "bun run build"
   },
+  "dependencies": {
+    "@stacksjs/clapp": "^0.2.0"
+  },
   "devDependencies": {
-    "@antfu/install-pkg": "^1.1.0",
-    "@clack/core": "^0.5.0",
     "@stacksjs/collections": "workspace:*",
     "@stacksjs/config": "workspace:*",
-    "@stacksjs/development": "workspace:*",
+    "better-dx": "^0.2.5",
     "@stacksjs/error-handling": "workspace:*",
     "@stacksjs/logging": "workspace:*",
     "@stacksjs/path": "workspace:*",
     "@stacksjs/types": "workspace:*",
     "@stacksjs/utils": "workspace:*",
-    "@stacksjs/validation": "workspace:*",
-    "@types/prompts": "^2.4.9",
-    "ansi-escapes": "^7.0.0",
-    "@stacksjs/clapp": "^0.2.0",
-    "consola": "^3.4.2",
-    "kolorist": "1.8.0",
-    "ora": "^8.2.0",
-    "prompts": "^2.4.2",
-    "supports-hyperlinks": "^4.1.0"
+    "@stacksjs/validation": "workspace:*"
   }
 }

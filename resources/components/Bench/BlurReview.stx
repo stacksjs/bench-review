@@ -1,0 +1,22 @@
+@if(color === 'off-white')
+  <div class="abl abm bh m ee abn" style="background: linear-gradient(rgba(249, 247, 241, 0), rgb(249, 247, 241))"></div>
+@else
+  <div class="abl abm bh m ee abn" style="background: linear-gradient(rgba(255, 255, 255, 0), rgb(255, 255, 255))"></div>
+@endif
+
+@push('styles')
+<style>
+  .abl {
+    margin-top: -240px;
+  }
+  .abm {
+    height: 250px;
+  }
+  .bh {
+    width: 100%;
+  }
+  .ee {
+    position: relative;
+  }
+</style>
+@endpush

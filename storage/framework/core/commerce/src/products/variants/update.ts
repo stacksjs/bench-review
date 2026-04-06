@@ -1,6 +1,7 @@
-import type { ProductVariantJsonResponse, ProductVariantUpdate } from '@stacksjs/orm'
 import { db } from '@stacksjs/database'
 import { formatDate } from '@stacksjs/orm'
+type ProductVariantJsonResponse = ModelRow<typeof ProductVariant>
+type ProductVariantUpdate = UpdateModelData<typeof ProductVariant>
 
 /**
  * Update a product variant
@@ -24,7 +25,7 @@ export async function update(id: number, data: Omit<ProductVariantUpdate, 'id'>)
     if (!result)
       throw new Error('Failed to update product variant')
 
-    return result
+    return result as ProductVariantJsonResponse
   }
   catch (error) {
     if (error instanceof Error)
@@ -47,24 +48,22 @@ export async function bulkUpdate(data: ProductVariantUpdate[]): Promise<number> 
   let updatedCount = 0
 
   try {
-    await db.transaction().execute(async (trx) => {
-      for (const variant of data) {
-        if (!variant.id)
-          continue
+    for (const variant of data) {
+      if (!(variant as Record<string, unknown>).id)
+        continue
 
-        const result = await trx
-          .updateTable('product_variants')
-          .set({
-            ...variant,
-            updated_at: formatDate(new Date()),
-          })
-          .where('id', '=', variant.id)
-          .executeTakeFirst()
+      const result = await db
+        .updateTable('product_variants')
+        .set({
+          ...variant,
+          updated_at: formatDate(new Date()),
+        })
+        .where('id', '=', (variant as Record<string, unknown>).id)
+        .executeTakeFirst()
 
-        if (Number(result.numUpdatedRows) > 0)
-          updatedCount++
-      }
-    })
+      if (Number(result.numUpdatedRows) > 0)
+        updatedCount++
+    }
 
     return updatedCount
   }

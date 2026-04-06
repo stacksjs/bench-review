@@ -1,0 +1,103 @@
+@extends('layouts/default')
+
+@section('content')
+<script server>
+let providers = []
+let stats = []
+let resources = []
+</script>
+<div class="p-6 space-y-6">
+
+  <PageHeader title="Cloud" description="Cloud provider management">
+    <template #actions>
+      <Button variant="secondary">Sync Resources</Button>
+      <Button variant="primary">
+        <div class="i-hugeicons-plus-sign h-4 w-4"></div>
+        Add Provider
+      </Button>
+    </template>
+  </PageHeader>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    @foreach (stats as stat)
+      <StatsCard :title="stat.label" value="{{ stat.value }}" icon="i-hugeicons-cloud" iconBg="primary" />
+    @endforeach
+  </div>
+
+  @if (providers.length > 0 || resources.length > 0)
+  <!-- Providers Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    @foreach (providers as provider)
+      <Card>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-[14px] font-semibold text-neutral-900 dark:text-white">{{ provider.name }}</span>
+            <Badge variant="success" size="xs" dot>{{ provider.status }}</Badge>
+          </div>
+          <div class="space-y-2 text-[13px]">
+            <div class="flex justify-between">
+              <span class="text-neutral-500 dark:text-neutral-400">Resources</span>
+              <span class="font-medium text-neutral-900 dark:text-white">{{ provider.resources }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-neutral-500 dark:text-neutral-400">Region</span>
+              <span class="text-neutral-600 dark:text-neutral-300">{{ provider.region }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-neutral-500 dark:text-neutral-400">Monthly</span>
+              <span class="font-semibold text-neutral-900 dark:text-white">{{ provider.spend }}</span>
+            </div>
+          </div>
+        </div>
+      </Card>
+    @endforeach
+  </div>
+
+  <!-- Resources Table -->
+  <div class="bg-white dark:bg-neutral-800/90 rounded-xl border border-black/5 dark:border-white/5">
+    <div class="p-4 border-b border-neutral-200/60 dark:border-white/5">
+      <FilterBar searchPlaceholder="Search resources..." />
+    </div>
+
+    <DataTable
+      :columns="{{ JSON.stringify([
+        { key: 'name', label: 'Name' },
+        { key: 'type', label: 'Type' },
+        { key: 'provider', label: 'Provider' },
+        { key: 'status', label: 'Status' },
+        { key: 'cost', label: 'Cost' },
+        { key: 'actions', label: '' }
+      ]) }}"
+      :data="resources"
+      emptyTitle="No resources"
+      emptyDescription="Cloud resources will appear here"
+      emptyIcon="i-hugeicons-cloud"
+    >
+      @foreach (resources as resource)
+        <tr class="hover:bg-neutral-50 dark:hover:bg-white/[0.02] transition-colors">
+          <td class="px-4 py-3 text-[13px] font-medium text-neutral-900 dark:text-white">{{ resource.name }}</td>
+          <td class="px-4 py-3">
+            <Badge variant="default" size="xs">{{ resource.type }}</Badge>
+          </td>
+          <td class="px-4 py-3 text-[13px] text-neutral-600 dark:text-neutral-300">{{ resource.provider }}</td>
+          <td class="px-4 py-3">
+            <Badge variant="success" size="xs" dot>{{ resource.status }}</Badge>
+          </td>
+          <td class="px-4 py-3 text-[13px] text-neutral-600 dark:text-neutral-300">{{ resource.cost }}</td>
+          <td class="px-4 py-3">
+            <Button variant="ghost" size="xs">Manage</Button>
+          </td>
+        </tr>
+      @endforeach
+    </DataTable>
+  </div>
+  @else
+  <EmptyState
+    icon="i-hugeicons-cloud"
+    title="No cloud resources configured"
+    description="Deploy your application to see cloud infrastructure"
+  />
+  @endif
+</div>
+@endsection

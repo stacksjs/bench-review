@@ -1,6 +1,7 @@
-import type { WaitlistRestaurantJsonResponse, WaitlistRestaurantUpdate } from '@stacksjs/orm'
 import { db } from '@stacksjs/database'
 import { formatDate } from '@stacksjs/orm'
+type WaitlistRestaurantJsonResponse = ModelRow<typeof WaitlistRestaurant>
+type WaitlistRestaurantUpdate = UpdateModelData<typeof WaitlistRestaurant>
 
 /**
  * Update a restaurant waitlist entry
@@ -14,15 +15,16 @@ export async function update(id: number, data: WaitlistRestaurantUpdate): Promis
     if (!id)
       throw new Error('Restaurant waitlist entry ID is required for update')
 
+    const d = data as Record<string, unknown>
     const result = await db
       .updateTable('waitlist_restaurants')
       .set({
         name: data.name,
         email: data.email,
         phone: data.phone,
-        party_size: data.party_size,
-        check_in_time: data.check_in_time ? Math.floor(new Date(data.check_in_time).getTime() / 1000) : undefined,
-        table_preference: data.table_preference,
+        party_size: d.party_size,
+        check_in_time: d.check_in_time ? Math.floor(new Date(d.check_in_time as string).getTime() / 1000) : undefined,
+        table_preference: d.table_preference,
         status: data.status,
         quoted_wait_time: data.quoted_wait_time,
         actual_wait_time: data.actual_wait_time,
@@ -37,7 +39,7 @@ export async function update(id: number, data: WaitlistRestaurantUpdate): Promis
     if (!result)
       throw new Error('Failed to update restaurant waitlist entry')
 
-    return result
+    return result as WaitlistRestaurantJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
@@ -73,7 +75,7 @@ export async function updateStatus(
     if (!result)
       throw new Error('Failed to update restaurant waitlist entry status')
 
-    return result
+    return result as WaitlistRestaurantJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
@@ -109,7 +111,7 @@ export async function updatePartySize(
     if (!result)
       throw new Error('Failed to update party size')
 
-    return result
+    return result as WaitlistRestaurantJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
@@ -148,7 +150,7 @@ export async function updateWaitTimes(
     if (!result)
       throw new Error('Failed to update wait times')
 
-    return result
+    return result as WaitlistRestaurantJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
@@ -184,7 +186,7 @@ export async function updateQueuePosition(
     if (!result)
       throw new Error('Failed to update queue position')
 
-    return result
+    return result as WaitlistRestaurantJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {

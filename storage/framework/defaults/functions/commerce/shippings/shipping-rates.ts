@@ -1,92 +1,109 @@
-import type { ShippingRates } from '../../types'
-import { useFetch, useStorage } from '@vueuse/core'
+import type { NewShippingRate, ShippingRates } from '../../../types/defaults'
+import { useStorage } from '@stacksjs/browser'
 
 // Create a persistent shipping rates array using VueUse's useStorage
 const shippingRates = useStorage<ShippingRates[]>('shippingRates', [])
 
-const baseURL = 'http://localhost:3008/api'
+const baseURL = process.env.VITE_API_URL || `http://localhost:${process.env.PORT_API || '3008'}`
 
 // Basic fetch function to get all shipping rates
 async function fetchShippingRates() {
-  const { error, data } = useFetch<ShippingRates[]>(`${baseURL}/commerce/shipping-rates`)
+  try {
+    const response = await fetch(`${baseURL}/commerce/shipping-rates`)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
 
-  if (error.value) {
-    console.error('Error fetching shipping rates:', error.value)
-    return []
-  }
+    const { data } = await response.json() as { data: ShippingRates[] }
 
-  // Ensure data is an array before assigning
-  if (Array.isArray(data.value)) {
-    shippingRates.value = data.value
-    return data.value
+    shippingRates.value = data
+
+    return data
   }
-  else {
-    console.error('Expected array of shipping rates but received:', typeof data.value)
+  catch (error) {
+    console.error('Error fetching shipping rates:', error)
     return []
   }
 }
 
-async function createShippingRate(shippingRate: ShippingRates) {
-  const { error, data } = useFetch<ShippingRates>(`${baseURL}/commerce/shipping-rates`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(shippingRate),
-  })
+async function createShippingRate(shippingRate: NewShippingRate) {
+  try {
+    const response = await fetch(`${baseURL}/commerce/shipping-rates`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(shippingRate),
+    })
 
-  if (error.value) {
-    console.error('Error creating shipping rate:', error.value)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json() as ShippingRates
+    if (data) {
+      shippingRates.value.push(data)
+      return data
+    }
     return null
   }
-
-  if (data.value) {
-    shippingRates.value.push(data.value)
-    return data.value
+  catch (error) {
+    console.error('Error creating shipping rate:', error)
+    return null
   }
-  return null
 }
 
 async function updateShippingRate(shippingRate: ShippingRates) {
-  const { error, data } = useFetch<ShippingRates>(`${baseURL}/commerce/shipping-rates/${shippingRate.id}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(shippingRate),
-  })
+  try {
+    const response = await fetch(`${baseURL}/commerce/shipping-rates/${shippingRate.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(shippingRate),
+    })
 
-  if (error.value) {
-    console.error('Error updating shipping rate:', error.value)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json() as ShippingRates
+    if (data) {
+      const index = shippingRates.value.findIndex(s => s.id === shippingRate.id)
+      if (index !== -1) {
+        shippingRates.value[index] = data
+      }
+      return data
+    }
     return null
   }
-
-  if (data.value) {
-    const index = shippingRates.value.findIndex(s => s.id === shippingRate.id)
-    if (index !== -1) {
-      shippingRates.value[index] = data.value
-    }
-    return data.value
+  catch (error) {
+    console.error('Error updating shipping rate:', error)
+    return null
   }
-  return null
 }
 
 async function deleteShippingRate(id: number) {
-  const { error } = useFetch(`${baseURL}/commerce/shipping-rates/${id}`, {
-    method: 'DELETE',
-  })
+  try {
+    const response = await fetch(`${baseURL}/commerce/shipping-rates/${id}`, {
+      method: 'DELETE',
+    })
 
-  if (error.value) {
-    console.error('Error deleting shipping rate:', error.value)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const index = shippingRates.value.findIndex(s => s.id === id)
+    if (index !== -1) {
+      shippingRates.value.splice(index, 1)
+    }
+
+    return true
+  }
+  catch (error) {
+    console.error('Error deleting shipping rate:', error)
     return false
   }
-
-  const index = shippingRates.value.findIndex(s => s.id === id)
-  if (index !== -1) {
-    shippingRates.value.splice(index, 1)
-  }
-
-  return true
 }
 
 // Export the composable

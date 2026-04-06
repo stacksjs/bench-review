@@ -96,17 +96,78 @@ export interface ServicesOptions {
     retryTimeout?: number
   }
 
-  slack?: {
-    appId: string
-    clientId: string
-    secretKey: string
+  /**
+   * SMTP Configuration for local development
+   * Works with HELO, Mailtrap Desktop, Mailhog, etc.
+   */
+  smtp?: {
+    host: string
+    port: number
+    username?: string
+    password?: string
+    encryption?: 'tls' | 'ssl' | null
     maxRetries?: number
     retryTimeout?: number
   }
 
+  slack?: {
+    appId?: string
+    clientId?: string
+    secretKey?: string
+    webhookUrl?: string
+    botToken?: string
+    maxRetries?: number
+    retryTimeout?: number
+  }
+
+  discord?: {
+    webhookUrl?: string
+    botToken?: string
+    maxRetries?: number
+    retryTimeout?: number
+  }
+
+  teams?: {
+    webhookUrl?: string
+    maxRetries?: number
+    retryTimeout?: number
+  }
+
+  // Push Notification Services
+  expo?: {
+    accessToken?: string
+  }
+
+  fcm?: {
+    serverKey?: string
+    projectId?: string
+    clientEmail?: string
+    privateKey?: string
+  }
+
+  // AI Services
+  openai?: {
+    apiKey?: string
+    model?: string
+    embeddingModel?: string
+    baseUrl?: string
+  }
+
+  anthropic?: {
+    apiKey?: string
+    model?: string
+    maxTokens?: number
+  }
+
+  ollama?: {
+    host?: string
+    model?: string
+    embeddingModel?: string
+  }
+
   stripe?: {
-    secretKey: string
-    publicKey: string
+    secretKey?: string
+    publicKey?: string
   }
 
   // supabase?: {

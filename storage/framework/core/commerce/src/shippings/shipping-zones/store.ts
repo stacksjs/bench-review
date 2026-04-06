@@ -1,7 +1,9 @@
 // Import dependencies
-import type { NewShippingZone, ShippingZoneJsonResponse } from '@stacksjs/orm'
+type ShippingZoneJsonResponse = ModelRow<typeof ShippingZone>
+type NewShippingZone = NewModelData<typeof ShippingZone>
 import { randomUUIDv7 } from 'bun'
 import { db } from '@stacksjs/database'
+import { fetchById } from './fetch'
 
 /**
  * Create a new shipping zone
@@ -19,13 +21,16 @@ export async function store(data: NewShippingZone): Promise<ShippingZoneJsonResp
     const result = await db
       .insertInto('shipping_zones')
       .values(zoneData)
-      .returningAll()
       .executeTakeFirst()
 
     if (!result)
       throw new Error('Failed to create shipping zone')
 
-    return result
+    const insertId = Number(result.insertId) || Number(result.numInsertedOrUpdatedRows)
+
+    const model = await fetchById(insertId)
+
+    return model as ShippingZoneJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {

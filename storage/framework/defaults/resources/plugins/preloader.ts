@@ -1,0 +1,256 @@
+/**
+ * Main Preloader
+ *
+ * This file is loaded before the main (Bun) process is started.
+ * You may use this file to preload/define plugins that will
+ * automatically be injected into the Bun process.
+ */
+
+// Skip preloader for fast commands to maximize startup speed
+// These commands don't need env loading
+const args = process.argv.slice(2)
+const fastCommands = ['dev', 'build', 'test', 'lint', '--version', '-v', 'version', '--help', '-h', 'help']
+const skipPreloader = args.length === 0 || fastCommands.some(cmd => args[0] === cmd || args[0].startsWith(`${cmd}:`))
+
+if (!skipPreloader) {
+  // Detect production/deployment commands and set environment accordingly BEFORE loading env files
+  // This ensures the correct .env.{env} file is loaded with proper encryption/decryption
+  const productionCommands = ['cloud:remove', 'cloud:rm', 'cloud:destroy', 'cloud:cleanup', 'cloud:clean-up', 'undeploy']
+  const isProductionCommand = productionCommands.includes(args[0])
+
+  // Handle deploy command which can have an optional env argument: `deploy [env]`
+  const isDeployCommand = args[0] === 'deploy'
+  if (isDeployCommand) {
+    // Check if second arg is an environment (not a flag starting with -)
+    const deployEnv = args[1] && !args[1].startsWith('-') ? args[1] : 'production'
+    process.env.APP_ENV = deployEnv
+    process.env.NODE_ENV = deployEnv
+  }
+  else if (isProductionCommand) {
+    process.env.APP_ENV = 'production'
+    process.env.NODE_ENV = 'production'
+  }
+
+  // Load .env files with encryption support using our native Bun plugin
+  const { autoLoadEnv } = await import('@stacksjs/env')
+
+  // Auto-load .env files based on environment
+  // Set quiet: true to prevent duplicate logging across multiple processes
+  autoLoadEnv({ quiet: true })
+}
+
+// stx template engine plugin
+// enables .stx file processing
+// NOTE: Commented out until bun-plugin-stx is properly installed
+// Uncomment after running: bun add bun-plugin-stx
+// eslint-disable-next-line antfu/no-top-level-await
+// await import('bun-plugin-stx')
+
+// Auto-import ALL Stacks framework modules into globalThis
+// This allows using Action, response, Activity, etc. without ANY imports
+async function loadAutoImports() {
+  const { Glob } = await import('bun')
+  const path = await import('@stacksjs/path')
+
+  // CRITICAL: Never overwrite these built-in globals
+  const protectedGlobals = new Set([
+    'process', 'globalThis', 'global', 'window', 'self',
+    'console', 'require', 'module', 'exports', '__dirname', '__filename',
+    'Buffer', 'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval',
+    'setImmediate', 'clearImmediate', 'queueMicrotask',
+    'fetch', 'Request', 'Response', 'Headers', 'URL', 'URLSearchParams',
+    'TextEncoder', 'TextDecoder', 'Blob', 'File', 'FormData',
+    'crypto', 'performance', 'navigator', 'location',
+    'Promise', 'Symbol', 'Proxy', 'Reflect', 'WeakMap', 'WeakSet', 'Map', 'Set',
+    'Array', 'Object', 'String', 'Number', 'Boolean', 'Date', 'RegExp', 'Error',
+    'JSON', 'Math', 'Intl', 'eval', 'isNaN', 'isFinite', 'parseInt', 'parseFloat',
+    'encodeURI', 'encodeURIComponent', 'decodeURI', 'decodeURIComponent',
+    'Bun', 'Deno', 'Node',
+  ])
+
+  // 1. Load Stacks framework packages into globalThis
+  const stacksPackages = [
+    '@stacksjs/actions',
+    '@stacksjs/router',
+    '@stacksjs/orm',
+    '@stacksjs/validation',
+    '@stacksjs/strings',
+    '@stacksjs/arrays',
+    '@stacksjs/objects',
+    '@stacksjs/collections',
+    '@stacksjs/path',
+    '@stacksjs/storage',
+    '@stacksjs/env',
+    '@stacksjs/config',
+    '@stacksjs/logging',
+    '@stacksjs/cache',
+    '@stacksjs/queue',
+    '@stacksjs/events',
+    '@stacksjs/notifications',
+    '@stacksjs/email',
+    '@stacksjs/security',
+    '@stacksjs/auth',
+    '@stacksjs/database',
+    '@stacksjs/error-handling',
+  ]
+
+  for (const pkg of stacksPackages) {
+    try {
+      const module = await import(pkg)
+      for (const [name, value] of Object.entries(module)) {
+        // Skip default exports and protected globals
+        if (name === 'default' || protectedGlobals.has(name)) continue
+        if (typeof value !== 'undefined') {
+          (globalThis as any)[name] = value
+        }
+      }
+    } catch {
+      // Package might not exist or not be built yet
+    }
+  }
+
+  // 2. Load all functions from resources/functions
+  const functionsPath = path.resourcesPath('functions')
+  const glob = new Glob('**/*.ts')
+
+  for await (const file of glob.scan({
+    cwd: functionsPath,
+    absolute: true,
+    onlyFiles: true,
+  })) {
+    if (file.endsWith('.d.ts')) continue
+
+    try {
+      const module = await import(file)
+      for (const [name, value] of Object.entries(module)) {
+        // Skip default exports and protected globals
+        if (name === 'default' || protectedGlobals.has(name)) continue
+        if (typeof value !== 'undefined') {
+          (globalThis as any)[name] = value
+        }
+      }
+    } catch {
+      // Some files may have client-side dependencies, skip them
+    }
+  }
+
+  // 3. Load all defineModel()-based model instances into globalThis
+  // This enables using Post.where('title', 'test') without imports
+  // Priority: user models > framework models > default models
+  const modelDirs = [
+    path.userModelsPath(),
+    path.storagePath('framework/models'),
+    path.storagePath('framework/defaults/app/Models'),
+  ]
+
+  const loadedModels = new Set<string>()
+
+  for (const dir of modelDirs) {
+    try {
+      for await (const file of glob.scan({
+        cwd: dir,
+        absolute: true,
+        onlyFiles: true,
+      })) {
+        if (file.endsWith('.d.ts') || file.endsWith('/index.ts')) continue
+
+        const modelName = file.split('/').pop()?.replace('.ts', '') || ''
+        if (!modelName || loadedModels.has(modelName) || protectedGlobals.has(modelName)) continue
+
+        try {
+          const module = await import(file)
+          if (module.default) {
+            (globalThis as any)[modelName] = module.default
+            loadedModels.add(modelName)
+          }
+        } catch {
+          // Model may have unresolved dependencies during bootstrap
+        }
+      }
+    } catch {
+      // Directory may not exist
+    }
+  }
+
+  // 4. Load all Job instances from app/Jobs into globalThis
+  // This enables using SendWelcomeEmail.dispatch() without imports
+  const jobsDir = path.userJobsPath()
+  const loadedJobs = new Set<string>()
+
+  try {
+    for await (const file of glob.scan({
+      cwd: jobsDir,
+      absolute: true,
+      onlyFiles: true,
+    })) {
+      if (file.endsWith('.d.ts') || file.endsWith('/index.ts')) continue
+
+      const jobName = file.split('/').pop()?.replace('.ts', '') || ''
+      if (!jobName || loadedJobs.has(jobName) || protectedGlobals.has(jobName)) continue
+
+      try {
+        const module = await import(file)
+        if (module.default) {
+          (globalThis as any)[jobName] = module.default
+          loadedJobs.add(jobName)
+        }
+      } catch {
+        // Job may have unresolved dependencies during bootstrap
+      }
+    }
+  } catch {
+    // Directory may not exist
+  }
+
+  // 5. Load all Controller classes into globalThis
+  // This enables using ComingSoonController without imports
+  // Priority: user controllers > default controllers
+  const controllerDirs = [
+    path.userControllersPath(),
+    path.storagePath('framework/defaults/app/Controllers'),
+  ]
+  const loadedControllers = new Set<string>()
+
+  for (const dir of controllerDirs) {
+    try {
+      for await (const file of glob.scan({
+        cwd: dir,
+        absolute: true,
+        onlyFiles: true,
+      })) {
+        if (file.endsWith('.d.ts') || file.endsWith('/index.ts')) continue
+
+        const controllerName = file.split('/').pop()?.replace('.ts', '') || ''
+        if (!controllerName || loadedControllers.has(controllerName) || protectedGlobals.has(controllerName)) continue
+
+        try {
+          const module = await import(file)
+          if (module.default) {
+            (globalThis as any)[controllerName] = module.default
+            loadedControllers.add(controllerName)
+          }
+        } catch {
+          // Controller may have unresolved dependencies during bootstrap
+        }
+      }
+    } catch {
+      // Directory may not exist
+    }
+  }
+}
+
+// Load auto-imports for server/API contexts (serve, any server process)
+// Skip for fast commands (dev, build, test, etc.) and CLI info commands
+const skipAutoImports = skipPreloader || ['--version', '-v', 'version', '--help', '-h', 'help'].includes(args[0])
+if (!skipAutoImports) {
+  await loadAutoImports()
+
+  // Run package auto-discovery after all imports are loaded
+  try {
+    const { discoverPackages } = await import('@stacksjs/actions')
+    await discoverPackages()
+  }
+  catch {
+    // Discovery may fail during early bootstrap — not critical
+  }
+}

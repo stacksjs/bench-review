@@ -1,92 +1,118 @@
-import type { Customers } from '../types'
-import { useFetch, useStorage } from '@vueuse/core'
+import type { Customers } from '../../types/defaults'
+import { useStorage } from '@stacksjs/browser'
 
 // Create a persistent customers array using VueUse's useStorage
 const customers = useStorage<Customers[]>('customers', [])
 
-const baseURL = 'http://localhost:3008/api'
+const baseURL = process.env.VITE_API_URL || `http://localhost:${process.env.PORT_API || '3008'}`
 
 // Basic fetch function to get all customers
 async function fetchCustomers() {
-  const { error, data } = useFetch<Customers[]>(`${baseURL}/commerce/customers`)
+  try {
+    const response = await fetch(`${baseURL}/commerce/customers`)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    const { data } = await response.json() as { data: Customers[] }
 
-  if (error.value) {
-    console.error('Error fetching customers:', error.value)
-    return []
+    if (Array.isArray(data)) {
+      // Update both the storage and the reactive ref
+      customers.value = data
+      return data
+    }
+    else {
+      console.error('Expected array of customers but received:', typeof data)
+      return []
+    }
   }
-
-  // Ensure data is an array before assigning
-  if (Array.isArray(data.value)) {
-    customers.value = data.value
-    return data.value
-  }
-  else {
-    console.error('Expected array of customers but received:', typeof data.value)
-    return []
+  catch (error) {
+    console.error('Error fetching customers:', error)
+    // Return the stored customers if fetch fails
+    return customers.value
   }
 }
 
-async function createCustomer(customer: Customers) {
-  const { error, data } = useFetch<Customers>(`${baseURL}/commerce/customers`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(customer),
-  })
+async function createCustomer(customer: Omit<Customers, 'id'>) {
+  try {
+    const response = await fetch(`${baseURL}/commerce/customers`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(customer),
+    })
 
-  if (error.value) {
-    console.error('Error creating customer:', error.value)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const { data } = await response.json() as { data: Customers }
+    if (data) {
+      // Update both the storage and the reactive ref
+      customers.value = [...customers.value, data]
+      return data
+    }
     return null
   }
-
-  if (data.value) {
-    customers.value.push(data.value)
-    return data.value
+  catch (error) {
+    console.error('Error creating customer:', error)
+    return null
   }
-  return null
 }
 
 async function updateCustomer(customer: Customers) {
-  const { error, data } = useFetch<Customers>(`${baseURL}/commerce/customers/${customer.id}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(customer),
-  })
+  try {
+    const response = await fetch(`${baseURL}/commerce/customers/${customer.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(customer),
+    })
 
-  if (error.value) {
-    console.error('Error updating customer:', error.value)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const { data } = await response.json() as { data: Customers }
+    if (data) {
+      // Update both the storage and the reactive ref
+      const index = customers.value.findIndex(c => c.id === customer.id)
+      if (index !== -1) {
+        customers.value = [
+          ...customers.value.slice(0, index),
+          data,
+          ...customers.value.slice(index + 1),
+        ]
+      }
+      return data
+    }
     return null
   }
-
-  if (data.value) {
-    const index = customers.value.findIndex(c => c.id === customer.id)
-    if (index !== -1) {
-      customers.value[index] = data.value
-    }
-    return data.value
+  catch (error) {
+    console.error('Error updating customer:', error)
+    return null
   }
-  return null
 }
 
 async function deleteCustomer(id: number) {
-  const { error } = useFetch(`${baseURL}/commerce/customers/${id}`, {
-    method: 'DELETE',
-  })
+  try {
+    const response = await fetch(`${baseURL}/commerce/customers/${id}`, {
+      method: 'DELETE',
+    })
 
-  if (error.value) {
-    console.error('Error deleting customer:', error.value)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    // Update both the storage and the reactive ref
+    customers.value = customers.value.filter(c => c.id !== id)
+    return true
+  }
+  catch (error) {
+    console.error('Error deleting customer:', error)
     return false
   }
-
-  const index = customers.value.findIndex(c => c.id === id)
-  if (index !== -1) {
-    customers.value.splice(index, 1)
-  }
-
-  return true
 }
 
 // Export the composable

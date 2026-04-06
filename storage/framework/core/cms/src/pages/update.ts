@@ -1,4 +1,5 @@
-import type { PageJsonResponse, PageUpdate } from '@stacksjs/orm'
+type PageJsonResponse = ModelRow<typeof Page>
+type PageUpdate = UpdateModelData<typeof Page>
 import { db } from '@stacksjs/database'
 import { formatDate } from '@stacksjs/orm'
 
@@ -26,7 +27,7 @@ export async function update(id: number, data: Partial<PageUpdate>): Promise<Pag
     if (!result)
       throw new Error('Failed to update page')
 
-    return result
+    return result as PageJsonResponse
   }
   catch (error) {
     if (error instanceof Error)

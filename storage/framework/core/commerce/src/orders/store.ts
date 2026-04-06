@@ -1,8 +1,9 @@
 // Import dependencies
-import type { NewOrder, OrderJsonResponse } from '@stacksjs/orm'
 import { randomUUIDv7 } from 'bun'
 import { db } from '@stacksjs/database'
 import { formatDate } from '@stacksjs/orm'
+type OrderJsonResponse = ModelRow<typeof Order>
+type NewOrder = NewModelData<typeof Order>
 
 /**
  * Create a new order
@@ -11,7 +12,7 @@ import { formatDate } from '@stacksjs/orm'
  * @returns The newly created order record
  */
 export async function store(data: NewOrder): Promise<OrderJsonResponse | undefined> {
-  const orderData: NewOrder = {
+  const orderData = {
     ...data,
     status: data.status || 'PENDING',
     uuid: randomUUIDv7(),
@@ -23,7 +24,7 @@ export async function store(data: NewOrder): Promise<OrderJsonResponse | undefin
     // Insert the order record
     const createdOrder = await db
       .insertInto('orders')
-      .values(orderData)
+      .values(orderData as NewOrder)
       .executeTakeFirst()
 
     const insertId = Number(createdOrder?.insertId) || Number(createdOrder?.numInsertedOrUpdatedRows)
@@ -36,7 +37,7 @@ export async function store(data: NewOrder): Promise<OrderJsonResponse | undefin
         .selectAll()
         .executeTakeFirst()
 
-      return order
+      return order as OrderJsonResponse | undefined
     }
 
     return undefined

@@ -4,7 +4,9 @@
   "version": "0.70.23",
   "description": "The Stacks helper functions.",
   "author": "Chris Breuer",
-  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "contributors": [
+    "Chris Breuer <chris@stacksjs.com>"
+  ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
   "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/helpers#readme",
@@ -29,6 +31,7 @@
   ],
   "exports": {
     ".": {
+      "bun": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
@@ -38,47 +41,29 @@
   },
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["README.md", "dist"],
+  "files": [
+    "README.md",
+    "dist"
+  ],
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "bun tsc --noEmit",
     "prepublishOnly": "bun run build",
     "size": "bun scripts/export-size.ts"
   },
+  "dependencies": {
+    "@stacksjs/browser": "workspace:*"
+  },
   "devDependencies": {
     "@stacksjs/actions": "workspace:*",
     "@stacksjs/arrays": "workspace:*",
     "@stacksjs/cli": "workspace:*",
     "@stacksjs/config": "workspace:*",
-    "@stacksjs/development": "workspace:*",
+    "better-dx": "^0.2.5",
     "@stacksjs/lint": "workspace:*",
     "@stacksjs/path": "workspace:*",
     "@stacksjs/storage": "workspace:*",
     "@stacksjs/strings": "workspace:*",
-    "@stacksjs/types": "workspace:*",
-    "@types/js-yaml": "^4.0.9",
-    "@vueuse/core": "^13.3.0",
-    "@vueuse/head": "^2.0.0",
-    "@vueuse/math": "^13.3.0",
-    "@vueuse/shared": "^13.3.0",
-    "ace-builds": "^1.42.0",
-    "bun-plugin-dotenvx": "^0.6.3",
-    "bun-plugin-yml": "^0.3.1",
-    "defu": "^6.1.4",
-    "detect-indent": "^7.0.1",
-    "detect-newline": "^4.0.1",
-    "export-size": "^0.7.0",
-    "jiti": "^2.4.2",
-    "js-yaml": "^4.1.0",
-    "kolorist": "1.8.0",
-    "macroable": "^7.0.2",
-    "magic-regexp": "^0.10.0",
-    "markdown-table": "^3.0.4",
-    "perfect-debounce": "^1.0.0",
-    "pretty-bytes": "^7.0.0",
-    "resize-observer-polyfill": "^1.5.1",
-    "vue-starport": "^0.4.0",
-    "vue3-ace-editor": "^2.2.4",
-    "yaml": "^2.8.0"
+    "@stacksjs/types": "workspace:*"
   }
 }

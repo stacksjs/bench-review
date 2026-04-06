@@ -1,4 +1,4 @@
-import type { AuthorJsonResponse } from '@stacksjs/orm'
+type AuthorJsonResponse = ModelRow<typeof Author>
 import { db } from '@stacksjs/database'
 
 /**
@@ -7,7 +7,7 @@ import { db } from '@stacksjs/database'
  * @param id The ID of the author to delete
  * @returns The deleted author record
  */
-export async function destroy(id: number): Promise<AuthorJsonResponse | undefined> {
+export async function destroy(id: number): Promise<AuthorJsonResponse> {
   try {
     const result = await db
       .deleteFrom('authors')
@@ -15,11 +15,15 @@ export async function destroy(id: number): Promise<AuthorJsonResponse | undefine
       .returningAll()
       .executeTakeFirst()
 
-    return result
+    if (!result) {
+      throw new Error(`Author with ID ${id} not found`)
+    }
+
+    return result as AuthorJsonResponse
   }
   catch (error) {
     if (error instanceof Error)
-      throw new TypeError(`Failed to delete author: ${error.message}`)
+      throw new TypeError(`Author with ID ${id} not found`)
 
     throw error
   }
@@ -38,7 +42,7 @@ export async function destroyMany(ids: number[]): Promise<number> {
       .where('id', 'in', ids)
       .execute()
 
-    return result.length
+    return Number(result) || 0
   }
   catch (error) {
     if (error instanceof Error)

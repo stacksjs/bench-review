@@ -27,14 +27,25 @@ export async function runScheduler(): Promise<Ok<string, never> | Err<string, an
 
   await runSchedulerInstance()
 
-  return ok('Schedules ran successfully')
+  return ok('Schedules ran successfully') as any
 }
 
 async function runSchedulerInstance(): Promise<void> {
   const schedulerFile = path.appPath('Scheduler.ts')
-  const scheduleInstance = await import(schedulerFile)
 
-  scheduleInstance.default()
+  try {
+    const scheduleInstance = await import(schedulerFile)
+
+    if (typeof scheduleInstance.default === 'function') {
+      scheduleInstance.default()
+    }
+    else {
+      console.warn(`Scheduler file ${schedulerFile} does not export a default function`)
+    }
+  }
+  catch (error) {
+    console.warn(`Could not load scheduler file ${schedulerFile}:`, error)
+  }
 }
 
 function executeJobRate(jobName: string, rate: string): void {

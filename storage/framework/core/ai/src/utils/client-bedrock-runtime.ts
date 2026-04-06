@@ -3,19 +3,13 @@ import type {
   InvokeModelCommandOutput,
   InvokeModelWithResponseStreamCommandInput,
   InvokeModelWithResponseStreamCommandOutput,
-} from '@aws-sdk/client-bedrock-runtime'
+} from '@stacksjs/ts-cloud/aws'
 import process from 'node:process'
-import {
-  BedrockRuntimeClient,
-  InvokeModelCommand,
-  InvokeModelWithResponseStreamCommand,
-} from '@aws-sdk/client-bedrock-runtime'
+import { BedrockRuntimeClient } from '@stacksjs/ts-cloud/aws'
 
-export const client: BedrockRuntimeClient = new BedrockRuntimeClient({
-  region: process.env.REGION || 'us-east-1',
-})
-
-const logger = console // import your own logger
+export const client = new BedrockRuntimeClient(
+  process.env.REGION || 'us-east-1',
+)
 
 /*
  * Invoke Model
@@ -24,12 +18,7 @@ const logger = console // import your own logger
  * @see https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/BedrockRuntime.html#invokeModel-property
  */
 export async function invokeModel(params: InvokeModelCommandInput): Promise<InvokeModelCommandOutput> {
-  logger.debug(params)
-  const command = new InvokeModelCommand(params)
-  const res = await client.send(command)
-  logger.debug('Successfully invoke model')
-  logger.debug(res)
-  return res
+  return client.invokeModel(params)
 }
 
 /*
@@ -41,14 +30,7 @@ export async function invokeModel(params: InvokeModelCommandInput): Promise<Invo
 export async function invokeModelWithResponseStream(
   params: InvokeModelWithResponseStreamCommandInput,
 ): Promise<InvokeModelWithResponseStreamCommandOutput> {
-  logger.debug(params)
-  const command = new InvokeModelWithResponseStreamCommand(params)
-  const res = await client.send(command)
-  logger.debug('Successfully invoke model with response stream')
-  logger.debug(res)
-  return res
+  return client.invokeModelWithResponseStream(params)
 }
-
-export { InvokeModelCommand }
 
 export type { InvokeModelCommandInput, InvokeModelWithResponseStreamCommandInput }

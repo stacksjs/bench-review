@@ -1,30 +1,29 @@
 import type { QueueOption } from '@stacksjs/types'
-import process from 'node:process'
-import { path } from '@stacksjs/path'
-import Job from '../../../orm/src/models/Job'
 
 export async function storeJob(name: string, options: QueueOption): Promise<void> {
-  const importedJob = (await import(path.appPath(`Jobs/${name}.ts`))).default
-
   const payloadJson = JSON.stringify({
-    path: `app/Jobs/${name}.ts`,
-    name,
-    timeout: null,
-    timeoutAt: null,
-    params: options.payload || {},
-    classPayload: JSON.stringify(importedJob),
+    jobName: name,
+    payload: options.payload || {},
+    options: {
+      queue: options.queue,
+      tries: options.maxTries,
+      timeout: options.timeout,
+      backoff: options.backoff,
+    },
   })
 
-  const job = {
-    queue: options.queue,
-    payload: payloadJson,
-    attempts: 0,
-    available_at: generateUnixTimestamp(options.delay || 0),
-  }
+  const { db } = await import('@stacksjs/database')
 
-  await Job.create(job)
-
-  process.exit()
+  await db
+    .insertInto('jobs')
+    .values({
+      queue: options.queue || 'default',
+      payload: payloadJson,
+      attempts: 0,
+      available_at: generateUnixTimestamp(options.delay || 0),
+      created_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+    })
+    .execute()
 }
 
 function generateUnixTimestamp(secondsToAdd: number): number {

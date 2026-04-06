@@ -1,6 +1,7 @@
-import type { TaxRateJsonResponse, TaxRateUpdate } from '@stacksjs/orm'
 import { db } from '@stacksjs/database'
 import { formatDate } from '@stacksjs/orm'
+type TaxRateJsonResponse = ModelRow<typeof TaxRate>
+type TaxRateUpdate = UpdateModelData<typeof TaxRate>
 
 /**
  * Update a tax rate
@@ -14,6 +15,7 @@ export async function update(id: number, data: TaxRateUpdate): Promise<TaxRateJs
     if (!id)
       throw new Error('Tax rate ID is required for update')
 
+    const d = data as Record<string, unknown>
     const result = await db
       .updateTable('tax_rates')
       .set({
@@ -23,7 +25,7 @@ export async function update(id: number, data: TaxRateUpdate): Promise<TaxRateJs
         country: data.country,
         region: data.region,
         status: data.status,
-        is_default: data.is_default,
+        is_default: d.is_default,
         updated_at: formatDate(new Date()),
       })
       .where('id', '=', id)
@@ -33,7 +35,7 @@ export async function update(id: number, data: TaxRateUpdate): Promise<TaxRateJs
     if (!result)
       throw new Error('Failed to update tax rate')
 
-    return result
+    return result as TaxRateJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
@@ -69,7 +71,7 @@ export async function updateStatus(
     if (!result)
       throw new Error('Failed to update tax rate status')
 
-    return result
+    return result as TaxRateJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
@@ -105,7 +107,7 @@ export async function updateRate(
     if (!result)
       throw new Error('Failed to update rate information')
 
-    return result
+    return result as TaxRateJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {

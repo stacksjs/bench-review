@@ -1,256 +1,212 @@
-import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
-import {
-  BedrockClient,
-  CreateModelCustomizationJobCommand,
-  GetModelCustomizationJobCommand,
-  ListFoundationModelsCommand,
-} from '@aws-sdk/client-bedrock'
-import { log } from '@stacksjs/cli'
-import { ai } from '@stacksjs/config'
-import { mockClient } from 'aws-sdk-client-mock'
-import {
-  createModelCustomizationJob,
-  getModelCustomizationJob,
-  listFoundationModels,
-} from '../src/utils/client-bedrock'
-import { requestModelAccess } from '../src/utils/model-access'
+import { describe, expect, it } from 'bun:test'
 
-const bedrockMock = mockClient(BedrockClient)
-
-const MOCK_ACCESS_KEY = 'test-access-key'
-const MOCK_SECRET_KEY = 'test-secret-key'
-const MOCK_SESSION_TOKEN = 'test-session-token'
-const MOCK_BEDROCK_URL = 'https://bedrock.us-east-1.amazonaws.com/foundation-model-entitlement'
-
-describe('@stacksjs/ai', () => {
-  beforeEach(() => {
-    // Mock defaultProvider
-    mock.module('@aws-sdk/credential-provider-node', () => ({
-      defaultProvider: () => () =>
-        Promise.resolve({
-          accessKeyId: MOCK_ACCESS_KEY,
-          secretAccessKey: MOCK_SECRET_KEY,
-          sessionToken: MOCK_SESSION_TOKEN,
-        }),
-    }))
-
-    mock.module('@stacksjs/cli', () => ({
-      log: {
-        info: () => {},
-        error: () => {},
-      },
-    }))
-
-    // Mock AWS4 sign function
-    mock.module('aws4', () => ({
-      sign: (request: any) => ({
-        ...request,
-        headers: {
-          ...request.headers,
-          'X-Amz-Date': '20230101T000000Z',
-          'Authorization': 'AWS4-HMAC-SHA256 Credential=test/20230101/us-east-1/bedrock/aws4_request',
-        },
-      }),
-    }))
-
-    // Mock fetch function
-    globalThis.fetch = mock(() =>
-      Promise.resolve({
-        json: () => Promise.resolve({ status: 'success' }),
-      } as Response),
-    )
-
-    bedrockMock.reset()
-  })
-
-  afterEach(() => {
-    mock.restore()
-  })
-
-  it('should request access to AI models', async () => {
-    const infoSpy = spyOn(log, 'info')
-    const errorSpy = spyOn(log, 'error')
-
-    await requestModelAccess()
-
-    expect(fetch).toHaveBeenCalledTimes(ai.models?.length ?? 0)
-
-    const fetchCalls = (fetch as any).mock.calls
-    fetchCalls.forEach((call: any, index: number) => {
-      expect(call[0]).toBe(MOCK_BEDROCK_URL)
-      expect(call[1].method).toBe('POST')
-      expect(call[1].headers['Content-Type']).toBe('application/json')
-      expect((JSON.parse(call[1].body) as any).modelId).toBe(ai.models?.[index] ?? '')
+describe('AI Module', () => {
+  describe('exports', () => {
+    it('should export types module', async () => {
+      const types = await import('../src/types')
+      expect(types).toBeDefined()
     })
 
-    expect(infoSpy).toHaveBeenCalledTimes((ai.models?.length ?? 0) * 2)
-    expect(errorSpy).not.toHaveBeenCalled()
-  })
-
-  it('should handle errors when requesting access', async () => {
-    const errorSpy = spyOn(log, 'error')
-    globalThis.fetch = mock(() => Promise.reject(new Error('Network error')))
-
-    await requestModelAccess()
-
-    expect(errorSpy).toHaveBeenCalled()
-  })
-
-  it('should handle undefined ai.models', async () => {
-    const originalModels = ai.models
-    ai.models = undefined
-
-    const infoSpy = spyOn(log, 'info')
-
-    await expect(requestModelAccess()).rejects.toThrow('No AI models found')
-
-    expect(infoSpy).not.toHaveBeenCalled()
-
-    ai.models = originalModels
-  })
-
-  it('should create model customization job', async () => {
-    const mockResponse = {
-      $metadata: {
-        httpStatusCode: 200,
-        requestId: 'test-request-id',
-        attempts: 1,
-        totalRetryDelay: 0,
-      },
-      jobArn: 'arn:aws:bedrock:us-east-1:123456789012:model-customization-job/example-job',
-      jobName: 'example-job',
-      jobStatus: 'IN_PROGRESS',
-    }
-
-    bedrockMock.on(CreateModelCustomizationJobCommand).resolves(mockResponse)
-
-    const result = await createModelCustomizationJob({
-      jobName: 'example-job',
-      customModelName: 'my-custom-model',
-      baseModelIdentifier: 'anthropic.claude-v2',
-      trainingDataConfig: {
-        s3Uri: 's3://example-bucket/training-data',
-      },
-      outputDataConfig: {
-        s3Uri: 's3://example-bucket/output-data',
-      },
-      roleArn: 'arn:aws:iam::123456789012:role/BedrockModelCustomizationRole',
-      hyperParameters: {},
+    it('should export driver factories', async () => {
+      const drivers = await import('../src/drivers')
+      expect(drivers.createAnthropicDriver).toBeFunction()
+      expect(drivers.createOpenAIDriver).toBeFunction()
+      expect(drivers.createOllamaDriver).toBeFunction()
+      expect(drivers.createClaudeAgentSDKDriver).toBeFunction()
     })
 
-    expect(result).toEqual(mockResponse)
-    expect(bedrockMock.calls()).toHaveLength(1)
-    expect(bedrockMock.call(0).args[0].input).toMatchObject({
-      jobName: 'example-job',
-      customModelName: 'my-custom-model',
-      baseModelIdentifier: 'anthropic.claude-v2',
-      trainingDataConfig: {
-        s3Uri: 's3://example-bucket/training-data',
-      },
-      outputDataConfig: {
-        s3Uri: 's3://example-bucket/output-data',
-      },
-      roleArn: 'arn:aws:iam::123456789012:role/BedrockModelCustomizationRole',
-      hyperParameters: {},
+    it('should export estimateTokens from anthropic driver', async () => {
+      const drivers = await import('../src/drivers')
+      expect(drivers.estimateTokens).toBeFunction()
+    })
+
+    it('should export image module functions', async () => {
+      const imageModule = await import('../src/image')
+      expect(imageModule.generateImage).toBeFunction()
+      expect(imageModule.editImage).toBeFunction()
+      expect(imageModule.createImageVariation).toBeFunction()
+      expect(imageModule.analyzeImage).toBeFunction()
+      expect(imageModule.analyzeImages).toBeFunction()
+      expect(imageModule.image).toBeDefined()
+    })
+
+    it('should export search module functions', async () => {
+      const searchModule = await import('../src/search')
+      expect(searchModule.createEmbedding).toBeFunction()
+      expect(searchModule.cosineSimilarity).toBeFunction()
+      expect(searchModule.dotProduct).toBeFunction()
+      expect(searchModule.euclideanDistance).toBeFunction()
+      expect(searchModule.VectorIndex).toBeDefined()
+      expect(searchModule.rag).toBeFunction()
+      expect(searchModule.chunkText).toBeFunction()
+      expect(searchModule.indexText).toBeFunction()
+    })
+
+    it('should export buddy module functions', async () => {
+      const buddyModule = await import('../src/buddy')
+      expect(buddyModule.CONFIG).toBeDefined()
+      expect(buddyModule.buddyState).toBeDefined()
+      expect(buddyModule.getDriver).toBeFunction()
+      expect(buddyModule.getAvailableDrivers).toBeFunction()
+      expect(buddyModule.buildSystemPrompt).toBeFunction()
+      expect(buddyModule.processCommand).toBeFunction()
+    })
+
+    it('should export text module (or gracefully handle missing aws dep)', async () => {
+      try {
+        const textModule = await import('../src/text')
+        expect(textModule.summarize).toBeFunction()
+        expect(textModule.ask).toBeFunction()
+      }
+      catch (e: any) {
+        // ts-cloud/aws may not be installed — verify the error is a module resolution issue
+        expect(e.message).toContain('Cannot find module')
+      }
     })
   })
 
-  it('should get model customization job', async () => {
-    const mockResponse = {
-      $metadata: {
-        httpStatusCode: 200,
-        requestId: 'test-request-id',
-        attempts: 1,
-        totalRetryDelay: 0,
-      },
-      jobArn: 'arn:aws:bedrock:us-east-1:123456789012:model-customization-job/example-job',
-      jobName: 'example-job',
-      jobStatus: 'COMPLETED',
-      modelId: 'example-model',
-      baseModelIdentifier: 'anthropic.claude-v2',
-      outputModelName: 'my-custom-model',
-      roleArn: 'arn:aws:iam::123456789012:role/BedrockModelCustomizationRole',
-      creationTime: new Date(),
-      baseModelArn: 'arn:aws:bedrock:us-east-1:123456789012:foundation-model/anthropic.claude-v2',
-      lastModifiedTime: new Date(),
-      trainingDataConfig: {
-        s3Uri: 's3://example-bucket/training-data',
-      },
-      validationDataConfig: {
-        s3Uri: 's3://example-bucket/validation-data',
-      },
-      outputDataConfig: {
-        s3Uri: 's3://example-bucket/output-data',
-      },
-      hyperParameters: {},
-      trainingMetrics: {
-        trainingLoss: 0.1,
-        validationLoss: 0.2,
-        epochsCompleted: 10,
-      },
-    }
-
-    bedrockMock.on(GetModelCustomizationJobCommand).resolves(mockResponse)
-
-    const result = await getModelCustomizationJob({
-      jobIdentifier: 'example-job',
+  describe('Driver factory pattern', () => {
+    it('should create an Anthropic driver with config', async () => {
+      const { createAnthropicDriver } = await import('../src/drivers')
+      const driver = createAnthropicDriver({ apiKey: 'test-key' })
+      expect(driver).toBeDefined()
+      expect(driver.name).toBe('Claude API')
+      expect(driver.process).toBeFunction()
     })
 
-    expect(result).toEqual(mockResponse)
-    expect(bedrockMock.calls()).toHaveLength(1)
-    expect(bedrockMock.call(0).args[0].input).toMatchObject({
-      jobIdentifier: 'example-job',
+    it('should create an OpenAI driver with config', async () => {
+      const { createOpenAIDriver } = await import('../src/drivers')
+      const driver = createOpenAIDriver({ apiKey: 'test-key' })
+      expect(driver).toBeDefined()
+      expect(driver.name).toBe('OpenAI')
+      expect(driver.process).toBeFunction()
+    })
+
+    it('should create an Ollama driver with config', async () => {
+      const { createOllamaDriver } = await import('../src/drivers')
+      const driver = createOllamaDriver({ host: 'http://localhost:11434', model: 'llama3.2' })
+      expect(driver).toBeDefined()
+      expect(driver.name).toBe('Ollama')
+      expect(driver.process).toBeFunction()
+    })
+
+    it('should list available drivers', async () => {
+      const { getAvailableDrivers } = await import('../src/buddy')
+      const drivers = getAvailableDrivers()
+      expect(drivers).toBeArray()
+      expect(drivers).toContain('claude-cli-local')
+      expect(drivers).toContain('claude')
+      expect(drivers).toContain('openai')
+      expect(drivers).toContain('ollama')
+      expect(drivers).toContain('mock')
+    })
+
+    it('should throw on unknown driver name', async () => {
+      const { getDriver } = await import('../src/buddy')
+      expect(() => getDriver('nonexistent-driver')).toThrow('Unknown driver')
     })
   })
 
-  it('should list foundation models', async () => {
-    const mockResponse = {
-      $metadata: {
-        httpStatusCode: 200,
-        requestId: 'test-request-id',
-        attempts: 1,
-        totalRetryDelay: 0,
-      },
-      modelSummaries: [
-        {
-          modelId: 'anthropic.claude-v2',
-          modelName: 'Claude V2',
-          providerName: 'Anthropic',
-        },
-        {
-          modelId: 'ai21.j2-ultra',
-          modelName: 'Jurassic-2 Ultra',
-          providerName: 'AI21 Labs',
-        },
-      ],
-    }
+  describe('Search utilities (pure functions)', () => {
+    it('should compute cosine similarity between identical vectors', async () => {
+      const { cosineSimilarity } = await import('../src/search')
+      const v = [1, 2, 3]
+      expect(cosineSimilarity(v, v)).toBeCloseTo(1.0, 5)
+    })
 
-    bedrockMock.on(ListFoundationModelsCommand).resolves(mockResponse)
+    it('should compute cosine similarity between orthogonal vectors', async () => {
+      const { cosineSimilarity } = await import('../src/search')
+      expect(cosineSimilarity([1, 0], [0, 1])).toBeCloseTo(0, 5)
+    })
 
-    const result = await listFoundationModels({})
+    it('should compute dot product correctly', async () => {
+      const { dotProduct } = await import('../src/search')
+      expect(dotProduct([1, 2, 3], [4, 5, 6])).toBe(32) // 1*4 + 2*5 + 3*6
+    })
 
-    expect(result).toEqual(mockResponse)
-    expect(bedrockMock.calls()).toHaveLength(1)
-    expect(bedrockMock.call(0).args[0].input).toMatchObject({})
+    it('should compute euclidean distance correctly', async () => {
+      const { euclideanDistance } = await import('../src/search')
+      expect(euclideanDistance([0, 0], [3, 4])).toBeCloseTo(5, 5)
+    })
+
+    it('should throw on vector dimension mismatch', async () => {
+      const { cosineSimilarity } = await import('../src/search')
+      expect(() => cosineSimilarity([1, 2], [1, 2, 3])).toThrow('Vector dimensions must match')
+    })
   })
 
-  it('should handle errors in Bedrock client calls', async () => {
-    bedrockMock.on(CreateModelCustomizationJobCommand).rejects(new Error('AWS Error'))
+  describe('Text chunking', () => {
+    it('should chunk text into segments', async () => {
+      const { chunkText } = await import('../src/search')
+      const text = 'line1\nline2\nline3\nline4\nline5'
+      const chunks = chunkText(text, { chunkSize: 15, chunkOverlap: 0 })
+      expect(chunks.length).toBeGreaterThan(1)
+      for (const chunk of chunks) {
+        expect(chunk.length).toBeGreaterThan(0)
+      }
+    })
 
-    await expect(
-      createModelCustomizationJob({
-        jobName: 'example-job',
-        customModelName: 'my-custom-model',
-        baseModelIdentifier: 'anthropic.claude-v2',
-        trainingDataConfig: {
-          s3Uri: 's3://example-bucket/training-data',
-        },
-        outputDataConfig: {
-          s3Uri: 's3://example-bucket/output-data',
-        },
-        roleArn: 'arn:aws:iam::123456789012:role/BedrockModelCustomizationRole',
-        hyperParameters: {},
-      }),
-    ).rejects.toThrow('AWS Error')
+    it('should return single chunk for short text', async () => {
+      const { chunkText } = await import('../src/search')
+      const chunks = chunkText('short text', { chunkSize: 1000 })
+      expect(chunks).toHaveLength(1)
+      expect(chunks[0]).toBe('short text')
+    })
+  })
+
+  describe('Image generation interface', () => {
+    it('should throw when OPENAI_API_KEY is missing', async () => {
+      const originalKey = process.env.OPENAI_API_KEY
+      delete process.env.OPENAI_API_KEY
+
+      const { generateImage } = await import('../src/image')
+      await expect(generateImage('a cat')).rejects.toThrow('OPENAI_API_KEY')
+
+      if (originalKey) process.env.OPENAI_API_KEY = originalKey
+    })
+
+    it('should throw for unsupported provider', async () => {
+      const { generateImage } = await import('../src/image')
+      await expect(
+        generateImage('a cat', { provider: 'ollama' as any }),
+      ).rejects.toThrow('not supported')
+    })
+
+    it('should export image namespace object with expected methods', async () => {
+      const { image } = await import('../src/image')
+      expect(image.generate).toBeFunction()
+      expect(image.edit).toBeFunction()
+      expect(image.variation).toBeFunction()
+      expect(image.analyze).toBeFunction()
+      expect(image.analyzeMultiple).toBeFunction()
+    })
+  })
+
+  describe('Buddy config and state', () => {
+    it('should have valid CONFIG structure', async () => {
+      const { CONFIG } = await import('../src/buddy')
+      expect(CONFIG.workDir).toBeString()
+      expect(CONFIG.commitMessage).toBeString()
+      expect(CONFIG.ollamaHost).toBeString()
+      expect(CONFIG.ollamaModel).toBeString()
+    })
+
+    it('should provide state manager with expected methods', async () => {
+      const { buddyState } = await import('../src/buddy')
+      expect(buddyState.getState).toBeFunction()
+      expect(buddyState.setRepo).toBeFunction()
+      expect(buddyState.setCurrentDriver).toBeFunction()
+      expect(buddyState.setGitHub).toBeFunction()
+      expect(buddyState.addToHistory).toBeFunction()
+      expect(buddyState.clearHistory).toBeFunction()
+    })
+
+    it('should build system prompt with no repo context', async () => {
+      const { buildSystemPrompt, buddyState } = await import('../src/buddy')
+      buddyState.setRepo(null)
+      const prompt = buildSystemPrompt('some context')
+      expect(prompt).toContain('Buddy')
+      expect(prompt).toContain('No repository is currently open')
+    })
   })
 })

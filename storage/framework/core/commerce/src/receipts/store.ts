@@ -1,4 +1,5 @@
-import type { NewReceipt, ReceiptJsonResponse } from '@stacksjs/orm'
+type ReceiptJsonResponse = ModelRow<typeof Receipt>
+type NewReceipt = NewModelData<typeof Receipt>
 import { randomUUIDv7 } from 'bun'
 import { db } from '@stacksjs/database'
 
@@ -24,7 +25,7 @@ export async function store(data: NewReceipt): Promise<ReceiptJsonResponse> {
     if (!result)
       throw new Error('Failed to create receipt')
 
-    return result
+    return result as ReceiptJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {

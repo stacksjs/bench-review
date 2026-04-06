@@ -1,5 +1,5 @@
-import type { CouponJsonResponse, NewCoupon } from '@stacksjs/orm'
-import { randomUUIDv7 } from 'bun'
+type CouponJsonResponse = ModelRow<typeof Coupon>
+type NewCoupon = NewModelData<typeof Coupon>
 import { db } from '@stacksjs/database'
 
 /**
@@ -9,16 +9,11 @@ import { db } from '@stacksjs/database'
  * @returns The newly created coupon record
  */
 export async function store(data: NewCoupon): Promise<CouponJsonResponse | undefined> {
-  const couponData: NewCoupon = {
-    ...data,
-    uuid: randomUUIDv7(),
-  }
-
   try {
     // Insert the coupon record
     const createdCoupon = await db
       .insertInto('coupons')
-      .values(couponData)
+      .values(data)
       .executeTakeFirst()
 
     const couponId = Number(createdCoupon.insertId) || Number(createdCoupon.numInsertedOrUpdatedRows)
@@ -30,7 +25,7 @@ export async function store(data: NewCoupon): Promise<CouponJsonResponse | undef
         .selectAll()
         .executeTakeFirst()
 
-      return coupon
+      return coupon as CouponJsonResponse
     }
 
     return undefined

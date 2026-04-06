@@ -1,92 +1,109 @@
-import type { ShippingZones } from '../../types'
-import { useFetch, useStorage } from '@vueuse/core'
+import type { NewShippingZone, ShippingZones } from '../../../types/defaults'
+import { useStorage } from '@stacksjs/browser'
 
 // Create a persistent shipping zones array using VueUse's useStorage
 const shippingZones = useStorage<ShippingZones[]>('shippingZones', [])
 
-const baseURL = 'http://localhost:3008/api'
+const baseURL = process.env.VITE_API_URL || `http://localhost:${process.env.PORT_API || '3008'}`
 
 // Basic fetch function to get all shipping zones
 async function fetchShippingZones() {
-  const { error, data } = useFetch<ShippingZones[]>(`${baseURL}/commerce/shipping-zones`)
+  try {
+    const response = await fetch(`${baseURL}/commerce/shipping-zones`)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
 
-  if (error.value) {
-    console.error('Error fetching shipping zones:', error.value)
-    return []
-  }
+    const { data } = await response.json() as { data: ShippingZones[] }
 
-  // Ensure data is an array before assigning
-  if (Array.isArray(data.value)) {
-    shippingZones.value = data.value
-    return data.value
+    shippingZones.value = data
+
+    return data
   }
-  else {
-    console.error('Expected array of shipping zones but received:', typeof data.value)
+  catch (error) {
+    console.error('Error fetching shipping zones:', error)
     return []
   }
 }
 
-async function createShippingZone(shippingZone: ShippingZones) {
-  const { error, data } = useFetch<ShippingZones>(`${baseURL}/commerce/shipping-zones`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(shippingZone),
-  })
+async function createShippingZone(shippingZone: NewShippingZone) {
+  try {
+    const response = await fetch(`${baseURL}/commerce/shipping-zones`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(shippingZone),
+    })
 
-  if (error.value) {
-    console.error('Error creating shipping zone:', error.value)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json() as ShippingZones
+    if (data) {
+      shippingZones.value.push(data)
+      return data
+    }
     return null
   }
-
-  if (data.value) {
-    shippingZones.value.push(data.value)
-    return data.value
+  catch (error) {
+    console.error('Error creating shipping zone:', error)
+    return null
   }
-  return null
 }
 
 async function updateShippingZone(shippingZone: ShippingZones) {
-  const { error, data } = useFetch<ShippingZones>(`${baseURL}/commerce/shipping-zones/${shippingZone.id}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(shippingZone),
-  })
+  try {
+    const response = await fetch(`${baseURL}/commerce/shipping-zones/${shippingZone.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(shippingZone),
+    })
 
-  if (error.value) {
-    console.error('Error updating shipping zone:', error.value)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json() as ShippingZones
+    if (data) {
+      const index = shippingZones.value.findIndex(s => s.id === shippingZone.id)
+      if (index !== -1) {
+        shippingZones.value[index] = data
+      }
+      return data
+    }
     return null
   }
-
-  if (data.value) {
-    const index = shippingZones.value.findIndex(s => s.id === shippingZone.id)
-    if (index !== -1) {
-      shippingZones.value[index] = data.value
-    }
-    return data.value
+  catch (error) {
+    console.error('Error updating shipping zone:', error)
+    return null
   }
-  return null
 }
 
 async function deleteShippingZone(id: number) {
-  const { error } = useFetch(`${baseURL}/commerce/shipping-zones/${id}`, {
-    method: 'DELETE',
-  })
+  try {
+    const response = await fetch(`${baseURL}/commerce/shipping-zones/${id}`, {
+      method: 'DELETE',
+    })
 
-  if (error.value) {
-    console.error('Error deleting shipping zone:', error.value)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const index = shippingZones.value.findIndex(s => s.id === id)
+    if (index !== -1) {
+      shippingZones.value.splice(index, 1)
+    }
+
+    return true
+  }
+  catch (error) {
+    console.error('Error deleting shipping zone:', error)
     return false
   }
-
-  const index = shippingZones.value.findIndex(s => s.id === id)
-  if (index !== -1) {
-    shippingZones.value.splice(index, 1)
-  }
-
-  return true
 }
 
 // Export the composable

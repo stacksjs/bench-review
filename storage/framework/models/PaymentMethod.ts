@@ -1,9 +1,9 @@
-import type { Model } from '@stacksjs/types'
+import { defineModel } from '@stacksjs/orm'
 import { collect } from '@stacksjs/collections'
 
 import { schema } from '@stacksjs/validation'
 
-export default {
+export default defineModel({
   name: 'PaymentMethod', // defaults to the sanitized file name
   table: 'payment_methods', // defaults to the lowercase, plural name of the model name (or the name of the model file)
   primaryKey: 'id', // defaults to `id`
@@ -18,10 +18,9 @@ export default {
   },
   attributes: {
     type: {
-      required: true,
       fillable: true,
       validation: {
-        rule: schema.string().max(512),
+        rule: schema.string().required().max(512),
         message: {
           string: 'type must be a string',
           required: 'type is required',
@@ -32,25 +31,24 @@ export default {
     },
 
     lastFour: {
-      required: true,
       fillable: true,
       validation: {
-        rule: schema.number(),
+        rule: schema.string().required().length(4),
         message: {
-          number: 'last_four must be a number',
+          string: 'last_four must be a string',
           required: 'last_four is required',
+          length: 'last_four must be exactly 4 characters',
         },
       },
       factory: faker => faker.string.numeric(4),
     },
 
     brand: {
-      required: true,
       fillable: true,
       validation: {
-        rule: schema.string().max(50),
+        rule: schema.string().required().max(50),
         message: {
-          number: 'brand must be a number',
+          string: 'brand must be a string',
           required: 'brand is required',
         },
       },
@@ -58,12 +56,11 @@ export default {
     },
 
     expMonth: {
-      required: true,
       fillable: true,
       validation: {
-        rule: schema.number(),
+        rule: schema.number().required(),
         message: {
-          string: 'exp_month must be a number',
+          number: 'exp_month must be a number',
           required: 'exp_month is required',
         },
       },
@@ -71,10 +68,9 @@ export default {
     },
 
     expYear: {
-      required: true,
       fillable: true,
       validation: {
-        rule: schema.number(),
+        rule: schema.number().required(),
         message: {
           string: 'exp_year must be a number',
           required: 'exp_year is required',
@@ -100,4 +96,4 @@ export default {
       factory: faker => faker.string.alphanumeric(10),
     },
   },
-} satisfies Model
+} as const)

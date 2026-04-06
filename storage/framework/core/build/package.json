@@ -4,7 +4,9 @@
   "version": "0.70.23",
   "description": "The Stacks framework build tools and configurations.",
   "author": "Chris Breuer",
-  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "contributors": [
+    "Chris Breuer <chris@stacksjs.com>"
+  ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
   "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/build#readme",
@@ -21,36 +23,39 @@
     "stacks",
     "framework",
     "typescript",
-    "javascript",
-    "vite",
-    "nitro",
-    "vue"
+    "javascript"
   ],
   "exports": {
     ".": {
+      "bun": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./*": {
+      "bun": "./src/*",
       "import": "./dist/*"
     }
   },
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["README.md", "dist"],
+  "files": [
+    "README.md",
+    "dist"
+  ],
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "bun tsc --noEmit",
     "prepublishOnly": "bun run build"
   },
+  "dependencies": {
+    "@babel/generator": "^7.29.1",
+    "@babel/traverse": "^7.29.0",
+    "better-dx": "^0.2.5"
+  },
   "devDependencies": {
     "@stacksjs/cli": "workspace:*",
-    "@stacksjs/development": "workspace:*",
+    "better-dx": "^0.2.5",
     "@stacksjs/path": "workspace:*",
-    "@stacksjs/storage": "workspace:*",
-    "@types/babel__generator": "^7.27.0",
-    "@types/babel__traverse": "^7.20.7",
-    "bun-plugin-dtsx": "^0.21.12",
-    "vue-docgen-web-types": "^0.1.8"
+    "@stacksjs/storage": "workspace:*"
   }
 }

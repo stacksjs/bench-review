@@ -6,15 +6,13 @@ import {
   generateIdeHelpers,
   generateLibEntries,
   generateOpenApiSpec,
-  generatePkgxConfig,
+  generatePantryConfig,
   generateTypes,
   generateVsCodeCustomData,
   generateWebTypes,
   invoke as startGenerationProcess,
 } from '@stacksjs/actions'
 import { intro, log, outro } from '@stacksjs/cli'
-import { generateModelFiles } from '@stacksjs/orm'
-import { initiateImports } from '@stacksjs/server'
 import { ExitCode } from '@stacksjs/types'
 
 export function generate(buddy: CLI): void {
@@ -28,8 +26,7 @@ export function generate(buddy: CLI): void {
     ideHelpers: 'Generate IDE helpers',
     componentMeta: 'Generate component meta information',
     coreSymlink: 'Generate symlink of the core framework to the project root',
-    pkgx: 'Generate the pkgx configuration file',
-    modelFiles: 'Generate the model files',
+    pantry: 'Generate the pantry configuration file',
     openApi: 'Generate the OpenAPI specification',
     select: 'What are you trying to generate?',
     project: 'Target a specific project',
@@ -44,8 +41,7 @@ export function generate(buddy: CLI): void {
     .option('-c, --custom-data', descriptions.customData)
     .option('-i, --ide-helpers', descriptions.ideHelpers)
     .option('-c, --component-meta', descriptions.componentMeta)
-    .option('-p, --pkgx', descriptions.pkgx)
-    .option('-m, --model-files', descriptions.modelFiles)
+    .option('-p, --pantry', descriptions.pantry)
     .option('-o, --openapi', descriptions.openApi)
     .option('-p, --project [project]', descriptions.project, { default: false })
     .option('--core-symlink', descriptions.coreSymlink)
@@ -113,7 +109,7 @@ export function generate(buddy: CLI): void {
     .option('--verbose', descriptions.verbose, { default: false })
     .action(async (options: GeneratorOptions) => {
       log.debug('Running `buddy generate:vscode-custom-data` ...', options)
-      await generateVsCodeCustomData(options)
+      await (generateVsCodeCustomData as any)(options)
     })
 
   buddy
@@ -131,39 +127,16 @@ export function generate(buddy: CLI): void {
     .option('--verbose', descriptions.verbose, { default: false })
     .action(async (options: GeneratorOptions) => {
       log.debug('Running `buddy generate:component-meta` ...', options)
-      await generateComponentMeta()
+      await (generateComponentMeta as any)()
     })
 
   buddy
-    .command('generate:pkgx-config', descriptions.pkgx)
+    .command('generate:pantry-config', descriptions.pantry)
     .option('-p, --project [project]', descriptions.project, { default: false })
     .option('--verbose', descriptions.verbose, { default: false })
-    .action((options: GeneratorOptions) => {
-      log.debug('Running `buddy generate:pkgx-config` ...', options)
-      generatePkgxConfig()
-    })
-
-  buddy
-    .command('generate:model-files', descriptions.modelFiles)
-    .option('-p, --project [project]', descriptions.project, { default: false })
-    .option('--verbose', descriptions.verbose, { default: false })
-    .action(async () => {
-      const perf = await intro('buddy generate:model-files')
-
-      try {
-        await generateModelFiles()
-
-        await initiateImports()
-
-        outro('Generated Model files', {
-          startTime: perf,
-          useSeconds: true,
-        })
-      }
-      catch (error) {
-        log.error('There was an error generating your model files', error)
-        process.exit(ExitCode.FatalError)
-      }
+    .action(async (options: GeneratorOptions) => {
+      log.debug('Running `buddy generate:pantry-config` ...', options)
+      await generatePantryConfig()
     })
 
   buddy
@@ -177,7 +150,7 @@ export function generate(buddy: CLI): void {
 
       await generateOpenApiSpec()
 
-      outro('Generated OpenAPI specification', {
+      await outro('Generated OpenAPI specification', {
         startTime: perf,
         useSeconds: true,
       })

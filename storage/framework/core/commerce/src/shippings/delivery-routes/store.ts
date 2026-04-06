@@ -1,4 +1,5 @@
-import type { DeliveryRouteJsonResponse, NewDeliveryRoute } from '@stacksjs/orm'
+type DeliveryRouteJsonResponse = ModelRow<typeof DeliveryRoute>
+type NewDeliveryRoute = NewModelData<typeof DeliveryRoute>
 import { randomUUIDv7 } from 'bun'
 import { db } from '@stacksjs/database'
 
@@ -24,7 +25,7 @@ export async function store(data: NewDeliveryRoute): Promise<DeliveryRouteJsonRe
     if (!result)
       throw new Error('Failed to create delivery route')
 
-    return result
+    return result as DeliveryRouteJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
@@ -56,7 +57,7 @@ export async function updateLastActive(id: number): Promise<DeliveryRouteJsonRes
     if (!result)
       throw new Error('Failed to update delivery route last active')
 
-    return result
+    return result as DeliveryRouteJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {

@@ -31,7 +31,7 @@ In other words, Stacks helps you, as a developer, every step along the way—in 
 It’s incredibly easy to get started with this framework. Simply run the following command in your terminal:
 
 ```bash
-curl -Ssf stacksjs.org/install | sh # wip
+curl -Ssf stacksjs.com/install | sh # wip
 
 # alternatively, if Bun >= v1.1.11 is installed already,
 # you may also get started via:
@@ -128,7 +128,6 @@ buddy build:library # builds any or all libraries
 buddy build:functions # builds function library
 buddy build:components # builds Vue component library & Web Component library
 buddy build:web-components # builds framework agnostic Web Component library (i.e. Custom Elements)
-buddy build:vue-components # builds Vue 2 & 3-ready Component library
 buddy build:all # builds all your code
 
 # `buddy build` aliases
@@ -138,7 +137,6 @@ buddy prod:desktop
 buddy prod:library
 buddy prod:views
 buddy prod:functions
-buddy prod:vue-components
 buddy prod:web-components
 buddy prod:all
 buddy production # `buddy prod` alias
@@ -162,21 +160,15 @@ buddy migrate # runs database migrations
 buddy migrate:dns # sets the ./config/dns.ts file
 
 buddy dns example.com # list all DNS records for example.com
-buddy dns example.com --type MX # list MX records for example.com (proxies dog)
+buddy dns example.com --type MX # list MX records for example.com
 
-buddy https httpie.io/hello
+buddy https example.com/api/hello
 # http [flags] [METHOD] URL [ITEM [ITEM]]
 buddy http --help
-buddy http PUT pie.dev/put X-API-Token:123 name=John # Custom HTTP method, HTTP headers and JSON data
-buddy http -v pie.dev/get # See the request that is being sent using one of the output options
-buddy http -f POST pie.dev/post hello=World # submitting forms
-buddy http --offline pie.dev/post hello=offline
-buddy http -a USERNAME POST https://api.github.com/repos/httpie/cli/issues/83/comments body='HTTPie is awesome! :heart:'
-buddy http pie.dev/post < files/data.json
-buddy http pie.dev/image/png > image.png
-buddy http --download pie.dev/image/png
-buddy http --session=logged-in -a username:password pie.dev/get API-Key:123
-buddy http --session=logged-in pie.dev/headers
+buddy http PUT example.com/api/put X-API-Token:123 name=John # Custom HTTP method, HTTP headers and JSON data
+buddy http -v example.com/api/get # See the request that is being sent using one of the output options
+buddy http POST example.com/api/post hello=World # submitting forms
+buddy http -a USERNAME POST https://api.github.com/repos/user/repo/issues/83/comments body='Great feature! :heart:'
 buddy http localhost:8000 Host:example.com
 
 buddy lint # runs linter
@@ -221,11 +213,11 @@ buddy types:generate # generates types for your components, functions, & views
 buddy types:fix # auto-fixes types for your components, functions, & views
 
 buddy domains # alias for `buddy domains:list`
-buddy domains:add stacksjs.org # adds a domain
-buddy domains:remove stacksjs.org # removes a domain
+buddy domains:add stacksjs.com # adds a domain
+buddy domains:remove stacksjs.com # removes a domain
 buddy domains:list # lists all domains
 buddy domains:update # apply ./config/dns.ts updates
-buddy domains:purchase stacksjs.org # purchase a new domain
+buddy domains:purchase stacksjs.com # purchase a new domain
 
 # test your stack
 buddy test # runs test suite (unit & e2e)
@@ -258,7 +250,7 @@ _Develop dynamic UIs with helpers for atomic design, and much more._
 - 🖥️ **Desktop** _transforms your web app into a desktop app, plus more_
 - 📝 **Documentation** _markdown-based documentation, auto-generated_
 - 📚 **Library** _auto-builds & manages component & function libraries_
-- ⚡️ Powered by Bun, Tauri, UnoCSS, Vite, VitePress and Vue
+- ⚡️ Powered by Bun, Tauri, Headwind, Vite, VitePress and Vue
 
 ### Backend Development
 

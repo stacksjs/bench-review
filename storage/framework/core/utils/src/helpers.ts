@@ -9,7 +9,7 @@ import { Action } from '@stacksjs/enums'
 import { err, handleError, ok } from '@stacksjs/error-handling'
 import { frameworkPath, projectPath } from '@stacksjs/path'
 import { fs, readJsonFile, readPackageJson, readTextFile, writeTextFile } from '@stacksjs/storage'
-import { parse } from 'yaml'
+// Bun has native YAML support via Bun.YAML
 
 // import { semver } from './versions'
 
@@ -25,12 +25,12 @@ export async function initProject(): Promise<Result<Subprocess, Error>> {
 
   const result = await runAction(Action.KeyGenerate, { cwd: projectPath() })
 
-  if (result.isErr())
+  if (result.isErr)
     return err(handleError(result.error))
 
   log.info('Application key generated.')
 
-  return ok(result.value)
+  return ok((result as any).value)
 }
 
 export async function ensureProjectIsInitialized(): Promise<boolean> {
@@ -40,7 +40,7 @@ export async function ensureProjectIsInitialized(): Promise<boolean> {
 
   // copy the .env.example file to .env
   if (fs.existsSync(projectPath('.env.example')))
-    await runCommand('cp .env.example .env', { cwd: projectPath() })
+    fs.copyFileSync(projectPath('.env.example'), projectPath('.env'))
   else console.error('no .env.example file found')
 
   return await isAppKeySet()
@@ -70,29 +70,27 @@ export async function isAppKeySet(): Promise<boolean> {
 /**
  * Determines the utilized reset preset.
  *
- * @url https://www.npmjs.com/package/@unocss/reset
+ * @url https://github.com/cwcss/crosswind
  * @param preset
  */
-export function determineResetPreset(preset?: string): string[] {
-  if (ui.reset)
+export function determineResetPreset(preset?: string | null): string[] {
+  if (preset === undefined && ui.reset)
     preset = ui.reset
 
-  if (preset === 'tailwind')
-    return ['import \'@unocss/reset/tailwind.css\'']
+  if (preset === null)
+    return []
 
-  if (preset === 'normalize')
-    return ['import \'@unocss/reset/normalize.css\'']
+  const selectedPreset = preset ?? 'tailwind'
+  const resetImports: Record<string, string> = {
+    tailwind: 'import \"@unocss/reset/tailwind.css\"',
+    normalize: 'import \"@unocss/reset/normalize.css\"',
+    sanitize: 'import \"@unocss/reset/sanitize/sanitize.css\"',
+    'eric-meyer': 'import \"@unocss/reset/eric-meyer.css\"',
+    antfu: 'import \"@unocss/reset/antfu.css\"',
+  }
 
-  if (preset === 'sanitize')
-    return ['import \'@unocss/reset/sanitize/sanitize.css\'', 'import \'@unocss/reset/sanitize/assets.css']
-
-  if (preset === 'eric-meyer')
-    return ['import \'@unocss/reset/eric-meyer.css\'']
-
-  if (preset === 'antfu')
-    return ['import \'@unocss/reset/antfu.css\'']
-
-  return []
+  const resetImport = resetImports[selectedPreset]
+  return resetImport ? [resetImport] : []
 }
 
 /**
@@ -111,7 +109,7 @@ export function isManifest(obj: any): obj is Manifest {
 /**
  * Determines whether the specified value is a string, null, or undefined.
  */
-export function isOptionalString(value: any): value is string | undefined {
+export function isOptionalString(value: any): value is string | null | undefined {
   const type = typeof value
   return value === null || type === 'undefined' || type === 'string'
 }
@@ -119,9 +117,16 @@ export function isOptionalString(value: any): value is string | undefined {
 export async function setEnvValue(key: string, value: string): Promise<void> {
   const file = await readTextFile(projectPath('.env'))
 
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const keyPattern = new RegExp(`^${escapedKey}=.*$`, 'm')
+  const nextValue = `${key}=${value}`
+  const data = keyPattern.test(file.data)
+    ? file.data.replace(keyPattern, nextValue)
+    : `${file.data}${file.data.endsWith('\n') ? '' : '\n'}${nextValue}\n`
+
   await writeTextFile({
     path: projectPath('.env'),
-    data: file.data.replace(/APP_KEY=/g, `APP_KEY=${value}`), // todo: do not hardcode the APP_KEY here and instead use the key parameter
+    data,
   })
 }
 
@@ -151,7 +156,7 @@ export function hasScript(manifest: Manifest, script: NpmScript): boolean {
 }
 
 export function parseYaml(content: any): any {
-  return parse(content)
+  return Bun.YAML.parse(content)
 }
 
 /**
@@ -184,4 +189,15 @@ export function isIpv6(address: AddressInfo): boolean {
   )
 }
 
-export { dump as dumpYaml, load as loadYaml } from 'js-yaml'
+export function dumpYaml(content: any): string {
+  const yaml = Bun.YAML as unknown as { stringify?: (value: unknown) => string }
+
+  if (typeof yaml.stringify === 'function')
+    return yaml.stringify(content)
+
+  return JSON.stringify(content, null, 2)
+}
+
+export function loadYaml(content: string): any {
+  return Bun.YAML.parse(content)
+}

@@ -6,7 +6,7 @@ const { startTime } = await intro({
 })
 
 const result = await Bun.build({
-  root: './src',
+  root: '.',
   outdir: './dist',
   format: 'esm',
   target: 'bun',
@@ -56,6 +56,7 @@ const result = await Bun.build({
     './src/make.ts',
     './src/prepublish.ts',
     './src/release.ts',
+    './src/run-action.ts',
     './src/typecheck.ts',
     './src/types.ts',
     './src/upgrade.ts',
@@ -75,7 +76,7 @@ const result = await Bun.build({
 
   plugins: [
     dts({
-      root: './src',
+      root: '.',
       outdir: './dist',
     }),
   ],

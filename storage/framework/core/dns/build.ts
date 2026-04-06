@@ -27,7 +27,12 @@ const result = await Bun.build({
     '@stacksjs/types',
   ],
 
-  plugins: [dts()],
+  plugins: [
+    dts({
+      root: '.',
+      outdir: './dist',
+    }),
+  ],
 })
 
 await outro({

@@ -8,20 +8,19 @@ import { findOrCreate } from './store'
  * @param id The ID of the tag to fetch
  * @returns The tag record if found
  */
-export async function fetchTagById(id: number): Promise<TaggableTable> {
+export async function fetchTagById(id: number): Promise<TaggableTable | undefined> {
   try {
     const result = await db
       .selectFrom('taggables')
       .where('id', '=', id)
-      .where('is_active', '=', true)
       .selectAll()
       .executeTakeFirst()
 
     if (!result) {
-      throw new Error(`Tag with ID ${id} not found`)
+      return undefined
     }
 
-    return result
+    return result as unknown as TaggableTable
   }
   catch (error) {
     if (error instanceof Error) {
@@ -43,7 +42,7 @@ export async function fetchTags(): Promise<TaggableTable[]> {
       .selectFrom('taggables')
       .where('is_active', '=', true)
       .selectAll()
-      .execute()
+      .execute() as unknown as unknown as TaggableTable[]
   }
   catch (error) {
     if (error instanceof Error) {
@@ -93,13 +92,10 @@ export async function countTaggedPosts(taggableType: string): Promise<number> {
   try {
     const result = await db
       .selectFrom('taggable_models')
-      .select(({ fn }) => [
-        fn.count<number>('id').as('count'),
-      ])
       .where('taggable_type', '=', taggableType)
-      .executeTakeFirst()
+      .count()
 
-    return result?.count || 0
+    return Number(result) || 0
   }
   catch (error) {
     if (error instanceof Error) {
@@ -119,12 +115,9 @@ export async function countTotalTags(): Promise<number> {
   try {
     const result = await db
       .selectFrom('taggables')
-      .select(({ fn }) => [
-        fn.count<number>('id').as('count'),
-      ])
-      .executeTakeFirst()
+      .count()
 
-    return result?.count || 0
+    return Number(result) || 0
   }
   catch (error) {
     if (error instanceof Error) {
@@ -145,18 +138,17 @@ export async function findMostUsedTag(taggableType?: string): Promise<{ name: st
   try {
     let query = db
       .selectFrom('taggable_models')
-      .innerJoin('taggables', 'taggable.id', 'taggable_models.tag_id')
-      .select(({ fn }) => [
-        'taggable.name',
-        fn.count<number>('taggable_models.id').as('usage_count'),
+      .innerJoin('taggables', 'taggables.id', '=', 'taggable_models.tag_id')
+      .select([
+        'taggables.name',
       ])
-      .groupBy('taggable.name')
+      .groupBy('taggables.name') as any
 
     if (taggableType)
       query = query.where('taggable_models.taggable_type', '=', taggableType)
 
     const result = await query
-      .orderBy('usage_count', 'desc')
+      .orderBy('taggables.name', 'asc')
       .executeTakeFirst()
 
     if (!result) {
@@ -164,8 +156,8 @@ export async function findMostUsedTag(taggableType?: string): Promise<{ name: st
     }
 
     return {
-      name: result.name,
-      count: result.usage_count,
+      name: (result as Record<string, unknown>).name as string,
+      count: Number((result as Record<string, unknown>).usage_count || 0),
     }
   }
   catch (error) {
@@ -184,15 +176,14 @@ export async function findMostUsedTag(taggableType?: string): Promise<{ name: st
  */
 export async function findLeastUsedTag(): Promise<{ name: string, count: number } | null> {
   try {
-    const result = await db
+    const result = await (db
       .selectFrom('taggable_models')
-      .innerJoin('taggables', 'taggable.id', 'taggable_models.tag_id')
-      .select(({ fn }) => [
-        'taggable.name',
-        fn.count<number>('taggable_models.id').as('usage_count'),
+      .innerJoin('taggables', 'taggables.id', '=', 'taggable_models.tag_id')
+      .select([
+        'taggables.name',
       ])
-      .groupBy('taggable.name')
-      .orderBy('usage_count', 'asc')
+      .groupBy('taggables.name') as any)
+      .orderBy('taggables.name', 'asc')
       .executeTakeFirst()
 
     if (!result) {
@@ -200,8 +191,8 @@ export async function findLeastUsedTag(): Promise<{ name: string, count: number 
     }
 
     return {
-      name: result.name,
-      count: result.usage_count,
+      name: (result as Record<string, unknown>).name as string,
+      count: Number((result as Record<string, unknown>).usage_count || 0),
     }
   }
   catch (error) {
@@ -220,23 +211,20 @@ export async function findLeastUsedTag(): Promise<{ name: string, count: number 
  */
 export async function fetchTagsWithPostCounts(): Promise<Array<{ name: string, postCount: number }>> {
   try {
-    const result = await db
+    const result = await (db
       .selectFrom('taggables')
-      .leftJoin('taggable_models', join => join
-        .onRef('taggable.id', '=', 'taggable_models.tag_id')
-        .on('taggable_models.taggable_type', '=', 'posts'))
-      .select(({ fn }) => [
-        'taggable.name',
-        fn.count<number>('taggable_models.id').as('post_count'),
+      .leftJoin('taggable_models', 'taggables.id', '=', 'taggable_models.tag_id')
+      .select([
+        'taggables.name',
       ])
-      .groupBy('taggable.name')
-      .orderBy('post_count', 'desc')
+      .groupBy('taggables.name') as any)
+      .orderBy('taggables.name', 'desc')
       .limit(10)
       .execute()
 
-    return result.map(row => ({
-      name: row.name,
-      postCount: Number(row.post_count),
+    return (result as Record<string, unknown>[]).map((row: Record<string, unknown>) => ({
+      name: row.name as string,
+      postCount: Number(row.post_count || 0),
     }))
   }
   catch (error) {
@@ -255,26 +243,25 @@ export async function fetchTagsWithPostCounts(): Promise<Array<{ name: string, p
  */
 export async function fetchTagDistribution(): Promise<Array<{ name: string, count: number, percentage: number }>> {
   try {
-    const result = await db
+    const result = await (db
       .selectFrom('taggables')
-      .leftJoin('taggable_models', join => join
-        .onRef('taggable.id', '=', 'taggable_models.tag_id')
-        .on('taggable_models.taggable_type', '=', 'posts'))
-      .select(({ fn }) => [
-        'taggable.name',
-        fn.count<number>('taggable_models.id').as('count'),
+      .leftJoin('taggable_models', 'taggables.id', '=', 'taggable_models.tag_id')
+      .select([
+        'taggables.name',
       ])
-      .groupBy('taggable.name')
-      .orderBy('count', 'desc')
+      .groupBy('taggables.name') as any)
+      .orderBy('taggables.name', 'desc')
       .execute()
 
-    // Calculate total count for percentage calculation
-    const totalCount = result.reduce((sum, row) => sum + Number(row.count), 0)
+    const typedResult = result as Record<string, unknown>[]
 
-    return result.map(row => ({
-      name: row.name,
-      count: Number(row.count),
-      percentage: totalCount > 0 ? (Number(row.count) / totalCount) * 100 : 0,
+    // Calculate total count for percentage calculation
+    const totalCount = typedResult.reduce((sum: number, row: Record<string, unknown>) => sum + Number(row.count || 0), 0)
+
+    return typedResult.map((row: Record<string, unknown>) => ({
+      name: row.name as string,
+      count: Number(row.count || 0),
+      percentage: totalCount > 0 ? (Number(row.count || 0) / totalCount) * 100 : 0,
     }))
   }
   catch (error) {

@@ -1,0 +1,99 @@
+@extends('layouts/default')
+
+@section('content')
+<script server>
+let reviews = []
+let stats = []
+let statusOptions = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'published', label: 'Published' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'flagged', label: 'Flagged' },
+]
+let ratingOptions = [
+  { value: 'all', label: 'All Ratings' },
+  { value: '5', label: '5 Stars' },
+  { value: '4', label: '4 Stars' },
+  { value: '3', label: '3 Stars' },
+  { value: '2', label: '2 Stars' },
+  { value: '1', label: '1 Star' },
+]
+
+function statusVariant(s) {
+  s = String(s || '').toLowerCase()
+  if (['published', 'approved'].includes(s)) return 'success'
+  if (['pending', 'draft'].includes(s)) return 'warning'
+  if (['flagged', 'spam', 'rejected'].includes(s)) return 'danger'
+  return 'default'
+}
+</script>
+<div class="p-6 space-y-6">
+
+  <PageHeader title="Reviews" description="Customer reviews and ratings">
+    <template #actions>
+      <Button variant="secondary">Request Reviews</Button>
+      <Button variant="primary">Export</Button>
+    </template>
+  </PageHeader>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    @foreach (stats as stat)
+      <StatsCard :title="stat.label" value="{{ stat.value }}" icon="i-hugeicons-star" iconBg="primary" />
+    @endforeach
+  </div>
+
+  <!-- Reviews Table -->
+  <div class="bg-white dark:bg-neutral-800/90 rounded-xl border border-black/5 dark:border-white/5">
+    <div class="p-4 border-b border-neutral-200/60 dark:border-white/5">
+      <FilterBar searchPlaceholder="Search reviews...">
+        <Select
+          placeholder="All Statuses"
+          :options="{{ JSON.stringify(statusOptions) }}"
+          size="sm"
+        />
+        <Select
+          placeholder="All Ratings"
+          :options="{{ JSON.stringify(ratingOptions) }}"
+          size="sm"
+        />
+      </FilterBar>
+    </div>
+
+    <DataTable
+      :columns="{{ JSON.stringify([
+        { key: 'product', label: 'Product' },
+        { key: 'author', label: 'Author' },
+        { key: 'rating', label: 'Rating' },
+        { key: 'comment', label: 'Comment' },
+        { key: 'status', label: 'Status' },
+        { key: 'date', label: 'Date' },
+        { key: 'actions', label: '' }
+      ]) }}"
+      :data="reviews"
+      emptyTitle="No reviews yet"
+      emptyDescription="Customer reviews will appear here once submitted"
+      emptyIcon="i-hugeicons-star"
+    >
+      @foreach (reviews as review)
+        <tr class="hover:bg-neutral-50 dark:hover:bg-white/[0.02] transition-colors">
+          <td class="px-4 py-3 text-[13px] font-medium text-neutral-900 dark:text-white">{{ review.product }}</td>
+          <td class="px-4 py-3 text-[13px] text-neutral-600 dark:text-neutral-300">{{ review.author }}</td>
+          <td class="px-4 py-3 text-[13px] text-amber-500">{{ '★'.repeat(review.rating) }}{{ '☆'.repeat(5 - review.rating) }}</td>
+          <td class="px-4 py-3 text-[13px] text-neutral-500 dark:text-neutral-400 max-w-[250px] truncate">{{ review.comment }}</td>
+          <td class="px-4 py-3">
+            <Badge variant="{{ statusVariant(review.status) }}" size="xs" dot>{{ review.status }}</Badge>
+          </td>
+          <td class="px-4 py-3 text-[12px] text-neutral-500 dark:text-neutral-400">{{ review.date }}</td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-1">
+              <Button variant="ghost" size="xs">Reply</Button>
+              <Button variant="outline" size="xs">Approve</Button>
+            </div>
+          </td>
+        </tr>
+      @endforeach
+    </DataTable>
+  </div>
+</div>
+@endsection

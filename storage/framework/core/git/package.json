@@ -4,7 +4,9 @@
   "version": "0.70.23",
   "description": "The Stacks git utilities & conventions.",
   "author": "Chris Breuer",
-  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "contributors": [
+    "Chris Breuer <chris@stacksjs.com>"
+  ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
   "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/git#readme",
@@ -16,31 +18,38 @@
   "bugs": {
     "url": "https://github.com/stacksjs/stacks/issues"
   },
-  "keywords": ["git", "github", "utilities", "functions", "stacks"],
+  "keywords": [
+    "git",
+    "github",
+    "utilities",
+    "functions",
+    "stacks"
+  ],
   "exports": {
     ".": {
+      "bun": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./*": {
+      "bun": "./src/*",
       "import": "./dist/*"
     }
   },
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["README.md", "dist"],
+  "files": [
+    "README.md",
+    "dist"
+  ],
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "bun tsc --noEmit",
     "prepublishOnly": "bun run build"
   },
   "devDependencies": {
-    "@stacksjs/development": "workspace:*",
-    "bumpp": "^10.1.1",
-    "bun-git-hooks": "^0.2.16",
-    "changelogen": "^0.6.1",
-    "commitizen": "^4.3.1",
-    "cz-git": "^1.11.1",
-    "giget": "^2.0.0"
+    "@stacksjs/gitlint": "^0.1.5",
+    "@stacksjs/gitit": "^0.2.5",
+    "bun-git-hooks": "^0.3.1"
   }
 }

@@ -1,0 +1,7 @@
+<main>
+  @include('partials/bench-header', { comingSoon: true })
+
+  @slot('content')
+
+  @include('partials/bench-footer')
+</main>

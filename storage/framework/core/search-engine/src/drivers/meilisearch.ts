@@ -1,32 +1,43 @@
 import type { SearchEngineDriver } from '@stacksjs/types'
 import type { Dictionary, DocumentOptions, EnqueuedTask, Faceting, Index, IndexesResults, IndexOptions, PaginationSettings, SearchResponse, Settings, Synonyms, TypoTolerance } from 'meilisearch'
-import process from 'node:process'
-
 import { searchEngine } from '@stacksjs/config'
 import { log } from '@stacksjs/logging'
-import { ExitCode } from '@stacksjs/types'
 import { Meilisearch } from 'meilisearch'
 
-function client(): Meilisearch {
-  const host = searchEngine.meilisearch?.host || 'http://127.0.0.1:7700'
-  const apiKey = searchEngine.meilisearch?.apiKey || ''
+let _client: Meilisearch | null = null
 
-  if (!host) {
-    log.error('Please specify a search engine host.')
-    process.exit(ExitCode.FatalError)
+function client(): Meilisearch {
+  if (!_client) {
+    const host = searchEngine.meilisearch?.host || 'http://127.0.0.1:7700'
+    const apiKey = searchEngine.meilisearch?.apiKey || ''
+
+    if (!host) {
+      throw new Error('Meilisearch host is not configured. Please specify a search engine host.')
+    }
+
+    _client = new Meilisearch({ host, apiKey })
   }
 
-  return new Meilisearch({ host, apiKey })
+  return _client
+}
+
+/**
+ * Reset the cached client (useful for reconfiguration or testing)
+ */
+function resetClient(): void {
+  _client = null
 }
 
 async function search(index: string, params: any): Promise<SearchResponse<Record<string, any>>> {
-  const offsetVal = ((params.page * params.perPage) - 20) || 0
+  const page = Number(params.page) || 1
+  const perPage = Number(params.perPage) || 20
+  const offsetVal = (page - 1) * perPage
   const filter = convertToFilter(params.filter)
   const sort = convertToMeilisearchSorting(params.sort)
 
   return await client()
     .index(index)
-    .search(params.query, { limit: params.perPage, filter, sort, offset: offsetVal })
+    .search(params.query, { limit: perPage, filter, sort, offset: offsetVal })
 }
 
 async function addDocument(indexName: string, params: any): Promise<EnqueuedTask> {
@@ -78,7 +89,7 @@ async function listAllIndexes(): Promise<IndexesResults<Index[]>> {
 }
 
 async function getFilterableAttributes(index: string): Promise<string[]> {
-  return client().index(index).getFilterableAttributes()
+  return client().index(index).getFilterableAttributes() as any
 }
 
 async function updateFilterableAttributes(index: string, filterableAttributes: string[] | null): Promise<EnqueuedTask> {
@@ -222,13 +233,16 @@ async function resetDictionary(index: string): Promise<EnqueuedTask> {
 }
 
 function convertToFilter(jsonData: any): string[] {
+  if (!jsonData) return []
+
   const filters: string[] = []
 
   for (const key in jsonData) {
     if (Object.prototype.hasOwnProperty.call(jsonData, key)) {
       const value = jsonData[key]
-      const filter = `${key}='${value}'`
-      filters.push(filter)
+      // Escape single quotes in values to prevent filter injection
+      const escaped = String(value).replace(/'/g, "\\'")
+      filters.push(`${key}='${escaped}'`)
     }
   }
 
@@ -236,21 +250,24 @@ function convertToFilter(jsonData: any): string[] {
 }
 
 function convertToMeilisearchSorting(jsonData: any): string[] {
-  const filters: string[] = []
+  if (!jsonData) return []
+
+  const sortRules: string[] = []
 
   for (const key in jsonData) {
     if (Object.prototype.hasOwnProperty.call(jsonData, key)) {
-      const value = jsonData[key]
-      const filter = `${key}='${value}'`
-      filters.push(filter)
+      const value = String(jsonData[key]).toLowerCase()
+      const direction = value === 'desc' ? 'desc' : 'asc'
+      sortRules.push(`${key}:${direction}`)
     }
   }
 
-  return filters
+  return sortRules
 }
 
 const meilisearch: SearchEngineDriver = {
   client,
+  resetClient,
   search,
 
   getIndex,

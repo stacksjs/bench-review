@@ -1,7 +1,7 @@
-import process from 'node:process'
+import { stat } from 'node:fs/promises'
 import { bold, dim, green, italic, log } from '@stacksjs/cli'
 import { path as p } from '@stacksjs/path'
-import { fs, glob } from '@stacksjs/storage'
+import { glob } from '@stacksjs/storage'
 
 export async function outro(options: {
   dir: string
@@ -13,16 +13,25 @@ export async function outro(options: {
   const timeTaken = endTime - options.startTime
   const pkgName = options.pkgName ?? `@stacksjs/${p.basename(options.dir)}`
 
-  if (!options.result.success) {
+  // Handle both esbuild and Bun.build result formats
+  if (options.result.errors && options.result.errors.length > 0) {
+    // esbuild format
     // eslint-disable-next-line no-console
-    console.log(options.result.logs[0])
-    process.exit(1)
+    console.error('Build errors:', options.result.errors)
+    throw new Error(`Build failed with errors: ${JSON.stringify(options.result.errors)}`)
+  }
+  else if (options.result.success !== undefined && !options.result.success) {
+    // Bun.build format
+    const firstLog = options.result.logs?.[0] || 'Unknown build error'
+    // eslint-disable-next-line no-console
+    console.log(firstLog)
+    throw new Error(`Build failed: ${firstLog}`)
   }
 
   // loop over all the files in the dist directory and log them and their size
   const files = await glob([p.resolve(options.dir, 'dist', '**/*')], { absolute: true })
   for (const file of files) {
-    const stats = await fs.stat(file)
+    const stats = await stat(file)
 
     let sizeStr
     if (stats.size < 1024 * 1024) {

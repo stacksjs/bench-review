@@ -1,14 +1,13 @@
 // thanks to mitt for the base of this wonderful functional event emitter
 
 import type { ModelEvents } from '@stacksjs/types'
-import type { UserModel } from '../../../orm/src/models/User'
 
 export type EventType = string | symbol
 
 // An event handler can take an optional event argument
 // and should not return a value
-export type Handler<T = unknown> = (event: T) => void
-export type WildcardHandler<T = Record<string, unknown>> = (type: keyof T, event: T[keyof T]) => void
+export type Handler<T = unknown> = (_event: T) => void
+export type WildcardHandler<T = Record<string, unknown>> = (_type: keyof T, _event: T[keyof T]) => void
 
 // An array of all currently registered event handlers for a type
 export type EventHandlerList<T = unknown> = Array<Handler<T>>
@@ -23,14 +22,14 @@ export type EventHandlerMap<Events extends Record<EventType, unknown>> = Map<
 export interface Emitter<Events extends Record<EventType, unknown>> {
   all: EventHandlerMap<Events>
 
-  on: (<Key extends keyof Events>(type: Key, handler: Handler<Events[Key]>) => void) &
-    ((type: '*', handler: WildcardHandler<Events>) => void)
+  on: (<Key extends keyof Events>(_type: Key, _handler: Handler<Events[Key]>) => void) &
+    ((_type: '*', _handler: WildcardHandler<Events>) => void)
 
-  off: (<Key extends keyof Events>(type: Key, handler?: Handler<Events[Key]>) => void) &
-    ((type: '*', handler?: WildcardHandler<Events>) => void)
+  off: (<Key extends keyof Events>(_type: Key, _handler?: Handler<Events[Key]>) => void) &
+    ((_type: '*', _handler?: WildcardHandler<Events>) => void)
 
-  emit: (<Key extends keyof Events>(type: Key, event: Events[Key]) => void) &
-    (<Key extends keyof Events>(type: undefined extends Events[Key] ? Key : never) => void)
+  emit: (<Key extends keyof Events>(_type: Key, _event: Events[Key]) => void) &
+    (<Key extends keyof Events>(_type: undefined extends Events[Key] ? Key : never) => void)
 }
 
 /**
@@ -107,16 +106,49 @@ export default function mitt<Events extends Record<EventType, unknown>>(
 
       if (handlers) {
         ;(handlers as EventHandlerList<Events[keyof Events]>).slice().forEach((handler) => {
-          if (evt !== undefined)
-            handler(evt)
+          try {
+            if (evt !== undefined)
+              handler(evt)
+          }
+          catch (err) {
+            console.error(`[Events] Handler error for '${String(type)}':`, err)
+          }
         })
       }
+
+      // Pattern matching: fire handlers registered with glob-like patterns (e.g., 'user:*')
+      const typeStr = String(type)
+      ;(all as EventHandlerMap<Events>).forEach((patternHandlers, key) => {
+        const keyStr = String(key)
+        // Skip exact matches (already handled) and the '*' wildcard (handled below)
+        if (keyStr === typeStr || keyStr === '*') return
+        // Check glob patterns like 'user:*' or '*.created'
+        if (keyStr.includes('*')) {
+          const regex = new RegExp(`^${keyStr.replace(/\*/g, '.*')}$`)
+          if (regex.test(typeStr)) {
+            ;(patternHandlers as WildCardEventHandlerList<Events>).slice().forEach((handler) => {
+              try {
+                handler(type, evt as any)
+              }
+              catch (err) {
+                console.error(`[Events] Pattern handler '${keyStr}' error for '${typeStr}':`, err)
+              }
+            })
+          }
+        }
+      })
+
       handlers = (all as EventHandlerMap<Events>).get('*')
 
       if (handlers) {
         ;(handlers as WildCardEventHandlerList<Events>).slice().forEach((handler) => {
-          if (evt !== undefined)
-            handler(type, evt)
+          try {
+            if (evt !== undefined)
+              handler(type, evt)
+          }
+          catch (err) {
+            console.error(`[Events] Wildcard handler error for '${String(type)}':`, err)
+          }
         })
       }
     },
@@ -145,13 +177,12 @@ export default function mitt<Events extends Record<EventType, unknown>>(
  * ```
  */
 
-// TODO: need to create an action that auto generates this Events type from the ./app/Events
 export interface StacksEvents extends ModelEvents, Record<EventType, unknown> {
-  'user:registered': Partial<UserModel>
-  'user:logged-in': Partial<UserModel>
-  'user:logged-out': Partial<UserModel>
-  'user:password-reset': Partial<UserModel>
-  'user:password-changed': Partial<UserModel>
+  'user:registered': Record<string, any>
+  'user:logged-in': Record<string, any>
+  'user:logged-out': Record<string, any>
+  'user:password-reset': Record<string, any>
+  'user:password-changed': Record<string, any>
 }
 
 const events: Emitter<StacksEvents> = mitt<StacksEvents>()

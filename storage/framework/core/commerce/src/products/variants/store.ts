@@ -1,4 +1,5 @@
-import type { NewProductVariant, ProductVariantJsonResponse } from '@stacksjs/orm'
+type ProductVariantJsonResponse = ModelRow<typeof ProductVariant>
+type NewProductVariant = NewModelData<typeof ProductVariant>
 import { randomUUIDv7 } from 'bun'
 import { db } from '@stacksjs/database'
 
@@ -24,7 +25,7 @@ export async function store(data: NewProductVariant): Promise<ProductVariantJson
     if (!result)
       throw new Error('Failed to create product variant')
 
-    return result
+    return result as ProductVariantJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
@@ -48,21 +49,19 @@ export async function bulkStore(data: NewProductVariant[]): Promise<number> {
   let createdCount = 0
 
   try {
-    await db.transaction().execute(async (trx) => {
-      for (const variant of data) {
-        const variantData = {
-          ...variant,
-          uuid: randomUUIDv7(),
-        }
-
-        await trx
-          .insertInto('product_variants')
-          .values(variantData)
-          .execute()
-
-        createdCount++
+    for (const variant of data) {
+      const variantData = {
+        ...variant,
+        uuid: randomUUIDv7(),
       }
-    })
+
+      await db
+        .insertInto('product_variants')
+        .values(variantData)
+        .execute()
+
+      createdCount++
+    }
 
     return createdCount
   }
@@ -86,7 +85,7 @@ export function formatVariantOptions(rawOptions: string[]): string {
     return JSON.stringify([])
 
   // Clean and normalize the options
-  const cleanedOptions = rawOptions.map(option => option.trim()).filter(Boolean)
+  const cleanedOptions = rawOptions.map((option: any) => option.trim()).filter(Boolean)
 
   return JSON.stringify(cleanedOptions)
 }

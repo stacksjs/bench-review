@@ -1,5 +1,6 @@
 // Import dependencies
-import type { NewProductUnit, ProductUnitJsonResponse } from '@stacksjs/orm'
+type ProductUnitJsonResponse = ModelRow<typeof ProductUnit>
+type NewProductUnit = NewModelData<typeof ProductUnit>
 import { randomUUIDv7 } from 'bun'
 import { db } from '@stacksjs/database'
 
@@ -26,7 +27,7 @@ export async function store(data: NewProductUnit): Promise<ProductUnitJsonRespon
       throw new Error('Failed to create product unit')
 
     // If this unit is set as default, update all other units of the same type
-    if (unitData.is_default) {
+    if ((unitData as Record<string, unknown>).is_default) {
       await db
         .updateTable('product_units')
         .set({ is_default: false })
@@ -35,7 +36,7 @@ export async function store(data: NewProductUnit): Promise<ProductUnitJsonRespon
         .execute()
     }
 
-    return result
+    return result as ProductUnitJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
@@ -59,32 +60,30 @@ export async function bulkStore(data: NewProductUnit[]): Promise<number> {
   let createdCount = 0
 
   try {
-    await db.transaction().execute(async (trx) => {
-      for (const unit of data) {
-        const unitData = {
-          ...unit,
-          uuid: randomUUIDv7(),
-        }
-
-        const result = await trx
-          .insertInto('product_units')
-          .values(unitData)
-          .returningAll()
-          .executeTakeFirst()
-
-        // If this unit is set as default, update all other units of the same type
-        if (unitData.is_default && result) {
-          await trx
-            .updateTable('product_units')
-            .set({ is_default: false })
-            .where('type', '=', unitData.type)
-            .where('id', '!=', result.id)
-            .execute()
-        }
-
-        createdCount++
+    for (const unit of data) {
+      const unitData = {
+        ...unit,
+        uuid: randomUUIDv7(),
       }
-    })
+
+      const result = await db
+        .insertInto('product_units')
+        .values(unitData)
+        .returningAll()
+        .executeTakeFirst()
+
+      // If this unit is set as default, update all other units of the same type
+      if ((unitData as Record<string, unknown>).is_default && result) {
+        await db
+          .updateTable('product_units')
+          .set({ is_default: false })
+          .where('type', '=', unitData.type)
+          .where('id', '!=', result.id)
+          .execute()
+      }
+
+      createdCount++
+    }
 
     return createdCount
   }
@@ -109,16 +108,17 @@ export function formatUnitOptions(
   try {
     let query = db
       .selectFrom('product_units')
-      .select(['id', 'name', 'abbreviation', 'is_default'])
-      .orderBy('name')
+      .select(['id', 'name', 'abbreviation', 'is_default'] as any) as any
 
     // Filter by type if provided
     if (type)
       query = query.where('type', '=', type)
 
+    query = query.orderBy('name')
+
     // Convert db results to ensure id is string and handle potentially undefined is_default
-    return query.execute().then(results =>
-      results.map(result => ({
+    return query.execute().then((results: any) =>
+      results.map((result: any) => ({
         id: String(result.id), // Convert id to string
         name: result.name,
         abbreviation: result.abbreviation,
@@ -150,7 +150,7 @@ export async function getDefaultUnit(type: string): Promise<ProductUnitJsonRespo
       .where('is_default', '=', true)
       .executeTakeFirst()
 
-    return defaultUnit
+    return defaultUnit as ProductUnitJsonResponse | undefined
   }
   catch (error) {
     if (error instanceof Error) {

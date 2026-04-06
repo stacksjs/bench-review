@@ -22,13 +22,13 @@ export function saas(buddy: CLI): void {
       const perf = await intro('buddy stripe:setup')
       const result = await runAction(Action.StripeSetup, options)
 
-      if (result.isErr()) {
+      if (result.isErr) {
         await outro(
           'While running the stripe:setup command, there was an issue',
           { startTime: perf, useSeconds: true },
           result.error,
         )
-        process.exit()
+        process.exit(ExitCode.FatalError)
       }
 
       await outro(`Stripe products created successfully`, {

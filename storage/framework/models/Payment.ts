@@ -1,7 +1,7 @@
-import type { Model } from '@stacksjs/types'
+import { defineModel } from '@stacksjs/orm'
 import { schema } from '@stacksjs/validation'
 
-export default {
+export default defineModel({
   name: 'Payment',
   table: 'payments',
   primaryKey: 'id',
@@ -28,25 +28,27 @@ export default {
     observe: true,
   },
 
-  belongsTo: ['Order', 'Customer'], // For order_id and customer_id
+  belongsTo: ['Order', 'Customer'],
 
   attributes: {
     amount: {
-      required: true,
       order: 3,
       fillable: true,
       validation: {
-        rule: schema.number().min(0.01),
+        rule: schema.number().required().min(0.01).max(999999.99),
+        message: {
+          min: 'Amount must be at least 0.01',
+          max: 'Amount cannot exceed 999,999.99',
+        },
       },
-      factory: faker => Number.parseFloat(faker.commerce.price({ min: 10, max: 500, dec: 2 })),
+      factory: faker => faker.number.int({ min: 1000, max: 50000 }),
     },
 
     method: {
-      required: true,
       order: 4,
       fillable: true,
       validation: {
-        rule: schema.string(),
+        rule: schema.string().required(),
       },
       factory: faker => faker.helpers.arrayElement([
         'creditCard',
@@ -60,11 +62,10 @@ export default {
     },
 
     status: {
-      required: true,
       order: 5,
       fillable: true,
       validation: {
-        rule: schema.string(),
+        rule: schema.string().required(),
       },
       factory: faker => faker.helpers.arrayElement([
         'pending',
@@ -77,7 +78,6 @@ export default {
     },
 
     currency: {
-      required: false,
       order: 7,
       fillable: true,
       validation: {
@@ -87,7 +87,6 @@ export default {
     },
 
     referenceNumber: {
-      required: false,
       order: 8,
       fillable: true,
       validation: {
@@ -97,7 +96,6 @@ export default {
     },
 
     cardLastFour: {
-      required: false,
       order: 9,
       fillable: true,
       validation: {
@@ -107,7 +105,6 @@ export default {
     },
 
     cardBrand: {
-      required: false,
       order: 10,
       fillable: true,
       validation: {
@@ -117,7 +114,6 @@ export default {
     },
 
     billingEmail: {
-      required: false,
       order: 11,
       fillable: true,
       validation: {
@@ -127,10 +123,10 @@ export default {
     },
 
     transactionId: {
-      required: false,
       order: 12,
       unique: true,
       fillable: true,
+      foreignKey: false, // This is a payment processor transaction ID string, not a FK to transactions table
       validation: {
         rule: schema.string(),
       },
@@ -138,7 +134,6 @@ export default {
     },
 
     paymentProvider: {
-      required: false,
       order: 13,
       fillable: true,
       validation: {
@@ -148,17 +143,15 @@ export default {
     },
 
     refundAmount: {
-      required: false,
       order: 14,
       fillable: true,
       validation: {
         rule: schema.number().min(0),
       },
-      factory: faker => faker.helpers.maybe(() => Number.parseFloat(faker.commerce.price({ min: 5, max: 100, dec: 2 })), { probability: 0.2 }),
+      factory: faker => faker.helpers.maybe(() => faker.number.int({ min: 500, max: 10000 }), { probability: 0.2 }),
     },
 
     notes: {
-      required: false,
       order: 15,
       fillable: true,
       validation: {
@@ -171,4 +164,4 @@ export default {
   dashboard: {
     highlight: true,
   },
-} satisfies Model
+} as const)

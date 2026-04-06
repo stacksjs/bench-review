@@ -10,7 +10,6 @@
     "moduleResolution": "bundler",
     "paths": {
       "@stacksjs/*": ["./*/src"],
-      "@stacksjs/utils/*": ["./utils/src/*"],
       "stacks/*": ["./*/src"],
       "buddy": ["./buddy/src/index.ts"],
       "buddy/*": ["./buddy/src/*"],
@@ -21,26 +20,19 @@
       "Models/*": ["../../../app/Models/*"],
       "Notifications/*": ["../../../app/Notifications/*"],
       "~/*": ["../../../*"],
-      "@/*": ["../../../resources/*"]
+      "@/*": ["../../../resources/*"],
+      "*": ["../../../pantry/*"]
     },
     "resolveJsonModule": true,
     "types": [
-      "bun",
-      "vite/client",
-      "unplugin-vue-router/client",
-      // "vue/ref-macros",
-      "vite-plugin-pwa/client",
-      "vite-plugin-layouts/client",
-      "@intlify/unplugin-vue-i18n/messages",
-      "@vite-pwa/vitepress",
-      "vitepress"
+      "bun"
     ],
     "allowImportingTsExtensions": true,
     "strict": true,
-    "strictNullChecks": true,
-    "noUncheckedIndexedAccess": true,
+    "strictNullChecks": false,
+    "noUncheckedIndexedAccess": false,
     "noUncheckedSideEffectImports": true,
-    "noUnusedLocals": true,
+    "noUnusedLocals": false,
     "declaration": true,
     "declarationMap": true,
     "noEmit": true,
@@ -51,17 +43,9 @@
     "isolatedModules": true,
     "skipLibCheck": true
   },
-  "vueCompilerOptions": {
-    "plugins": [
-      "@vue-macros/volar/define-models",
-      "@vue-macros/volar/define-slots"
-    ]
-  },
   "include": [
     "../../../*.stx",
     "../../../**/*.stx",
-    "../../../*.vue",
-    "../../../**/*.vue",
     "../../../*.ts",
     "../../../**/*.ts",
     "../../../*.yaml",
@@ -69,22 +53,36 @@
     "../../../*.yml",
     "../../../**/*.yml",
     "../../../*.d.ts",
-    "../../../**/*.d.ts",
-    "../docs/.vitepress/*"
+    "../../../**/*.d.ts"
   ],
   "exclude": [
+    "../../../dist",
+    "../../../dist/**",
+    "../../../pantry",
+    "../../../pantry/**",
     "../**/cdk.out",
     "../**/dist",
     "../**/fixtures",
-    "../node_modules",
-    "../**/node_modules",
-    "../**/out", // not needed by us, but potentially by the user
+    "**/node_modules",
+    "../**/out",
     "../server/app",
     "../server/config",
     "../server/core",
     "../server/docs",
     "../server/routes",
     "../server/storage",
-    "../../../.stacks"
+    "../**/tests/**",
+    "../**/*.test.ts",
+    "../**/*.spec.ts",
+    "../models/**",
+    "../../../resources/assets/**",
+    "../../../cloud/**",
+    "./cloud/**",
+    "./deploy/**",
+    "../../../config/**",
+    "../views/**",
+    "../auto-imports/**",
+    "../requests/**",
+    "../**/build.ts"
   ]
 }

@@ -1,0 +1,75 @@
+<script>
+interface ModalProps {
+  isOpen?: boolean
+  title?: string
+  description?: string
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
+  closable?: boolean
+}
+
+const { isOpen = false, title = '', description = '', size = 'md', closable = true } = defineProps<ModalProps>()
+
+const sizeClasses = {
+  sm: 'max-w-sm',
+  md: 'max-w-lg',
+  lg: 'max-w-2xl',
+  xl: 'max-w-4xl',
+  full: 'max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)]'
+}
+</script>
+@if(isOpen)
+  <div ref="pageRoot" class="fixed inset-0 z-50 overflow-y-auto">
+    <!-- Overlay -->
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" data-modal-overlay></div>
+
+    <!-- Modal container -->
+    <div class="flex min-h-full p-4 items-center justify-center">
+      <div class="relative w-full rounded-xl bg-white dark:bg-neutral-900 shadow-2xl {{ sizeClasses[size] }}">
+        <!-- Header -->
+        @if(title || closable)
+          <div class="flex items-start justify-between gap-4 p-6 border-b border-neutral-200 dark:border-neutral-700">
+            <div class="min-w-0">
+              @if(title)
+                <h3 class="text-lg font-semibold text-neutral-900 dark:text-white">
+                  {{ title }}
+                </h3>
+              @endif
+              @if(description)
+                <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                  {{ description }}
+                </p>
+              @endif
+            </div>
+
+            @if(closable)
+              <button
+                type="button"
+                class="p-2 -m-2 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:hover:text-neutral-300 dark:hover:bg-neutral-800 transition-colors"
+                data-modal-close
+              >
+                <div class="i-hugeicons-cancel-01 w-5 h-5"></div>
+              </button>
+            @endif
+          </div>
+        @endif
+
+        <!-- Body -->
+        <div class="p-6">
+          <slot />
+        </div>
+      </div>
+    </div>
+  </div>
+  @endif
+<script client>
+var _root = useRef('pageRoot')
+onMount(function() {
+  var el = _root.current;
+  if (!el) return;
+  el.querySelectorAll('[data-modal-overlay], [data-modal-close]').forEach(item => {
+    item.addEventListener('click', () => {
+      item.closest('.fixed.inset-0')?.remove();
+    });
+  });
+});
+</script>

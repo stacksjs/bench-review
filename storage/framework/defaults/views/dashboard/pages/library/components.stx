@@ -1,0 +1,84 @@
+@extends('layouts/default')
+
+@section('content')
+<script server>
+const fs = await import('fs')
+const path = await import('path')
+
+let components = []
+let categoryOptions = [
+  { value: 'all', label: 'All' },
+  { value: 'forms', label: 'Forms' },
+  { value: 'layout', label: 'Layout' },
+  { value: 'overlay', label: 'Overlay' },
+  { value: 'data', label: 'Data' },
+  { value: 'display', label: 'Display' },
+  { value: 'navigation', label: 'Navigation' },
+]
+
+try {
+  const componentsDir = path.resolve(process.cwd(), 'resources/components')
+  if (fs.existsSync(componentsDir)) {
+    const files = fs.readdirSync(componentsDir, { recursive: true })
+    components = files
+      .filter(f => String(f).endsWith('.stx') || String(f).endsWith('.vue'))
+      .map(f => {
+        const name = path.basename(String(f), path.extname(String(f)))
+        return { name, path: String(f), category: 'General' }
+      })
+  }
+} catch (e) {
+  // resources/components not available
+}
+</script>
+<div class="p-6 space-y-6">
+
+  <PageHeader title="Components" description="Browse and manage your UI component library">
+    <template #actions>
+      <Button variant="secondary">Import</Button>
+      <Button variant="primary">
+        <div class="i-hugeicons-plus-sign h-4 w-4"></div>
+        New Component
+      </Button>
+    </template>
+  </PageHeader>
+
+  <!-- Filter -->
+  <div class="bg-white dark:bg-neutral-800/90 rounded-xl border border-black/5 dark:border-white/5 p-4">
+    <FilterBar searchPlaceholder="Search components...">
+      <Select
+        placeholder="All Categories"
+        :options="{{ JSON.stringify(categoryOptions) }}"
+        size="sm"
+      />
+    </FilterBar>
+  </div>
+
+  <!-- Components Grid -->
+  @if (components.length > 0)
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    @foreach (components as component)
+      <Card>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-[14px] font-semibold text-neutral-900 dark:text-white">{{ component.name }}</span>
+            <Badge variant="info" size="xs">{{ component.category }}</Badge>
+          </div>
+          <p class="text-[13px] text-neutral-500 dark:text-neutral-400 mb-4">{{ component.description }}</p>
+          <div class="flex items-center justify-between">
+            <span class="text-[12px] text-neutral-500 dark:text-neutral-400">{{ component.instances }} instances</span>
+            <Button variant="ghost" size="xs">View</Button>
+          </div>
+        </div>
+      </Card>
+    @endforeach
+  </div>
+  @else
+  <EmptyState
+    icon="i-hugeicons-puzzle"
+    title="No components found"
+    description="Components will appear here when added to resources/components"
+  />
+  @endif
+</div>
+@endsection

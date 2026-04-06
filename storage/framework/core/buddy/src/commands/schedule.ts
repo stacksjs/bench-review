@@ -22,13 +22,13 @@ export function schedule(buddy: CLI): void {
       const perf = await intro('buddy schedule:run')
       const result = await runAction(Action.ScheduleRun, options)
 
-      if (result.isErr()) {
+      if (result.isErr) {
         await outro(
           'While running the schedule:run command, there was an issue',
           { startTime: perf, useSeconds: true },
           result.error,
         )
-        process.exit()
+        process.exit(ExitCode.FatalError)
       }
 
       process.exit(ExitCode.Success)

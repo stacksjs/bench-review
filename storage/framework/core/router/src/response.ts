@@ -1,52 +1,133 @@
-import type { ResponseInstance } from '@stacksjs/types'
+/**
+ * Response Factory
+ *
+ * Provides fluent response helpers for Stacks actions.
+ * This mirrors the bun-router response factory API.
+ */
 
-interface ResponseData {
-  status: number
-  headers: { [key: string]: string }
-  body: string
+/**
+ * JSON response options
+ */
+export interface JsonResponseOptions {
+  status?: number
+  headers?: Record<string, string>
+  pretty?: boolean
 }
 
-export class Response implements ResponseInstance {
-  public json(data: any, statusCode: number = 200): ResponseData {
-    const isErrorStatus = statusCode >= 400
-    return {
-      status: statusCode,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(isErrorStatus ? { errors: data } : { data }),
+/**
+ * Response factory with common response helpers
+ */
+export const response = {
+  /**
+   * Create a JSON response
+   */
+  json: <T>(data: T, options: JsonResponseOptions = {}): Response => {
+    const { status = 200, headers = {}, pretty = false } = options
+    let body: string
+    try {
+      body = pretty ? JSON.stringify(data, null, 2) : JSON.stringify(data)
     }
-  }
+    catch {
+      // Handle circular references or non-serializable data
+      body = JSON.stringify({ error: 'Response data could not be serialized' })
+    }
 
-  public success(data: any): ResponseData {
-    return this.json(data, 200)
-  }
+    return new Response(body, {
+      status,
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers,
+      },
+    })
+  },
 
-  public created(data: any): ResponseData {
-    return this.json(data, 201)
-  }
-
-  public noContent(): ResponseData {
-    return {
+  /**
+   * Create a 204 No Content response
+   */
+  noContent: (headers: Record<string, string> = {}): Response => {
+    return new Response(null, {
       status: 204,
-      headers: { 'Content-Type': 'application/json' },
-      body: '',
-    }
-  }
+      headers,
+    })
+  },
 
-  public error(message: string, statusCode: number = 500): ResponseData {
-    return this.json({ error: message }, statusCode)
-  }
+  /**
+   * Create a 201 Created response
+   */
+  created: <T>(data: T, options: JsonResponseOptions = {}): Response => {
+    return response.json(data, { ...options, status: 201 })
+  },
 
-  public forbidden(message: string): ResponseData {
-    return this.error(message, 403)
-  }
+  /**
+   * Create a 400 Bad Request response
+   */
+  badRequest: <T>(data: T, options: JsonResponseOptions = {}): Response => {
+    return response.json(data, { ...options, status: 400 })
+  },
 
-  public unauthorized(message: string): ResponseData {
-    return this.error(message, 401)
-  }
+  /**
+   * Create a 401 Unauthorized response
+   */
+  unauthorized: <T>(data: T = { error: 'Unauthorized' } as T, options: JsonResponseOptions = {}): Response => {
+    return response.json(data, { ...options, status: 401 })
+  },
 
-  public notFound(message: string): ResponseData {
-    return this.error(message, 404)
-  }
+  /**
+   * Create a 403 Forbidden response
+   */
+  forbidden: <T>(data: T = { error: 'Forbidden' } as T, options: JsonResponseOptions = {}): Response => {
+    return response.json(data, { ...options, status: 403 })
+  },
+
+  /**
+   * Create a 404 Not Found response
+   */
+  notFound: <T>(data: T = { error: 'Not Found' } as T, options: JsonResponseOptions = {}): Response => {
+    return response.json(data, { ...options, status: 404 })
+  },
+
+  /**
+   * Create a 500 Internal Server Error response
+   */
+  error: <T>(data: T = { error: 'Internal Server Error' } as T, options: JsonResponseOptions = {}): Response => {
+    return response.json(data, { ...options, status: 500 })
+  },
+
+  /**
+   * Create a redirect response
+   */
+  redirect: (url: string, status: 301 | 302 | 303 | 307 | 308 = 302): Response => {
+    return new Response(null, {
+      status,
+      headers: { Location: url },
+    })
+  },
+
+  /**
+   * Create a text response
+   */
+  text: (text: string, options: { status?: number, headers?: Record<string, string> } = {}): Response => {
+    const { status = 200, headers = {} } = options
+    return new Response(text, {
+      status,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        ...headers,
+      },
+    })
+  },
+
+  /**
+   * Create an HTML response
+   */
+  html: (html: string, options: { status?: number, headers?: Record<string, string> } = {}): Response => {
+    const { status = 200, headers = {} } = options
+    return new Response(html, {
+      status,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        ...headers,
+      },
+    })
+  },
 }
-
-export const response: Response = new Response()

@@ -1,6 +1,8 @@
-import type { NewProductItem, ProductItemJsonResponse } from '@stacksjs/orm'
+type ProductJsonResponse = ModelRow<typeof Product>
+type NewProduct = NewModelData<typeof Product>
 import { randomUUIDv7 } from 'bun'
 import { db } from '@stacksjs/database'
+import { fetchById } from './fetch'
 
 /**
  * Create a new product item
@@ -8,7 +10,7 @@ import { db } from '@stacksjs/database'
  * @param data The product item data to store
  * @returns The newly created product item record
  */
-export async function store(data: NewProductItem): Promise<ProductItemJsonResponse> {
+export async function store(data: NewProduct): Promise<ProductJsonResponse> {
   try {
     const itemData = {
       ...data,
@@ -16,15 +18,21 @@ export async function store(data: NewProductItem): Promise<ProductItemJsonRespon
     }
 
     const result = await db
-      .insertInto('product_items')
+      .insertInto('products')
       .values(itemData)
-      .returningAll()
       .executeTakeFirst()
 
     if (!result)
       throw new Error('Failed to create product item')
 
-    return result
+    const insertId = Number(result.insertId) || Number(result.numInsertedOrUpdatedRows)
+
+    const model = await fetchById(insertId)
+
+    if (!model)
+      throw new Error('Failed to create product item')
+
+    return model
   }
   catch (error) {
     if (error instanceof Error) {
@@ -41,14 +49,14 @@ export async function store(data: NewProductItem): Promise<ProductItemJsonRespon
  * @param data Array of product item data to store
  * @returns Number of product items created
  */
-export async function bulkStore(data: NewProductItem[]): Promise<number> {
+export async function bulkStore(data: NewProduct[]): Promise<number> {
   if (!data.length)
     return 0
 
   let createdCount = 0
 
   try {
-    await db.transaction().execute(async (trx) => {
+    await (db as any).transaction().execute(async (trx: any) => {
       for (const item of data) {
         const itemData = {
           ...item,
@@ -56,7 +64,7 @@ export async function bulkStore(data: NewProductItem[]): Promise<number> {
         }
 
         await trx
-          .insertInto('product_items')
+          .insertInto('products')
           .values(itemData)
           .execute()
 

@@ -1,7 +1,8 @@
-import type { LicenseKeyJsonResponse, LicenseKeyUpdate } from '@stacksjs/orm'
 import { db } from '@stacksjs/database'
 // Import dependencies
 import { formatDate } from '@stacksjs/orm'
+type LicenseKeyJsonResponse = ModelRow<typeof LicenseKey>
+type LicenseKeyUpdate = UpdateModelData<typeof LicenseKey>
 
 /**
  * Update a license key
@@ -28,7 +29,7 @@ export async function update(id: number, data: LicenseKeyUpdate): Promise<Licens
     if (!result)
       throw new Error('Failed to update license key')
 
-    return result
+    return result as LicenseKeyJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
@@ -64,7 +65,7 @@ export async function updateStatus(
     if (!result)
       throw new Error('Failed to update license key status')
 
-    return result
+    return result as LicenseKeyJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
@@ -104,7 +105,7 @@ export async function updateExpiration(
     if (!result)
       throw new Error('Failed to update expiration information')
 
-    return result
+    return result as LicenseKeyJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {

@@ -1,4 +1,5 @@
-import type { DriverJsonResponse, NewDriver } from '@stacksjs/orm'
+type DriverJsonResponse = ModelRow<typeof Driver>
+type NewDriver = NewModelData<typeof Driver>
 import { randomUUIDv7 } from 'bun'
 import { db } from '@stacksjs/database'
 
@@ -24,7 +25,7 @@ export async function store(data: NewDriver): Promise<DriverJsonResponse> {
     if (!result)
       throw new Error('Failed to create driver')
 
-    return result
+    return result as DriverJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {

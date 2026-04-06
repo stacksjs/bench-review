@@ -1,3 +1,4 @@
+
 import type { UserModel } from '@stacksjs/orm'
 import type { StripeCustomerOptions } from '@stacksjs/types'
 import type Stripe from 'stripe'
@@ -69,7 +70,11 @@ export const manageCustomer: ManageCustomer = (() => {
   }
 
   async function updateStripeCustomer(user: UserModel, options: Stripe.CustomerCreateParams = {}): Promise<Stripe.Response<Stripe.Customer>> {
-    const customer = await stripe.customers.update(user.stripe_id || '', options)
+    if (!user.stripe_id) {
+      throw new Error('User does not have a Stripe customer ID. Create a customer first.')
+    }
+
+    const customer = await stripe.customers.update(user.stripe_id, options)
 
     return customer
   }
@@ -80,7 +85,11 @@ export const manageCustomer: ManageCustomer = (() => {
     }
 
     try {
-      const deletedCustomer = await stripe.customers.del(user.stripe_id || '')
+      if (!user.stripe_id) {
+        throw new Error('User has no Stripe ID')
+      }
+
+      const deletedCustomer = await stripe.customers.del(user.stripe_id)
 
       // Update the user model to remove the Stripe ID
       await user.update({ stripe_id: '' })
@@ -101,7 +110,7 @@ export const manageCustomer: ManageCustomer = (() => {
     }
 
     try {
-      const customer = await stripe.customers.retrieve(user.stripe_id || '')
+      const customer = await stripe.customers.retrieve(user.stripe_id!)
       if ((customer as Stripe.DeletedCustomer).deleted) {
         throw new Error('Customer was deleted')
       }
@@ -122,7 +131,7 @@ export const manageCustomer: ManageCustomer = (() => {
     }
 
     try {
-      const customer = await stripe.customers.retrieve(user.stripe_id || '')
+      const customer = await stripe.customers.retrieve(user.stripe_id!)
 
       if ((customer as Stripe.DeletedCustomer).deleted) {
         throw new Error('Customer was deleted in Stripe')
@@ -144,7 +153,7 @@ export const manageCustomer: ManageCustomer = (() => {
     }
 
     try {
-      const customer = await stripe.customers.retrieve(user.stripe_id || '')
+      const customer = await stripe.customers.retrieve(user.stripe_id!)
       if ((customer as Stripe.DeletedCustomer).deleted) {
         return await createStripeCustomer(user, options)
       }

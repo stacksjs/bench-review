@@ -1,0 +1,74 @@
+@extends('layouts/default')
+
+@section('content')
+<script server>
+// Data available when full dev server runs (buddy dev)
+let terminals = []
+let todayStats = []
+let recentTransactions = []
+
+function statusVariant(s) {
+  s = String(s || '').toLowerCase()
+  if (['active', 'connected', 'online'].includes(s)) return 'success'
+  if (['pending', 'idle'].includes(s)) return 'warning'
+  if (['offline', 'error', 'disconnected'].includes(s)) return 'danger'
+  if (['info', 'processing'].includes(s)) return 'info'
+  return 'default'
+}
+</script>
+<div class="p-6 space-y-6">
+
+  <PageHeader title="Point of Sale" description="Manage POS terminals and transactions">
+    <template #actions>
+      <Button variant="secondary">Reports</Button>
+      <Button variant="primary">New Sale</Button>
+    </template>
+  </PageHeader>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    @foreach (todayStats as stat)
+      <StatsCard :title="stat.label" value="{{ stat.value }}" icon="i-hugeicons-store-01" iconBg="primary" />
+    @endforeach
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <!-- Terminals -->
+    <Card title="Terminals">
+      <div class="divide-y divide-neutral-100 dark:divide-neutral-700/50">
+        @foreach (terminals as terminal)
+          <div class="flex items-center gap-3 p-4 hover:bg-neutral-50 dark:hover:bg-white/[0.02] transition-colors">
+            <div class="flex-1 min-w-0">
+              <div class="text-[13px] font-medium text-neutral-900 dark:text-white">{{ terminal.name }}</div>
+              <div class="text-[12px] text-neutral-500 dark:text-neutral-400">{{ terminal.id }} &middot; {{ terminal.location }}</div>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-[12px] text-neutral-500 dark:text-neutral-400">{{ terminal.lastTransaction }}</span>
+              <Badge variant="{{ statusVariant(terminal.status) }}" size="xs" dot>{{ terminal.status }}</Badge>
+            </div>
+          </div>
+        @endforeach
+      </div>
+    </Card>
+
+    <!-- Recent Transactions -->
+    <Card title="Recent Transactions">
+      <div class="divide-y divide-neutral-100 dark:divide-neutral-700/50">
+        @foreach (recentTransactions as txn)
+          <div class="flex items-center gap-3 p-4 hover:bg-neutral-50 dark:hover:bg-white/[0.02] transition-colors">
+            <div class="flex-1 min-w-0">
+              <div class="text-[13px] font-medium text-neutral-900 dark:text-white">{{ txn.id }}</div>
+              <div class="text-[12px] text-neutral-500 dark:text-neutral-400">{{ txn.terminal }} &middot; {{ txn.time }}</div>
+            </div>
+            <div class="flex items-center gap-3">
+              <Badge variant="default" size="xs">{{ txn.method }}</Badge>
+              <span class="text-[13px] font-semibold text-neutral-900 dark:text-white">{{ txn.amount }}</span>
+            </div>
+          </div>
+        @endforeach
+      </div>
+    </Card>
+  </div>
+
+</div>
+@endsection

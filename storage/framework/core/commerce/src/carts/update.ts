@@ -1,6 +1,7 @@
-import type { CartJsonResponse, CartUpdate } from '@stacksjs/orm'
 import { db } from '@stacksjs/database'
 import { formatDate } from '@stacksjs/orm'
+type CartJsonResponse = ModelRow<typeof Cart>
+type CartUpdate = UpdateModelData<typeof Cart>
 
 /**
  * Update a cart
@@ -24,7 +25,7 @@ export async function update(id: number, data: Omit<CartUpdate, 'id'>): Promise<
     if (!result)
       throw new Error('Failed to update cart')
 
-    return result
+    return result as CartJsonResponse
   }
   catch (error) {
     if (error instanceof Error)
@@ -47,9 +48,9 @@ export async function bulkUpdate(data: CartUpdate[]): Promise<number> {
   let updatedCount = 0
 
   try {
-    await db.transaction().execute(async (trx) => {
+    await (db as any).transaction().execute(async (trx: any) => {
       for (const cart of data) {
-        if (!cart.id)
+        if (!(cart as Record<string, unknown>).id)
           continue
 
         const result = await trx
@@ -58,7 +59,7 @@ export async function bulkUpdate(data: CartUpdate[]): Promise<number> {
             ...cart,
             updated_at: formatDate(new Date()),
           })
-          .where('id', '=', cart.id)
+          .where('id', '=', (cart as Record<string, unknown>).id)
           .executeTakeFirst()
 
         if (Number(result.numUpdatedRows) > 0)

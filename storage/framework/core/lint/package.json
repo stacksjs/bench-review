@@ -5,7 +5,7 @@
   "description": "The Stacks way to lint.",
   "author": "Chris Breuer",
   "contributors": [
-    "Chris Breuer <chris@stacksjs.org>"
+    "Chris Breuer <chris@stacksjs.com>"
   ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
@@ -21,18 +21,19 @@
   "keywords": [
     "linter",
     "formatter",
-    "eslint",
-    "antfu",
+    "pickier",
     "pre-configured",
     "zero-config",
     "stacks"
   ],
   "exports": {
     ".": {
+      "bun": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./*": {
+      "bun": "./src/*",
       "import": "./dist/*"
     }
   },
@@ -49,11 +50,8 @@
     "prepublishOnly": "bun run build"
   },
   "devDependencies": {
-    "@commitlint/cli": "^19.8.1",
-    "@stacksjs/development": "workspace:*",
-    "@stacksjs/eslint-config": "^4.14.0-beta.3",
-    "bun-git-hooks": "^0.2.16",
-    "lint-staged": "^16.1.0",
-    "publint": "^0.3.12"
+    "better-dx": "^0.2.5",
+    "@stacksjs/gitlint": "^0.1.5",
+    "bun-git-hooks": "^0.3.1"
   }
 }

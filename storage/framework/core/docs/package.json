@@ -5,7 +5,7 @@
   "description": "The Stacks way to document.",
   "author": "Chris Breuer",
   "contributors": [
-    "Chris Breuer <chris@stacksjs.org>"
+    "Chris Breuer <chris@stacksjs.com>"
   ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
@@ -26,10 +26,12 @@
   ],
   "exports": {
     ".": {
+      "bun": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./*": {
+      "bun": "./src/*",
       "import": "./dist/*"
     }
   },
@@ -45,23 +47,13 @@
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@iconify-json/carbon": "^1.2.9",
-    "@shikijs/vitepress-twoslash": "^3.5.0",
-    "@vite-pwa/assets-generator": "^1.0.0",
-    "@vite-pwa/vitepress": "^1.0.0",
-    "unplugin-icons": "^22.1.0",
-    "unplugin-vue-components": "^28.7.0",
-    "vite-plugin-pwa": "^1.0.0",
-    "vitepress": "1.6.3"
+    "@stacksjs/bunpress": "^0.1.4"
   },
   "devDependencies": {
     "@stacksjs/alias": "workspace:*",
     "@stacksjs/config": "workspace:*",
-    "@stacksjs/development": "workspace:*",
+    "better-dx": "^0.2.5",
     "@stacksjs/path": "workspace:*",
     "@stacksjs/server": "workspace:*"
-  },
-  "overrides": {
-    "vite": "npm:rolldown-vite@latest"
   }
 }

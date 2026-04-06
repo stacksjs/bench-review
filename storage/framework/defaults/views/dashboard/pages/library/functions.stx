@@ -1,0 +1,69 @@
+@extends('layouts/default')
+
+@section('content')
+<script server>
+const fs = await import('fs')
+const path = await import('path')
+
+let functions = []
+
+try {
+  const functionsDir = path.resolve(process.cwd(), 'resources/functions')
+  if (fs.existsSync(functionsDir)) {
+    const files = fs.readdirSync(functionsDir, { recursive: true })
+    functions = files
+      .filter(f => String(f).endsWith('.ts') || String(f).endsWith('.js'))
+      .map(f => {
+        const name = path.basename(String(f), path.extname(String(f)))
+        return { name, path: String(f), type: path.extname(String(f)).slice(1) }
+      })
+  }
+} catch (e) {
+  // resources/functions not available
+}
+</script>
+<div class="p-6 space-y-6">
+
+  <PageHeader title="Functions" description="Utility functions and helpers">
+    <template #actions>
+      <Button variant="primary">
+        <div class="i-hugeicons-plus-sign h-4 w-4"></div>
+        New Function
+      </Button>
+    </template>
+  </PageHeader>
+
+  <!-- Functions Table -->
+  <div class="bg-white dark:bg-neutral-800/90 rounded-xl border border-black/5 dark:border-white/5">
+    <DataTable
+      :columns="{{ JSON.stringify([
+        { key: 'name', label: 'Function' },
+        { key: 'category', label: 'Category' },
+        { key: 'description', label: 'Description' },
+        { key: 'calls', label: 'Calls (30d)' },
+        { key: 'actions', label: '' }
+      ]) }}"
+      :data="functions"
+      emptyTitle="No functions found"
+      emptyDescription="Functions will appear here when added to resources/functions"
+      emptyIcon="i-hugeicons-function"
+    >
+      @foreach (functions as fn)
+        <tr class="hover:bg-neutral-50 dark:hover:bg-white/[0.02] transition-colors">
+          <td class="px-4 py-3">
+            <code class="text-xs font-mono px-1.5 py-0.5 bg-neutral-100 dark:bg-neutral-700 rounded text-neutral-700 dark:text-neutral-300">{{ fn.name }}()</code>
+          </td>
+          <td class="px-4 py-3">
+            <Badge variant="default" size="xs">{{ fn.category }}</Badge>
+          </td>
+          <td class="px-4 py-3 text-[13px] text-neutral-500 dark:text-neutral-400">{{ fn.description }}</td>
+          <td class="px-4 py-3 text-[13px] text-neutral-600 dark:text-neutral-300">{{ fn.calls.toLocaleString() }}</td>
+          <td class="px-4 py-3">
+            <Button variant="ghost" size="xs" iconOnly><div class="i-hugeicons-view w-4 h-4"></div></Button>
+          </td>
+        </tr>
+      @endforeach
+    </DataTable>
+  </div>
+</div>
+@endsection

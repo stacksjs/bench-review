@@ -1,7 +1,7 @@
-import type { Model } from '@stacksjs/types'
+import { defineModel } from '@stacksjs/orm'
 import { schema } from '@stacksjs/validation'
 
-export default {
+export default defineModel({
   name: 'Author', // defaults to the sanitized file name
   table: 'authors', // defaults to the lowercase, plural name of the model name (or the name of the model file)
   primaryKey: 'id', // defaults to `id`
@@ -47,13 +47,12 @@ export default {
 
   attributes: {
     name: {
-      required: true,
       order: 1,
       fillable: true,
       validation: {
-        rule: schema.string().min(5).max(255),
+        rule: schema.string().required().min(5).max(255),
         message: {
-          min: 'Name must have a minimum of 3 characters',
+          min: 'Name must have a minimum of 5 characters',
           max: 'Name must have a maximum of 255 characters',
         },
       },
@@ -63,11 +62,10 @@ export default {
 
     email: {
       unique: true,
-      required: true,
       order: 2,
       fillable: true,
       validation: {
-        rule: schema.string().email(),
+        rule: schema.string().required().email(),
         message: {
           email: 'Email must be a valid email address',
         },
@@ -79,4 +77,4 @@ export default {
   dashboard: {
     highlight: true,
   },
-} satisfies Model
+} as const)

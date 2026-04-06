@@ -1,36 +1,48 @@
-import type { MiddlewareOptions } from '@stacksjs/types'
-import type { Request } from './request'
-import { userMiddlewarePath } from '@stacksjs/path'
+import type { EnhancedRequest } from '@stacksjs/bun-router'
 
-export class Middleware implements MiddlewareOptions {
+/**
+ * Middleware class for defining route middleware
+ *
+ * Provides a simple, structured way to define middleware handlers
+ * that can be attached to routes and route groups.
+ *
+ * The request object is an EnhancedRequest with helper methods like
+ * `bearerToken()`, `get()`, `input()`, `has()`, etc.
+ *
+ * @example
+ * ```ts
+ * import { Middleware } from '@stacksjs/router'
+ *
+ * export default new Middleware({
+ *   name: 'Auth',
+ *   priority: 1,
+ *   async handle(request) {
+ *     const token = request.bearerToken()
+ *     if (!token) throw new HttpError(401, 'Unauthorized')
+ *   },
+ * })
+ * ```
+ */
+
+export type Request = EnhancedRequest
+
+export interface MiddlewareConfig {
+  /** Middleware name — used for identification and debugging */
   name: string
-  priority: number
-  handle: (request: Request) => Promise<void> | void
+  /** Execution priority — lower numbers run first (default: 10) */
+  priority?: number
+  /** The middleware handler — throw HttpError or Response to short-circuit */
+  handle: (request: EnhancedRequest) => void | Promise<void>
+}
 
-  constructor(data: MiddlewareOptions) {
-    this.name = data.name
-    this.priority = data.priority
-    this.handle = data.handle
+export class Middleware {
+  readonly name: string
+  readonly priority: number
+  readonly handle: (request: EnhancedRequest) => void | Promise<void>
+
+  constructor(config: MiddlewareConfig) {
+    this.name = config.name
+    this.priority = config.priority ?? 10
+    this.handle = config.handle
   }
-}
-
-// const readdir = promisify(fs.readdir)
-
-async function importMiddlewares(directory: string): Promise<string[]> {
-  // const middlewares = []
-  // TODO: somehow this breaks ./buddy dev
-  // const files = await readdir(directory)
-
-  // for (const file of files) {
-  //   // Dynamically import the middleware
-  //   const imported = await import(path.join(directory, file))
-  //   middlewares.push(imported.default)
-  // }
-
-  // return middlewares
-  return [directory] // fix this: return array of middlewares
-}
-
-export async function middlewares(): Promise<string[]> {
-  return await importMiddlewares(userMiddlewarePath())
 }

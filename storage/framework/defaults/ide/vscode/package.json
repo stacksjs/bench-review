@@ -28,7 +28,7 @@
   "icon": "logo.png",
   "files": ["LICENSE.md", "logo.png"],
   "engines": {
-    "vscode": "^1.100.3"
+    "vscode": "^1.109.5"
   },
   "scripts": {
     "package": "bunx --bun vsce package",
@@ -41,7 +41,6 @@
   "extensionPack": [
     "dotenv.dotenvx-vscode",
     "amazonwebservices.aws-toolkit-vscode",
-    "antfu.unocss",
     "antfu.goto-alias",
     "dbaeumer.vscode-eslint",
     "christian-kohler.npm-intellisense",
@@ -57,6 +56,6 @@
     "vue.volar"
   ],
   "devDependencies": {
-    "@vscode/vsce": "^3.4.2"
+    "@vscode/vsce": "^3.7.2-12"
   }
 }

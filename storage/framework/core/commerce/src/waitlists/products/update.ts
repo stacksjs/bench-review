@@ -1,6 +1,7 @@
-import type { WaitlistProductJsonResponse, WaitlistProductUpdate } from '@stacksjs/orm'
 import { db } from '@stacksjs/database'
 import { formatDate } from '@stacksjs/orm'
+type WaitlistProductJsonResponse = ModelRow<typeof WaitlistProduct>
+type WaitlistProductUpdate = UpdateModelData<typeof WaitlistProduct>
 
 /**
  * Update a waitlist product
@@ -14,22 +15,23 @@ export async function update(id: number, data: WaitlistProductUpdate): Promise<W
     if (!id)
       throw new Error('Waitlist product ID is required for update')
 
+    const d = data as Record<string, unknown>
     const result = await db
       .updateTable('waitlist_products')
       .set({
         name: data.name,
         email: data.email,
         phone: data.phone,
-        quantity: data.quantity,
-        notification_preference: data.notification_preference,
+        quantity: data.quantity ?? d.party_size,
+        notification_preference: d.notification_preference,
         source: data.source,
         notes: data.notes,
         status: data.status,
         product_id: data.product_id,
         customer_id: data.customer_id,
-        notified_at: data.notified_at,
-        purchased_at: data.purchased_at,
-        cancelled_at: data.cancelled_at,
+        notified_at: d.notified_at,
+        purchased_at: d.purchased_at,
+        cancelled_at: d.cancelled_at,
         updated_at: formatDate(new Date()),
       })
       .where('id', '=', id)
@@ -39,7 +41,7 @@ export async function update(id: number, data: WaitlistProductUpdate): Promise<W
     if (!result)
       throw new Error('Failed to update waitlist product')
 
-    return result
+    return result as WaitlistProductJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
@@ -75,7 +77,7 @@ export async function updateStatus(
     if (!result)
       throw new Error('Failed to update waitlist product status')
 
-    return result
+    return result as WaitlistProductJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
@@ -101,7 +103,7 @@ export async function updatePartySize(
     const result = await db
       .updateTable('waitlist_products')
       .set({
-        party_size: partySize,
+        quantity: partySize,
         updated_at: formatDate(new Date()),
       })
       .where('id', '=', id)
@@ -111,7 +113,7 @@ export async function updatePartySize(
     if (!result)
       throw new Error('Failed to update party size')
 
-    return result
+    return result as WaitlistProductJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {

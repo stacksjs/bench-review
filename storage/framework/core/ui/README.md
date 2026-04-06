@@ -5,7 +5,7 @@ This package contains the Stacks UI engine.
 ## ☘️ Features
 
 - 🍀 **Vue-powered** _extendable & native access to the ecosystem_
-- 🎨 **Style with ease** _via an atomic CSS engine, powered by UnoCSS_
+- 🎨 **Style with ease** _via a blazingly fast utility-first CSS framework, powered by Headwind_
 - 🍍 **Simple data storage** _accessed via an intuitive API_
 - Written in modern ESM/TypeScript
 
@@ -23,7 +23,7 @@ import ui from '@stacksjs/ui'
 // wip
 ```
 
-To view the full documentation, please visit [https://stacksjs.org/ui](https://stacksjs.org/ui).
+To view the full documentation, please visit [https://stacksjs.com/ui](https://stacksjs.com/ui).
 
 ## 🧪 Testing
 
@@ -53,9 +53,8 @@ For casual chit-chat with others using this package:
 
 Many thanks to the following core technologies & people who have contributed to this package:
 
-- [Vue](https://vuejs.org)
-- [UnoCSS](https://github.com/unocss/unocss)
-- [Pinia](https://pinia.vuejs.org)
+- [STX](https://github.com/stacksjs/stx)
+- [Crosswind](https://github.com/cwcss/crosswind)
 - [Chris Breuer](https://github.com/chrisbbreuer)
 - [All Contributors](../../contributors)
 

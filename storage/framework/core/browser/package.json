@@ -4,7 +4,9 @@
   "version": "0.70.23",
   "description": "Stacks core frontend/browser functionalities.",
   "author": "Chris Breuer",
-  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "contributors": [
+    "Chris Breuer <chris@stacksjs.com>"
+  ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
   "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/browser#readme",
@@ -16,26 +18,43 @@
   "bugs": {
     "url": "https://github.com/stacksjs/stacks/issues"
   },
-  "keywords": ["frontend", "browser", "stacks", "api"],
+  "keywords": [
+    "frontend",
+    "browser",
+    "stacks",
+    "api"
+  ],
   "exports": {
     ".": {
+      "bun": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./*": {
+      "bun": "./src/*",
       "import": "./dist/*"
     }
   },
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["README.md", "dist"],
+  "files": [
+    "README.md",
+    "dist"
+  ],
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "bun tsc --noEmit",
     "prepublishOnly": "bun run build"
   },
+  "dependencies": {
+    "@stacksjs/composables": "workspace:*",
+    "@stacksjs/stx": "^0.2.7",
+    "@stripe/stripe-js": "^9.0.0",
+    "bun-query-builder": "^0.1.13",
+    "magic-regexp": "^0.11.0"
+  },
   "devDependencies": {
-    "@stacksjs/development": "workspace:*",
+    "better-dx": "^0.2.5",
     "@stacksjs/utils": "workspace:*"
   }
 }

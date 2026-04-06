@@ -1,7 +1,8 @@
-import type { Model } from '@stacksjs/types'
+import { defineModel } from '@stacksjs/orm'
+import { slug } from '@stacksjs/strings'
 import { schema } from '@stacksjs/validation'
 
-export default {
+export default defineModel({
   name: 'Category',
   table: 'categories',
   primaryKey: 'id',
@@ -32,11 +33,10 @@ export default {
 
   attributes: {
     name: {
-      required: true,
       order: 1,
       fillable: true,
       validation: {
-        rule: schema.string().max(50),
+        rule: schema.string().required().max(50),
         message: {
           max: 'Name must have a maximum of 50 characters',
         },
@@ -45,7 +45,6 @@ export default {
     },
 
     description: {
-      required: false,
       order: 2,
       fillable: true,
       validation: {
@@ -54,9 +53,17 @@ export default {
       factory: faker => faker.commerce.productDescription(),
     },
 
-    imageUrl: {
-      required: false,
+    slug: {
       order: 3,
+      fillable: true,
+      validation: {
+        rule: schema.string().required(),
+      },
+      factory: faker => slug(faker.commerce.department()),
+    },
+
+    imageUrl: {
+      order: 4,
       fillable: true,
       validation: {
         rule: schema.string(),
@@ -65,7 +72,6 @@ export default {
     },
 
     isActive: {
-      required: false,
       order: 4,
       fillable: true,
       validation: {
@@ -75,7 +81,6 @@ export default {
     },
 
     parentCategoryId: {
-      required: false,
       order: 5,
       fillable: true,
       validation: {
@@ -85,11 +90,10 @@ export default {
     },
 
     displayOrder: {
-      required: true,
       order: 6,
       fillable: true,
       validation: {
-        rule: schema.number(),
+        rule: schema.number().required(),
       },
       factory: faker => faker.number.int({ min: 1, max: 100 }),
     },
@@ -98,4 +102,4 @@ export default {
   dashboard: {
     highlight: true,
   },
-} satisfies Model
+} as const)

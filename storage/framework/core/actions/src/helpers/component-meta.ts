@@ -1,7 +1,7 @@
 import type { ComponentMeta, MetaCheckerOptions } from 'vue-component-meta'
 import { frameworkPath, join, path, projectPath } from '@stacksjs/path'
 import { existsSync, globSync, mkdirSync, writeFileSync } from '@stacksjs/storage'
-import MarkdownIt from 'markdown-it'
+import { parseMarkdown } from 'ts-md'
 import { createComponentMetaChecker } from 'vue-component-meta'
 
 /**
@@ -15,7 +15,6 @@ import { createComponentMetaChecker } from 'vue-component-meta'
  */
 
 export function generateComponentMeta(): void {
-  const md = new MarkdownIt()
   const checkerOptions: MetaCheckerOptions = {
     forceUseTs: true,
     schema: { ignore: ['MyIgnoredNestedProps'] },
@@ -29,7 +28,7 @@ export function generateComponentMeta(): void {
 
     // Exclude global props
     const props: ComponentApiProps[] = []
-    meta.props.forEach((prop) => {
+    meta.props.forEach((prop: any) => {
       if (prop?.global)
         return
 
@@ -37,7 +36,7 @@ export function generateComponentMeta(): void {
 
       props.push({
         name: `${name}${required ? '' : '?'}`,
-        description: md.render(description),
+        description: parseMarkdown(description),
 
         // required,
 

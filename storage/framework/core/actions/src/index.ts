@@ -5,6 +5,7 @@ export * from './dev'
 
 export * from './generate'
 export * from './helpers'
+export * from './setup'
 
 // makeFactory,
 export {
@@ -13,6 +14,7 @@ export {
   createFactory,
   createFunction,
   createLanguage,
+  createMiddleware,
   createMigration,
   createModel,
   createNotification,
@@ -29,3 +31,11 @@ export {
   makeStack,
   make as runMake,
 } from './make'
+
+export { discoverPackages } from './discover-packages'
+export { installStack, uninstallStack, listStacks } from './stacks'
+export type { DiscoveredPackagesManifest, PackageStacksMeta } from './discover-packages'
+export { makeJob } from './make-job'
+export { makeCommand } from './make-command'
+export { makePolicy } from './make-policy'
+export { makeResource } from './make-resource'

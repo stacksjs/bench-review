@@ -8,30 +8,297 @@ import { ExitCode } from '@stacksjs/types'
 export function queue(buddy: CLI): void {
   const descriptions = {
     project: 'Target a specific project',
-    queue: 'Run a specific queue',
+    queue: 'Specify queue name',
     verbose: 'Enable verbose output',
+    id: 'Job or batch ID',
+    all: 'Apply to all items',
+    force: 'Force the operation without confirmation',
+    connection: 'Queue connection to use',
+    concurrency: 'Number of concurrent workers',
   }
 
   buddy
-    .command('queue:work', descriptions.queue)
+    .command('queue:work', 'Start processing jobs on the queue')
     .option('-p, --project [project]', descriptions.project, { default: false })
     .option('-q, --queue [queue]', descriptions.queue, { default: false })
+    .option('-c, --connection [connection]', descriptions.connection, { default: false })
+    .option('--concurrency [concurrency]', descriptions.concurrency, { default: '1' })
     .option('--verbose', descriptions.verbose, { default: false })
-    .action(async (options: CliQueueOptions) => {
+    .action(async (options: CliQueueOptions & { concurrency?: string }) => {
       log.debug('Running `buddy queue:work` ...', options)
 
       const perf = await intro('buddy queue:work')
       const result = await runAction(Action.QueueWork, options)
 
-      if (result.isErr()) {
+      if (result.isErr) {
         await outro(
           'While running the queue:work command, there was an issue',
           { startTime: perf, useSeconds: true },
           result.error,
         )
-        process.exit()
+        process.exit(ExitCode.FatalError)
       }
 
       process.exit(ExitCode.Success)
     })
+
+  buddy
+    .command('queue:failed', 'List all failed jobs')
+    .option('-p, --project [project]', descriptions.project, { default: false })
+    .option('-q, --queue [queue]', descriptions.queue, { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (options: CliQueueOptions) => {
+      log.debug('Running `buddy queue:failed` ...', options)
+
+      const perf = await intro('buddy queue:failed')
+      const result = await runAction(Action.QueueFailed, options)
+
+      if (result.isErr) {
+        await outro(
+          'While running the queue:failed command, there was an issue',
+          { startTime: perf, useSeconds: true },
+          result.error,
+        )
+        process.exit(ExitCode.FatalError)
+      }
+
+      await outro('Listed all failed jobs', {
+        startTime: perf,
+        useSeconds: true,
+      })
+      process.exit(ExitCode.Success)
+    })
+
+  buddy
+    .command('queue:retry [id]', 'Retry failed jobs')
+    .option('-p, --project [project]', descriptions.project, { default: false })
+    .option('-q, --queue [queue]', descriptions.queue, { default: false })
+    .option('--all', descriptions.all, { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (id: string | undefined, options: CliQueueOptions) => {
+      log.debug('Running `buddy queue:retry` ...', options)
+
+      const perf = await intro('buddy queue:retry')
+      const result = await runAction(Action.QueueRetry, { ...options, id } as any)
+
+      if (result.isErr) {
+        await outro(
+          'While running the queue:retry command, there was an issue',
+          { startTime: perf, useSeconds: true },
+          result.error,
+        )
+        process.exit(ExitCode.FatalError)
+      }
+
+      const message = options.all ? 'Retried all failed jobs' : `Retried failed job ${id}`
+      await outro(message, {
+        startTime: perf,
+        useSeconds: true,
+      })
+      process.exit(ExitCode.Success)
+    })
+
+  buddy
+    .command('queue:clear', 'Clear all jobs from the queue')
+    .option('-p, --project [project]', descriptions.project, { default: false })
+    .option('-q, --queue [queue]', descriptions.queue, { default: false })
+    .option('--force', descriptions.force, { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (options: CliQueueOptions) => {
+      log.debug('Running `buddy queue:clear` ...', options)
+
+      const perf = await intro('buddy queue:clear')
+      const result = await runAction(Action.QueueClear, options)
+
+      if (result.isErr) {
+        await outro(
+          'While running the queue:clear command, there was an issue',
+          { startTime: perf, useSeconds: true },
+          result.error,
+        )
+        process.exit(ExitCode.FatalError)
+      }
+
+      const queueName = options.queue || 'default'
+      await outro(`Cleared all jobs from the "${queueName}" queue`, {
+        startTime: perf,
+        useSeconds: true,
+      })
+      process.exit(ExitCode.Success)
+    })
+
+  buddy
+    .command('queue:status', 'Display the status of queue workers')
+    .option('-p, --project [project]', descriptions.project, { default: false })
+    .option('-q, --queue [queue]', descriptions.queue, { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (options: CliQueueOptions) => {
+      log.debug('Running `buddy queue:status` ...', options)
+
+      const perf = await intro('buddy queue:status')
+      const result = await runAction(Action.QueueStatus, options)
+
+      if (result.isErr) {
+        await outro(
+          'While running the queue:status command, there was an issue',
+          { startTime: perf, useSeconds: true },
+          result.error,
+        )
+        process.exit(ExitCode.FatalError)
+      }
+
+      await outro('Queue status displayed', {
+        startTime: perf,
+        useSeconds: true,
+      })
+      process.exit(ExitCode.Success)
+    })
+
+  buddy
+    .command('queue:flush', 'Delete all failed jobs')
+    .option('-p, --project [project]', descriptions.project, { default: false })
+    .option('-q, --queue [queue]', descriptions.queue, { default: false })
+    .option('--force', descriptions.force, { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (options: CliQueueOptions) => {
+      log.debug('Running `buddy queue:flush` ...', options)
+
+      const perf = await intro('buddy queue:flush')
+      const result = await runAction(Action.QueueFlush, options)
+
+      if (result.isErr) {
+        await outro(
+          'While running the queue:flush command, there was an issue',
+          { startTime: perf, useSeconds: true },
+          result.error,
+        )
+        process.exit(ExitCode.FatalError)
+      }
+
+      await outro('Flushed all failed jobs', {
+        startTime: perf,
+        useSeconds: true,
+      })
+      process.exit(ExitCode.Success)
+    })
+
+  buddy
+    .command('queue:table', 'Create a migration for the jobs database table')
+    .option('-p, --project [project]', descriptions.project, { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (options: CliQueueOptions) => {
+      log.debug('Running `buddy queue:table` ...', options)
+
+      const perf = await intro('buddy queue:table')
+      const result = await runAction(Action.QueueTable, options)
+
+      if (result.isErr) {
+        await outro(
+          'While running the queue:table command, there was an issue',
+          { startTime: perf, useSeconds: true },
+          result.error,
+        )
+        process.exit(ExitCode.FatalError)
+      }
+
+      await outro('Jobs table migration created', {
+        startTime: perf,
+        useSeconds: true,
+      })
+      process.exit(ExitCode.Success)
+    })
+
+  buddy
+    .command('queue:monitor', 'Monitor queue status in real-time')
+    .option('-p, --project [project]', descriptions.project, { default: false })
+    .option('-q, --queue [queue]', descriptions.queue, { default: false })
+    .option('-i, --interval [interval]', 'Refresh interval in milliseconds', { default: '2000' })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (options: CliQueueOptions & { interval?: string }) => {
+      log.debug('Running `buddy queue:monitor` ...', options)
+
+      const result = await runAction(Action.QueueMonitor, options)
+
+      if (result.isErr) {
+        log.error('While running the queue:monitor command, there was an issue', result.error)
+        process.exit(ExitCode.FatalError)
+      }
+
+      process.exit(ExitCode.Success)
+    })
+
+  buddy
+    .command('queue:inspect [id]', 'Inspect a specific job')
+    .option('-p, --project [project]', descriptions.project, { default: false })
+    .option('--failed', 'Inspect a failed job', { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (id: string | undefined, options: CliQueueOptions & { failed?: boolean }) => {
+      log.debug('Running `buddy queue:inspect` ...', options)
+
+      const perf = await intro('buddy queue:inspect')
+      const result = await runAction(Action.QueueInspect, { ...options, id } as any)
+
+      if (result.isErr) {
+        await outro(
+          'While running the queue:inspect command, there was an issue',
+          { startTime: perf, useSeconds: true },
+          result.error,
+        )
+        process.exit(ExitCode.FatalError)
+      }
+
+      await outro('Job inspection complete', {
+        startTime: perf,
+        useSeconds: true,
+      })
+      process.exit(ExitCode.Success)
+    })
+
+  buddy
+    .command('queue:schedule', 'Start the job scheduler for cron-based jobs')
+    .option('-p, --project [project]', descriptions.project, { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (options: CliQueueOptions) => {
+      log.debug('Running `buddy queue:schedule` ...', options)
+
+      const result = await runAction(Action.QueueSchedule, options)
+
+      if (result.isErr) {
+        log.error('While running the queue:schedule command, there was an issue', result.error)
+        process.exit(ExitCode.FatalError)
+      }
+
+      process.exit(ExitCode.Success)
+    })
+
+  buddy
+    .command('queue:schedule:list', 'List all scheduled jobs')
+    .option('-p, --project [project]', descriptions.project, { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (options: CliQueueOptions) => {
+      log.debug('Running `buddy queue:schedule:list` ...', options)
+
+      const perf = await intro('buddy queue:schedule:list')
+      const result = await runAction(Action.QueueScheduleList, options)
+
+      if (result.isErr) {
+        await outro(
+          'While running the queue:schedule:list command, there was an issue',
+          { startTime: perf, useSeconds: true },
+          result.error,
+        )
+        process.exit(ExitCode.FatalError)
+      }
+
+      await outro('Listed all scheduled jobs', {
+        startTime: perf,
+        useSeconds: true,
+      })
+      process.exit(ExitCode.Success)
+    })
+
+  buddy.on('queue:*', () => {
+    console.error('Invalid command: %s\nSee --help for a list of available commands.', buddy.args.join(' '))
+    process.exit(1)
+  })
 }

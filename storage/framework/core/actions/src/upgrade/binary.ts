@@ -2,6 +2,7 @@ import process from 'node:process'
 import { runCommand } from '@stacksjs/cli'
 import { log } from '@stacksjs/logging'
 import { path } from '@stacksjs/path'
+import { ExitCode } from '@stacksjs/types'
 import { fs, storage } from '@stacksjs/storage'
 
 /**
@@ -17,9 +18,9 @@ log.info('Upgrading `stacks`...')
 // ensure the latest binary is generated
 const result = await runCommand('bun compile.ts', { cwd: path.buddyPath() })
 
-if (result.isErr()) {
+if (result.isErr) {
   log.error('There was an error compiling the binary', result.error)
-  process.exit()
+  process.exit(ExitCode.FatalError)
 }
 
 // Check if the source exists (it should be, because bun compile.ts was successful)
@@ -29,15 +30,17 @@ if (await storage.exists(source)) {
     log.info(`Source: ${source}`) // TODO: should be debug
     log.info(`Destination: ${destination}`) // TODO: should be debug
 
-    await fs.ensureDir(destinationDir) // Ensure the destination directory exists
-    await fs.move(source, destination, { overwrite: true })
+    await (fs as any).ensureDir(destinationDir)
+    await (fs as any).move(source, destination, { overwrite: true })
 
     log.success('Binary Latest Version Is Used')
   }
   catch (err: any) {
     log.error(err)
+    process.exit(ExitCode.FatalError)
   }
 }
 else {
   log.error(`Binary source not found: ${source}`)
+  process.exit(ExitCode.FatalError)
 }

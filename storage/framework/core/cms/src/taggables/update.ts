@@ -19,16 +19,42 @@ interface UpdateTagData {
  * @param data The tag data to update
  * @returns The updated tag record
  */
-export async function update(id: number, data: UpdateTagData): Promise<TaggableTable> {
+export async function update(data: UpdateTagData): Promise<TaggableTable> {
   try {
-    // Only include fields that are provided
-    if (data.name !== undefined) {
-      data.slug = await uniqueSlug(data.name, { table: 'taggables', column: 'slug' })
+    const id = data.id
+
+    if (!id) {
+      throw new Error('Tag ID is required for update')
     }
+
+    if (data.name !== undefined) {
+      if (data.name.trim() === '') {
+        throw new Error('Tag name cannot be empty')
+      }
+
+      const slug = await uniqueSlug(data.name, { table: 'taggables', column: 'slug' })
+
+      // Enforce unique slugs on update
+      const existingSlug = await db
+        .selectFrom('taggables')
+        .selectAll()
+        .where('slug', '=', slug)
+        .where('id', '!=', id)
+        .executeTakeFirst()
+
+      if (existingSlug) {
+        throw new Error(`Tag with unique slug "${slug}" already exists`)
+      }
+
+      data.slug = slug
+    }
+
+    // Remove id from the data to avoid updating it
+    const { id: _id, ...updateData } = data
 
     const result = await db
       .updateTable('taggables')
-      .set(data)
+      .set(updateData as unknown as Record<string, unknown>)
       .where('id', '=', id)
       .returningAll()
       .executeTakeFirst()
@@ -36,7 +62,7 @@ export async function update(id: number, data: UpdateTagData): Promise<TaggableT
     if (!result)
       throw new Error('Failed to update tag')
 
-    return result
+    return result as unknown as TaggableTable
   }
   catch (error) {
     if (error instanceof Error)

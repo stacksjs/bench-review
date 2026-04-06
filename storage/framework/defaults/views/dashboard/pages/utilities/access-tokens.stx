@@ -1,0 +1,111 @@
+@extends('layouts/default')
+
+@section('content')
+<script server>
+let tokens = []
+let stats = []
+let scopes = []
+
+function statusVariant(s) {
+  s = String(s || '').toLowerCase()
+  if (['active', 'valid'].includes(s)) return 'success'
+  if (['pending', 'expiring'].includes(s)) return 'warning'
+  if (['expired', 'revoked', 'inactive'].includes(s)) return 'danger'
+  return 'default'
+}
+</script>
+<div class="p-6 space-y-6">
+
+  <PageHeader title="Access Tokens" description="API keys and authentication tokens">
+    <template #actions>
+      <Button variant="primary">
+        <div class="i-hugeicons-plus-sign h-4 w-4"></div>
+        Create Token
+      </Button>
+    </template>
+  </PageHeader>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    @foreach (stats as stat)
+      <StatsCard :title="stat.label" value="{{ stat.value }}" icon="i-hugeicons-key-01" iconBg="primary" />
+    @endforeach
+  </div>
+
+  @if (tokens.length > 0)
+  <!-- Tokens Table -->
+  <div class="bg-white dark:bg-neutral-800/90 rounded-xl border border-black/5 dark:border-white/5">
+    <div class="p-4 border-b border-neutral-200/60 dark:border-white/5">
+      <span class="text-[14px] font-semibold text-neutral-900 dark:text-white">API Tokens</span>
+    </div>
+
+    <DataTable
+      :columns="{{ JSON.stringify([
+        { key: 'name', label: 'Name' },
+        { key: 'token', label: 'Token' },
+        { key: 'scopes', label: 'Scopes' },
+        { key: 'lastUsed', label: 'Last Used' },
+        { key: 'created', label: 'Created' },
+        { key: 'status', label: 'Status' },
+        { key: 'actions', label: '' }
+      ]) }}"
+      :data="tokens"
+      emptyTitle="No tokens"
+      emptyDescription="Create API tokens to authenticate services"
+      emptyIcon="i-hugeicons-key-01"
+    >
+      @foreach (tokens as token)
+        <tr class="hover:bg-neutral-50 dark:hover:bg-white/[0.02] transition-colors">
+          <td class="px-4 py-3 text-[13px] font-medium text-neutral-900 dark:text-white">{{ token.name }}</td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-2">
+              <code class="text-xs font-mono px-1.5 py-0.5 bg-neutral-100 dark:bg-neutral-700 rounded text-neutral-700 dark:text-neutral-300">{{ token.token }}</code>
+              <Button variant="ghost" size="xs" iconOnly><div class="i-hugeicons-copy-01 w-3.5 h-3.5"></div></Button>
+            </div>
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex flex-wrap gap-1">
+              @foreach (token.scopes as scope)
+                <Badge variant="default" size="xs">{{ scope }}</Badge>
+              @endforeach
+            </div>
+          </td>
+          <td class="px-4 py-3 text-[12px] text-neutral-500 dark:text-neutral-400">{{ token.lastUsed }}</td>
+          <td class="px-4 py-3 text-[12px] text-neutral-500 dark:text-neutral-400">{{ token.created }}</td>
+          <td class="px-4 py-3">
+            <Badge variant="{{ statusVariant(token.status) }}" size="xs" dot>{{ token.status }}</Badge>
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-1">
+              <Button variant="ghost" size="xs" iconOnly><div class="i-hugeicons-edit-01 w-4 h-4"></div></Button>
+              <Button variant="danger" size="xs">Revoke</Button>
+            </div>
+          </td>
+        </tr>
+      @endforeach
+    </DataTable>
+  </div>
+
+  <!-- Available Scopes -->
+  <Card>
+    <div class="p-4 border-b border-neutral-200/60 dark:border-white/5">
+      <span class="text-[14px] font-semibold text-neutral-900 dark:text-white">Available Scopes</span>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
+      @foreach (scopes as scope)
+        <div class="p-4 rounded-lg bg-neutral-50 dark:bg-neutral-800">
+          <code class="text-xs font-mono px-1.5 py-0.5 bg-neutral-100 dark:bg-neutral-700 rounded text-neutral-700 dark:text-neutral-300">{{ scope.name }}</code>
+          <p class="text-[12px] text-neutral-500 dark:text-neutral-400 mt-2">{{ scope.description }}</p>
+        </div>
+      @endforeach
+    </div>
+  </Card>
+  @else
+  <EmptyState
+    icon="i-hugeicons-key-01"
+    title="No access tokens"
+    description="Generate API tokens to authenticate external services"
+  />
+  @endif
+</div>
+@endsection

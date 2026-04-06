@@ -1,20 +1,41 @@
 import type { LogErrorOptions } from '@stacksjs/logging'
-import { appendFile, mkdir } from 'node:fs/promises'
+import fs from 'node:fs'
 import { dirname } from 'node:path'
 import * as process from 'node:process'
-import { italic, stripAnsi } from '@stacksjs/cli'
+// Inlined to avoid circular dependency: error-handling -> cli -> error-handling
+function italic(str: string): string {
+  return `\x1B[3m${str}\x1B[23m`
+}
+
+function stripAnsi(str: string): string {
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1B\[[0-9;]*m/g, '')
+}
 import * as path from '@stacksjs/path'
 import { ExitCode } from '@stacksjs/types'
-import fs from 'fs-extra'
+
+/**
+ * Context information attached to errors for better debugging.
+ */
+export interface ErrorContext {
+  requestId?: string
+  url?: string
+  method?: string
+  userId?: string | number
+  ip?: string
+  userAgent?: string
+  [key: string]: unknown
+}
 
 type ErrorMessage = string
 
 export class ErrorHandler {
   static isTestEnvironment = false
-  static shouldExitProcess = true
+  static shouldExitProcess = false
 
   static handle(err: Error | ErrorMessage | unknown, options?: LogErrorOptions): Error {
-    this.shouldExitProcess = options?.shouldExit !== false
+    if (!this.isTestEnvironment)
+      this.shouldExitProcess = options?.shouldExit === true
     if (options?.silent !== true)
       this.writeErrorToConsole(err)
 
@@ -52,18 +73,22 @@ export class ErrorHandler {
     return err
   }
 
-  static async writeErrorToFile(err: Error | unknown): Promise<void> {
+  static async writeErrorToFile(err: Error | unknown, context?: ErrorContext): Promise<void> {
     if (!(err instanceof Error)) {
       console.error('Error is not an instance of Error:', err)
       return
     }
 
-    const formattedError = `[${new Date().toISOString()}] ${err.name}: ${err.message}\n`
+    const contextStr = context
+      ? ` | url=${context.url || 'N/A'} method=${context.method || 'N/A'} user=${context.userId || 'anonymous'}`
+      : ''
+    const stackLine = err.stack ? `\n${err.stack.split('\n').slice(1, 4).join('\n')}` : ''
+    const formattedError = `[${new Date().toISOString()}] ${err.name}: ${err.message}${contextStr}${stackLine}\n`
     const logFilePath = path.logsPath('stacks.log') ?? path.logsPath('errors.log')
 
     try {
-      await mkdir(path.dirname(logFilePath), { recursive: true })
-      await appendFile(logFilePath, formattedError)
+      await fs.promises.mkdir(path.dirname(logFilePath), { recursive: true })
+      await fs.promises.appendFile(logFilePath, formattedError)
     }
     catch (error) {
       console.error('Failed to write to error file:', error)
@@ -126,12 +151,10 @@ export async function writeToLogFile(message: string, options?: WriteOptions): P
   const logFile = options?.logFile ?? defaultLogPath
   const dirPath = dirname(logFile)
 
-  if (!fs.existsSync(dirPath)) {
-    await mkdir(dirPath, { recursive: true })
-  }
+  await fs.promises.mkdir(dirPath, { recursive: true })
 
   // Write to the log file
-  await appendFile(logFile, formattedMessage)
+  await fs.promises.appendFile(logFile, formattedMessage)
 }
 
 export function handleError(
@@ -152,7 +175,7 @@ export function handleError(
   }
 
   // Get the error message from the error object first
-  const errMsg = err instanceof Error ? err.message : String(err)
+  const errMsg = err instanceof Error ? err.message : (typeof err === 'string' ? err : JSON.stringify(err))
 
   if (options && 'message' in options) {
     // If options is provided with a message, put the context message first
@@ -169,7 +192,9 @@ export function handleError(
     logMessage += `\nContext: ${JSON.stringify(contextData, null, 2)}`
   }
 
-  writeToLogFile(logMessage)
+  writeToLogFile(logMessage).catch((err) => {
+    console.error('Failed to write error log:', err)
+  })
 
   // Create a new Error with the combined message
   const error = new Error(errorMessage)
@@ -177,5 +202,5 @@ export function handleError(
     Object.assign(error, err)
   }
 
-  return ErrorHandler.handle(error, { ...options as ErrorOptions, message: errorMessage })
+  return ErrorHandler.handle(error, { ...options as LogErrorOptions, message: errorMessage })
 }

@@ -1,4 +1,5 @@
-import type { NewPrintDevice, PrintDeviceJsonResponse } from '@stacksjs/orm'
+type PrintDeviceJsonResponse = ModelRow<typeof PrintDevice>
+type NewPrintDevice = NewModelData<typeof PrintDevice>
 import { randomUUIDv7 } from 'bun'
 import { db } from '@stacksjs/database'
 
@@ -11,7 +12,7 @@ import { db } from '@stacksjs/database'
 export async function store(data: NewPrintDevice): Promise<PrintDeviceJsonResponse | undefined> {
   try {
     // Prepare print device data
-    const deviceData: NewPrintDevice = {
+    const deviceData = {
       ...data,
       uuid: randomUUIDv7(),
     }
@@ -19,7 +20,7 @@ export async function store(data: NewPrintDevice): Promise<PrintDeviceJsonRespon
     // Insert the print device
     const result = await db
       .insertInto('print_devices')
-      .values(deviceData)
+      .values(deviceData as NewPrintDevice)
       .executeTakeFirst()
 
     const deviceId = Number(result.insertId) || Number(result.numInsertedOrUpdatedRows)
@@ -31,7 +32,7 @@ export async function store(data: NewPrintDevice): Promise<PrintDeviceJsonRespon
       .selectAll()
       .executeTakeFirst()
 
-    return printDevice
+    return printDevice as PrintDeviceJsonResponse | undefined
   }
   catch (error) {
     if (error instanceof Error) {
@@ -55,24 +56,19 @@ export async function bulkStore(data: NewPrintDevice[]): Promise<number> {
   let createdCount = 0
 
   try {
-    // Process each print device
-    await db.transaction().execute(async (trx) => {
-      for (const device of data) {
-        // Prepare print device data
-        const deviceData: NewPrintDevice = {
-          ...device,
-          uuid: randomUUIDv7(),
-        }
-
-        // Insert the print device
-        await trx
-          .insertInto('print_devices')
-          .values(deviceData)
-          .execute()
-
-        createdCount++
+    for (const device of data) {
+      const deviceData = {
+        ...device,
+        uuid: randomUUIDv7(),
       }
-    })
+
+      await db
+        .insertInto('print_devices')
+        .values(deviceData as NewPrintDevice)
+        .execute()
+
+      createdCount++
+    }
 
     return createdCount
   }

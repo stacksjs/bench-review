@@ -1,7 +1,8 @@
-import type { CategoryJsonResponse, CategoryRequestType } from '@stacksjs/orm'
 import { db } from '@stacksjs/database'
 import { formatDate } from '@stacksjs/orm'
 import { fetchById } from './fetch'
+
+type CategoryRow = ModelRow<typeof Category>
 
 /**
  * Update a category by ID
@@ -10,7 +11,7 @@ import { fetchById } from './fetch'
  * @param request The updated category data
  * @returns The updated category record
  */
-export async function update(id: number, request: CategoryRequestType): Promise<CategoryJsonResponse | undefined> {
+export async function update(id: number, request: RequestInstance<typeof Category>): Promise<CategoryRow | undefined> {
   // Validate the request data
   await request.validate()
 
@@ -21,13 +22,13 @@ export async function update(id: number, request: CategoryRequestType): Promise<
   }
 
   // Create update data object using request fields
-  const updateData: Record<string, any> = {
+  const updateData = {
     name: request.get('name'),
     description: request.get('description'),
-    image_url: request.get('image_url'),
-    is_active: request.get<boolean>('is_active'),
-    parent_category_id: request.get('parent_category_id'),
-    display_order: request.get<number>('display_order'),
+    imageUrl: request.get('imageUrl'),
+    isActive: request.get('isActive'),
+    parentCategoryId: request.get('parentCategoryId'),
+    displayOrder: request.get('displayOrder'),
     updated_at: formatDate(new Date()),
   }
 
@@ -68,7 +69,7 @@ export async function update(id: number, request: CategoryRequestType): Promise<
  * @param newOrder The new display order value
  * @returns The updated category
  */
-export async function updateDisplayOrder(id: number, newOrder: number): Promise<CategoryJsonResponse | undefined> {
+export async function updateDisplayOrder(id: number, newOrder: number): Promise<CategoryRow | undefined> {
   // Check if category exists
   const category = await fetchById(id)
 
@@ -106,7 +107,7 @@ export async function updateDisplayOrder(id: number, newOrder: number): Promise<
  * @param isActive Whether the category should be active
  * @returns The updated category
  */
-export async function updateActiveStatus(id: number, isActive: boolean): Promise<CategoryJsonResponse | undefined> {
+export async function updateActiveStatus(id: number, isActive: boolean): Promise<CategoryRow | undefined> {
   // Check if category exists
   const category = await fetchById(id)
 
@@ -144,7 +145,7 @@ export async function updateActiveStatus(id: number, isActive: boolean): Promise
  * @param newParentId The ID of the new parent category, or null to make it a root category
  * @returns The updated category
  */
-export async function updateParent(id: number, newParentId: string | null): Promise<CategoryJsonResponse | undefined> {
+export async function updateParent(id: number, newParentId: string | null): Promise<CategoryRow | undefined> {
   // Check if category exists
   const category = await fetchById(id)
 
@@ -174,9 +175,9 @@ export async function updateParent(id: number, newParentId: string | null): Prom
 
   try {
     // Update the category's parent
-    const updateObject = {
+    const updateObject: { updated_at: string, parent_category_id?: string | undefined } = {
       updated_at: formatDate(new Date()),
-    } as Record<string, any>
+    }
 
     // Set parent_category_id explicitly based on whether newParentId is null
     if (newParentId === null) {
@@ -238,12 +239,12 @@ async function wouldCreateCircularReference(categoryId: number, newParentId: str
 
     // Get the parent's parent
     const parent = await fetchById(currentParentId)
-    if (!parent || !parent.parent_category_id) {
+    if (!parent || !parent.parentCategoryId) {
       // We've reached a root category, no cycle
       return false
     }
 
-    currentParentId = Number(parent.parent_category_id)
+    currentParentId = Number(parent.parentCategoryId)
   }
 
   return false

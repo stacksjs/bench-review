@@ -1,0 +1,557 @@
+@extends('layouts/default')
+
+@section('content')
+<script server>
+definePageMeta({
+  middleware: ['auth']
+})
+
+import type { Coupons, NewCoupon } from '../../../../types/defaults'
+import { useCoupons } from '../../../../functions/commerce/coupons'
+import CouponsTable from '../../../../components/Dashboard/Commerce/CouponsTable.stx'
+import CouponsForm from '../../../../components/Dashboard/Commerce/Forms/CouponsForm.stx'
+import Pagination from '../../../../components/Dashboard/Commerce/Delivery/Pagination.stx'
+import SearchFilter from '../../../../components/Dashboard/Commerce/Delivery/SearchFilter.stx'
+// Chart options
+const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      display: false,
+    },
+  },
+  scales: {
+    y: {
+      beginAtZero: true,
+      grid: {
+        display: true,
+        color: 'rgba(0, 0, 0, 0.05)',
+      },
+    },
+    x: {
+      grid: {
+        display: false,
+      },
+    },
+  },
+}
+
+// Generate monthly data for charts
+function monthlyChartData() {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+  // Sample data - in a real app, this would be calculated from actual usage data
+  const redemptionsData = [120, 145, 132, 160, 185, 170, 210, 230, 245, 220, 260, 280]
+  const discountData = [2500, 3200, 2800, 3600, 4100, 3800, 4500, 5200, 5800, 5400, 6200, 6800]
+
+  // Coupon usage chart data
+  const couponUsageData = {
+    labels: months,
+    datasets: [
+      {
+        label: 'Coupon Redemptions',
+        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+        borderColor: 'rgba(59, 130, 246, 1)',
+        borderWidth: 2,
+        pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+        pointBorderColor: '#fff',
+        pointHoverBackgroundColor: '#fff',
+        pointHoverBorderColor: 'rgba(59, 130, 246, 1)',
+        fill: true,
+        tension: 0.4,
+        data: redemptionsData,
+      },
+    ],
+  }
+
+  // Discount amount chart data
+  const discountAmountData = {
+    labels: months,
+    datasets: [
+      {
+        label: 'Discount Amount',
+        backgroundColor: 'rgba(16, 185, 129, 0.8)',
+        borderColor: 'rgba(16, 185, 129, 1)',
+        borderWidth: 1,
+        borderRadius: 4,
+        data: discountData,
+      },
+    ],
+  }
+
+  return {
+    couponUsageData,
+    discountAmountData
+  }
+}
+
+// Time range selector
+let timeRange = 'Last 30 days'
+const timeRanges = ['Today', 'Last 7 days', 'Last 30 days', 'Last 90 days', 'Last year', 'All time']
+
+// Get coupons data and functions from the composable
+const { coupons, createCoupon, fetchCoupons, deleteCoupon, updateCoupon } = useCoupons()
+
+// Filter and sort options
+let searchQuery = ''
+let sortBy = 'code'
+let sortOrder = 'asc'
+let statusFilter = 'all'
+
+// Available statuses
+const statuses = ['all', 'Active', 'Expired', 'Scheduled'] as const
+
+// Pagination
+let currentPage = 1
+let itemsPerPage = 10
+
+// Computed coupon statistics
+function couponStats() {
+  const activeCoupons = coupons.filter(c => c.status === 'Active').length
+  const totalRedemptions = coupons.reduce((sum, c) => sum + c.usage_count, 0)
+
+  // Calculate total discount amount (simplified calculation)
+  const totalDiscountAmount = coupons.reduce((sum, c) => {
+    const avgOrderValue = 100 // Assuming $100 average order value
+    let discountPerUse = 0
+
+    if (c.discount_type === 'Percentage') {
+      discountPerUse = avgOrderValue * (c.discount_value / 100)
+    } else {
+      discountPerUse = c.discount_value
+    }
+
+    return sum + (discountPerUse * c.usage_count)
+  }, 0)
+
+  const avgDiscountPerOrder = totalRedemptions > 0
+    ? (totalDiscountAmount / totalRedemptions).toFixed(2)
+    : '0.00'
+
+  return {
+    activeCoupons,
+    totalRedemptions,
+    totalDiscountAmount: totalDiscountAmount.toFixed(0),
+    avgDiscountPerOrder
+  }
+}
+
+// Computed filtered and sorted coupons
+function filteredCoupons() {
+  return coupons
+    .filter(coupon => {
+      // Apply search filter
+      const matchesSearch = coupon.code?.toLowerCase().includes(searchQuery.toLowerCase()) || false
+
+      // Apply status filter
+      const matchesStatus = statusFilter === 'all' || coupon.status === statusFilter
+
+      return matchesSearch && matchesStatus
+    })
+    .sort((a, b) => {
+      // Apply sorting
+      let comparison = 0
+      if (sortBy === 'code') {
+        comparison = a.code.localeCompare(b.code)
+    } else if (sortBy === 'discount_value') {
+        comparison = a.discount_value - b.discount_value
+      } else if (sortBy === 'usage_count') {
+        comparison = a.usage_count - b.usage_count
+      } else if (sortBy === 'end_date') {
+        comparison = new Date(a.end_date).getTime() - new Date(b.end_date).getTime()
+      }
+
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+}
+
+function paginatedCoupons() {
+  const start = (currentPage - 1) * itemsPerPage
+  const end = start + itemsPerPage
+  return filteredCoupons.slice(start, end)
+}
+
+// Event handlers
+function handleSearch(query: string): void {
+  searchQuery = query
+  currentPage = 1
+}
+
+function handlePrevPage(): void {
+  if (currentPage > 1) {
+    currentPage--
+  }
+}
+
+function handleNextPage(): void {
+  const totalPages = Math.ceil(filteredCoupons.length / itemsPerPage)
+  if (currentPage < totalPages) {
+    currentPage++
+  }
+}
+
+function handlePageChange(page: number): void {
+  currentPage = page
+}
+
+// Toggle sort order
+function toggleSort(column: string): void {
+  if (sortBy === column) {
+    sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortBy = column
+    sortOrder = 'asc'
+  }
+}
+
+// Modal state
+let showFormModal = false
+let formMode = 'add'
+let couponToEdit = null
+let showDeleteModal = false
+let couponToDelete = null
+
+function openAddModal(): void {
+  formMode = 'add'
+  couponToEdit = null
+  showFormModal = true
+}
+
+function closeFormModal(): void {
+  showFormModal = false
+  couponToEdit = null
+}
+
+function editCoupon(coupon: any): void {
+  formMode = 'edit'
+  couponToEdit = { ...coupon }
+  showFormModal = true
+}
+
+// Form submission handlers
+async function handleFormSubmit(couponData: NewCoupon): Promise<void> {
+  if (formMode === 'add') {
+    await addCoupon(couponData)
+  } else {
+    await doUpdateCoupon(couponData)
+  }
+}
+
+async function addCoupon(couponData: NewCoupon): Promise<void> {
+  // First add to local state for immediate UI update
+  const id = Math.max(...coupons.map(c => c.id || 0)) + 1
+  const newCouponData = {
+    id,
+    ...couponData,
+    usage_count: 0
+  } as Coupons
+  coupons.push(newCouponData)
+
+  // Then send to server
+  try {
+    await createCoupon(couponData as any)
+    closeFormModal()
+  } catch (error) {
+    // If server request fails, remove from local state
+    coupons = coupons.filter(c => c.id !== id)
+    console.error('Failed to create coupon:', error)
+  }
+}
+
+async function doUpdateCoupon(couponData: NewCoupon): Promise<void> {
+  if (!couponToEdit) return
+
+  const couponId = couponToEdit.id
+
+  // Update local state for immediate UI update
+  const index = coupons.findIndex(c => c.id === couponId)
+  if (index !== -1) {
+    coupons[index] = { ...coupons[index], ...couponData }
+  }
+
+  try {
+    await updateCoupon(couponId, couponData)
+    closeFormModal()
+  } catch (error) {
+    // If server request fails, restore original values
+    console.error('Failed to update coupon:', error)
+  }
+}
+
+// Coupon actions
+function viewCoupon(coupon: any): void {
+  // TODO: implement view coupon detail
+}
+
+function removeCoupon(coupon: any): void {
+  couponToDelete = coupon
+  showDeleteModal = true
+}
+
+function closeDeleteModal(): void {
+  showDeleteModal = false
+  couponToDelete = null
+}
+
+async function confirmDelete(): Promise<void> {
+  if (!couponToDelete) return
+
+  const couponId = couponToDelete.id
+
+  // Remove from local state for immediate UI update
+  coupons = coupons.filter(c => c.id !== couponId)
+
+  try {
+    await deleteCoupon(couponId)
+    closeDeleteModal()
+  } catch (error) {
+    // If server request fails, restore to local state
+    coupons.push(couponToDelete)
+    console.error('Failed to delete coupon:', error)
+  }
+}
+</script>
+
+@title('Dashboard - Commerce Coupons')
+<div class="p-6 space-y-6">
+
+  <PageHeader title="Coupons" description="Manage discount coupons for your store">
+    <template #actions>
+      <Button variant="primary" onclick="openAddModal">
+        <div class="i-hugeicons-plus-sign h-4 w-4"></div>
+        Add Coupon
+      </Button>
+    </template>
+  </PageHeader>
+
+      <!-- Time range selector -->
+      <div class="mt-4 flex items-center justify-between">
+        <p class="text-sm text-gray-500 dark:text-neutral-400">
+          Overview of your coupon performance
+        </p>
+        <div class="relative">
+          <select value="{{ timeRange }}" class="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 sm:text-sm sm:leading-6 dark:bg-neutral-800 dark:text-white dark:ring-neutral-700">
+            @foreach(timeRanges as range)
+              <option value="{{ range }}">{{ range }}</option>
+            @endforeach
+          </select>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6 dark:bg-neutral-800">
+          <dt class="truncate text-sm font-medium text-gray-500 dark:text-neutral-300">Active Coupons</dt>
+          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">{{ couponStats.activeCoupons }}</dd>
+          <dd class="mt-2 flex items-center text-sm text-green-600 dark:text-green-400">
+            <div class="i-hugeicons-analytics-up h-4 w-4 mr-1"></div>
+            <span>1 more than last month</span>
+          </dd>
+        </div>
+
+        <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6 dark:bg-neutral-800">
+          <dt class="truncate text-sm font-medium text-gray-500 dark:text-neutral-300">Total Redemptions</dt>
+          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">{{ couponStats.totalRedemptions.toLocaleString() }}</dd>
+          <dd class="mt-2 flex items-center text-sm text-green-600 dark:text-green-400">
+            <div class="i-hugeicons-analytics-up h-4 w-4 mr-1"></div>
+            <span>12.5% increase</span>
+          </dd>
+        </div>
+
+        <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6 dark:bg-neutral-800">
+          <dt class="truncate text-sm font-medium text-gray-500 dark:text-neutral-300">Total Discount Amount</dt>
+          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">${{ couponStats.totalDiscountAmount.toLocaleString() }}</dd>
+          <dd class="mt-2 flex items-center text-sm text-green-600 dark:text-green-400">
+            <div class="i-hugeicons-analytics-up h-4 w-4 mr-1"></div>
+            <span>8.2% increase</span>
+          </dd>
+        </div>
+
+        <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6 dark:bg-neutral-800">
+          <dt class="truncate text-sm font-medium text-gray-500 dark:text-neutral-300">Avg. Discount per Order</dt>
+          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">${{ couponStats.avgDiscountPerOrder }}</dd>
+          <dd class="mt-2 flex items-center text-sm text-red-600 dark:text-red-400">
+            <div class="i-hugeicons-analytics-down h-4 w-4 mr-1"></div>
+            <span>3.2% decrease</span>
+          </dd>
+        </div>
+      </dl>
+
+      <!-- Charts -->
+      <div class="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-neutral-800">
+          <div class="p-6">
+            <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">Coupon Redemptions</h3>
+            <div class="mt-2 h-80">
+              <canvas id="chart_1"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-neutral-800">
+          <div class="p-6">
+            <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">Discount Amount</h3>
+            <div class="mt-2 h-80">
+              <canvas id="chart_2"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="mt-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <SearchFilter
+          placeholder="Search coupons..."
+          @search="handleSearch"
+          class="w-full md:w-96"
+        />
+        <div class="flex flex-col sm:flex-row gap-4">
+          <select
+            value="{{ statusFilter }}"
+            class="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 dark:bg-neutral-800 dark:text-white dark:ring-neutral-700"
+          >
+            @foreach(statuses as status)
+              <option value="{{ status }}">
+                {{ status }}
+              </option>
+            @endforeach
+          </select>
+
+          <select
+            value="{{ itemsPerPage }}"
+            class="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 dark:bg-neutral-800 dark:text-white dark:ring-neutral-700"
+          >
+            <option value="{{ 5 }}">5 per page</option>
+            <option value="{{ 10 }}">10 per page</option>
+            <option value="{{ 25 }}">25 per page</option>
+            <option value="{{ 50 }}">50 per page</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Coupons table -->
+      <div class="mt-6 flow-root">
+        <div class="sm:flex sm:items-center sm:justify-between mb-4">
+          <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">All Coupons</h3>
+          <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">
+            A list of all the coupons in your store including their code, value, and status.
+          </p>
+        </div>
+        <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+          <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+            <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+              <CouponsTable
+                :coupons="paginatedCoupons"
+                :search-query="searchQuery"
+                :status-filter="statusFilter"
+                :sort-by="sortBy"
+                :sort-order="sortOrder"
+                :current-page="currentPage"
+                :items-per-page="itemsPerPage"
+                :statuses="statuses"
+                @toggle-sort="toggleSort"
+                @change-page="handlePageChange"
+                @previous-page="handlePrevPage"
+                @next-page="handleNextPage"
+                @view-coupon="viewCoupon"
+                @edit-coupon="editCoupon"
+                @delete-coupon="removeCoupon"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div class="px-4 py-3 bg-gray-50 dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-700">
+        <Pagination
+          :current-page="currentPage"
+          :total-items="filteredCoupons.length"
+          :items-per-page="itemsPerPage"
+          @prev="handlePrevPage"
+          @next="handleNextPage"
+          @page="handlePageChange"
+        />
+      </div>
+
+  <!-- Coupons Form Modal -->
+  <CouponsForm
+    :show="showFormModal"
+    :mode="formMode"
+    :coupon="couponToEdit"
+    @close="closeFormModal"
+    @submit="handleFormSubmit"
+  />
+
+  <!-- Delete Coupon Confirmation Modal -->
+  @if(showDeleteModal)
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+      <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeDeleteModal"></div>
+
+        <div class="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 dark:bg-neutral-800">
+          <div>
+            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900">
+              <div class="i-hugeicons-alert-triangle h-6 w-6 text-red-600 dark:text-red-400"></div>
+            </div>
+            <div class="mt-3 text-center sm:mt-5">
+              <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">Delete Coupon</h3>
+              <div class="mt-2">
+                <p class="text-sm text-gray-500 dark:text-neutral-400">
+                  Are you sure you want to delete <strong>{{ couponToDelete?.code }}</strong>? This action cannot be undone.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="mt-5 sm:mt-6 sm:grid sm:grid-flow-row-dense sm:grid-cols-2 sm:gap-3">
+            <button
+              type="button"
+              onclick="confirmDelete"
+              class="inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 sm:col-start-2"
+            >
+              Delete Coupon
+            </button>
+            <button
+              type="button"
+              onclick="closeDeleteModal"
+              class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:col-start-1 sm:mt-0 dark:bg-neutral-700 dark:text-white dark:ring-neutral-600 dark:hover:bg-neutral-600"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  @endif
+</div>
+<script client>
+const { Chart, registerables } = await import('chart.js/auto')
+Chart.register(...registerables)
+
+const chart_1_ctx = document.getElementById('chart_1')
+if (chart_1_ctx) {
+  new Chart(chart_1_ctx, {
+    type: 'line',
+    data: monthlyChartData.couponUsageData,
+    options: chartOptions,
+  })
+}
+
+const chart_2_ctx = document.getElementById('chart_2')
+if (chart_2_ctx) {
+  new Chart(chart_2_ctx, {
+    type: 'bar',
+    data: monthlyChartData.discountAmountData,
+    options: chartOptions,
+  })
+}
+
+import { onMount } from 'stx'
+
+onMount(async () => {
+  await fetchCoupons()
+})
+</script>
+
+@endsection

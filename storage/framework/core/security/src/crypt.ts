@@ -1,23 +1,31 @@
 import { config } from '@stacksjs/config'
-import aes from 'crypto-js/aes'
-import utf8 from 'crypto-js/enc-utf8'
+import { decrypt as cryptoDecrypt, encrypt as cryptoEncrypt } from 'ts-security-crypto'
 
-function encrypt(message: string, customPassphrase?: string): string {
+async function encrypt(message: string, customPassphrase?: string): Promise<string> {
+  if (!message && message !== '') {
+    throw new Error('encrypt() requires a string message')
+  }
+
   const passphrase = customPassphrase || config.app.key
 
   if (!passphrase)
     throw new Error('APP_KEY is not defined')
 
-  return aes.encrypt(message, passphrase).toString()
+  const result = await cryptoEncrypt(message, passphrase)
+  return result.encrypted
 }
 
-function decrypt(encrypted: string, customPassphrase?: string): string {
+async function decrypt(encrypted: string, customPassphrase?: string): Promise<string> {
+  if (!encrypted) {
+    throw new Error('decrypt() requires a non-empty encrypted string')
+  }
+
   const passphrase = customPassphrase || config.app.key
 
   if (!passphrase)
     throw new Error('APP_KEY is not defined')
 
-  return aes.decrypt(encrypted, passphrase).toString(utf8)
+  return await cryptoDecrypt(encrypted, passphrase)
 }
 
 export { decrypt, encrypt }

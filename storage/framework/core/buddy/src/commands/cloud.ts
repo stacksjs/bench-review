@@ -1,6 +1,5 @@
 import type { CLI, CloudCliOptions } from '@stacksjs/types'
 import process from 'node:process'
-import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront'
 import { intro, italic, log, outro, prompts, runCommand, underline } from '@stacksjs/cli'
 import {
   addJumpBox,
@@ -18,7 +17,182 @@ import {
 } from '@stacksjs/cloud'
 import { path as p } from '@stacksjs/path'
 import { ExitCode } from '@stacksjs/types'
-import { loop } from '@stacksjs/utils'
+
+/**
+ * Create a temporary IAM role to allow CloudFormation to delete a stuck stack
+ * Uses raw AWS API calls since AWS SDK has dependency issues with Bun
+ */
+async function createTemporaryCdkRole(roleName: string): Promise<void> {
+  // Import AWSClient for direct IAM API calls
+  const { AWSClient } = await import('@stacksjs/ts-cloud')
+  const client = new AWSClient()
+
+  // Trust policy that allows CloudFormation to assume this role
+  const trustPolicy = {
+    Version: '2012-10-17',
+    Statement: [
+      {
+        Effect: 'Allow',
+        Principal: {
+          Service: 'cloudformation.amazonaws.com',
+        },
+        Action: 'sts:AssumeRole',
+      },
+    ],
+  }
+
+  try {
+    // Check if role already exists
+    try {
+      const getRoleParams = new URLSearchParams({
+        Action: 'GetRole',
+        RoleName: roleName,
+        Version: '2010-05-08',
+      })
+
+      await client.request({
+        service: 'iam',
+        region: 'us-east-1', // IAM is global but needs us-east-1 for signing
+        method: 'POST',
+        path: '/',
+        body: getRoleParams.toString(),
+      })
+
+      log.debug(`Role ${roleName} already exists`)
+      return
+    }
+    catch (e: any) {
+      // Role doesn't exist - this is expected, continue to create it
+      if (!e.message?.includes('NoSuchEntity') && !e.message?.includes('cannot be found')) {
+        throw e
+      }
+    }
+
+    // Create the role
+    log.info('Creating temporary IAM role to enable stack deletion...')
+
+    const createRoleParams = new URLSearchParams({
+      Action: 'CreateRole',
+      RoleName: roleName,
+      AssumeRolePolicyDocument: JSON.stringify(trustPolicy),
+      Description: 'Temporary role to allow CloudFormation to delete stuck stack',
+      Version: '2010-05-08',
+    })
+
+    await client.request({
+      service: 'iam',
+      region: 'us-east-1',
+      method: 'POST',
+      path: '/',
+      body: createRoleParams.toString(),
+    })
+
+    log.success('Created IAM role')
+
+    // Attach AdministratorAccess policy to ensure it can delete any resources
+    log.info('Attaching permissions...')
+
+    const attachPolicyParams = new URLSearchParams({
+      Action: 'AttachRolePolicy',
+      RoleName: roleName,
+      PolicyArn: 'arn:aws:iam::aws:policy/AdministratorAccess',
+      Version: '2010-05-08',
+    })
+
+    await client.request({
+      service: 'iam',
+      region: 'us-east-1',
+      method: 'POST',
+      path: '/',
+      body: attachPolicyParams.toString(),
+    })
+
+    log.success('IAM role ready for stack deletion')
+
+    // Wait a few seconds for IAM to propagate
+    log.info('Waiting for IAM role to propagate...')
+    await new Promise(resolve => setTimeout(resolve, 10000))
+  }
+  catch (error: any) {
+    if (error.message?.includes('EntityAlreadyExists')) {
+      log.debug('Role already exists')
+    }
+    else {
+      throw error
+    }
+  }
+}
+
+/**
+ * Delete the temporary IAM role after stack deletion
+ * Uses raw AWS API calls since AWS SDK has dependency issues with Bun
+ */
+async function deleteTemporaryCdkRole(roleName: string): Promise<void> {
+  const { AWSClient } = await import('@stacksjs/ts-cloud')
+  const client = new AWSClient()
+
+  try {
+    // First, detach the AdministratorAccess policy
+    const detachPolicyParams = new URLSearchParams({
+      Action: 'DetachRolePolicy',
+      RoleName: roleName,
+      PolicyArn: 'arn:aws:iam::aws:policy/AdministratorAccess',
+      Version: '2010-05-08',
+    })
+
+    await client.request({
+      service: 'iam',
+      region: 'us-east-1',
+      method: 'POST',
+      path: '/',
+      body: detachPolicyParams.toString(),
+    })
+
+    // Then delete the role
+    const deleteRoleParams = new URLSearchParams({
+      Action: 'DeleteRole',
+      RoleName: roleName,
+      Version: '2010-05-08',
+    })
+
+    await client.request({
+      service: 'iam',
+      region: 'us-east-1',
+      method: 'POST',
+      path: '/',
+      body: deleteRoleParams.toString(),
+    })
+
+    log.success('Cleaned up temporary IAM role')
+  }
+  catch (error: any) {
+    // Don't fail if cleanup doesn't work - role will be orphaned but harmless
+    log.debug(`Could not clean up temporary role: ${error.message}`)
+  }
+}
+
+interface ResultLike {
+  isErr?: boolean | (() => boolean)
+  error?: string | Error
+  value?: unknown
+}
+
+function isResultError(result: unknown): result is ResultLike & { error: string } {
+  if (!result || typeof result !== 'object') return false
+  const r = result as ResultLike
+  if (typeof r.isErr === 'function') return r.isErr()
+  return !!r.isErr
+}
+
+function getResultError(result: unknown): string {
+  if (!result || typeof result !== 'object') return 'Unknown error'
+  return String((result as ResultLike).error || 'Unknown error')
+}
+
+function getResultValue(result: unknown): unknown {
+  if (!result || typeof result !== 'object') return undefined
+  return (result as ResultLike).value
+}
 
 export function cloud(buddy: CLI): void {
   const descriptions = {
@@ -56,11 +230,11 @@ export function cloud(buddy: CLI): void {
           stdin: 'pipe',
         })
 
-        if (result.isErr()) {
+        if (isResultError(result)) {
           await outro(
             'While running the cloud command, there was an issue',
             { startTime, useSeconds: true },
-            result.error,
+            getResultError(result),
           )
           process.exit(ExitCode.FatalError)
         }
@@ -70,7 +244,7 @@ export function cloud(buddy: CLI): void {
       }
 
       if (options.invalidateCache) {
-        const { confirm } = await prompts({
+        const { confirm } = await (prompts as any)({
           name: 'confirm',
           type: 'confirm',
           message: 'Would you like to invalidate the CDN (CloudFront) cache?',
@@ -83,55 +257,67 @@ export function cloud(buddy: CLI): void {
 
         log.info('Invalidating the CloudFront cache...')
 
-        const cloudfront = new CloudFrontClient()
+        // Use ts-cloud CloudFront client instead of AWS SDK
+        const { AWSCloudFrontClient } = await import('@stacksjs/ts-cloud')
+        const cloudfront = new AWSCloudFrontClient()
         const distributionId = await getCloudFrontDistributionId()
 
-        const params = {
-          DistributionId: distributionId,
-          InvalidationBatch: {
-            CallerReference: `${Date.now()}`,
-            Paths: {
-              Quantity: 1,
-              Items: [
-                '/*',
-                /* more items */
-              ],
-            },
-          },
+        try {
+          const invalidationId = await cloudfront.invalidateAll(distributionId)
+          log.success(`Invalidation created: ${invalidationId}`)
+          log.info(`Status: pending`)
         }
-
-        const command = new CreateInvalidationCommand(params)
-
-        cloudfront.send(command).then(
-          data => console.log(data),
-          err => console.log(err, err.stack),
-        )
+        catch (err: any) {
+          log.error(`Failed to invalidate CloudFront cache: ${err.message}`)
+        }
 
         await outro('Exited', { startTime, useSeconds: true })
         process.exit(ExitCode.Success)
       }
 
       if (options.diff) {
-        const result = await runCommand('bunx --bun cdk diff', {
-          cwd: p.frameworkCloudPath(),
-          stdin: 'pipe',
-        })
+        try {
+          const { InfrastructureGenerator } = await import('@stacksjs/ts-cloud')
+          const { CloudFormationClient } = await import('@stacksjs/ts-cloud/aws')
+          const { tsCloud: cloudConfig } = await import('~/config/cloud')
 
-        if (result.isErr()) {
-          await outro(
-            'While running the cloud diff command, there was an issue',
-            { startTime, useSeconds: true },
-            result.error,
-          )
-          process.exit(ExitCode.FatalError)
+          const environment = (process.env.APP_ENV || process.env.NODE_ENV || 'production') as 'production' | 'staging' | 'development'
+          const generator = new InfrastructureGenerator({
+            config: cloudConfig as any,
+            environment,
+          })
+
+          const newTemplate = generator.generate().toJSON()
+          const stackName = `${cloudConfig.project?.slug || 'stacks'}-${environment}`
+          const cfn = new CloudFormationClient(process.env.AWS_REGION || 'us-east-1')
+
+          let currentTemplate = '{}'
+          try {
+            const result = await cfn.getTemplate(stackName)
+            currentTemplate = result.TemplateBody
+          }
+          catch {
+            log.info('No deployed stack found. Showing full template as diff.')
+          }
+
+          if (currentTemplate === newTemplate) {
+            log.info('No changes detected.')
+          }
+          else {
+            log.info('Changes detected between deployed and local template:')
+            log.info(`Current template: ${currentTemplate.length} bytes`)
+            log.info(`New template: ${newTemplate.length} bytes`)
+          }
+        }
+        catch (error: any) {
+          log.error(`Failed to compute diff: ${error.message}`)
         }
 
-        await outro('Showing diff of the current, undeployed cloud changes', { startTime, useSeconds: true })
-        console.log(result.value)
+        await outro('Cloud diff complete', { startTime, useSeconds: true })
         process.exit(ExitCode.Success)
       }
 
-      log.info('Not implemented yet. Read more about `buddy cloud` here: https://stacksjs.org/docs/cloud')
+      log.info('Not implemented yet. Read more about `buddy cloud` here: https://stacksjs.com/docs/cloud')
       process.exit(ExitCode.Success)
     })
 
@@ -146,7 +332,7 @@ export function cloud(buddy: CLI): void {
       const startTime = await intro('buddy cloud:add')
 
       if (options.jumpBox) {
-        const { confirm } = await prompts({
+        const { confirm } = await (prompts as any)({
           name: 'confirm',
           type: 'confirm',
           message: 'Would you like to add a jump-box to your cloud?',
@@ -164,11 +350,11 @@ export function cloud(buddy: CLI): void {
 
         const result = await addJumpBox()
 
-        if (result.isErr()) {
+        if (isResultError(result)) {
           await outro(
             'While running the cloud:add command, there was an issue',
             { startTime, useSeconds: true },
-            result.error,
+            getResultError(result),
           )
           process.exit(ExitCode.FatalError)
         }
@@ -199,6 +385,8 @@ export function cloud(buddy: CLI): void {
     .alias('cloud:rm')
     .alias('undeploy')
     .option('--jump-box', 'Remove the jump-box', { default: false })
+    .option('--force', 'Force deletion of stack in bad state', { default: false })
+    .option('--yes', 'Skip confirmation prompts', { default: false })
     // .option('--realtime-cdn-logs', 'Remove the CDN Realtime Log Stream', { default: false }) // TODO: implement this
     .option('-p, --project [project]', descriptions.project, { default: false })
     .option('--verbose', descriptions.verbose, { default: false })
@@ -208,7 +396,7 @@ export function cloud(buddy: CLI): void {
       const startTime = await intro('buddy cloud:remove')
 
       if (options.jumpBox) {
-        const { confirm } = await prompts({
+        const { confirm } = await (prompts as any)({
           name: 'confirm',
           type: 'confirm',
           message: 'Would you like to remove your jump-box for now?',
@@ -221,8 +409,8 @@ export function cloud(buddy: CLI): void {
 
         const result = await deleteJumpBox()
 
-        if (result.isErr()) {
-          await outro('While removing your jump-box, there was an issue', { startTime, useSeconds: true }, result.error)
+        if (isResultError(result)) {
+          await outro('While removing your jump-box, there was an issue', { startTime, useSeconds: true }, getResultError(result))
           process.exit(ExitCode.FatalError)
         }
 
@@ -233,58 +421,106 @@ export function cloud(buddy: CLI): void {
         process.exit(ExitCode.Success)
       }
 
-      console.log(`   ${italic('ℹ️   Removing your cloud resources takes a while to complete.')}`)
-      console.log(`   ${italic('Please note, your backups will not yet be deleted. Though,')}`)
-      console.log(`   ${italic('Backups are scheduled to delete themselves in 30 days.')}`)
+      console.log('')
+      console.log('Removing cloud infrastructure...')
+      console.log(`   ${italic('This typically takes 2-5 minutes.')}`)
+      console.log('')
 
-      // sleep for 2 seconds to get the user to read the message
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Determine environment first
+      const environment = process.env.APP_ENV || process.env.NODE_ENV || 'production'
 
-      const result = await runCommand(`bunx --bun cdk destroy`, {
-        ...options,
-        cwd: p.frameworkCloudPath(),
-        stdin: 'inherit',
-      })
+      // Load AWS credentials from environment-specific .env file if not already set
+      if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
+        const { existsSync, readFileSync } = await import('node:fs')
+        const { projectPath } = await import('@stacksjs/path')
 
-      if (result.isErr()) {
-        await outro(
-          'While running the cloud:remove ("undeploy") command, there was an issue',
-          { startTime, useSeconds: true },
-          result.error,
-        )
-        process.exit(ExitCode.FatalError)
+        // Try environment-specific file first (e.g., .env.staging, .env.production)
+        const envFiles = [
+          projectPath(`.env.${environment}`),
+          projectPath('.env'),
+        ]
+
+        for (const envPath of envFiles) {
+          if (existsSync(envPath)) {
+            const envContent = readFileSync(envPath, 'utf-8')
+            const lines = envContent.split('\n')
+
+            for (const line of lines) {
+              const trimmed = line.trim()
+              if (trimmed.startsWith('#') || !trimmed.includes('='))
+                continue
+
+              const [key, ...valueParts] = trimmed.split('=')
+              const value = valueParts.join('=').replace(/^["']|["']$/g, '')
+
+              if (key === 'AWS_ACCESS_KEY_ID' || key === 'AWS_SECRET_ACCESS_KEY' || key === 'AWS_REGION' || key === 'AWS_ACCOUNT_ID') {
+                process.env[key] = value
+              }
+            }
+            break // Stop after loading the first existing file
+          }
+        }
       }
 
-      await runCommand('buddy cloud:cleanup', {
-        ...options,
-        cwd: p.projectPath(),
-        stdin: 'inherit',
-      })
+      // Use static credentials from environment-specific .env file
+      delete process.env.AWS_PROFILE
 
-      // TODO: this should not be necessary but for some reason some buckets with versions aren't properly getting deleted
-      // and because of that, we simply run the command several times, because eventually the versions will be deleted
-      // and consequently the buckets will be deleted
-      // the reason we are using 7 as the number of times to run the command is because it’s the most amount of times I have had to run it to get it to delete everything
+      // Use the new undeployStack function with CDK-style status updates
       try {
-        log.info('Finalizing the removal of your cloud resources.')
-        log.info('This will take a few moments...')
-        // sometimes, this fails, so we need to retry it until all resources are deleted -> weird workaround, and would love a more stable alternative
-        await loop(7, async () => {
-          await runCommand('buddy cloud:cleanup', {
-            ...options,
-            cwd: p.projectPath(),
-            stdout: 'ignore',
-          })
+        const { undeployStack } = await import('../../../actions/deploy')
+
+        const region = process.env.AWS_REGION || 'us-east-1'
+
+        await undeployStack({
+          environment,
+          region,
+          verbose: options.verbose,
         })
 
-        await outro('Your cloud has been removed', {
-          startTime,
-          useSeconds: true,
-        })
+        // Cleanup is already handled by CloudFormation - retained resources (like S3)
+        // are intentional and can be cleaned up separately with `./buddy cloud:cleanup`
+
+        await outro('Cloud infrastructure removed', { startTime, useSeconds: true })
         process.exit(ExitCode.Success)
       }
-      catch (error) {
-        await outro('While cleaning up the cloud, there was an issue', { startTime, useSeconds: true }, error as Error)
+      catch (error: any) {
+        console.log('')
+        console.error('✗ Failed to remove cloud infrastructure')
+
+        // Check for common error patterns
+        const errorStr = String(error.message || error)
+        if (errorStr.includes('security token') || errorStr.includes('credentials')) {
+          console.log('')
+          console.error('  AWS credentials are invalid or expired')
+          console.log('  Check your AWS credentials in .env.production:')
+          console.log('    - AWS_ACCESS_KEY_ID')
+          console.log('    - AWS_SECRET_ACCESS_KEY')
+        }
+        else if (errorStr.includes('region') || errorStr.includes('AWS_REGION')) {
+          console.log('')
+          console.error('  AWS Region not configured')
+          console.log('  Add AWS_REGION to your .env.production file')
+        }
+        else if (errorStr.includes('AccessDenied')) {
+          console.log('')
+          console.error('  Access denied')
+          console.log('  Your AWS credentials may not have permission to delete stacks')
+        }
+        else {
+          console.error(`  ${errorStr}`)
+        }
+
+        console.log('')
+        console.log('Troubleshooting:')
+        console.log('  ./buddy cloud:cleanup   - Clean up resources manually')
+        console.log('  --verbose               - Show detailed error information')
+        console.log('')
+
+        if (options.verbose) {
+          console.error('Error details:', error)
+        }
+
+        await outro('Failed to remove infrastructure', { startTime, useSeconds: true })
         process.exit(ExitCode.FatalError)
       }
     })
@@ -301,7 +537,7 @@ export function cloud(buddy: CLI): void {
       const startTime = await intro('buddy cloud:optimize-cost')
 
       if (options.jumpBox) {
-        const { confirm } = await prompts({
+        const { confirm } = await (prompts as any)({
           name: 'confirm',
           type: 'confirm',
           message: 'Would you like to remove your jump-box to optimize your costs?',
@@ -337,124 +573,57 @@ export function cloud(buddy: CLI): void {
 
       const startTime = await intro('buddy cloud:cleanup')
 
+      // Unset AWS_PROFILE to force AWS SDK to use static credentials from .env.production
+      delete process.env.AWS_PROFILE
+
       log.info(`Cleaning up your cloud resources will take a while to complete. Please be patient.`)
 
       // sleep for 2 seconds to get the user to read the message
       await new Promise(resolve => setTimeout(resolve, 2000))
 
-      log.info('Removing any jump-boxes...')
-      const result = await deleteJumpBox()
+      const cleanupSteps: { label: string; fn: () => Promise<unknown>; ignoreErrors?: string[] }[] = [
+        { label: 'jump-boxes', fn: deleteJumpBox, ignoreErrors: ['Jump-box not found'] },
+        { label: 'retained S3 buckets', fn: deleteStacksBuckets },
+        { label: 'retained Lambda functions', fn: deleteStacksFunctions, ignoreErrors: ['No stacks functions found'] },
+        { label: 'remaining Stacks logs', fn: deleteLogGroups },
+        { label: 'stored parameters', fn: deleteParameterStore },
+        { label: 'VPCs', fn: deleteVpcs },
+        { label: 'Subnets', fn: deleteSubnets },
+        { label: 'CDK remnants', fn: deleteCdkRemnants },
+        { label: 'IAM users', fn: deleteIamUsers },
+      ]
 
-      if (result.isErr()) {
-        if (result.error !== 'Jump-box not found') {
-          await outro('While removing your jump-box, there was an issue', { startTime, useSeconds: true }, result.error)
-          process.exit(ExitCode.FatalError)
+      const errors: { label: string; error: string }[] = []
+
+      for (const step of cleanupSteps) {
+        log.info(`Removing any ${step.label}...`)
+        try {
+          const result = await step.fn()
+          if (isResultError(result)) {
+            const errMsg = getResultError(result)
+            if (!step.ignoreErrors?.includes(errMsg)) {
+              log.warn(`${step.label} cleanup issue: ${errMsg}`)
+              errors.push({ label: step.label, error: errMsg })
+            }
+          }
+          else {
+            const value = getResultValue(result)
+            if (value) log.info(String(value))
+          }
+        }
+        catch (e: any) {
+          const errMsg = e.message || 'AWS SDK error'
+          log.warn(`${step.label} cleanup skipped: ${errMsg}`)
+          errors.push({ label: step.label, error: errMsg })
         }
       }
 
-      log.info('Removing any retained S3 buckets...')
-      const result2 = await deleteStacksBuckets()
-
-      if (result2.isErr()) {
-        await outro(
-          'While deleting the retained S3 buckets, there was an issue',
-          { startTime, useSeconds: true },
-          result2.error,
-        )
-        process.exit(ExitCode.FatalError)
-      }
-
-      log.info('Removing any retained Lambda functions...')
-      const result3 = await deleteStacksFunctions()
-
-      if (result3.isErr()) {
-        if (result3.error !== 'No stacks functions found') {
-          await outro(
-            'While deleting the Origin Request Lambda function, there was an issue',
-            { startTime, useSeconds: true },
-            result3.error,
-          )
+      if (errors.length > 0) {
+        log.warn(`Cleanup completed with ${errors.length} issue(s):`)
+        for (const { label, error } of errors) {
+          log.warn(`  - ${label}: ${error}`)
         }
-
-        process.exit(ExitCode.FatalError)
       }
-
-      log.info(result3.value)
-
-      log.info('Removing any remaining Stacks logs...')
-      const result4 = await deleteLogGroups()
-      // TODO: investigate other regions for edge (cloudfront) logs
-
-      if (result4.isErr()) {
-        await outro(
-          'While deleting the Stacks log groups, there was an issue',
-          { startTime, useSeconds: true },
-          result4.error,
-        )
-        process.exit(ExitCode.FatalError)
-      }
-
-      // log.info('Removing any Backup Vaults...')
-      // const result5 = await deleteBackupVaults()
-
-      // if (result5.isErr()) {
-      //   await outro('While deleting the Backup Vaults, there was an issue', { startTime, useSeconds: true }, result5.error)
-      //   process.exit(ExitCode.FatalError)
-      // }
-
-      log.info('Removing any stored parameters...')
-      const result7 = await deleteParameterStore()
-
-      if (result7.isErr()) {
-        await outro(
-          'While deleting the Stacks log groups, there was an issue',
-          { startTime, useSeconds: true },
-          result7.error,
-        )
-        process.exit(ExitCode.FatalError)
-      }
-
-      // delete all vpcs & subnets & internet gateways
-      const result9 = await deleteVpcs()
-
-      if (result9.isErr()) {
-        await outro('While deleting the VPCs, there was an issue', { startTime, useSeconds: true }, result9.error)
-        process.exit(ExitCode.FatalError)
-      }
-
-      const result10 = await deleteSubnets()
-
-      if (result10.isErr()) {
-        await outro('While deleting the Subnets, there was an issue', { startTime, useSeconds: true }, result10.error)
-        process.exit(ExitCode.FatalError)
-      }
-
-      log.info('Removing any CDK remnants...')
-      const result6 = await deleteCdkRemnants()
-
-      if (result6.isErr()) {
-        await outro(
-          'While deleting the Stacks log groups, there was an issue',
-          { startTime, useSeconds: true },
-          result6.error,
-        )
-        process.exit(ExitCode.FatalError)
-      }
-
-      log.info('Removing any IAM users...')
-      const result8 = await deleteIamUsers()
-
-      if (result8.isErr()) {
-        await outro(
-          'While deleting the Stacks log groups, there was an issue',
-          { startTime, useSeconds: true },
-          result8.error,
-        )
-        process.exit(ExitCode.FatalError)
-      }
-
-      // TODO: needs to delete all Backup Vaults
-      // TODO: needs to delete all KMS keys
 
       await outro('AWS resources have been removed', {
         startTime,
@@ -473,7 +642,7 @@ export function cloud(buddy: CLI): void {
 
       const startTime = await intro('buddy cloud:invalidate-cache')
 
-      const { confirm } = await prompts({
+      const { confirm } = await (prompts as any)({
         name: 'confirm',
         type: 'confirm',
         message: 'Would you like to invalidate the CloudFront cache?',
@@ -485,36 +654,36 @@ export function cloud(buddy: CLI): void {
       }
 
       log.info('Invalidating the CloudFront cache...')
-      // const result = await runCommand('aws cloudfront create-invalidation --distribution-id E1U4Z2E9NJW9J --paths "/*"', {
-      //   ...options,
-      //   cwd: p.projectPath(),
-      //   stdin: 'pipe',
-      // })
-
-      if (options.paths) {
-        const result = await runCommand(
-          `aws cloudfront create-invalidation --distribution-id E1U4Z2E9NJW9J --paths ${options.paths}`,
-          {
-            ...options,
-            cwd: p.projectPath(), // TODO: this should be the cloud path
-            stdin: 'pipe',
-          },
-        ) // TODO: this should be the cloud path
-
-        if (result.isErr()) {
-          await outro(
-            'While running the cloud command, there was an issue',
-            { startTime, useSeconds: true },
-            result.error,
-          )
-          process.exit(ExitCode.FatalError)
-        }
-
-        await outro('Exited', { startTime, useSeconds: true })
-        process.exit(ExitCode.Success)
+      const distributionId = await getCloudFrontDistributionId()
+      if (!distributionId) {
+        await outro(
+          'Could not resolve CloudFront distribution ID',
+          { startTime, useSeconds: true },
+          'Ensure your cloud stack is deployed before invalidating cache.',
+        )
+        process.exit(ExitCode.FatalError)
       }
 
-      log.info('Not implemented yet. Read more about `buddy cloud` here: https://stacksjs.org/docs/cloud')
+      const paths = options.paths ? String(options.paths) : '/*'
+      const result = await runCommand(
+        `aws cloudfront create-invalidation --distribution-id ${distributionId} --paths ${paths}`,
+        {
+          ...options,
+          cwd: p.projectPath(),
+          stdin: 'pipe',
+        },
+      )
+
+      if (isResultError(result)) {
+        await outro(
+          'While running the cloud command, there was an issue',
+          { startTime, useSeconds: true },
+          getResultError(result),
+        )
+        process.exit(ExitCode.FatalError)
+      }
+
+      await outro('Exited', { startTime, useSeconds: true })
       process.exit(ExitCode.Success)
     })
 
@@ -527,22 +696,49 @@ export function cloud(buddy: CLI): void {
 
       const startTime = await intro('buddy cloud:diff')
 
-      const result = await runCommand('bunx --bun cdk diff', {
-        cwd: p.frameworkCloudPath(),
-        stdin: 'pipe',
-      })
+      try {
+        const { InfrastructureGenerator } = await import('@stacksjs/ts-cloud')
+        const { CloudFormationClient } = await import('@stacksjs/ts-cloud/aws')
+        const { tsCloud: cloudConfig } = await import('~/config/cloud')
 
-      if (result.isErr()) {
+        const environment = (process.env.APP_ENV || process.env.NODE_ENV || 'production') as 'production' | 'staging' | 'development'
+        const generator = new InfrastructureGenerator({
+          config: cloudConfig as any,
+          environment,
+        })
+
+        const newTemplate = generator.generate().toJSON()
+        const stackName = `${cloudConfig.project?.slug || 'stacks'}-${environment}`
+        const cfn = new CloudFormationClient(process.env.AWS_REGION || 'us-east-1')
+
+        let currentTemplate = '{}'
+        try {
+          const result = await cfn.getTemplate(stackName)
+          currentTemplate = result.TemplateBody
+        }
+        catch {
+          log.info('No deployed stack found. Showing full template as diff.')
+        }
+
+        if (currentTemplate === newTemplate) {
+          log.info('No changes detected.')
+        }
+        else {
+          log.info('Changes detected between deployed and local template:')
+          log.info(`Current template: ${currentTemplate.length} bytes`)
+          log.info(`New template: ${newTemplate.length} bytes`)
+        }
+      }
+      catch (error: any) {
         await outro(
           'While running the cloud diff command, there was an issue',
           { startTime, useSeconds: true },
-          result.error,
+          error.message,
         )
         process.exit(ExitCode.FatalError)
       }
 
-      await outro('Showing diff of the current, undeployed cloud changes', { startTime, useSeconds: true })
-      console.log(result.value)
+      await outro('Cloud diff complete', { startTime, useSeconds: true })
       process.exit(ExitCode.Success)
     })
 

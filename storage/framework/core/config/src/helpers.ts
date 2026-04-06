@@ -9,6 +9,7 @@ import type {
   DnsConfig,
   EmailConfig,
   Events,
+  FilesystemsConfig,
   GitConfig,
   HashingConfig,
   LibraryConfig,
@@ -23,7 +24,6 @@ import type {
   StorageConfig,
   UiConfig,
 } from '@stacksjs/types'
-import { createLocalTunnel } from '@stacksjs/tunnel'
 import { config } from '.'
 
 export type LocalUrlType =
@@ -37,73 +37,79 @@ export type LocalUrlType =
   | 'inspect'
   | 'desktop'
 
-export async function localUrl({
-  domain = config.app.url || 'stacks',
-  type = 'frontend' as LocalUrlType,
-  localhost = false,
-  https = undefined as boolean | undefined,
-  network = undefined as boolean | undefined,
-}: {
+export async function localUrl(options: {
   domain?: string
   type?: LocalUrlType
   network?: boolean
   localhost?: boolean
   https?: boolean
 } = {}): Promise<string> {
+  const domain = options.domain ?? config.app.url ?? 'stacks'
+  const type: LocalUrlType = options.type ?? 'frontend'
+  const localhost = options.localhost ?? false
+  const https = options.https
+  const network = options.network
   let url = domain.replace(/\.[^.]+$/, '.localhost')
+
+  // Dynamically import tunnel only when network mode is requested
+  // to avoid eagerly loading localtunnels in all modules
+  async function tunnel(port: number): Promise<string> {
+    const { createLocalTunnel } = await import('@stacksjs/tunnel')
+    return createLocalTunnel(port)
+  }
 
   switch (type) {
     case 'frontend':
       if (network)
-        return await createLocalTunnel(config.ports?.frontend || 3000)
+        return await tunnel(config.ports?.frontend || 3000)
       if (localhost)
         return `http://localhost:${config.ports?.frontend}`
       break
     case 'backend':
       if (network)
-        return await createLocalTunnel(config.ports?.backend || 3001)
+        return await tunnel(config.ports?.backend || 3001)
       if (localhost)
         return `http://localhost:${config.ports?.backend}`
       url = `api.${url}`
       break
     case 'admin':
       if (network)
-        return await createLocalTunnel(config.ports?.admin || 3002)
+        return await tunnel(config.ports?.admin || 3002)
       if (localhost)
         return `http://localhost:${config.ports?.admin}`
       url = `admin.${url}`
       break
     case 'library':
       if (network)
-        return await createLocalTunnel(config.ports?.library || 3003)
+        return await tunnel(config.ports?.library || 3003)
       if (localhost)
         return `http://localhost:${config.ports?.library}`
       url = `libs.${url}`
       break
     case 'email':
       if (network)
-        return await createLocalTunnel(config.ports?.email || 3005)
+        return await tunnel(config.ports?.email || 3005)
       if (localhost)
         return `http://localhost:${config.ports?.email}`
       url = `email.${url}`
       break
     case 'desktop':
       if (network)
-        return await createLocalTunnel(config.ports?.desktop || 3004)
+        return await tunnel(config.ports?.desktop || 3004)
       if (localhost)
         return `http://localhost:${config.ports?.desktop}`
       url = `desktop.${url}`
       break
     case 'docs':
       if (network)
-        return await createLocalTunnel(config.ports?.docs || 3006)
+        return await tunnel(config.ports?.docs || 3006)
       if (localhost)
         return `http://localhost:${config.ports?.docs}`
       url = `docs.${url}`
       break
     case 'inspect':
       if (network)
-        return await createLocalTunnel(config.ports?.inspect || 3007)
+        return await tunnel(config.ports?.inspect || 3007)
       if (localhost)
         return `http://localhost:${config.ports?.inspect}`
       url = `inspect.${url}`
@@ -203,6 +209,10 @@ export function defineSms(config: any): any {
 }
 
 export function defineStorage(config: StorageConfig): StorageConfig {
+  return config
+}
+
+export function defineFilesystems(config: FilesystemsConfig): FilesystemsConfig {
   return config
 }
 

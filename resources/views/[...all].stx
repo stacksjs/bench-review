@@ -1,0 +1,7 @@
+@extends('layouts/404')
+
+@section('content')
+  <div>
+    Page not found
+  </div>
+@endsection

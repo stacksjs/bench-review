@@ -1,10 +1,9 @@
-import type { UserConfig } from '@unocss/core'
-import type { UserShortcuts } from 'unocss'
+import type { CrosswindOptions } from 'crosswind'
 
 export type Font = 'inter' | 'mona' | 'hubot'
 export type Icon = 'heroicons' | 'hugeicons'
 export type WebFontsProviders = 'google' | 'bunny' | 'fontshare'
-export type Shortcuts = UserShortcuts
+export type Shortcuts = CrosswindOptions['shortcuts']
 
 export interface FontInfo {
   title: string
@@ -119,7 +118,7 @@ export interface UiOptions {
    * reset styles are utilized. You may set this value to `null`
    * if you prefer not applying any default stylesheets.
    *
-   * @url https://www.npmjs.com/package/@unocss/reset
+   * @url https://github.com/cwcss/crosswind
    * @todo preset needs to be added via a Vite plugin on development & build
    * @example
    * ```ts
@@ -135,7 +134,7 @@ export interface UiOptions {
    * for several local font providers. You may set this value to
    * `null` if you prefer not utilize any local fonts.
    *
-   * @see https://stacksjs.org/docs/fonts
+   * @see https://stacksjs.com/docs/fonts
    * ```
    */
   fonts?: any
@@ -149,7 +148,7 @@ export interface UiOptions {
    * are displayed utilizing a technique called "icons in pure css."
    * Learn more here https://antfu.me/posts/icons-in-pure-css.
    *
-   * @see https://stacksjs.org/config/icons — list of available icon sets
+   * @see https://stacksjs.com/config/icons — list of available icon sets
    * @todo implement this into Vite build flow
    * @example
    * ```ts
@@ -163,11 +162,10 @@ export interface UiOptions {
   icons: Icon | Icon[]
   // icons: Record<string, () => Promise<any>>
 
-  theme: UserConfig['theme']
-  // plugins: UserConfig['plugins']
-  // corePlugins: UserConfig['corePlugins']
-  variants: UserConfig['variants']
-  layers: UserConfig['layers']
+  theme: CrosswindOptions['theme']
+  // plugins: CrosswindOptions['plugins']
+  // corePlugins: CrosswindOptions['corePlugins']
+  variants: CrosswindOptions['variants']
   // darkMode: UserConfig['darkMode']
   // extend: UserConfig['extend']
   // screens: UserConfig['screens']

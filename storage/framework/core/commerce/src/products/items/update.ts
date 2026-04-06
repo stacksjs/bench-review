@@ -1,6 +1,7 @@
-import type { ProductItemJsonResponse, ProductItemUpdate } from '@stacksjs/orm'
 import { db } from '@stacksjs/database'
 import { formatDate } from '@stacksjs/orm'
+type ProductJsonResponse = ModelRow<typeof Product>
+type ProductUpdate = UpdateModelData<typeof Product>
 import { fetchById } from './fetch'
 
 /**
@@ -10,13 +11,13 @@ import { fetchById } from './fetch'
  * @param data The product item data to update
  * @returns The updated product item record
  */
-export async function update(id: number, data: Omit<ProductItemUpdate, 'id'>): Promise<ProductItemJsonResponse> {
+export async function update(id: number, data: Omit<ProductUpdate, 'id'>): Promise<ProductJsonResponse> {
   try {
     if (!id)
       throw new Error('Product item ID is required for update')
 
     const result = await db
-      .updateTable('product_items')
+      .updateTable('products')
       .set({
         ...data,
         updated_at: formatDate(new Date()),
@@ -28,7 +29,7 @@ export async function update(id: number, data: Omit<ProductItemUpdate, 'id'>): P
     if (!result)
       throw new Error('Failed to update product item')
 
-    return result
+    return result as ProductJsonResponse
   }
   catch (error) {
     if (error instanceof Error) {
@@ -45,25 +46,25 @@ export async function update(id: number, data: Omit<ProductItemUpdate, 'id'>): P
  * @param data Array of product item updates
  * @returns Number of product items updated
  */
-export async function bulkUpdate(data: ProductItemUpdate[]): Promise<number> {
+export async function bulkUpdate(data: ProductUpdate[]): Promise<number> {
   if (!data.length)
     return 0
 
   let updatedCount = 0
 
   try {
-    await db.transaction().execute(async (trx) => {
+    await (db as any).transaction().execute(async (trx: any) => {
       for (const item of data) {
-        if (!item.id)
+        if (!(item as Record<string, unknown>).id)
           continue
 
         const result = await trx
-          .updateTable('product_items')
+          .updateTable('products')
           .set({
             ...item,
             updated_at: formatDate(new Date()),
           })
-          .where('id', '=', item.id)
+          .where('id', '=', (item as Record<string, unknown>).id)
           .executeTakeFirst()
 
         if (Number(result.numUpdatedRows) > 0)
@@ -92,7 +93,7 @@ export async function bulkUpdate(data: ProductItemUpdate[]): Promise<number> {
 export async function updateAvailability(
   id: number,
   isAvailable: boolean,
-): Promise<ProductItemJsonResponse | undefined> {
+): Promise<ProductJsonResponse | undefined> {
   // Check if product item exists
   const productItem = await fetchById(id)
 
@@ -103,7 +104,7 @@ export async function updateAvailability(
   try {
     // Update the product item availability
     await db
-      .updateTable('product_items')
+      .updateTable('products')
       .set({
         is_available: isAvailable,
         updated_at: formatDate(new Date()),
@@ -133,7 +134,7 @@ export async function updateAvailability(
 export async function updateInventory(
   id: number,
   inventoryCount?: number,
-): Promise<ProductItemJsonResponse | undefined> {
+): Promise<ProductJsonResponse | undefined> {
   // Check if product item exists
   const productItem = await fetchById(id)
 
@@ -158,7 +159,7 @@ export async function updateInventory(
   try {
     // Update the product item
     await db
-      .updateTable('product_items')
+      .updateTable('products')
       .set(updateData)
       .where('id', '=', id)
       .execute()

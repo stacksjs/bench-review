@@ -1,13 +1,38 @@
 import type { MakeOptions } from '@stacksjs/types'
+import type { TemplateKey } from './templates'
 import process from 'node:process'
 import { italic, runCommand } from '@stacksjs/cli'
+import { ExitCode } from '@stacksjs/types'
 import { localUrl } from '@stacksjs/config'
 import { Action } from '@stacksjs/enums'
 import { handleError } from '@stacksjs/error-handling'
 import { log } from '@stacksjs/logging'
 import { frameworkPath, path as p, resolve } from '@stacksjs/path'
 import { createFolder, doesFolderExist, writeTextFile } from '@stacksjs/storage'
+import { template } from '@stacksjs/strings'
 import { runAction } from './helpers'
+import { CODE_TEMPLATES } from './templates'
+
+/**
+ * Helper function to generate code from templates
+ */
+function generateCode(templateKey: TemplateKey, ...args: any[]): string {
+  return template(CODE_TEMPLATES[templateKey], ...args)
+}
+
+/**
+ * Helper function to create a file with generated code
+ */
+async function createFileWithTemplate(
+  path: string,
+  templateKey: TemplateKey,
+  ...args: any[]
+): Promise<void> {
+  await writeTextFile({
+    path,
+    data: generateCode(templateKey, ...args),
+  })
+}
 
 export async function invoke(options: MakeOptions): Promise<void> {
   if (options.component)
@@ -19,6 +44,9 @@ export async function invoke(options: MakeOptions): Promise<void> {
   if (options.language)
     await makeLanguage(options)
 
+  if (options.middleware)
+    await createMiddleware(options)
+
   // if (options.migration)
   //   await migration(options)
 
@@ -27,7 +55,7 @@ export async function invoke(options: MakeOptions): Promise<void> {
   if (options.page)
     await makePage(options)
   if (options.stack)
-    makeStack(options)
+    await makeStack(options)
 }
 
 export async function make(options: MakeOptions): Promise<void> {
@@ -43,7 +71,7 @@ export async function makeAction(options: MakeOptions): Promise<void> {
   }
   catch (error) {
     log.error('There was an error creating your action', error)
-    process.exit()
+    process.exit(ExitCode.FatalError)
   }
 }
 
@@ -56,43 +84,18 @@ export async function makeComponent(options: MakeOptions): Promise<void> {
   }
   catch (error) {
     log.error('There was an error creating your component', error)
-    process.exit()
+    process.exit(ExitCode.FatalError)
   }
 }
 
 export async function createAction(options: MakeOptions): Promise<void> {
   const name = options.name
-  await writeTextFile({
-    path: p.userActionsPath(name),
-    data: `import { Action } from '@stacksjs/actions'
-
-export default new Action({
-  name: '${name}',
-  description: '${name} action',
-
-  handle() {
-    return 'Hello World action'
-  },
-})
-`,
-  })
+  await createFileWithTemplate(p.userActionsPath(name), 'action', name)
 }
 
 export async function createComponent(options: MakeOptions): Promise<void> {
   const name = options.name
-  await writeTextFile({
-    path: p.userComponentsPath(`${name}.vue`),
-    data: `<script setup lang="ts">
-console.log('Hello World component created')
-</script>
-
-<template>
-  <div>
-    Some HTML block
-  </div>
-</template>
-`,
-  })
+  await createFileWithTemplate(p.userComponentsPath(`${name}.vue`), 'component', name)
 }
 
 export function makeDatabase(options: MakeOptions): void {
@@ -104,12 +107,12 @@ export function makeDatabase(options: MakeOptions): void {
   }
   catch (error) {
     log.error('There was an error creating your database', error)
-    process.exit()
+    process.exit(ExitCode.FatalError)
   }
 }
 
 export function createDatabase(options: MakeOptions): void {
-  console.log('createDatabase options', options) // wip
+  log.debug('createDatabase options', options)
 }
 
 export function factory(options: MakeOptions): void {
@@ -121,12 +124,45 @@ export function factory(options: MakeOptions): void {
   }
   catch (error) {
     log.error('There was an error creating your factory', error)
-    process.exit()
+    process.exit(ExitCode.FatalError)
   }
 }
 
-export function createFactory(options: MakeOptions): void {
-  console.log('options', options) // wip
+export async function createFactory(options: MakeOptions): Promise<void> {
+  const name = options.name || 'MyFactory'
+  const factoryName = name.endsWith('Factory') ? name : `${name}Factory`
+
+  try {
+    const { path: p } = await import('@stacksjs/path')
+    const factoryDir = p.userDatabasePath('factories')
+    const factoryPath = `${factoryDir}/${factoryName}.ts`
+
+    // Check if factory already exists
+    const file = Bun.file(factoryPath)
+    if (await file.exists()) {
+      log.warn(`Factory ${factoryName} already exists at ${factoryPath}`)
+      return
+    }
+
+    const modelName = name.replace(/Factory$/, '')
+    const content = `import type { ${modelName}Model } from '@stacksjs/orm'
+
+export function ${factoryName}(): Partial<${modelName}Model> {
+  return {
+    // Define your factory attributes here
+  }
+}
+
+export default ${factoryName}
+`
+
+    await Bun.write(factoryPath, content)
+    log.success(`Created factory: ${factoryPath}`)
+  }
+  catch (error) {
+    log.error(`Failed to create factory ${factoryName}`, error)
+    throw error
+  }
 }
 
 export async function makeNotification(options: MakeOptions): Promise<void> {
@@ -138,7 +174,7 @@ export async function makeNotification(options: MakeOptions): Promise<void> {
   }
   catch (error) {
     log.error('There was an error creating your notification', error)
-    process.exit()
+    process.exit(ExitCode.FatalError)
   }
 }
 
@@ -151,25 +187,13 @@ export async function makePage(options: MakeOptions): Promise<void> {
   }
   catch (error) {
     log.error('There was an error creating your page', error)
-    process.exit()
+    process.exit(ExitCode.FatalError)
   }
 }
 
 export async function createPage(options: MakeOptions): Promise<void> {
   const name = options.name
-  await writeTextFile({
-    path: p.userViewsPath(`${name}.vue`),
-    data: `<script setup lang="ts">
-console.log('Hello World page created')
-</script>
-
-<template>
-  <div>
-    Visit http://127.0.0.1/${name}
-  </div>
-</template>
-`,
-  })
+  await createFileWithTemplate(p.userViewsPath(`${name}.vue`), 'page', name)
 }
 
 export async function makeFunction(options: MakeOptions): Promise<void> {
@@ -181,28 +205,13 @@ export async function makeFunction(options: MakeOptions): Promise<void> {
   }
   catch (error) {
     log.error('There was an error creating your function', error)
-    process.exit()
+    process.exit(ExitCode.FatalError)
   }
 }
 
 export async function createFunction(options: MakeOptions): Promise<void> {
   const name = options.name
-  await writeTextFile({
-    path: p.userFunctionsPath(`${name}.ts`),
-    data: `// reactive state
-const ${name} = ref(0)
-
-// functions that mutate state and trigger updates
-function increment() {
-  ${name}.value++
-}
-
-export {
-  ${name},
-  increment,
-}
-`,
-  })
+  await createFileWithTemplate(p.userFunctionsPath(`${name}.ts`), 'function', name)
 }
 
 export async function makeLanguage(options: MakeOptions): Promise<void> {
@@ -214,33 +223,51 @@ export async function makeLanguage(options: MakeOptions): Promise<void> {
   }
   catch (error) {
     log.error('There was an error creating your language.', error)
-    process.exit()
+    process.exit(ExitCode.FatalError)
   }
 }
 
 export async function createLanguage(options: MakeOptions): Promise<void> {
   const name = options.name
-  await writeTextFile({
-    path: p.resourcesPath(`lang/${name}.yml`),
-    data: `button:
-  text: Copy
-`,
-  })
+  await createFileWithTemplate(p.resourcesPath(`lang/${name}.yml`), 'language', name)
 }
 
-export function makeStack(options: MakeOptions): void {
+export async function makeStack(options: MakeOptions): Promise<void> {
   try {
     const name = options.name
     log.info(`Creating your ${name} stack...`)
-    const path = resolve(process.cwd(), name)
+    const stackDir = resolve(process.cwd(), name)
 
-    // await spawn(`giget stacks ${path}`)
-    log.success('Successfully scaffolded your project')
-    log.info(`cd ${path} && bun install`)
+    if (doesFolderExist(stackDir)) {
+      log.error(`Directory "${name}" already exists`)
+      process.exit(ExitCode.FatalError)
+    }
+
+    // Create directory structure
+    await createFolder(stackDir)
+    const dirs = ['app/Actions', 'app/Models', 'config', 'database/migrations', 'resources/views', 'resources/components', 'resources/functions', 'routes', 'public']
+    for (const dir of dirs) {
+      await createFolder(resolve(stackDir, dir))
+    }
+
+    // Derive a short name from the package name
+    const shortName = name.replace(/^@[^/]+\//, '').replace(/-stack$/, '')
+
+    // Create package.json
+    await createFileWithTemplate(resolve(stackDir, 'package.json'), 'stackPackageJson', name, shortName)
+
+    log.success(`Successfully scaffolded your "${name}" stack`)
+    log.info('')
+    log.info(`  cd ${name}`)
+    log.info('  # Add your models, actions, views, etc.')
+    log.info('  # Then publish: bun publish')
+    log.info('')
+    log.info('  Users install it with:')
+    log.info(`  buddy stack:install ${name}`)
   }
   catch (error) {
     log.error('There was an error creating your stack', error)
-    process.exit()
+    process.exit(ExitCode.FatalError)
   }
 }
 
@@ -258,20 +285,7 @@ export async function createNotification(options: MakeOptions): Promise<boolean>
     if (options.sms)
       importOption = 'SMSOptions'
 
-    await writeTextFile({
-      path: p.userNotificationsPath(`${name}.ts`),
-      data: `import type { ${importOption} } from \'@stacksjs/types\'
-
-function content(): string {
-  return 'example'
-}
-
-function send(): ${importOption} {
-  return {
-    content: content(),
-  }
-}`,
-    })
+    await createFileWithTemplate(p.userNotificationsPath(`${name}.ts`), 'notification', importOption)
 
     return true
   }
@@ -293,17 +307,7 @@ export async function createMigration(options: MakeOptions): Promise<void> {
   const path = frameworkPath(`database/migrations/${name}.ts`)
 
   try {
-    await writeTextFile({
-      path: `${path}`,
-      data: `import { Kysely } from 'kysely'
-
-export async function up(db: Kysely<any>): Promise<void> {
-  await db.schema
-    .createTable('${table}')
-    .addColumn('id', 'integer', col => col.autoIncrement().primaryKey())
-    .execute()
-}`,
-    })
+    await createFileWithTemplate(path, 'migration', table)
 
     log.success(`Successfully created your migration file at stacks/database/migrations/${name}.ts`)
   }
@@ -341,35 +345,20 @@ export async function createModel(options: MakeOptions): Promise<void> {
     throw new Error('options.name is required and cannot be empty')
 
   const name = optionName[0].toUpperCase() + optionName.slice(1)
+  const tableName = name.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '').replace(/([^s])$/, '$1s')
   const path = p.userModelsPath(`${name}.ts`)
 
   try {
-    await writeTextFile({
-      path: `${path}`,
-      data: `import { faker } from '@stacksjs/faker'
-import { schema } from '@stacksjs/validation'
-import type { Model } from '@stacksjs/types'
-
-export default {
-  name: '${name}',
-
-  traits: {
-    useTimestamps: true,
-
-    useSeeder: {
-      count: 10,
-    },
-  },
-
-  attributes: {
-    // your attributes here
-  },
-} satisfies Model`,
-    })
+    await createFileWithTemplate(path, 'model', name, tableName)
 
     log.success(`Model created: ${italic(`app/Models/${name}.ts`)}`)
   }
   catch (error: any) {
     log.error(error)
   }
+}
+
+export async function createMiddleware(options: MakeOptions): Promise<void> {
+  const name = options.name
+  await createFileWithTemplate(p.userMiddlewarePath(`${name}.ts`), 'middleware', name)
 }

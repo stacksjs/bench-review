@@ -1,7 +1,36 @@
-import { runCommand } from '@stacksjs/cli'
-import { frameworkPath } from '@stacksjs/path'
+import { log } from '@stacksjs/cli'
+import { projectPath } from '@stacksjs/path'
 
-await runCommand('bun run dev', {
-  cwd: frameworkPath('views/web'),
-  // verbose: true,
+// Try standard resolution first, then fall back to pantry path
+let serve: any
+try {
+  ;({ serve } = await import('bun-plugin-stx/serve'))
+}
+catch {
+  ;({ serve } = await import(projectPath('pantry/bun-plugin-stx/dist/serve.js')))
+}
+
+// Run stx dev server for resources/views
+// This serves .stx templates from the project's resources/views directory
+// User views override default views - check user path first, then defaults
+const userViewsPath = 'resources/views'
+const defaultViewsPath = 'storage/framework/defaults/resources/views'
+const userLayoutsPath = 'resources/layouts'
+const defaultLayoutsPath = 'storage/framework/defaults/resources/layouts'
+const preferredPort = Number(process.env.PORT) || 3000
+
+// STX serve will log the server URL
+
+// Start the server directly - no subprocess overhead!
+// Patterns are checked in order: user views first, then defaults
+await serve({
+  patterns: [userViewsPath, defaultViewsPath],
+  port: preferredPort,
+  componentsDir: 'storage/framework/defaults/resources/components/Dashboard',
+  layoutsDir: userLayoutsPath,
+  partialsDir: userViewsPath,
+  // Additional fallback layouts from defaults
+  fallbackLayoutsDir: defaultLayoutsPath,
+  fallbackPartialsDir: defaultViewsPath,
+  quiet: true,
 })

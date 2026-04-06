@@ -1,4 +1,4 @@
-import type { PrintDeviceJsonResponse } from '@stacksjs/orm'
+type PrintDeviceJsonResponse = ModelRow<typeof PrintDevice>
 import type { SpreadsheetWrapper } from 'ts-spreadsheets'
 import { createSpreadsheet } from 'ts-spreadsheets'
 import { fetchAll } from './fetch'
@@ -56,12 +56,12 @@ function prepareDevicesForExport(devices: PrintDeviceJsonResponse[]) {
     return [
       device.id,
       device.name,
-      device.mac_address,
+      device.macAddress,
       device.location,
       device.terminal,
       device.status,
-      new Date(device.last_ping).toLocaleString(),
-      device.print_count,
+      new Date(device.lastPing).toLocaleString(),
+      device.printCount,
     ]
   })
 

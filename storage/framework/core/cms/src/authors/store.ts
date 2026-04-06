@@ -1,4 +1,5 @@
-import type { AuthorJsonResponse, NewAuthor } from '@stacksjs/orm'
+type AuthorJsonResponse = ModelRow<typeof Author>
+type NewAuthor = NewModelData<typeof Author>
 import { randomUUIDv7 } from 'bun'
 import { db } from '@stacksjs/database'
 import { formatDate } from '@stacksjs/orm'
@@ -18,7 +19,7 @@ export async function findOrCreate(data: AuthorData): Promise<AuthorJsonResponse
     // First, try to find an existing author by email or name
     const existingAuthor = await db
       .selectFrom('authors')
-      .where(eb => eb.or([
+      .where((eb: any) => eb.or([
         eb('email', '=', data.email),
         eb('name', '=', data.name),
       ]))
@@ -27,7 +28,7 @@ export async function findOrCreate(data: AuthorData): Promise<AuthorJsonResponse
 
     // If author exists, return it
     if (existingAuthor)
-      return existingAuthor
+      return existingAuthor as AuthorJsonResponse
 
     // Look up or create the associated user
     let user = await db
@@ -58,11 +59,10 @@ export async function findOrCreate(data: AuthorData): Promise<AuthorJsonResponse
     }
 
     // Create a new author with the user_id
-    const authorData: NewAuthor = {
-      user_id: user.id,
+    const authorData = {
+      user_id: (user as Record<string, unknown>).id as number,
       name: data.name,
       email: data.email,
-      uuid: randomUUIDv7(),
       created_at: formatDate(new Date()),
       updated_at: formatDate(new Date()),
     }
@@ -76,7 +76,7 @@ export async function findOrCreate(data: AuthorData): Promise<AuthorJsonResponse
     if (!result)
       throw new Error('Failed to create author')
 
-    return result
+    return result as AuthorJsonResponse
   }
   catch (error) {
     if (error instanceof Error)
@@ -97,7 +97,7 @@ export async function store(data: NewAuthor): Promise<AuthorJsonResponse> {
     // First, try to find an existing author by email or name
     const existingAuthor = await db
       .selectFrom('authors')
-      .where(eb => eb.or([
+      .where((eb: any) => eb.or([
         eb('email', '=', data.email),
         eb('name', '=', data.name),
       ]))
@@ -106,14 +106,13 @@ export async function store(data: NewAuthor): Promise<AuthorJsonResponse> {
 
     // If author exists, return it
     if (existingAuthor)
-      return existingAuthor
+      return existingAuthor as AuthorJsonResponse
 
     // If no existing author, create a new one
-    const authorData: NewAuthor = {
+    const authorData = {
       user_id: data.user_id,
       name: data.name,
       email: data.email,
-      uuid: randomUUIDv7(),
       created_at: formatDate(new Date()),
       updated_at: formatDate(new Date()),
     }
@@ -127,7 +126,7 @@ export async function store(data: NewAuthor): Promise<AuthorJsonResponse> {
     if (!result)
       throw new Error('Failed to create author')
 
-    return result
+    return result as AuthorJsonResponse
   }
   catch (error) {
     if (error instanceof Error)

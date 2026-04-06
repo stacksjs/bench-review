@@ -1,4 +1,5 @@
-import type { AuthorJsonResponse, NewAuthor } from '@stacksjs/orm'
+type AuthorJsonResponse = ModelRow<typeof Author>
+type NewAuthor = NewModelData<typeof Author>
 import { db } from '@stacksjs/database'
 import { formatDate } from '@stacksjs/orm'
 
@@ -23,7 +24,7 @@ export async function update(id: number, data: Partial<NewAuthor>): Promise<Auth
       .returningAll()
       .executeTakeFirst()
 
-    return result
+    return result as AuthorJsonResponse | undefined
   }
   catch (error) {
     if (error instanceof Error)

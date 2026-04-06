@@ -1,4 +1,4 @@
-import type { CustomerJsonResponse } from '@stacksjs/orm'
+type CustomerJsonResponse = ModelRow<typeof Customer>
 import { db } from '@stacksjs/database'
 
 /**
@@ -9,12 +9,12 @@ export async function fetchById(id: number): Promise<CustomerJsonResponse | unde
     .selectFrom('customers')
     .where('id', '=', id)
     .selectAll()
-    .executeTakeFirst()
+    .executeTakeFirst() as CustomerJsonResponse | undefined
 }
 
 /**
  * Fetch all customers
  */
 export async function fetchAll(): Promise<CustomerJsonResponse[]> {
-  return await db.selectFrom('customers').selectAll().execute()
+  return await db.selectFrom('customers').selectAll().execute() as CustomerJsonResponse[]
 }

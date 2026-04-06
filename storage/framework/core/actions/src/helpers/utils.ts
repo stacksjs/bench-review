@@ -1,6 +1,7 @@
 import type { Action as ActionType } from '@stacksjs/actions'
-import type { Err, Ok, Result } from '@stacksjs/error-handling'
-import type { ActionOptions, CliOptions, CommandError, Readable, Subprocess, Writable } from '@stacksjs/types'
+import type { Result } from '@stacksjs/error-handling'
+import type { ActionOptions, CliOptions, CommandError, Subprocess } from '@stacksjs/types'
+import process from 'node:process'
 import { buddyOptions, runCommand, runCommands } from '@stacksjs/cli'
 import { err } from '@stacksjs/error-handling'
 import { log } from '@stacksjs/logging'
@@ -19,45 +20,117 @@ type Action = ActionPath | ActionName | string
  * @returns The result of the command.
  */
 export async function runAction(action: Action, options?: ActionOptions): Promise<Result<Subprocess, CommandError>> {
-  log.debug('runAction:', action, options)
-
-  // check if action is a file anywhere in ./app/Actions/**/*.ts
-  // if it is, return and await the action
-  const glob = new Bun.Glob('**/*.{ts,js}')
-  const scanOptions = { cwd: p.userActionsPath(), onlyFiles: true, absolute: true }
-
-  for await (const file of glob.scan(scanOptions)) {
-    if (file.endsWith(`${action}.ts`) || file.endsWith(`${action}.js`))
-      return ((await import(file)).default as ActionType).handle()
-
-    // if a custom model name is used, we need to check for it
+  // Special case: handle dev/views directly for maximum performance
+  if (action === 'dev/views') {
     try {
-      log.debug('trying to import', file)
-      const a = await import(file)
-      if (a.name === action) {
-        log.debug('a.name matches', a.name)
-        return await a.handle()
+      const port = Number(process.env.PORT) || 3000
+
+      // Ensure pantry packages are resolvable for compiled dependencies
+      // that import @stacksjs/* packages at runtime
+      const pantryPath = p.projectPath('pantry')
+      if (!process.env.NODE_PATH?.includes(pantryPath)) {
+        process.env.NODE_PATH = process.env.NODE_PATH ? `${pantryPath}:${process.env.NODE_PATH}` : pantryPath
+        // @ts-expect-error - force Bun/Node to re-read module paths
+        require('module').Module._initPaths?.()
       }
+
+      // Import and call serve function directly - no subprocess!
+      // Try standard resolution first, then fall back to pantry path
+      let serve: any
+      try {
+        ;({ serve } = await import('bun-plugin-stx/serve'))
+      }
+      catch {
+        ;({ serve } = await import(p.projectPath('pantry/bun-plugin-stx/dist/serve.js')))
+      }
+      await serve({
+        patterns: ['resources/views', 'storage/framework/defaults/resources/views'],
+        port,
+        componentsDir: 'storage/framework/defaults/resources/components/Dashboard',
+        layoutsDir: 'resources/layouts',
+        partialsDir: 'resources/views',
+        quiet: true,
+      })
+
+      // This will never return since serve runs forever
+      // eslint-disable-next-line no-unreachable
+      return { ok: true, value: {} as Subprocess } as any
     }
-    // eslint-disable-next-line unused-imports/no-unused-vars
     catch (error) {
-      // handleError(error, { shouldExit: false })
+      return err(`Failed to start dev server: ${error}`) as any
+    }
+  }
+
+  // Quick check: does this look like a core action? (contains a slash or is a common core action name)
+  // Most core actions are like "dev/views", "build/app", etc.
+  const isLikelyCoreAction = action.includes('/') || ['dev', 'build', 'install', 'upgrade', 'migrate'].some(prefix => action.startsWith(prefix))
+
+  if (!isLikelyCoreAction) {
+    // Only scan user actions if it's NOT likely a core action
+    const glob = new Bun.Glob('**/*.{ts,js}')
+    const scanOptions = { cwd: p.userActionsPath(), onlyFiles: true, absolute: true }
+
+    // First pass: only check filenames, don't import anything
+    const matchingFiles: string[] = []
+    const basePath = p.userActionsPath()
+
+    for await (const file of glob.scan(scanOptions)) {
+      // Normalize the file path relative to basePath to match the action name
+      // e.g., /path/to/app/Actions/SomeAction.ts -> SomeAction
+      const relativePath = file.replace(`${basePath}/`, '').replace(/\.(ts|js)$/, '')
+
+      if (relativePath === action || file.endsWith(`${action}.ts`) || file.endsWith(`${action}.js`)) {
+        // Direct filename match - import and execute immediately
+        return await ((await import(file)).default as ActionType).handle(undefined as unknown as Parameters<ActionType['handle']>[0])
+      }
+      // Collect all files for potential name matching (only if direct match fails)
+      matchingFiles.push(file)
+    }
+
+    // Second pass: only import files if we didn't find a direct match
+    // This is a fallback for custom action names
+    for (const file of matchingFiles) {
+      try {
+        const a = await import(file)
+        if (a.name === action) {
+          return await a.handle()
+        }
+      }
+      // eslint-disable-next-line unused-imports/no-unused-vars
+      catch (error) {
+        // handleError(error, { shouldExit: false })
+      }
     }
   }
 
   // or else, just run the action normally by assuming the action is core Action,  stored in p.actionsPath
-  const opts = buddyOptions()
   const path = p.relativeActionsPath(`src/${action}.ts`)
-  const cmd = `bun ${path} ${opts}`.trimEnd()
+
+  // Use --watch for dev actions to enable hot reloading
+  const isDevAction = action.startsWith('dev/')
+  const watchFlag = isDevAction ? '--watch' : ''
+  // Dev actions manage their own config — don't pass CLI flags that trigger dep loading
+  const opts = isDevAction ? '' : (buddyOptions(options) || '')
+  const cmd = `bun ${watchFlag} ${path} ${opts}`.trimEnd()
+
+  // Ensure pantry packages are resolvable via NODE_PATH
+  // This allows compiled pantry packages (e.g., bun-plugin-stx/serve.js) to
+  // import their dependencies like @stacksjs/stx at runtime
+  const pantryNodePath = p.projectPath('pantry')
+  const existingNodePath = process.env.NODE_PATH
+  const nodePath = existingNodePath ? `${pantryNodePath}:${existingNodePath}` : pantryNodePath
+
+  // Dev actions manage their own output (buffered banners, etc.), so inherit
+  // stdout/stderr by default. Suppress with quiet (used by multi-server mode).
+  const shouldInherit = options?.verbose || (isDevAction && !options?.quiet)
 
   const optionsWithCwd: CliOptions = {
     cwd: options?.cwd || p.projectPath(),
-    stdio: [options?.stdin ?? 'inherit', 'pipe', 'pipe'],
     ...options,
+    stdout: shouldInherit ? 'inherit' : undefined,
+    stderr: shouldInherit ? 'inherit' : undefined,
+    env: { ...options?.env, NODE_PATH: nodePath },
   }
-
-  log.debug('action cmd:', cmd)
-  log.debug('optionsWithCwd:', optionsWithCwd)
 
   return await runCommand(cmd, optionsWithCwd)
 }
@@ -72,19 +145,16 @@ export async function runAction(action: Action, options?: ActionOptions): Promis
 export async function runActions(
   actions: Action[],
   options?: ActionOptions,
-): Promise<Ok<Subprocess<Writable, Readable, Readable>, Error>[] | Err<never, string>> {
-  log.debug('runActions:', actions, options)
-
+): Promise<any> {
   if (!actions.length)
     return err('No actions were specified')
 
   for (const action of actions) {
-    log.debug(`running action "${action}"`)
     if (!hasAction(action))
       return err(`The specified action "${action}" does not exist`)
   }
 
-  const opts = buddyOptions()
+  const opts = buddyOptions(options) || ''
 
   const o = {
     cwd: options?.cwd || p.projectPath(),
@@ -92,8 +162,6 @@ export async function runActions(
   }
 
   const commands = actions.map(action => `bun ${p.relativeActionsPath(`src/${action}.ts`)} ${opts}`)
-
-  log.debug('commands:', commands)
 
   return await runCommands(commands, o)
 }

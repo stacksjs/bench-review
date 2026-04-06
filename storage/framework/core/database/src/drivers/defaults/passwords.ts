@@ -1,4 +1,8 @@
-import { italic, log } from '@stacksjs/cli'
+import { log } from '@stacksjs/logging'
+
+function italic(str: string): string {
+  return `\x1B[3m${str}\x1B[23m`
+}
 import { path } from '@stacksjs/path'
 import { hasMigrationBeenCreated } from '../index'
 
@@ -36,7 +40,7 @@ export async function createPasswordResetsTable(): Promise<void> {
   const migrationFileName = `${timestamp}-create-password-resets-table.ts`
   const migrationFilePath = path.userMigrationsPath(migrationFileName)
 
-  Bun.write(migrationFilePath, migrationContent)
+  await Bun.write(migrationFilePath, migrationContent)
 
   log.success(`Created migration: ${italic(migrationFileName)}`)
 }
@@ -55,7 +59,7 @@ export async function createPostgresPasswordResetsTable(): Promise<void> {
   migrationContent += `    .createTable('password_resets')\n`
   migrationContent += `    .addColumn('email', 'varchar(255)', col => col.notNull())\n`
   migrationContent += `    .addColumn('token', 'varchar(255)', col => col.notNull())\n`
-  migrationContent += `    .addColumn('created_at', 'timestamp with time zone', col => col.notNull().defaultTo(sql.raw('CURRENT_TIMESTAMP')))\n`
+  migrationContent += `    .addColumn('created_at', 'timestamp', col => col.notNull().defaultTo(sql.raw('CURRENT_TIMESTAMP')))\n`
   migrationContent += `    .execute()\n\n`
 
   migrationContent += `  await db.schema\n`
@@ -75,7 +79,7 @@ export async function createPostgresPasswordResetsTable(): Promise<void> {
   const migrationFileName = `${timestamp}-create-password-resets-table.ts`
   const migrationFilePath = path.userMigrationsPath(migrationFileName)
 
-  Bun.write(migrationFilePath, migrationContent)
+  await Bun.write(migrationFilePath, migrationContent)
 
   log.success(`Created migration: ${italic(migrationFileName)}`)
 }

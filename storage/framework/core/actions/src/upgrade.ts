@@ -5,6 +5,7 @@ import { NpmScript } from '@stacksjs/enums'
 import { log } from '@stacksjs/logging'
 import { projectPath } from '@stacksjs/path'
 import * as storage from '@stacksjs/storage'
+import { ExitCode } from '@stacksjs/types'
 import { version } from '../package.json'
 
 // import { determineDebugLevel } from '@stacksjs/utils'
@@ -58,18 +59,18 @@ export async function updateDependencies(): Promise<void> {
     cwd: projectPath(),
   })
 
-  if (result.isErr()) {
+  if (result.isErr) {
     await outro(
       'While running the upgrade:dependencies command, there was an issue',
       { startTime: perf, useSeconds: true },
       result.error,
     )
-    process.exit()
+    process.exit(ExitCode.FatalError)
   }
 
   await outro('Freshly updated your dependencies.', {
     startTime: perf,
     useSeconds: true,
   })
-  process.exit()
+  process.exit(ExitCode.Success)
 }

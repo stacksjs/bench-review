@@ -1,91 +1,113 @@
-import type { Units } from '../../types'
-import { useFetch, useStorage } from '@vueuse/core'
+import type { Units } from '../../../types/defaults'
+import { useStorage } from '@stacksjs/browser'
 
 // Create a persistent units array using VueUse's useStorage
 const units = useStorage<Units[]>('units', [])
 
-const baseURL = 'http://localhost:3008/api'
+const baseURL = `${process.env.VITE_API_URL || `http://localhost:${process.env.PORT_API || '3008'}`}/api`
 
 // Basic fetch function to get all units
 async function fetchUnits(): Promise<Units[]> {
-  const { error, data } = useFetch<Units[]>(`${baseURL}/commerce/products/units`)
+  try {
+    const response = await fetch(`${baseURL}/commerce/products/units`)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    const data = await response.json() as Units[]
 
-  if (error.value) {
-    console.error('Error fetching units:', error.value)
-    return []
+    if (Array.isArray(data)) {
+      units.value = data
+      return data
+    }
+    else {
+      console.error('Expected array of units but received:', typeof data)
+      return []
+    }
   }
-
-  if (Array.isArray(data.value)) {
-    units.value = data.value
-    return data.value
-  }
-  else {
-    console.error('Expected array of units but received:', typeof data.value)
+  catch (error) {
+    console.error('Error fetching units:', error)
     return []
   }
 }
 
 async function createUnit(unit: Units): Promise<Units | null> {
-  const { error, data } = useFetch<Units>(`${baseURL}/commerce/products/units`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(unit),
-  })
+  try {
+    const response = await fetch(`${baseURL}/commerce/products/units`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(unit),
+    })
 
-  if (error.value) {
-    console.error('Error creating unit:', error.value)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json() as Units
+    if (data) {
+      units.value.push(data)
+      return data
+    }
     return null
   }
-
-  if (data.value) {
-    units.value.push(data.value)
-    return data.value
+  catch (error) {
+    console.error('Error creating unit:', error)
+    return null
   }
-  return null
 }
 
 async function updateUnit(unit: Units): Promise<Units | null> {
-  const { error, data } = useFetch<Units>(`${baseURL}/commerce/products/units/${unit.id}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(unit),
-  })
+  try {
+    const response = await fetch(`${baseURL}/commerce/products/units/${unit.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(unit),
+    })
 
-  if (error.value) {
-    console.error('Error updating unit:', error.value)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json() as Units
+    if (data) {
+      const index = units.value.findIndex(u => u.id === unit.id)
+      if (index !== -1) {
+        units.value[index] = data
+      }
+      return data
+    }
     return null
   }
-
-  if (data.value) {
-    const index = units.value.findIndex(u => u.id === unit.id)
-    if (index !== -1) {
-      units.value[index] = data.value
-    }
-    return data.value
+  catch (error) {
+    console.error('Error updating unit:', error)
+    return null
   }
-  return null
 }
 
 async function deleteUnit(id: number): Promise<boolean> {
-  const { error } = useFetch(`${baseURL}/commerce/products/units/${id}`, {
-    method: 'DELETE',
-  })
+  try {
+    const response = await fetch(`${baseURL}/commerce/products/units/${id}`, {
+      method: 'DELETE',
+    })
 
-  if (error.value) {
-    console.error('Error deleting unit:', error.value)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const index = units.value.findIndex(u => u.id === id)
+    if (index !== -1) {
+      units.value.splice(index, 1)
+    }
+
+    return true
+  }
+  catch (error) {
+    console.error('Error deleting unit:', error)
     return false
   }
-
-  const index = units.value.findIndex(u => u.id === id)
-  if (index !== -1) {
-    units.value.splice(index, 1)
-  }
-
-  return true
 }
 
 // Export the composable

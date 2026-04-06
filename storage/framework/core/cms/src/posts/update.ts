@@ -1,4 +1,5 @@
-import type { PostJsonResponse, PostUpdate } from '@stacksjs/orm'
+type PostJsonResponse = ModelRow<typeof Post>
+type PostUpdate = UpdateModelData<typeof Post>
 import { db } from '@stacksjs/database'
 
 /**
@@ -10,6 +11,19 @@ import { db } from '@stacksjs/database'
  */
 export async function update(id: number, data: Partial<PostUpdate>): Promise<PostJsonResponse> {
   try {
+    if (data.title !== undefined && typeof data.title === 'string' && data.title.trim() === '') {
+      throw new Error('Post title cannot be empty')
+    }
+
+    const validStatuses = ['published', 'draft', 'archived']
+    if (data.status !== undefined && typeof data.status === 'string' && !validStatuses.includes(data.status)) {
+      throw new Error(`Invalid post status: ${data.status}`)
+    }
+
+    if (data.views !== undefined && typeof data.views === 'number' && data.views < 0) {
+      throw new Error('Views count cannot be negative')
+    }
+
     const result = await db
       .updateTable('posts')
       .set(data)
@@ -20,7 +34,7 @@ export async function update(id: number, data: Partial<PostUpdate>): Promise<Pos
     if (!result)
       throw new Error('Failed to update post')
 
-    return result
+    return result as PostJsonResponse
   }
   catch (error) {
     if (error instanceof Error)
