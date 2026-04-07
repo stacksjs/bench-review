@@ -23,8 +23,6 @@ export async function runAction(action: Action, options?: ActionOptions): Promis
   // Special case: handle dev/views directly for maximum performance
   if (action === 'dev/views') {
     try {
-      const port = Number(process.env.PORT) || 3000
-
       // Ensure pantry packages are resolvable for compiled dependencies
       // that import @stacksjs/* packages at runtime
       const pantryPath = p.projectPath('pantry')
@@ -34,23 +32,35 @@ export async function runAction(action: Action, options?: ActionOptions): Promis
         require('module').Module._initPaths?.()
       }
 
-      // Import and call serve function directly - no subprocess!
-      // Try standard resolution first, then fall back to pantry path
-      let serve: any
-      try {
-        ;({ serve } = await import('bun-plugin-stx/serve'))
+      // Check if the project has its own serve.ts — if so, use it directly.
+      // This allows projects to define their own API routes, middleware, and config.
+      const projectServe = p.projectPath('serve.ts')
+      const projectServeFile = Bun.file(projectServe)
+      if (await projectServeFile.exists()) {
+        await import(projectServe)
       }
-      catch {
-        ;({ serve } = await import(p.projectPath('pantry/bun-plugin-stx/dist/serve.js')))
+      else {
+        const port = Number(process.env.PORT) || 3000
+
+        // Import and call serve function directly - no subprocess!
+        // Try standard resolution first, then fall back to pantry path
+        let serve: any
+        try {
+          ;({ serve } = await import('bun-plugin-stx/serve'))
+        }
+        catch {
+          ;({ serve } = await import(p.projectPath('pantry/bun-plugin-stx/dist/serve.js')))
+        }
+        await serve({
+          patterns: ['resources/views', 'storage/framework/defaults/resources/views'],
+          port,
+          componentsDir: 'storage/framework/defaults/resources/components/Dashboard',
+          layoutsDir: 'resources/layouts',
+          partialsDir: 'resources/components',
+          fallbackPartialsDir: 'resources/views',
+          quiet: true,
+        })
       }
-      await serve({
-        patterns: ['resources/views', 'storage/framework/defaults/resources/views'],
-        port,
-        componentsDir: 'storage/framework/defaults/resources/components/Dashboard',
-        layoutsDir: 'resources/layouts',
-        partialsDir: 'resources/views',
-        quiet: true,
-      })
 
       // This will never return since serve runs forever
       // eslint-disable-next-line no-unreachable

@@ -1,3 +1,5 @@
+@section('title', 'Blog Post - Bench Review')
+
 <script server>
 import { blogPosts } from '../../functions/sample'
 const post = blogPosts.find(p => p.id === parseInt(params.id))

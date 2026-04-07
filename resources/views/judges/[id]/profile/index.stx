@@ -1,1 +1,3 @@
+@section('title', 'Judge Profile - Bench Review')
+
 @include('components/judge-profile')

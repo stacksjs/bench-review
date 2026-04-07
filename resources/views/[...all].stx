@@ -1,5 +1,7 @@
 @extends('layouts/404')
 
+@section('title', 'Page Not Found - Bench Review')
+
 @section('content')
   <div>
     Page not found
