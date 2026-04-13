@@ -20,6 +20,8 @@ type Action = ActionPath | ActionName | string
  * @returns The result of the command.
  */
 export async function runAction(action: Action, options?: ActionOptions): Promise<Result<Subprocess, CommandError>> {
+  log.debug(`[action] Running: ${action}`)
+
   // Special case: handle dev/views directly for maximum performance
   if (action === 'dev/views') {
     try {
@@ -91,6 +93,7 @@ export async function runAction(action: Action, options?: ActionOptions): Promis
 
       if (relativePath === action || file.endsWith(`${action}.ts`) || file.endsWith(`${action}.js`)) {
         // Direct filename match - import and execute immediately
+        log.debug(`[action] Resolved: ${action} → ${file}`)
         return await ((await import(file)).default as ActionType).handle(undefined as unknown as Parameters<ActionType['handle']>[0])
       }
       // Collect all files for potential name matching (only if direct match fails)
@@ -103,6 +106,7 @@ export async function runAction(action: Action, options?: ActionOptions): Promis
       try {
         const a = await import(file)
         if (a.name === action) {
+          log.debug(`[action] Resolved: ${action} → ${file}`)
           return await a.handle()
         }
       }
@@ -115,6 +119,7 @@ export async function runAction(action: Action, options?: ActionOptions): Promis
 
   // or else, just run the action normally by assuming the action is core Action,  stored in p.actionsPath
   const path = p.relativeActionsPath(`src/${action}.ts`)
+  log.debug(`[action] Resolved: ${action} → ${path}`)
 
   // Use --watch for dev actions to enable hot reloading
   const isDevAction = action.startsWith('dev/')
@@ -142,7 +147,9 @@ export async function runAction(action: Action, options?: ActionOptions): Promis
     env: { ...options?.env, NODE_PATH: nodePath },
   }
 
-  return await runCommand(cmd, optionsWithCwd)
+  const result = await runCommand(cmd, optionsWithCwd)
+  log.debug(`[action] Completed: ${action}`)
+  return result
 }
 
 /**

@@ -1,7 +1,7 @@
-@include('partials/bench-header')
+@include('Bench/BenchHeader')
 
 <main class="bg-off-white py-16">
   @slot('content')
 </main>
 
-@include('partials/bench-footer')
+@include('Bench/BenchFooter')

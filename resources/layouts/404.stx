@@ -3,7 +3,7 @@
     <main class="mx-auto max-w-md w-full md:max-w-sm md:w-96 md:px-0 sm:px-4">
       <div class="flex">
         <StxLink to="/" aria-label="Home">
-          @include('partials/logo')
+          @include('Logo')
         </StxLink>
       </div>
 

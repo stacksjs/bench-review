@@ -1,3 +1,90 @@
-#!/usr/bin/env bun
-// TODO: should be a symlink to the prod-compiled `buddy` binary
-import('./storage/framework/core/buddy/src/cli')
+#!/bin/sh
+set -e
+
+ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+PANTRY_LOCAL_BIN="${ROOT_DIR}/pantry/.bin"
+PANTRY_DIR="${ROOT_DIR}/pantry"
+USER_LOCAL_BIN="${HOME}/.local/bin"
+PANTRY_INSTALLER="${ROOT_DIR}/storage/framework/scripts/pantry-install"
+BUDDY_ENTRY="${ROOT_DIR}/storage/framework/core/buddy/src/cli.ts"
+PANTRY_BOOTSTRAP_TIMEOUT_SECONDS="${PANTRY_BOOTSTRAP_TIMEOUT_SECONDS:-600}"
+PANTRY_DEPENDENCIES_TIMEOUT_SECONDS="${PANTRY_DEPENDENCIES_TIMEOUT_SECONDS:-1200}"
+
+run_with_timeout() {
+  timeout_seconds="$1"
+  shift
+  timeout_flag="${TMPDIR:-/tmp}/buddy-timeout-$$"
+  rm -f "${timeout_flag}"
+
+  "$@" &
+  cmd_pid=$!
+
+  (
+    sleep "${timeout_seconds}"
+
+    if kill -0 "${cmd_pid}" 2>/dev/null; then
+      echo "Command timed out after ${timeout_seconds}s: $*" >&2
+      : > "${timeout_flag}"
+      kill "${cmd_pid}" 2>/dev/null || true
+      sleep 2
+      kill -9 "${cmd_pid}" 2>/dev/null || true
+    fi
+  ) &
+  watchdog_pid=$!
+
+  wait "${cmd_pid}"
+  status=$?
+
+  kill "${watchdog_pid}" 2>/dev/null || true
+  wait "${watchdog_pid}" 2>/dev/null || true
+
+  if [ -f "${timeout_flag}" ]; then
+    rm -f "${timeout_flag}"
+    return 124
+  fi
+
+  rm -f "${timeout_flag}"
+  return "${status}"
+}
+
+# Run buddy with the correct PATH and NODE_PATH for pantry resolution
+run_buddy() {
+  BUN_CMD="$1"
+  shift
+  exec env PATH="${PANTRY_LOCAL_BIN}:${USER_LOCAL_BIN}:${PATH}" NODE_PATH="${PANTRY_DIR}:${NODE_PATH:-}" "${BUN_CMD}" "${BUDDY_ENTRY}" "$@"
+}
+
+# Fast path: if pantry is already set up, run immediately
+# Check for pantry/.bin/bun first (managed runtime), then system bun
+if [ -x "${PANTRY_LOCAL_BIN}/bun" ]; then
+  run_buddy "${PANTRY_LOCAL_BIN}/bun" "$@"
+fi
+
+if [ -d "${PANTRY_DIR}" ] && command -v bun >/dev/null 2>&1; then
+  run_buddy bun "$@"
+fi
+
+# Pantry not set up — bootstrap it
+if ! command -v pantry >/dev/null 2>&1; then
+  if [ ! -x "${PANTRY_INSTALLER}" ]; then
+    echo "Pantry installer not found at ${PANTRY_INSTALLER}" >&2
+    exit 1
+  fi
+
+  run_with_timeout "${PANTRY_BOOTSTRAP_TIMEOUT_SECONDS}" "${PANTRY_INSTALLER}"
+  export PATH="${USER_LOCAL_BIN}:${PATH}"
+fi
+
+run_with_timeout "${PANTRY_DEPENDENCIES_TIMEOUT_SECONDS}" pantry install
+
+# After install, try again
+if [ -x "${PANTRY_LOCAL_BIN}/bun" ]; then
+  run_buddy "${PANTRY_LOCAL_BIN}/bun" "$@"
+fi
+
+if command -v bun >/dev/null 2>&1; then
+  run_buddy bun "$@"
+fi
+
+echo "Pantry did not provide a local bun runtime." >&2
+exit 1

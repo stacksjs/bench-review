@@ -16,6 +16,7 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { config } from '@stacksjs/config'
 import { db } from '@stacksjs/database'
 import { mail, template } from '@stacksjs/email'
+import { log } from '@stacksjs/logging'
 
 export interface EmailVerificationResult {
   success: boolean
@@ -96,7 +97,7 @@ export async function sendVerificationEmail(user: { id: number, email: string, n
     .executeTakeFirst()
 
   // Build verification URL
-  const appUrl = config.app.url || 'https://localhost:5173'
+  const appUrl = config.app.url ? `https://${config.app.url}` : `http://localhost:${process.env.PORT || '3000'}`
   const verificationUrl = `${appUrl}/verify-email/${user.id}/${token}`
   const appName = config.app.name || 'Stacks'
 
@@ -118,7 +119,7 @@ export async function sendVerificationEmail(user: { id: number, email: string, n
     })
   }
   catch (templateError) {
-    console.warn('[EmailVerification] Template rendering failed, using fallback:', templateError)
+    log.warn('[email] Email verification template failed, using plain text fallback:', templateError)
     // Fallback: send a simple text email if template is not found
     await mail.send({
       to: user.email,

@@ -7,6 +7,7 @@
 
 import type { EnhancedRequest } from '@stacksjs/bun-router'
 import process from 'node:process'
+import { log } from '@stacksjs/logging'
 import {
   createErrorHandler,
   renderProductionErrorPage,
@@ -44,7 +45,8 @@ function getJsonHeaders(): Record<string, string> {
   const isDev = process.env.APP_ENV !== 'production' && process.env.NODE_ENV !== 'production'
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (isDev) {
-    headers['Access-Control-Allow-Origin'] = 'http://localhost:5173'
+    const appUrl = process.env.APP_URL ? `https://${process.env.APP_URL}` : '*'
+    headers['Access-Control-Allow-Origin'] = appUrl
   }
   return headers
 }
@@ -228,6 +230,7 @@ export async function createErrorResponse(
   },
 ): Promise<Response> {
   const status = options?.status || 500
+  log.debug(`[error] ${status} ${error.message}`)
   const isDevelopment = process.env.APP_ENV !== 'production' && process.env.NODE_ENV !== 'production'
 
   if (!isDevelopment) {
@@ -319,7 +322,7 @@ export async function createErrorResponse(
       status,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Access-Control-Allow-Origin': 'http://localhost:5173',
+        'Access-Control-Allow-Origin': process.env.APP_URL ? `https://${process.env.APP_URL}` : '*',
       },
     })
   }
