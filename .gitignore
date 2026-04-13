@@ -34,4 +34,4 @@ storage/framework/core/cms/storage/logs/stacks.log
 storage/framework/orm/src/tests/storage/logs/stacks.log
 storage/framework/core/commerce/storage/logs/stacks.log
 storage/framework/views/dashboard/storage/logs/stacks.log
-storage/framework/core/commerce/src/tests/storage/logs/stacks.log
+storage/framework/core/commerce/src/tests/storage/logs/stacks.log.stx
