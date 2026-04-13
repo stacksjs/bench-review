@@ -42,6 +42,12 @@
     "hasDedicatedPage": true
   },
   {
+    "id": "court-house",
+    "name": "CourtHouse",
+    "icon": "tablecells.fill",
+    "hasDedicatedPage": false
+  },
+  {
     "id": "customer",
     "name": "Customer",
     "icon": "person.crop.circle.fill",
@@ -72,6 +78,12 @@
     "hasDedicatedPage": false
   },
   {
+    "id": "email-subscription",
+    "name": "EmailSubscription",
+    "icon": "tablecells.fill",
+    "hasDedicatedPage": false
+  },
+  {
     "id": "gift-card",
     "name": "GiftCard",
     "icon": "giftcard.fill",
@@ -82,6 +94,18 @@
     "name": "Job",
     "icon": "briefcase.fill",
     "hasDedicatedPage": true
+  },
+  {
+    "id": "judge",
+    "name": "Judge",
+    "icon": "tablecells.fill",
+    "hasDedicatedPage": false
+  },
+  {
+    "id": "judge-review",
+    "name": "JudgeReview",
+    "icon": "tablecells.fill",
+    "hasDedicatedPage": false
   },
   {
     "id": "license-key",
@@ -118,6 +142,18 @@
     "name": "Notification",
     "icon": "bell.fill",
     "hasDedicatedPage": true
+  },
+  {
+    "id": "oauth-access-token",
+    "name": "OauthAccessToken",
+    "icon": "tablecells.fill",
+    "hasDedicatedPage": false
+  },
+  {
+    "id": "oauth-client",
+    "name": "OauthClient",
+    "icon": "tablecells.fill",
+    "hasDedicatedPage": false
   },
   {
     "id": "order",
@@ -159,6 +195,12 @@
     "id": "payment-transaction",
     "name": "PaymentTransaction",
     "icon": "creditcard.fill",
+    "hasDedicatedPage": false
+  },
+  {
+    "id": "personal-access-token",
+    "name": "PersonalAccessToken",
+    "icon": "tablecells.fill",
     "hasDedicatedPage": false
   },
   {

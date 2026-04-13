@@ -6,6 +6,8 @@ preload = [ "./tests/setup.ts" ]
 coverage = true
 
 [install]
+linker = "hoisted"
+
 # To configure Bun's package auto-install behavior.
 # Default "auto" — when no node_modules folder is found, Bun
 # will automatically install dependencies on the fly during execution.

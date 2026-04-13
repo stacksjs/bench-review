@@ -3,5 +3,5 @@
 @section('title', 'Coming Soon - The Chamber of Secrets')
 
 @section('content')
-  @include('components/bench-coming-soon')
+  @include('Bench/BenchComingSoon')
 @endsection

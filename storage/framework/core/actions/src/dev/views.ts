@@ -41,7 +41,7 @@ async function startDefaultServer() {
     port: preferredPort,
     componentsDir: 'storage/framework/defaults/resources/components/Dashboard',
     layoutsDir: userLayoutsPath,
-    partialsDir: userComponentsPath,
+    partialsDir: userViewsPath,
     fallbackLayoutsDir: defaultLayoutsPath,
     fallbackPartialsDir: defaultViewsPath,
     quiet: true,
