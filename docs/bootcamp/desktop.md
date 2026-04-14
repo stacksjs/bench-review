@@ -1,3 +1,3 @@
-# How to build a Desktop app?
+# How to build a Desktop app
 
 wip

@@ -75,15 +75,15 @@ const cases = [
 ]
 </script>
 
-<div class="-mx-4 px-4 py-6 shadow-sm ring-1 ring-gray-900/5 sm:mx-0 sm:rounded-lg sm:px-6 sm:pb-10 lg:col-span-2 lg:row-span-2 lg:row-end-2 xl:px-12 xl:pb-16 xl:pt-12">
+<div class="lg:col-span-2 lg:row-end-2 lg:row-span-2 -mx-4 px-4 py-6 sm:mx-0 sm:pb-10 sm:px-6 xl:pb-16 xl:pt-12 xl:px-12 ring-1 ring-gray-900/5 sm:rounded-lg shadow-sm">
   <!-- Header with Stats -->
   <div class="flex items-center justify-between">
     <div>
-      <h2 class="text-2xl font-semibold text-gray-900">Case History</h2>
-      <p class="mt-1 text-sm text-gray-500">Total cases: 1,248 | Active cases: 12</p>
+      <h2 class="font-semibold text-2xl text-gray-900">Case History</h2>
+      <p class="mt-1 text-gray-500 text-sm">Total cases: 1,248 | Active cases: 12</p>
     </div>
     <div class="flex items-center space-x-4">
-      <button type="button" class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+      <button type="button" class="px-3 py-2 font-semibold text-gray-900 text-sm bg-white hover:bg-gray-50 ring-1 ring-gray-300 ring-inset rounded-md shadow-sm">
         <span class="flex items-center">
           <svg class="mr-2 h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M2 3.75A.75.75 0 012.75 3h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 3.75zm0 4.167a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75zm0 4.166a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75z" clip-rule="evenodd" />
@@ -91,7 +91,7 @@ const cases = [
           Filter
         </span>
       </button>
-      <button type="button" class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+      <button type="button" class="px-3 py-2 font-semibold text-gray-900 text-sm bg-white hover:bg-gray-50 ring-1 ring-gray-300 ring-inset rounded-md shadow-sm">
         <span class="flex items-center">
           <svg class="mr-2 h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M2 3.75A.75.75 0 012.75 3h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 3.75zm0 4.167a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75zm0 4.166a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75z" clip-rule="evenodd" />
@@ -105,32 +105,32 @@ const cases = [
   <!-- Cases Table -->
   <div class="mt-8">
     <div class="flow-root">
-      <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-        <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-          <table class="min-w-full divide-y divide-gray-300">
+      <div class="overflow-x-auto -mx-4 -my-2 sm:-mx-6 lg:-mx-8">
+        <div class="inline-block py-2 sm:px-6 lg:px-8 min-w-full align-middle">
+          <table class="min-w-full divide-gray-300 divide-y">
             <thead>
               <tr>
-                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-0">Case Number</th>
-                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Title</th>
-                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Type</th>
-                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
-                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Filed Date</th>
-                <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-0">
+                <th scope="col" class="pl-4 pr-3 py-3.5 sm:pl-0 font-semibold text-gray-900 text-left text-sm">Case Number</th>
+                <th scope="col" class="px-3 py-3.5 font-semibold text-gray-900 text-left text-sm">Title</th>
+                <th scope="col" class="px-3 py-3.5 font-semibold text-gray-900 text-left text-sm">Type</th>
+                <th scope="col" class="px-3 py-3.5 font-semibold text-gray-900 text-left text-sm">Status</th>
+                <th scope="col" class="px-3 py-3.5 font-semibold text-gray-900 text-left text-sm">Filed Date</th>
+                <th scope="col" class="relative pl-3 pr-4 py-3.5 sm:pr-0">
                   <span class="sr-only">View</span>
                 </th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200">
+            <tbody class="divide-gray-200 divide-y">
               @foreach(cases as case_)
                 <tr>
-                  <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-0">{{ case_.number }}</td>
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ case_.title }}</td>
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    <span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                  <td class="pl-4 pr-3 py-4 sm:pl-0 font-medium text-gray-900 text-sm whitespace-nowrap">{{ case_.number }}</td>
+                  <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap">{{ case_.title }}</td>
+                  <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap">
+                    <span class="inline-flex items-center px-2 py-1 font-medium text-blue-700 text-xs bg-blue-50 ring-1 ring-blue-700/10 ring-inset rounded-md">
                       {{ case_.type }}
                     </span>
                   </td>
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                  <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap">
                     <span :class="[
                       'inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset',
                       case_.status === 'Active' ? 'bg-green-50 text-green-700 ring-green-600/20' :
@@ -140,8 +140,8 @@ const cases = [
                       {{ case_.status }}
                     </span>
                   </td>
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ case_.filedDate }}</td>
-                  <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
+                  <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap">{{ case_.filedDate }}</td>
+                  <td class="relative pl-3 pr-4 py-4 sm:pr-0 font-medium text-right text-sm whitespace-nowrap">
                     <a href="#" class="text-gray-600 hover:text-gray-900">View<span class="sr-only">, {{ case_.number }}</span></a>
                   </td>
                 </tr>
@@ -154,33 +154,33 @@ const cases = [
   </div>
 
   <!-- Pagination -->
-  <div class="mt-6 flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
-    <div class="flex flex-1 justify-between sm:hidden">
-      <a href="#" class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Previous</a>
-      <a href="#" class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Next</a>
+  <div class="flex items-center justify-between mt-6 px-4 py-3 sm:px-6 bg-white border-gray-200 border-t">
+    <div class="flex sm:hidden flex-1 justify-between">
+      <a href="#" class="inline-flex relative items-center px-4 py-2 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-300 rounded-md">Previous</a>
+      <a href="#" class="inline-flex relative items-center ml-3 px-4 py-2 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-300 rounded-md">Next</a>
     </div>
     <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
       <div>
-        <p class="text-sm text-gray-700">
+        <p class="text-gray-700 text-sm">
           Showing <span class="font-medium">1</span> to <span class="font-medium">10</span> of <span class="font-medium">97</span> results
         </p>
       </div>
       <div>
-        <nav class="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-          <a href="#" class="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0">
+        <nav class="inline-flex -space-x-px rounded-md shadow-sm isolate" aria-label="Pagination">
+          <a href="#" class="inline-flex relative focus:z-20 items-center px-2 py-2 text-gray-400 hover:bg-gray-50 ring-1 ring-gray-300 ring-inset rounded-l-md focus:outline-offset-0">
             <span class="sr-only">Previous</span>
             <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
             </svg>
           </a>
-          <a href="#" aria-current="page" class="relative z-10 inline-flex items-center bg-gray-600 px-4 py-2 text-sm font-semibold text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-600">1</a>
-          <a href="#" class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0">2</a>
-          <a href="#" class="relative hidden items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 md:inline-flex">3</a>
-          <span class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700 ring-1 ring-inset ring-gray-300 focus:outline-offset-0">...</span>
-          <a href="#" class="relative hidden items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 md:inline-flex">8</a>
-          <a href="#" class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0">9</a>
-          <a href="#" class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0">10</a>
-          <a href="#" class="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0">
+          <a href="#" aria-current="page" class="inline-flex relative z-10 focus:z-20 items-center px-4 py-2 font-semibold text-sm text-white bg-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2">1</a>
+          <a href="#" class="inline-flex relative focus:z-20 items-center px-4 py-2 font-semibold text-gray-900 text-sm hover:bg-gray-50 ring-1 ring-gray-300 ring-inset focus:outline-offset-0">2</a>
+          <a href="#" class="hidden md:inline-flex relative focus:z-20 items-center px-4 py-2 font-semibold text-gray-900 text-sm hover:bg-gray-50 ring-1 ring-gray-300 ring-inset focus:outline-offset-0">3</a>
+          <span class="inline-flex relative items-center px-4 py-2 font-semibold text-gray-700 text-sm ring-1 ring-gray-300 ring-inset focus:outline-offset-0">...</span>
+          <a href="#" class="hidden md:inline-flex relative focus:z-20 items-center px-4 py-2 font-semibold text-gray-900 text-sm hover:bg-gray-50 ring-1 ring-gray-300 ring-inset focus:outline-offset-0">8</a>
+          <a href="#" class="inline-flex relative focus:z-20 items-center px-4 py-2 font-semibold text-gray-900 text-sm hover:bg-gray-50 ring-1 ring-gray-300 ring-inset focus:outline-offset-0">9</a>
+          <a href="#" class="inline-flex relative focus:z-20 items-center px-4 py-2 font-semibold text-gray-900 text-sm hover:bg-gray-50 ring-1 ring-gray-300 ring-inset focus:outline-offset-0">10</a>
+          <a href="#" class="inline-flex relative focus:z-20 items-center px-2 py-2 text-gray-400 hover:bg-gray-50 ring-1 ring-gray-300 ring-inset rounded-r-md focus:outline-offset-0">
             <span class="sr-only">Next</span>
             <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />

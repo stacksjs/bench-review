@@ -1,17 +1,17 @@
 <div class="top-4">
   <!-- Trending Judges -->
-  <div class="rounded-lg border bg-off-gray">
+  <div class="bg-off-gray border rounded-lg">
     <div class="p-4">
-      <h2 class="text-base font-semibold text-gray-900">Trending Judges</h2>
+      <h2 class="font-semibold text-base text-gray-900">Trending Judges</h2>
       <div class="mt-4 space-y-4">
         @foreach(trendingJudges as judge)
           <div class="flex items-center space-x-3">
-            <img class="h-8 w-8 rounded-full filter grayscale" :src="judge.photo" :alt="judge.name" />
-            <div class="min-w-0 flex-1">
-              <p class="text-sm font-medium text-gray-900">{{ judge.name }}</p>
-              <p class="text-sm text-gray-500">{{ judge.court }}</p>
+            <img class="h-8 w-8 rounded-full grayscale filter" :src="judge.photo" :alt="judge.name" />
+            <div class="flex-1 min-w-0">
+              <p class="font-medium text-gray-900 text-sm">{{ judge.name }}</p>
+              <p class="text-gray-500 text-sm">{{ judge.court }}</p>
             </div>
-            <button type="button" class="text-xs font-semibold text-gray-900 hover:underline">Follow</button>
+            <button type="button" class="font-semibold text-gray-900 text-xs hover:underline">Follow</button>
           </div>
         @endforeach
       </div>
@@ -19,10 +19,10 @@
   </div>
 
   <!-- Recent Activity -->
-  <div class="mt-6 rounded-lg border bg-off-gray">
+  <div class="mt-6 bg-off-gray border rounded-lg">
     <div class="p-4">
-      <h2 class="text-base font-semibold text-gray-900">Recent Activity</h2>
-      <div class="mt-4 flow-root">
+      <h2 class="font-semibold text-base text-gray-900">Recent Activity</h2>
+      <div class="flow-root mt-4">
         <ul role="list" class="-mb-8">
           @foreach(recentActivity as activity, activityIdx)
             <li>
@@ -30,18 +30,18 @@
                 @if(activityIdx !== recentActivity.length - 1)
                   <span class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
                 @endif
-                <div class="relative flex space-x-3">
+                <div class="flex relative space-x-3">
                   <div>
-                    <span class="h-8 w-8 rounded-full bg-gray-400 flex items-center justify-center ring-8 ring-white">
+                    <span class="flex items-center justify-center h-8 w-8 bg-gray-400 ring-8 ring-white rounded-full">
                       <!-- Activity icon rendered server-side -->
                       <span class="h-5 w-5 text-white" aria-hidden="true">{{ activity.icon }}</span>
                     </span>
                   </div>
-                  <div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
+                  <div class="flex flex-1 justify-between pt-1.5 space-x-4 min-w-0">
                     <div>
-                      <p class="text-sm text-gray-500">{{ activity.content }}</p>
+                      <p class="text-gray-500 text-sm">{{ activity.content }}</p>
                     </div>
-                    <div class="whitespace-nowrap text-right text-sm text-gray-500">
+                    <div class="text-gray-500 text-right text-sm whitespace-nowrap">
                       <time :datetime="activity.dateTime">{{ activity.date }}</time>
                     </div>
                   </div>

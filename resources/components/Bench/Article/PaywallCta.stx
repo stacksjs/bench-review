@@ -1,12 +1,12 @@
-<div class="absolute left-0 right-0 bg-off-white py-16">
-  <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+<div class="absolute left-0 right-0 py-16 bg-off-white">
+  <div class="mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
     <div class="text-center">
-      <h3 class="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Want to read more?</h3>
-      <p class="mx-auto mt-6 max-w-xl text-lg leading-8 text-gray-600">
+      <h3 class="font-bold text-2xl text-gray-900 tracking-tight sm:text-3xl">Want to read more?</h3>
+      <p class="mt-6 mx-auto max-w-xl leading-8 text-gray-600 text-lg">
         Get unlimited access to detailed judge reviews, ratings, and insights from legal professionals—plus powerful search and filtering to find exactly what you are looking for.
       </p>
-      <div class="mt-10 flex items-center justify-center gap-x-6">
-        <a href="/register" class="rounded-md bg-gray-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gray-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-600">
+      <div class="flex gap-x-6 items-center justify-center mt-10">
+        <a href="/register" class="px-3.5 py-2.5 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm">
           Subscribe
         </a>
       </div>

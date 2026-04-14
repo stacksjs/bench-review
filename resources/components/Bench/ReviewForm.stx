@@ -1,5 +1,5 @@
 <div
-  class="space-y-12 pb-32"
+  class="pb-32 space-y-12"
   x-data="{
     reviewTitle: '',
     reviewContent: '',
@@ -65,25 +65,25 @@
       <!-- Review Header -->
       <div class="pb-12">
         <div>
-          <div class="text-center mb-8">
-            <img class="inline-block h-24 w-24 rounded-full ring-2 ring-white mb-4 filter grayscale" :src="judge.photo" :alt="judge.name" />
-            <h3 class="text-lg font-semibold text-gray-800" x-text="judge.name"></h3>
-            <p class="text-sm text-gray-600" x-text="judge.court"></p>
-            <p class="text-sm text-gray-600" x-text="judge.department"></p>
+          <div class="mb-8 text-center">
+            <img class="inline-block mb-4 h-24 w-24 ring-2 ring-white rounded-full grayscale filter" :src="judge.photo" :alt="judge.name" />
+            <h3 class="font-semibold text-gray-800 text-lg" x-text="judge.name"></h3>
+            <p class="text-gray-600 text-sm" x-text="judge.court"></p>
+            <p class="text-gray-600 text-sm" x-text="judge.department"></p>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="border-b border-gray-900/10 pb-12">
-    <h2 class="text-base/7 font-semibold text-gray-800">Judge's Performance</h2>
-    <p class="mt-1 text-sm/6 text-gray-600">Rate the judge's performance in different aspects.</p>
+  <div class="pb-12 border-b border-gray-900/10">
+    <h2 class="font-semibold text-base/7 text-gray-800">Judge's Performance</h2>
+    <p class="mt-1 text-gray-600 text-sm/6">Rate the judge's performance in different aspects.</p>
 
     <div class="mt-10 space-y-10">
       <!-- Title field -->
       <div class="col-span-full">
-        <label for="title" class="block text-sm/6 font-medium text-gray-700">Review Title</label>
+        <label for="title" class="block font-medium text-gray-700 text-sm/6">Review Title</label>
         <div class="mt-2">
           <input
             type="text"
@@ -92,14 +92,14 @@
             x-model="reviewTitle"
             :disabled="!judge"
             placeholder="Brief summary of your experience"
-            class="block w-full rounded-md bg-off-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-gray-600 sm:text-sm/6 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="block px-3 py-1.5 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-off-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 disabled:opacity-50 disabled:cursor-not-allowed -outline-offset-1 focus:-outline-offset-2"
           >
         </div>
       </div>
 
       <div class="space-y-6">
         <div class="flex items-center justify-between">
-          <label for="fairness" class="text-sm/6 font-medium text-gray-700">Fairness & Impartiality</label>
+          <label for="fairness" class="font-medium text-gray-700 text-sm/6">Fairness & Impartiality</label>
           <div class="flex items-center space-x-1 w-64">
             <div class="flex items-center space-x-1">
               @for(let star = 1; star <= 5; star++)
@@ -107,7 +107,7 @@
                   type="button"
                   :disabled="!judge"
                   class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="{ 'text-yellow-400': {{ star }} <= (hoverFairness || fairness) }"
+                  :class="'text-yellow-400': (hoverFairness { {{ } }} <= || fairness) star"
                   @click="fairness = {{ star }}"
                   @mouseenter="hoverFairness = {{ star }}"
                   @mouseleave="hoverFairness = 0"
@@ -118,12 +118,12 @@
                 </button>
               @endfor
             </div>
-            <span class="ml-2 text-sm text-gray-500 w-24" x-text="fairness ? getRatingText(fairness) : ''"></span>
+            <span class="ml-2 w-24 text-gray-500 text-sm" x-text="fairness ? getRatingText(fairness) : ''"></span>
           </div>
         </div>
 
         <div class="flex items-center justify-between">
-          <label for="knowledge" class="text-sm/6 font-medium text-gray-700">Legal Knowledge</label>
+          <label for="knowledge" class="font-medium text-gray-700 text-sm/6">Legal Knowledge</label>
           <div class="flex items-center space-x-1 w-64">
             <div class="flex items-center space-x-1">
               @for(let star = 1; star <= 5; star++)
@@ -131,7 +131,7 @@
                   type="button"
                   :disabled="!judge"
                   class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="{ 'text-yellow-400': {{ star }} <= (hoverKnowledge || knowledge) }"
+                  :class="'text-yellow-400': (hoverKnowledge { {{ } }} <= || knowledge) star"
                   @click="knowledge = {{ star }}"
                   @mouseenter="hoverKnowledge = {{ star }}"
                   @mouseleave="hoverKnowledge = 0"
@@ -142,12 +142,12 @@
                 </button>
               @endfor
             </div>
-            <span class="ml-2 text-sm text-gray-500 w-24" x-text="knowledge ? getRatingText(knowledge) : ''"></span>
+            <span class="ml-2 w-24 text-gray-500 text-sm" x-text="knowledge ? getRatingText(knowledge) : ''"></span>
           </div>
         </div>
 
         <div class="flex items-center justify-between">
-          <label for="demeanor" class="text-sm/6 font-medium text-gray-700">Professional Demeanor</label>
+          <label for="demeanor" class="font-medium text-gray-700 text-sm/6">Professional Demeanor</label>
           <div class="flex items-center space-x-1 w-64">
             <div class="flex items-center space-x-1">
               @for(let star = 1; star <= 5; star++)
@@ -155,7 +155,7 @@
                   type="button"
                   :disabled="!judge"
                   class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="{ 'text-yellow-400': {{ star }} <= (hoverDemeanor || demeanor) }"
+                  :class="'text-yellow-400': (hoverDemeanor { {{ } }} <= || demeanor) star"
                   @click="demeanor = {{ star }}"
                   @mouseenter="hoverDemeanor = {{ star }}"
                   @mouseleave="hoverDemeanor = 0"
@@ -166,47 +166,47 @@
                 </button>
               @endfor
             </div>
-            <span class="ml-2 text-sm text-gray-500 w-24" x-text="demeanor ? getRatingText(demeanor) : ''"></span>
+            <span class="ml-2 w-24 text-gray-500 text-sm" x-text="demeanor ? getRatingText(demeanor) : ''"></span>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+    <div class="grid gap-x-6 gap-y-8 grid-cols-1 sm:grid-cols-6 mt-10">
       <div class="sm:col-span-3">
-        <label for="case-number" class="block text-sm/6 font-medium text-gray-700">Case Number (Optional)</label>
+        <label for="case-number" class="block font-medium text-gray-700 text-sm/6">Case Number (Optional)</label>
         <div class="mt-2">
           <input
             type="text"
             name="case-number"
             id="case-number"
             :disabled="!judge"
-            class="block w-full rounded-md bg-off-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-gray-600 sm:text-sm/6 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="block px-3 py-1.5 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-off-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 disabled:opacity-50 disabled:cursor-not-allowed -outline-offset-1 focus:-outline-offset-2"
           >
         </div>
       </div>
 
       <div class="sm:col-span-3">
-        <label for="case-date" class="block text-sm/6 font-medium text-gray-700">Case Date (Optional)</label>
+        <label for="case-date" class="block font-medium text-gray-700 text-sm/6">Case Date (Optional)</label>
         <div class="mt-2">
           <input
             type="date"
             name="case-date"
             id="case-date"
             :disabled="!judge"
-            class="block w-full rounded-md bg-off-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-gray-600 sm:text-sm/6 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="block px-3 py-1.5 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-off-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 disabled:opacity-50 disabled:cursor-not-allowed -outline-offset-1 focus:-outline-offset-2"
           >
         </div>
       </div>
 
       <div class="col-span-full">
-        <label for="role" class="block text-sm/6 font-medium text-gray-700">Your Role in the Case</label>
+        <label for="role" class="block font-medium text-gray-700 text-sm/6">Your Role in the Case</label>
         <div class="mt-2">
           <select
             id="role"
             name="role"
             :disabled="!judge"
-            class="block w-full rounded-md bg-off-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-gray-600 sm:text-sm/6 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="block px-3 py-1.5 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-off-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 disabled:opacity-50 disabled:cursor-not-allowed -outline-offset-1 focus:-outline-offset-2"
           >
             <option>Attorney</option>
             <option>Party to the Case</option>
@@ -218,8 +218,8 @@
       </div>
 
       <div class="col-span-full">
-        <div class="relative flex items-start">
-          <div class="flex h-6 items-center">
+        <div class="flex relative items-start">
+          <div class="flex items-center h-6">
             <button
               type="button"
               :disabled="!judge"
@@ -260,7 +260,7 @@
               </span>
             </button>
           </div>
-          <div class="ml-3 text-sm leading-6">
+          <div class="ml-3 leading-6 text-sm">
             <label for="anonymous" class="font-medium text-gray-700">Post anonymously</label>
             <p class="text-gray-500">Your name will not be displayed with this review</p>
           </div>
@@ -268,9 +268,9 @@
       </div>
     </div>
 
-    <div class="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+    <div class="grid gap-x-6 gap-y-8 grid-cols-1 sm:grid-cols-6 mt-10">
       <div class="col-span-full">
-        <label for="rating" class="block text-sm/6 font-medium text-gray-700">Overall Rating</label>
+        <label for="rating" class="block font-medium text-gray-700 text-sm/6">Overall Rating</label>
         <div class="mt-2">
           <div class="flex items-center space-x-1">
             @for(let star = 1; star <= 5; star++)
@@ -278,7 +278,7 @@
                 type="button"
                 :disabled="!judge"
                 class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                :class="{ 'text-yellow-400': {{ star }} <= (hoverRating || rating) }"
+                :class="'text-yellow-400': (hoverRating { {{ } }} <= || rating) star"
                 @click="rating = {{ star }}"
                 @mouseenter="hoverRating = {{ star }}"
                 @mouseleave="hoverRating = 0"
@@ -288,28 +288,28 @@
                 </svg>
               </button>
             @endfor
-            <span class="ml-2 text-sm text-gray-500" x-text="ratingText"></span>
+            <span class="ml-2 text-gray-500 text-sm" x-text="ratingText"></span>
           </div>
         </div>
       </div>
 
       <div class="col-span-full">
-        <label for="review" class="block text-sm/6 font-medium text-gray-700">Your Review</label>
+        <label for="review" class="block font-medium text-gray-700 text-sm/6">Your Review</label>
         <div class="mt-2">
           <!-- TODO: Replace with vanilla JS rich text editor (was Tiptap/Vue-based RichTextEditor) -->
           @include('components/Bench/RichTextEditor')
         </div>
-        <p class="mt-3 text-sm/6 text-gray-600">Please be specific about your experience and maintain a professional tone.</p>
+        <p class="mt-3 text-gray-600 text-sm/6">Please be specific about your experience and maintain a professional tone.</p>
       </div>
     </div>
   </div>
 
-  <div class="mt-6 flex items-center justify-end gap-x-6">
-    <button type="button" @click="handleCancel" class="text-sm/6 font-semibold text-gray-700">Cancel</button>
+  <div class="flex gap-x-6 items-center justify-end mt-6">
+    <button type="button" @click="handleCancel" class="font-semibold text-gray-700 text-sm/6">Cancel</button>
     <button
       @click="handleSubmit"
       :disabled="!judge"
-      class="rounded-sm px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-600"
+      class="px-2.5 py-1.5 font-semibold text-sm text-white rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm"
       :class="[
         judge
           ? 'bg-gray-600 hover:bg-gray-500'

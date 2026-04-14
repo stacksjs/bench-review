@@ -6,24 +6,24 @@
       this.$dispatch('category-changed', categoryName)
     }
   }"
-  class="top-4 border p-4 rounded-md bg-off-gray"
+  class="top-4 p-4 bg-off-gray border rounded-md"
 >
-  <h2 class="text-base font-semibold text-gray-900">Explore Categories</h2>
+  <h2 class="font-semibold text-base text-gray-900">Explore Categories</h2>
   <nav class="mt-4 space-y-1">
     @foreach(categories as category)
       <a
         @click.prevent="setActiveCategory('{{ category.name }}')"
         href="#"
-        class="group flex items-center rounded-md px-3 py-2 text-sm font-medium"
+        class="flex items-center px-3 py-2 font-medium text-sm rounded-md group"
         :class="[activeCategory === '{{ category.name }}' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900']"
       >
         <span
-          class="mr-3 h-5 w-5 flex-shrink-0"
+          class="flex-shrink-0 mr-3 h-5 w-5"
           :class="[activeCategory === '{{ category.name }}' ? 'text-gray-500' : 'text-gray-400 group-hover:text-gray-500']"
           aria-hidden="true"
         ></span>
         {{ category.name }}
-        <span class="ml-auto inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+        <span class="inline-block ml-auto px-2 py-0.5 font-medium text-gray-600 text-xs bg-gray-100 rounded-full">
           {{ category.count }}
         </span>
       </a>

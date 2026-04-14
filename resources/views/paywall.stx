@@ -3,7 +3,7 @@
 @section('title', 'Upgrade - Bench Review')
 
 @section('content')
-<div class="min-h-screen bg-off-white py-16 sm:py-24 lg:py-32" x-data="{
+<div class="py-16 sm:py-24 lg:py-32 min-h-screen bg-off-white" x-data="{
   isLoading: false,
   async handleSubscribe() {
     this.isLoading = true
@@ -17,42 +17,42 @@
     }
   }
 }">
-  <div class="mx-auto max-w-2xl px-6 lg:px-8">
+  <div class="mx-auto px-6 lg:px-8 max-w-2xl">
     <div class="text-center">
-      <h1 class="mt-2 text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">Upgrade Your Experience</h1>
-      <p class="mt-6 text-lg leading-8 text-gray-600">
+      <h1 class="mt-2 font-bold text-4xl text-gray-900 tracking-tight sm:text-5xl">Upgrade Your Experience</h1>
+      <p class="mt-6 leading-8 text-gray-600 text-lg">
         Get unlimited access to all features and help build a more transparent judicial system.
       </p>
     </div>
 
-    <div class="mt-16 rounded-3xl bg-white p-8 ring-1 ring-gray-200 lg:p-12">
+    <div class="mt-16 p-8 lg:p-12 bg-white ring-1 ring-gray-200 rounded-3xl">
       <div class="flex flex-col items-center">
-        <div class="flex items-baseline gap-x-2">
-          <span class="text-5xl font-bold tracking-tight text-gray-900">$10</span>
-          <span class="text-sm font-semibold leading-6 text-gray-600">/month</span>
+        <div class="flex gap-x-2 items-baseline">
+          <span class="font-bold text-5xl text-gray-900 tracking-tight">$10</span>
+          <span class="font-semibold leading-6 text-gray-600 text-sm">/month</span>
         </div>
 
-        <ul role="list" class="mt-10 space-y-4 text-sm/6 text-gray-600">
+        <ul role="list" class="mt-10 space-y-4 text-gray-600 text-sm/6">
           <li class="flex gap-x-3">
-            <svg class="h-6 w-5 flex-none text-gray-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg class="flex-none h-6 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
             </svg>
             Unlimited judge reviews
           </li>
           <li class="flex gap-x-3">
-            <svg class="h-6 w-5 flex-none text-gray-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg class="flex-none h-6 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
             </svg>
             Advanced analytics and insights
           </li>
           <li class="flex gap-x-3">
-            <svg class="h-6 w-5 flex-none text-gray-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg class="flex-none h-6 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
             </svg>
             Priority support
           </li>
           <li class="flex gap-x-3">
-            <svg class="h-6 w-5 flex-none text-gray-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg class="flex-none h-6 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
             </svg>
             Early access to new features
@@ -62,13 +62,13 @@
         <button
           @click="handleSubscribe()"
           :disabled="isLoading"
-          class="mt-10 block w-full rounded-sm bg-gray-600 px-3 py-3 text-center text-sm font-semibold text-white shadow hover:bg-gray-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="block mt-10 px-3 py-3 w-full font-semibold text-center text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <span x-show="isLoading">Processing...</span>
           <span x-show="!isLoading">Subscribe Now</span>
         </button>
 
-        <p class="mt-4 text-sm text-gray-500">
+        <p class="mt-4 text-gray-500 text-sm">
           Secure payment powered by Stripe. Cancel anytime.
         </p>
       </div>

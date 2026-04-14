@@ -1,3 +1,3 @@
-# How to build an API?
+# How to build an API
 
 wip

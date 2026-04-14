@@ -42,8 +42,8 @@
   }"
   class="z-10"
 >
-  <nav class="mx-auto flex items-center justify-between p-6 lg:px-8 border-b bg-off-white" aria-label="Global">
-    <div class="flex items-center gap-x-16">
+  <nav class="flex items-center justify-between mx-auto p-6 lg:px-8 bg-off-white border-b" aria-label="Global">
+    <div class="flex gap-x-16 items-center">
       <StxLink to="/">
         <span class="sr-only">Judge Review</span>
         <img class="h-16" src="/images/bench/logo.png" alt="">
@@ -52,7 +52,7 @@
         <div class="hidden lg:flex lg:gap-x-8">
           <StxLink
             to="/judges"
-            class="text-sm/6 font-semibold text-gray-900 border-b-2 transition-colors duration-200"
+            class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
             :class="[
               route.path === '/judges'
                 ? 'border-gray-500 text-gray-600'
@@ -64,7 +64,7 @@
 
           <StxLink
             to="/court-houses"
-            class="text-sm/6 font-semibold text-gray-900 border-b-2 transition-colors duration-200"
+            class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
             :class="[
               route.path === '/court-houses'
                 ? 'border-gray-500 text-gray-600'
@@ -76,7 +76,7 @@
 
           <StxLink
             to="/review"
-            class="text-sm/6 font-semibold text-gray-900 border-b-2 transition-colors duration-200"
+            class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
             :class="[
               route.path === '/review'
                 ? 'border-gray-500 text-gray-600'
@@ -87,7 +87,7 @@
           </StxLink>
           <StxLink
             to="/reviews"
-            class="text-sm/6 font-semibold text-gray-900 border-b-2 transition-colors duration-200"
+            class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
             :class="[
               route.path === '/reviews'
                 ? 'border-gray-500 text-gray-600'
@@ -98,7 +98,7 @@
           </StxLink>
           <StxLink
             to="/blog"
-            class="text-sm/6 font-semibold text-gray-900 border-b-2 transition-colors duration-200"
+            class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
             :class="[
               route.path === '/blog'
                 ? 'border-gray-500 text-gray-600'
@@ -113,7 +113,7 @@
     <div class="flex items-center">
       @if(!comingSoon)
         <div class="flex lg:hidden">
-          <button @click="mobileMenu = true" type="button" class="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700">
+          <button @click="mobileMenu = true" type="button" class="inline-flex items-center justify-center -m-2.5 p-2.5 text-gray-700 rounded-md">
             <span class="sr-only">Open main menu</span>
             <svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
               <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
@@ -122,61 +122,61 @@
         </div>
         <div class="hidden lg:flex lg:flex-1 lg:justify-end">
           <div x-if="!isAuthenticated">
-              <StxLink to="/login" class="text-sm/6 font-semibold text-gray-900 mr-6">Log in</StxLink>
-              <StxLink to="/register" class="text-sm/6 font-semibold text-gray-900">Sign up</StxLink>
+              <StxLink to="/login" class="mr-6 font-semibold text-gray-900 text-sm/6">Log in</StxLink>
+              <StxLink to="/register" class="font-semibold text-gray-900 text-sm/6">Sign up</StxLink>
             </div>
-          <div x-if="isAuthenticated" class="flex items-center gap-x-4">
-              <div class="relative flex items-center">
+          <div x-if="isAuthenticated" class="flex gap-x-4 items-center">
+              <div class="flex relative items-center">
                 <button
                   type="button"
-                  class="text-gray-400 hover:text-gray-500 flex items-center"
+                  class="flex items-center text-gray-400 hover:text-gray-500"
                   @click="isNotificationMenuOpen = !isNotificationMenuOpen"
                 >
                   <span class="sr-only">View notifications</span>
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
                   </svg>
-                  <span x-show="unreadNotifications > 0" class="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-medium text-white" x-text="unreadNotifications"></span>
+                  <span x-show="unreadNotifications > 0" class="flex absolute items-center justify-center h-4 w-4 font-medium text-[10px] text-white bg-red-500 rounded-full -right-1 -top-1" x-text="unreadNotifications"></span>
                 </button>
                 <div
                   x-show="isNotificationMenuOpen"
-                  class="absolute right-0 z-50 mt-84 w-80 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+                  class="absolute right-0 z-50 mt-84 py-1 w-80 bg-white ring-1 ring-black ring-opacity-5 rounded-md focus:outline-none shadow-lg origin-top-right"
                   role="menu"
                   aria-orientation="vertical"
                   aria-labelledby="notification-menu-button"
                   tabindex="-1"
                 >
                   <div class="px-4 py-2 border-b border-gray-100">
-                    <h3 class="text-sm font-semibold text-gray-900">Notifications</h3>
+                    <h3 class="font-semibold text-gray-900 text-sm">Notifications</h3>
                   </div>
-                  <div class="max-h-96 overflow-y-auto">
+                  <div class="overflow-y-auto max-h-96">
                     <a
                         x-for="notif in notifications"
                         :key="notif.id"
                         href="#"
                         class="block px-4 py-3 hover:bg-gray-50"
-                        :class="{ 'bg-gray-50': notif.unread }"
+                        :class="'bg-gray-50': { } notif.unread"
                       >
                         <div class="flex items-start">
                           <div class="flex-shrink-0">
                             <img class="h-8 w-8 rounded-full" :src="notif.user.imageUrl" :alt="notif.user.name" />
                           </div>
-                          <div class="ml-3 w-0 flex-1">
-                            <p class="text-sm text-gray-900" x-text="notif.message"></p>
-                            <p class="mt-1 text-xs text-gray-500" x-text="notif.time"></p>
+                          <div class="flex-1 ml-3 w-0">
+                            <p class="text-gray-900 text-sm" x-text="notif.message"></p>
+                            <p class="mt-1 text-gray-500 text-xs" x-text="notif.time"></p>
                           </div>
                         </div>
                       </a>
-                    <div x-show="notifications.length === 0" class="px-4 py-3 text-sm text-gray-500 text-center">
+                    <div x-show="notifications.length === 0" class="px-4 py-3 text-center text-gray-500 text-sm">
                       No notifications
                     </div>
                   </div>
-                  <div class="border-t border-gray-100 px-4 py-2">
-                    <a href="#" class="text-sm font-medium text-gray-600 hover:text-gray-500">View all notifications</a>
+                  <div class="px-4 py-2 border-gray-100 border-t">
+                    <a href="#" class="font-medium text-gray-600 text-sm hover:text-gray-500">View all notifications</a>
                   </div>
                 </div>
               </div>
-              <div class="relative flex items-center">
+              <div class="flex relative items-center">
                 <button
                   type="button"
                   class="flex items-center rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
@@ -186,15 +186,15 @@
                 </button>
                 <div
                   x-show="isProfileMenuOpen"
-                  class="absolute right-0 z-50 mt-42 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+                  class="absolute right-0 z-50 mt-42 py-1 w-48 bg-white ring-1 ring-black ring-opacity-5 rounded-md focus:outline-none shadow-lg origin-top-right"
                   role="menu"
                   aria-orientation="vertical"
                   aria-labelledby="user-menu-button"
                   tabindex="-1"
                 >
-                  <StxLink to="/profile" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem" tabindex="-1">Your Profile</StxLink>
-                  <StxLink to="/settings" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem" tabindex="-1">Settings</StxLink>
-                  <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem" tabindex="-1">Sign out</a>
+                  <StxLink to="/profile" class="block px-4 py-2 text-gray-700 text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">Your Profile</StxLink>
+                  <StxLink to="/settings" class="block px-4 py-2 text-gray-700 text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">Settings</StxLink>
+                  <a href="#" class="block px-4 py-2 text-gray-700 text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">Sign out</a>
                 </div>
               </div>
             </div>

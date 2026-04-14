@@ -1,37 +1,37 @@
 <main>
   <div class="relative isolate">
     <div class="overflow-hidden">
-      <div class="mx-auto max-w-7xl px-6 pb-32 pt-36 sm:pt-60 lg:px-8 lg:pt-32">
-        <div class="mx-auto max-w-2xl gap-x-14 lg:mx-0 lg:flex lg:max-w-none lg:items-center">
-          <div class="relative w-full lg:max-w-xl lg:shrink-0 xl:max-w-2xl">
-            <h1 class="text-pretty text-5xl font-semibold tracking-tight text-gray-800 sm:text-7xl">Transparency in
+      <div class="mx-auto pb-32 pt-36 px-6 sm:pt-60 lg:pt-32 lg:px-8 max-w-7xl">
+        <div class="lg:flex gap-x-14 lg:items-center mx-auto lg:mx-0 max-w-2xl lg:max-w-none">
+          <div class="relative lg:shrink-0 w-full lg:max-w-xl xl:max-w-2xl">
+            <h1 class="font-semibold text-5xl text-gray-800 text-pretty tracking-tight sm:text-7xl">Transparency in
               the Judiciary Starts Here</h1>
 
-            <blockquote class="mt-8 border-l-4 border-gray-300 pl-4 italic ml-4">
-              <p class="text-gray-700 leading-8">
+            <blockquote class="ml-4 mt-8 pl-4 italic border-gray-300 border-l-4">
+              <p class="leading-8 text-gray-700">
                 "Publicity is justly commended as a remedy for social and industrial diseases. Sunlight is said to be
                 the best of disinfectants; electric light the most efficient policeman."
               </p>
-              <footer class="mt-2 text-sm text-gray-500">
+              <footer class="mt-2 text-gray-500 text-sm">
                 — Justice Louis D. Brandeis, "What Publicity Can Do," 1913
               </footer>
             </blockquote>
 
-            <p class="mt-8 text-pretty text-lg font-medium text-gray-600 sm:max-w-md sm:text-xl/8 lg:max-w-none">
+            <p class="mt-8 sm:max-w-md lg:max-w-none font-medium text-gray-600 text-lg text-pretty sm:text-xl/8">
               Like Glassdoor but for the judiciary. Written by clerks, so you can get a glimpse into the inner workings of the court system.</p>
-            <div class="mt-10 flex items-center gap-x-6">
+            <div class="flex gap-x-6 items-center mt-10">
               <StxLink to="/judges"
-                class="rounded-sm bg-gray-600 px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-gray-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-600">Find
+                class="px-2.5 py-1.5 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm">Find
                 a Judge</StxLink>
-              <StxLink to="/review" class="text-sm/6 font-semibold text-gray-700">Write a Review <span
+              <StxLink to="/review" class="font-semibold text-gray-700 text-sm/6">Write a Review <span
                   aria-hidden="true">→</span></StxLink>
             </div>
           </div>
-          <div class="mt-14 flex justify-center sm:-mt-44 lg:mt-0">
-            <div class="w-full max-w-2xl">
+          <div class="flex justify-center mt-14 sm:-mt-44 lg:mt-0">
+            <div class="max-w-2xl w-full">
               <div class="relative">
                 <img src="/images/bench/hero-image.webp" alt="Bench Hero"
-                  class="w-full rounded-lg object-cover">
+                  class="object-cover w-full rounded-lg">
               </div>
             </div>
           </div>

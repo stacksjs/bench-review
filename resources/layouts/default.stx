@@ -1,6 +1,6 @@
 @include('Bench/BenchHeader')
 
-<main class="bg-off-white py-16">
+<main class="py-16 bg-off-white">
   @slot('content')
 </main>
 

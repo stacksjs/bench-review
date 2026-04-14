@@ -10,7 +10,7 @@ Develop beautiful, reactive, composable UIs without learning a new set of langua
 
 Buddy is the name of the Stacks CLI. It is the main tool you will use to create, maintain and deploy your Stacks projects. It is also the tool that will help ensure your local and deployed environment is configured properly.
 
-## What will I learn?
+## What will I learn
 
 When you finish this bootcamp, you will have learned the following:
 

@@ -1,3 +1,3 @@
-# How to build an CLI?
+# How to build an CLI
 
 wip

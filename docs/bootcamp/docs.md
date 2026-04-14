@@ -1,4 +1,4 @@
-# How to build a documentation?
+# How to build a documentation
 
 Building a documentation is simple, and Stacks helps you every step of the way.
 

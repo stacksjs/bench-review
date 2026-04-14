@@ -2,7 +2,7 @@
 import { judges } from '../../../functions/sample'
 </script>
 
-<div class="max-w-3xl mx-auto" x-data="{
+<div class="mx-auto max-w-3xl" x-data="{
   searchQuery: '',
   judges: {{ JSON.stringify(judges.value) }},
   get filteredJudges() {
@@ -18,8 +18,8 @@ import { judges } from '../../../functions/sample'
   }
 }">
   <div class="text-center">
-    <h2 class="text-2xl font-bold tracking-tight text-gray-900">Write a Review</h2>
-    <p class="mt-2 text-sm text-gray-600">
+    <h2 class="font-bold text-2xl text-gray-900 tracking-tight">Write a Review</h2>
+    <p class="mt-2 text-gray-600 text-sm">
       Search for a judge by name, court, or department to begin your review.
     </p>
   </div>
@@ -29,30 +29,30 @@ import { judges } from '../../../functions/sample'
       <input
         type="text"
         x-model="searchQuery"
-        class="block w-full rounded-md bg-off-white px-4 py-3 text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-gray-600"
+        class="block px-4 py-3 w-full text-gray-900 placeholder:text-gray-400 bg-off-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2"
         placeholder="Search for a judge..."
       >
-      <div x-show="searchQuery && filteredJudges.length > 0" class="absolute z-10 mt-1 w-full rounded-md bg-white shadow-lg">
-        <ul class="max-h-60 overflow-auto rounded-md py-1 text-base">
+      <div x-show="searchQuery && filteredJudges.length > 0" class="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg">
+        <ul class="overflow-auto py-1 max-h-60 text-base rounded-md">
           <li
               x-for="judge in filteredJudges"
               :key="judge.id"
-              class="relative cursor-pointer select-none py-2 px-3 hover:bg-gray-100"
+              class="relative px-3 py-2 hover:bg-gray-100 cursor-pointer select-none"
               @click="selectJudge(judge)"
             >
               <div class="flex items-center">
-                <img :src="judge.image" class="h-10 w-10 rounded-full filter grayscale" :alt="judge.name">
+                <img :src="judge.image" class="h-10 w-10 rounded-full grayscale filter" :alt="judge.name">
                 <div class="ml-3">
-                  <p class="text-sm font-medium text-gray-900" x-text="judge.name"></p>
-                  <p class="text-sm text-gray-500" x-text="judge.court.name"></p>
-                  <p class="text-xs text-gray-500" x-text="judge.department"></p>
+                  <p class="font-medium text-gray-900 text-sm" x-text="judge.name"></p>
+                  <p class="text-gray-500 text-sm" x-text="judge.court.name"></p>
+                  <p class="text-gray-500 text-xs" x-text="judge.department"></p>
                 </div>
               </div>
             </li>
         </ul>
       </div>
-      <div x-show="searchQuery && filteredJudges.length === 0" class="absolute z-10 mt-1 w-full rounded-md bg-white shadow-lg">
-        <div class="py-4 px-3 text-center text-sm text-gray-500">
+      <div x-show="searchQuery && filteredJudges.length === 0" class="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg">
+        <div class="px-3 py-4 text-center text-gray-500 text-sm">
           No judges found matching your search.
         </div>
       </div>

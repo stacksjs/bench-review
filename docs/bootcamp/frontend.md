@@ -1,4 +1,4 @@
-# How to build a frontend?
+# How to build a frontend
 
 Before getting started, it is important to understand a few fundamental concepts about "Stacks frontends" _which you will notice reused throughout Stacks ecosystem._
 
