@@ -1,16 +1,6 @@
 ---
 outline: deep
 ---
-<pre>{{ page }}</pre>
-
-### Page Frontmatter
-
-<pre>{{ frontmatter }}</pre>
-
-```
-
-<script setup>
-import { useData } from '@stacksjs/docs' // wip
 
 const { site, theme, page, frontmatter } = useData()
 </script>
