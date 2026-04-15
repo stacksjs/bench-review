@@ -6,6 +6,8 @@
   "description": "A judge review application powered by Stacks",
   "scripts": {
     "dev": "bun --watch serve.ts",
+    "build": "bun build.ts",
+    "build:stacks": "./buddy build",
     "start": "bun serve.ts",
     "lint": "bunx --bun pickier .",
     "lint:fix": "bunx --bun pickier . --fix",
