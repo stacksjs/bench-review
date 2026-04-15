@@ -8,6 +8,7 @@
     "dev": "bun --watch serve.ts",
     "build": "bun build.ts",
     "build:stacks": "./buddy build",
+    "preview": "bun preview.ts",
     "start": "bun serve.ts",
     "lint": "bunx --bun pickier .",
     "lint:fix": "bunx --bun pickier . --fix",
