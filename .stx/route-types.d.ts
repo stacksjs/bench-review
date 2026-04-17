@@ -28,7 +28,6 @@ declare module "stx/routes" {
     '/settings': {  }
     '/terms': {  }
     '/verify-email': {  }
-    '/court-houses/:id/judges': { id: string }
     '/court-houses/:id/profile': { id: string }
     '/court-houses/:id/reviews': { id: string }
     '/judges/:id/cases': { id: string }

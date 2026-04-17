@@ -1,5 +1,4 @@
 <main>
-  @include('stores')
   @include('Bench/BenchHeader', { comingSoon: true })
 
   @slot('content')

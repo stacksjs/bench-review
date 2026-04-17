@@ -29,7 +29,6 @@ export const routes = [
   { pattern: '/settings', filePath: 'resources/views/settings.stx', isDynamic: false, params: [] },
   { pattern: '/terms', filePath: 'resources/views/terms.stx', isDynamic: false, params: [] },
   { pattern: '/verify-email', filePath: 'resources/views/verify-email.stx', isDynamic: false, params: [] },
-  { pattern: '/court-houses/:id/judges', filePath: 'resources/views/court-houses/[id]/judges/index.stx', isDynamic: true, params: ["id"] },
   { pattern: '/court-houses/:id/profile', filePath: 'resources/views/court-houses/[id]/profile/index.stx', isDynamic: true, params: ["id"] },
   { pattern: '/court-houses/:id/reviews', filePath: 'resources/views/court-houses/[id]/reviews/index.stx', isDynamic: true, params: ["id"] },
   { pattern: '/judges/:id/cases', filePath: 'resources/views/judges/[id]/cases/index.stx', isDynamic: true, params: ["id"] },

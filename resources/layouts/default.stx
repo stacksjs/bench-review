@@ -1,4 +1,3 @@
-@include('stores')
 @include('Bench/BenchHeader')
 
 <main class="py-16 bg-off-white">
