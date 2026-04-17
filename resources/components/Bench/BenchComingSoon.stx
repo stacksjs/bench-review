@@ -1,31 +1,32 @@
-<div
-  x-data="{
-    email: '',
-    loading: false,
-    async submitEmail() {
-      this.loading = true
-      try {
-        const response = await fetch('http://localhost:3008/api/email/subscribe', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          body: JSON.stringify({ email: this.email }),
-        })
-        if (!response.ok) {
-          const errs = await response.json()
-          notification.error(errs.errors[0]?.message || 'An error occurred. Please try again.')
-        } else {
-          notification.success('Thanks! Stay tuned for more updates.')
-        }
-      } catch (error) {
-        notification.error('An error occurred. Please try again.')
+<script client>
+  const email = state('')
+  const loading = state(false)
+
+  async function submitEmail() {
+    loading.set(true)
+    try {
+      const response = await fetch('http://localhost:3008/api/email/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ email: email() }),
+      })
+      if (!response.ok) {
+        const errs = await response.json()
+        notification.error(errs.errors[0]?.message || 'An error occurred. Please try again.')
+      } else {
+        notification.success('Thanks! Stay tuned for more updates.')
       }
-      this.email = ''
-      this.loading = false
+    } catch (error) {
+      notification.error('An error occurred. Please try again.')
     }
-  }"
+    email.set('')
+    loading.set(false)
+  }
+</script>
+<div
   class="overflow-hidden relative min-h-[calc(100vh-80px)] bg-off-white isolate"
 >
   <div class="lg:flex mx-auto pb-16 pt-10 px-6 sm:pb-24 lg:px-8 lg:py-16 max-w-7xl">

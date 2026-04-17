@@ -1,4 +1,7 @@
-<div class="flex flex-col lg:flex-row min-h-screen bg-gradient-to-br from-slate-50 to-slate-100" x-data="{ searchQuery: '' }">
+<script client>
+  const searchQuery = state('')
+</script>
+<div class="flex flex-col lg:flex-row min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
   <!-- Left side content -->
   <div class="flex items-center justify-center p-8 w-full lg:w-1/2">
     <div class="max-w-xl w-full">

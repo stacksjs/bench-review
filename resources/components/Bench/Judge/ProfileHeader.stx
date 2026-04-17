@@ -2,10 +2,12 @@
 // judge is passed via @include context
 </script>
 
-<header class="relative pt-16 isolate" x-data="{
-  showCopiedFeedback: false,
-  async shareProfile() {
-    const url = location.href
+<script client>
+  const showCopiedFeedback = state(false)
+  const menuOpen = state(false)
+
+  async function shareProfile() {
+    const url = window.location.href
     const title = 'Judge Profile'
     if (navigator.share) {
       try {
@@ -15,11 +17,13 @@
       }
     } else {
       navigator.clipboard.writeText(url)
-      this.showCopiedFeedback = true
-      setTimeout(() => { this.showCopiedFeedback = false }, 2000)
+      showCopiedFeedback.set(true)
+      setTimeout(() => { showCopiedFeedback.set(false) }, 2000)
     }
   }
-}">
+</script>
+
+<header class="relative pt-16 isolate">
     <div class="absolute inset-0 overflow-hidden -z-10" aria-hidden="true">
       <div class="absolute bottom-0 inset-x-0 h-px bg-gray-900/5"></div>
     </div>
@@ -39,22 +43,22 @@
           class="hidden sm:block font-semibold text-gray-900 text-sm/6"
           @click="shareProfile()"
         >
-          <span x-show="!showCopiedFeedback">Share Profile</span>
-          <span x-show="showCopiedFeedback">Copied!</span>
+          <span :show="!showCopiedFeedback">Share Profile</span>
+          <span :show="showCopiedFeedback">Copied!</span>
         </button>
         <StxLink :to="`/review/judge/${judge.id}`" class="hidden sm:block font-semibold text-gray-900 text-sm/6">Write Review</StxLink>
         <a href="#" class="px-3 py-2 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm">Follow</a>
 
-        <div class="sm:hidden relative" x-data="{ menuOpen: false }">
-          <button type="button" class="block -m-3 p-3" @click="menuOpen = !menuOpen" id="more-menu-button" aria-expanded="false" aria-haspopup="true">
+        <div class="sm:hidden relative">
+          <button type="button" class="block -m-3 p-3" @click="menuOpen.set(!menuOpen())" id="more-menu-button" aria-expanded="false" aria-haspopup="true">
             <span class="sr-only">More</span>
             <svg class="size-5 text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" data-slot="icon">
               <path d="M10 3a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM10 8.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM11.5 15.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z" />
             </svg>
           </button>
 
-          <div x-show="menuOpen" @click.away="menuOpen = false" class="absolute right-0 z-10 mt-0.5 py-2 w-32 bg-white ring-1 ring-gray-900/5 rounded-md focus:outline-none shadow-lg origin-top-right" role="menu" aria-orientation="vertical" aria-labelledby="more-menu-button" tabindex="-1">
-            <button type="button" class="block px-3 py-1 w-full text-gray-900 text-left text-sm/6" role="menuitem" tabindex="-1" id="more-menu-item-0" @click="shareProfile()">Share Profile</button>
+          <div :show="menuOpen" @click.away="menuOpen.set(false)" class="absolute right-0 z-10 mt-0.5 py-2 w-32 bg-white ring-1 ring-gray-900/5 rounded-md focus:outline-none shadow-lg origin-top-right" role="menu" aria-orientation="vertical" aria-labelledby="more-menu-button" tabindex="-1">
+            <button type="button" class="block px-3 py-1 w-full text-gray-900 text-left text-sm/6" role="menuitem" tabindex="-1" id="more-menu-item-0" @click="shareProfile">Share Profile</button>
             <StxLink to="/review" class="block px-3 py-1 text-gray-900 text-sm/6" role="menuitem" tabindex="-1" id="more-menu-item-1">Write Review</StxLink>
           </div>
         </div>

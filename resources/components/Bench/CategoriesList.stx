@@ -1,11 +1,12 @@
+<script client>
+  const activeCategory = state('{{ categories.find(cat => cat.current)?.name || '' }}')
+
+  function setActiveCategory(categoryName) {
+    activeCategory.set(categoryName)
+    document.dispatchEvent(new CustomEvent('category-changed', { detail: categoryName, bubbles: true }))
+  }
+</script>
 <div
-  x-data="{
-    activeCategory: '{{ categories.find(cat => cat.current)?.name || '' }}',
-    setActiveCategory(categoryName) {
-      this.activeCategory = categoryName
-      this.$dispatch('category-changed', categoryName)
-    }
-  }"
   class="top-4 p-4 bg-off-gray border rounded-md"
 >
   <h2 class="font-semibold text-base text-gray-900">Explore Categories</h2>

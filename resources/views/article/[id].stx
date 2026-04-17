@@ -52,8 +52,9 @@ const review = {
 @section('title', 'Review - A Masterclass in Judicial Excellence')
 @section('content')
 <div class="min-h-screen">
-  @include('components/article-header')
-  @include('components/article')
+  @include('Bench/ArticleHeader')
+  @include('Bench/Article')
+  @include('Bench/Article/Comments')
 </div>
 @endsection
 

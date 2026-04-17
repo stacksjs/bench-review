@@ -20,7 +20,7 @@ const judge = {
 @section('content')
   <div>
     <main>
-      @include('components/profile-header')
+      @include('Bench/Judge/ProfileHeader')
       <div class="mx-auto px-4 py-16 sm:px-6 lg:px-8 max-w-7xl">
         <div>
           <div class="grid sm:hidden grid-cols-1">

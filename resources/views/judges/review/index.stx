@@ -4,6 +4,6 @@
 
 @section('content')
 <div class="mt-16 mx-auto px-4 py-16 sm:px-6 lg:px-8 max-w-7xl">
-  @include('components/review-form')
+  @include('Bench/ReviewForm')
 </div>
 @endsection

@@ -1,0 +1,77 @@
+@extends('layouts/default')
+
+@section('title', 'About - Bench Review')
+
+@section('content')
+<div class="min-h-screen">
+  <div class="mx-auto px-6 py-24 sm:py-32 lg:px-8 max-w-7xl">
+    <!-- Mission -->
+    <div class="mx-auto max-w-3xl text-center">
+      <span class="inline-block px-3 py-1 font-semibold text-gray-600 text-xs tracking-wide uppercase bg-gray-100 rounded-full">Our mission</span>
+      <h1 class="mt-6 font-bold text-4xl text-gray-900 tracking-tight sm:text-5xl">
+        Sunlight is the best disinfectant
+      </h1>
+      <p class="mt-6 leading-8 text-gray-600 text-lg">
+        Bench Review brings transparency to the courtroom. Like Glassdoor for the judiciary, we help attorneys, clerks, and the public understand who's on the bench — so the system can be held to the standards a fair society demands.
+      </p>
+    </div>
+
+    <!-- Story -->
+    <div class="mt-24 mx-auto max-w-3xl">
+      <h2 class="font-bold text-3xl text-gray-900 tracking-tight">Our story</h2>
+      <div class="mt-6 space-y-6 leading-7 text-base text-gray-700">
+        <p>
+          We started Bench Review because the people who interact with judges every day — attorneys, clerks, court staff, and litigants — had no shared way to talk about what really happens in the courtroom. Decisions were made behind closed doors, and the only public record was the case docket.
+        </p>
+        <p>
+          Across the country, billions of dollars and millions of lives are decided in courtrooms every year. The judges who preside over those decisions deserve scrutiny — but also recognition for the work they do well. By giving the legal community a fair, structured way to share their experience, we make the entire system better.
+        </p>
+        <p>
+          We're not anti-judge. We're pro-transparency. The best judges have nothing to fear from honest review.
+        </p>
+      </div>
+    </div>
+
+    <!-- Values -->
+    <div class="mt-24 mx-auto max-w-5xl">
+      <h2 class="font-bold text-3xl text-center text-gray-900 tracking-tight">What we stand for</h2>
+      <dl class="grid gap-8 grid-cols-1 sm:grid-cols-3 mt-12">
+        <div class="p-6 bg-white border border-gray-100 rounded-2xl">
+          <dt class="font-semibold text-gray-900 text-lg">Transparency</dt>
+          <dd class="mt-2 leading-6 text-gray-600 text-sm">Open access to information about the people deciding cases that affect millions of lives.</dd>
+        </div>
+        <div class="p-6 bg-white border border-gray-100 rounded-2xl">
+          <dt class="font-semibold text-gray-900 text-lg">Fairness</dt>
+          <dd class="mt-2 leading-6 text-gray-600 text-sm">Reviews are moderated to keep them substantive, factual, and respectful — never personal attacks.</dd>
+        </div>
+        <div class="p-6 bg-white border border-gray-100 rounded-2xl">
+          <dt class="font-semibold text-gray-900 text-lg">Privacy</dt>
+          <dd class="mt-2 leading-6 text-gray-600 text-sm">You can review anonymously. We protect reviewers from retaliation and intimidation.</dd>
+        </div>
+      </dl>
+    </div>
+
+    <!-- Team -->
+    <div class="mt-24 mx-auto max-w-5xl">
+      <h2 class="font-bold text-3xl text-center text-gray-900 tracking-tight">Built by people who care</h2>
+      <p class="mt-4 mx-auto max-w-2xl text-center text-gray-600">
+        Bench Review is built by a small team of attorneys, engineers, and former clerks who believe the legal system works better when it's open.
+      </p>
+    </div>
+
+    <!-- CTA -->
+    <div class="mt-24 mx-auto max-w-3xl text-center">
+      <h3 class="font-bold text-2xl text-gray-900">Ready to contribute?</h3>
+      <p class="mt-4 text-gray-600">Join thousands of legal professionals helping to keep the bench accountable.</p>
+      <div class="flex gap-4 items-center justify-center mt-8">
+        <StxLink to="/register" class="px-4 py-2.5 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md shadow-sm">
+          Create an account
+        </StxLink>
+        <StxLink to="/contact" class="font-semibold text-gray-700 text-sm hover:text-gray-900">
+          Get in touch <span aria-hidden="true">→</span>
+        </StxLink>
+      </div>
+    </div>
+  </div>
+</div>
+@endsection

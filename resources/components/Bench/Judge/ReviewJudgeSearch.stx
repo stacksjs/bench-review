@@ -2,21 +2,27 @@
 import { judges } from '../../../functions/sample'
 </script>
 
-<div class="mx-auto max-w-3xl" x-data="{
-  searchQuery: '',
-  judges: {{ JSON.stringify(judges.value) }},
-  get filteredJudges() {
-    if (!this.searchQuery) return []
-    return this.judges.filter(judge =>
-      judge.name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-      judge.court.name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-      judge.department.toLowerCase().includes(this.searchQuery.toLowerCase())
+<script client>
+  const searchQuery = state('')
+  const allJudges = {{ JSON.stringify(judges.value) }}
+
+  const filteredJudges = derived(() => {
+    const q = searchQuery()
+    if (!q) return []
+    const needle = q.toLowerCase()
+    return allJudges.filter(judge =>
+      judge.name.toLowerCase().includes(needle) ||
+      judge.court.name.toLowerCase().includes(needle) ||
+      judge.department.toLowerCase().includes(needle)
     )
-  },
-  selectJudge(judge) {
-    location.href = `/review/${judge.id}`
+  })
+
+  function selectJudge(judge) {
+    window.location.href = `/review/${judge.id}`
   }
-}">
+</script>
+
+<div class="mx-auto max-w-3xl">
   <div class="text-center">
     <h2 class="font-bold text-2xl text-gray-900 tracking-tight">Write a Review</h2>
     <p class="mt-2 text-gray-600 text-sm">
@@ -32,10 +38,10 @@ import { judges } from '../../../functions/sample'
         class="block px-4 py-3 w-full text-gray-900 placeholder:text-gray-400 bg-off-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2"
         placeholder="Search for a judge..."
       >
-      <div x-show="searchQuery && filteredJudges.length > 0" class="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg">
+      <div :show="searchQuery() && filteredJudges().length" class="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg">
         <ul class="overflow-auto py-1 max-h-60 text-base rounded-md">
           <li
-              x-for="judge in filteredJudges"
+              :for="judge in filteredJudges"
               :key="judge.id"
               class="relative px-3 py-2 hover:bg-gray-100 cursor-pointer select-none"
               @click="selectJudge(judge)"
@@ -51,7 +57,7 @@ import { judges } from '../../../functions/sample'
             </li>
         </ul>
       </div>
-      <div x-show="searchQuery && filteredJudges.length === 0" class="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg">
+      <div :show="searchQuery() && filteredJudges().length === 0" class="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg">
         <div class="px-3 py-4 text-center text-gray-500 text-sm">
           No judges found matching your search.
         </div>

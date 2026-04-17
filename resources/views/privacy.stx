@@ -1,0 +1,82 @@
+@extends('layouts/default')
+
+@section('title', 'Privacy Policy - Bench Review')
+
+@section('content')
+<div class="min-h-screen">
+  <div class="mx-auto px-6 py-24 lg:px-8 max-w-3xl">
+    <div>
+      <h1 class="font-bold text-4xl text-gray-900 tracking-tight sm:text-5xl">Privacy Policy</h1>
+      <p class="mt-4 text-gray-500 text-sm">Last updated April 16, 2026</p>
+    </div>
+
+    <div class="mt-12 space-y-10 leading-7 text-base text-gray-700">
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Overview</h2>
+        <p class="mt-4">
+          Bench Review respects your privacy. This Privacy Policy explains what information we collect, how we use it, and the choices you have. By using Bench Review, you agree to this policy.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Information we collect</h2>
+        <ul class="mt-4 pl-6 space-y-2 list-disc">
+          <li><strong>Account information:</strong> name, email, password (hashed), and optional profile photo.</li>
+          <li><strong>Reviews and content:</strong> reviews, ratings, comments, and other content you submit.</li>
+          <li><strong>Usage data:</strong> pages you view, searches you run, and features you use, to improve the product.</li>
+          <li><strong>Device data:</strong> IP address, browser type, and operating system.</li>
+          <li><strong>Payment information:</strong> handled by Stripe; we never see your card details.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">How we use information</h2>
+        <ul class="mt-4 pl-6 space-y-2 list-disc">
+          <li>To provide and improve the service.</li>
+          <li>To moderate reviews and enforce our content policies.</li>
+          <li>To send you transactional emails (account confirmations, replies, billing).</li>
+          <li>To send marketing emails — only if you opt in (you can unsubscribe anytime).</li>
+          <li>To comply with legal obligations.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Anonymous reviews</h2>
+        <p class="mt-4">
+          When you choose to post a review anonymously, your name is hidden from the public version of the review. We retain your identity internally for moderation and abuse prevention, but we do not share it with the judge being reviewed, the court, or any third party except as required by law.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">What we do not do</h2>
+        <ul class="mt-4 pl-6 space-y-2 list-disc">
+          <li>We do not sell your personal information.</li>
+          <li>We do not share reviewer identities with judges or courts.</li>
+          <li>We do not run third-party advertising on the site.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Cookies</h2>
+        <p class="mt-4">
+          We use first-party cookies for authentication and to remember your preferences. Analytics cookies are set with your consent. You can clear or block cookies in your browser at any time.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Your rights</h2>
+        <p class="mt-4">
+          You can request a copy of your data, correct inaccuracies, or ask us to delete your account. Email <a href="mailto:privacy@bench.review" class="font-medium text-gray-900 hover:underline">privacy@bench.review</a> and we'll respond within 30 days.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Contact</h2>
+        <p class="mt-4">
+          For privacy questions, write to <a href="mailto:privacy@bench.review" class="font-medium text-gray-900 hover:underline">privacy@bench.review</a>.
+        </p>
+      </section>
+    </div>
+  </div>
+</div>
+@endsection

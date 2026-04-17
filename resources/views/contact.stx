@@ -1,0 +1,163 @@
+@extends('layouts/default')
+
+@section('title', 'Contact - Bench Review')
+
+@section('content')
+<script client>
+  const contactName = state('')
+  const contactEmail = state('')
+  const topic = state('general')
+  const contactMessage = state('')
+  const loading = state(false)
+  const sent = state(false)
+  const submitError = state('')
+
+  async function submit() {
+    loading.set(true)
+    submitError.set('')
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: contactName(), email: contactEmail(), topic: topic(), message: contactMessage() }),
+      })
+      if (!res.ok) throw new Error('Could not send message — please try again')
+      sent.set(true)
+    } catch (e) {
+      submitError.set(e.message)
+    } finally {
+      loading.set(false)
+    }
+  }
+</script>
+
+<div class="min-h-screen">
+  <div class="mx-auto px-6 py-24 sm:py-32 lg:px-8 max-w-7xl">
+    <div class="grid gap-16 lg:grid-cols-2">
+      <!-- Left: copy and info -->
+      <div>
+        <h1 class="font-bold text-4xl text-gray-900 tracking-tight sm:text-5xl">Get in touch</h1>
+        <p class="mt-6 leading-8 text-gray-600 text-lg">
+          We read every message. Whether you have feedback, want to flag an issue, or work in the legal community and want to partner with us — we'd love to hear from you.
+        </p>
+
+        <dl class="mt-12 space-y-6 text-base/7 text-gray-600">
+          <div class="flex gap-x-4">
+            <dt class="flex-none">
+              <span class="sr-only">Email</span>
+              <svg class="h-7 w-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+              </svg>
+            </dt>
+            <dd><a href="mailto:hello@bench.review" class="hover:text-gray-900">hello@bench.review</a></dd>
+          </div>
+          <div class="flex gap-x-4">
+            <dt class="flex-none">
+              <span class="sr-only">Press</span>
+              <svg class="h-7 w-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 12l2.25 2.25L15 12.75M5.625 21h12.75A1.875 1.875 0 0020.25 19.125V7.875c0-1.036-.84-1.875-1.875-1.875h-2.812c-.297 0-.586.108-.815.285l-.937.75A1.125 1.125 0 0112.937 7.5H8.25c-1.036 0-1.875.84-1.875 1.875v9.75c0 1.036.84 1.875 1.875 1.875z" />
+              </svg>
+            </dt>
+            <dd><a href="mailto:press@bench.review" class="hover:text-gray-900">press@bench.review</a></dd>
+          </div>
+          <div class="flex gap-x-4">
+            <dt class="flex-none">
+              <span class="sr-only">Address</span>
+              <svg class="h-7 w-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+              </svg>
+            </dt>
+            <dd>San Francisco, California</dd>
+          </div>
+        </dl>
+      </div>
+
+      <!-- Right: form -->
+      <div>
+        <div :show="!sent" class="p-8 bg-white border border-gray-100 rounded-2xl shadow-sm">
+          <form @submit.prevent="submit" class="space-y-6">
+            <div>
+              <label for="name" class="block font-medium text-gray-900 text-sm">Name</label>
+              <div class="mt-2">
+                <input
+                  x-model="contactName"
+                  type="text"
+                  id="name"
+                  required
+                  class="block px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2"
+                >
+              </div>
+            </div>
+
+            <div>
+              <label for="contact-email" class="block font-medium text-gray-900 text-sm">Email</label>
+              <div class="mt-2">
+                <input
+                  x-model="contactEmail"
+                  type="email"
+                  id="contact-email"
+                  required
+                  class="block px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2"
+                >
+              </div>
+            </div>
+
+            <div>
+              <label for="topic" class="block font-medium text-gray-900 text-sm">Topic</label>
+              <div class="mt-2">
+                <select
+                  x-model="topic"
+                  id="topic"
+                  class="block px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2"
+                >
+                  <option value="general">General question</option>
+                  <option value="report">Report a review</option>
+                  <option value="data">Judge data correction</option>
+                  <option value="press">Press inquiry</option>
+                  <option value="partnership">Partnership</option>
+                  <option value="legal">Legal request</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label for="message" class="block font-medium text-gray-900 text-sm">Message</label>
+              <div class="mt-2">
+                <textarea
+                  x-model="contactMessage"
+                  id="message"
+                  rows="5"
+                  required
+                  class="block px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2"
+                ></textarea>
+              </div>
+            </div>
+
+            <p :show="submitError" class="text-red-600 text-sm" x-text="submitError"></p>
+
+            <button
+              type="submit"
+              :disabled="loading"
+              class="px-4 py-2 w-full font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span :show="!loading">Send message</span>
+              <span :show="loading">Sending...</span>
+            </button>
+          </form>
+        </div>
+
+        <div :show="sent" class="p-8 text-center bg-white border border-gray-100 rounded-2xl shadow-sm">
+          <div class="flex items-center justify-center mx-auto h-12 w-12 bg-green-100 rounded-full">
+            <svg class="h-6 w-6 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <h2 class="mt-4 font-semibold text-gray-900 text-lg">Message sent</h2>
+          <p class="mt-2 text-gray-600 text-sm">Thanks for reaching out. We'll get back to you within a couple of business days.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+@endsection

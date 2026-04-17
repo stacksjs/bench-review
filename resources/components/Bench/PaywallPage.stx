@@ -1,23 +1,24 @@
+<script client>
+  const isLoading = state(false)
+
+  async function handleSubscribe() {
+    isLoading.set(true)
+    try {
+      // TODO: Implement actual Stripe subscription
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      // notification handled via server-side or toast library
+      window.location.href = '/dashboard'
+    }
+    catch (error) {
+      console.error('Failed to process subscription. Please try again.')
+    }
+    finally {
+      isLoading.set(false)
+    }
+  }
+</script>
 <div
   class="py-16 sm:py-24 lg:py-32 min-h-screen bg-gray-50"
-  x-data="{
-    isLoading: false,
-    async handleSubscribe() {
-      this.isLoading = true
-      try {
-        // TODO: Implement actual Stripe subscription
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        // notification handled via server-side or toast library
-        window.location.href = '/dashboard'
-      }
-      catch (error) {
-        console.error('Failed to process subscription. Please try again.')
-      }
-      finally {
-        this.isLoading = false
-      }
-    }
-  }"
 >
   <div class="mx-auto px-6 lg:px-8 max-w-2xl">
     <div class="text-center">
@@ -66,8 +67,8 @@
           :disabled="isLoading"
           class="block mt-10 px-3 py-3 w-full font-semibold text-center text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <span x-show="isLoading">Processing...</span>
-          <span x-show="!isLoading">Subscribe Now</span>
+          <span :show="isLoading">Processing...</span>
+          <span :show="!isLoading">Subscribe Now</span>
         </button>
 
         <p class="mt-4 text-gray-500 text-sm">

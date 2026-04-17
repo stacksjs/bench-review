@@ -1,45 +1,51 @@
-<header
-  x-data="{
-    isAuthenticated: false,
-    isProfileMenuOpen: false,
-    isNotificationMenuOpen: false,
-    mobileMenu: false,
-    notifications: [
-      {
-        id: 1,
-        user: {
-          name: 'Sarah Johnson',
-          imageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-        },
-        message: 'Sarah Johnson liked your review',
-        time: '2 minutes ago',
-        unread: true
+<script client>
+  const isAuthenticated = state(false)
+  const isProfileMenuOpen = state(false)
+  const isNotificationMenuOpen = state(false)
+  const mobileMenu = state(false)
+  const headerSearchQuery = state('')
+  const headerNotifications = state([
+    {
+      id: 1,
+      user: {
+        name: 'Sarah Johnson',
+        imageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
       },
-      {
-        id: 2,
-        user: {
-          name: 'Michael Chen',
-          imageUrl: 'https://images.unsplash.com/photo-1550525811-e5869dd03032?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-        },
-        message: 'Michael Chen commented on your review',
-        time: '1 hour ago',
-        unread: true
+      message: 'Sarah Johnson liked your review',
+      time: '2 minutes ago',
+      unread: true
+    },
+    {
+      id: 2,
+      user: {
+        name: 'Michael Chen',
+        imageUrl: 'https://images.unsplash.com/photo-1550525811-e5869dd03032?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
       },
-      {
-        id: 3,
-        user: {
-          name: 'Robert Davis',
-          imageUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-        },
-        message: 'Robert Davis followed you',
-        time: '3 hours ago',
-        unread: false
-      }
-    ],
-    get unreadNotifications() {
-      return this.notifications.filter(n => n.unread).length
+      message: 'Michael Chen commented on your review',
+      time: '1 hour ago',
+      unread: true
+    },
+    {
+      id: 3,
+      user: {
+        name: 'Robert Davis',
+        imageUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+      },
+      message: 'Robert Davis followed you',
+      time: '3 hours ago',
+      unread: false
     }
-  }"
+  ])
+
+  const unreadNotifications = derived(() => {
+    return headerNotifications().filter(n => n.unread).length
+  })
+
+  function submitHeaderSearch() {
+    window.location.href = '/search?q=' + encodeURIComponent(headerSearchQuery())
+  }
+</script>
+<header
   class="z-10"
 >
   <nav class="flex items-center justify-between mx-auto p-6 lg:px-8 bg-off-white border-b" aria-label="Global">
@@ -110,10 +116,34 @@
         </div>
       @endif
     </div>
+    @if(!comingSoon)
+      <div class="hidden lg:flex flex-1 justify-center mx-8 max-w-md">
+        <form
+          class="w-full"
+          @submit.prevent="submitHeaderSearch"
+        >
+          <label for="header-search" class="sr-only">Search</label>
+          <div class="relative">
+            <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+              <svg class="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <input
+              id="header-search"
+              type="text"
+              x-model="headerSearchQuery"
+              placeholder="Search judges or courts..."
+              class="block pl-9 pr-3 py-2 w-full text-gray-900 sm:text-sm placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-200 ring-inset rounded-lg focus:ring-2 focus:ring-gray-600 focus:ring-inset"
+            >
+          </div>
+        </form>
+      </div>
+    @endif
     <div class="flex items-center">
       @if(!comingSoon)
         <div class="flex lg:hidden">
-          <button @click="mobileMenu = true" type="button" class="inline-flex items-center justify-center -m-2.5 p-2.5 text-gray-700 rounded-md">
+          <button @click="mobileMenu.set(true)" type="button" class="inline-flex items-center justify-center -m-2.5 p-2.5 text-gray-700 rounded-md">
             <span class="sr-only">Open main menu</span>
             <svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
               <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
@@ -121,25 +151,25 @@
           </button>
         </div>
         <div class="hidden lg:flex lg:flex-1 lg:justify-end">
-          <div x-if="!isAuthenticated">
+          <div :if="!isAuthenticated">
               <StxLink to="/login" class="mr-6 font-semibold text-gray-900 text-sm/6">Log in</StxLink>
               <StxLink to="/register" class="font-semibold text-gray-900 text-sm/6">Sign up</StxLink>
             </div>
-          <div x-if="isAuthenticated" class="flex gap-x-4 items-center">
+          <div :if="isAuthenticated" class="flex gap-x-4 items-center">
               <div class="flex relative items-center">
                 <button
                   type="button"
                   class="flex items-center text-gray-400 hover:text-gray-500"
-                  @click="isNotificationMenuOpen = !isNotificationMenuOpen"
+                  @click="isNotificationMenuOpen.set(!isNotificationMenuOpen())"
                 >
                   <span class="sr-only">View notifications</span>
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
                   </svg>
-                  <span x-show="unreadNotifications > 0" class="flex absolute items-center justify-center h-4 w-4 font-medium text-[10px] text-white bg-red-500 rounded-full -right-1 -top-1" x-text="unreadNotifications"></span>
+                  <span :show="unreadNotifications() >= 1" class="flex absolute items-center justify-center h-4 w-4 font-medium text-[10px] text-white bg-red-500 rounded-full -right-1 -top-1" x-text="unreadNotifications"></span>
                 </button>
                 <div
-                  x-show="isNotificationMenuOpen"
+                  :show="isNotificationMenuOpen"
                   class="absolute right-0 z-50 mt-84 py-1 w-80 bg-white ring-1 ring-black ring-opacity-5 rounded-md focus:outline-none shadow-lg origin-top-right"
                   role="menu"
                   aria-orientation="vertical"
@@ -151,7 +181,7 @@
                   </div>
                   <div class="overflow-y-auto max-h-96">
                     <a
-                        x-for="notif in notifications"
+                        :for="notif in headerNotifications"
                         :key="notif.id"
                         href="#"
                         class="block px-4 py-3 hover:bg-gray-50"
@@ -167,7 +197,7 @@
                           </div>
                         </div>
                       </a>
-                    <div x-show="notifications.length === 0" class="px-4 py-3 text-center text-gray-500 text-sm">
+                    <div :show="headerNotifications().length === 0" class="px-4 py-3 text-center text-gray-500 text-sm">
                       No notifications
                     </div>
                   </div>
@@ -180,12 +210,12 @@
                 <button
                   type="button"
                   class="flex items-center rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-                  @click="isProfileMenuOpen = !isProfileMenuOpen"
+                  @click="isProfileMenuOpen.set(!isProfileMenuOpen())"
                 >
                   <img class="h-8 w-8 rounded-full" src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="" />
                 </button>
                 <div
-                  x-show="isProfileMenuOpen"
+                  :show="isProfileMenuOpen"
                   class="absolute right-0 z-50 mt-42 py-1 w-48 bg-white ring-1 ring-black ring-opacity-5 rounded-md focus:outline-none shadow-lg origin-top-right"
                   role="menu"
                   aria-orientation="vertical"
@@ -203,6 +233,6 @@
     </div>
   </nav>
   @if(!comingSoon)
-    @include('components/MobileMenu', { isOpen: mobileMenu, isAuthenticated: isAuthenticated })
+    @include('Bench/MobileMenu', { isOpen: mobileMenu, isAuthenticated: isAuthenticated })
   @endif
 </header>

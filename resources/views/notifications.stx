@@ -1,0 +1,158 @@
+<script client>
+  const filter = state('all')
+  const notifications = state([
+    {
+      id: 1,
+      type: 'like',
+      user: { name: 'Sarah Johnson', imageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80' },
+      message: 'liked your review of Hon. Robert Davis',
+      link: '/article/1',
+      time: '2 minutes ago',
+      unread: true
+    },
+    {
+      id: 2,
+      type: 'comment',
+      user: { name: 'Michael Chen', imageUrl: 'https://images.unsplash.com/photo-1550525811-e5869dd03032?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80' },
+      message: 'commented on your review: "Excellent breakdown of the procedural..."',
+      link: '/article/1',
+      time: '1 hour ago',
+      unread: true
+    },
+    {
+      id: 3,
+      type: 'follow',
+      user: { name: 'Robert Davis', imageUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80' },
+      message: 'started following you',
+      link: '/user/3',
+      time: '3 hours ago',
+      unread: false
+    },
+    {
+      id: 4,
+      type: 'reply',
+      user: { name: 'Maria Garcia', imageUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80' },
+      message: 'replied to your comment on "A Masterclass in Judicial Excellence"',
+      link: '/article/1',
+      time: '1 day ago',
+      unread: false
+    },
+    {
+      id: 5,
+      type: 'system',
+      user: { name: 'Bench Review', imageUrl: '/images/bench/logo.png' },
+      message: 'Your review of Hon. Sarah Johnson was approved and is now live.',
+      link: '/article/1',
+      time: '2 days ago',
+      unread: false
+    }
+  ])
+
+  const filtered = derived(() => {
+    const f = filter()
+    const notifs = notifications()
+    if (f === 'unread') return notifs.filter(n => n.unread)
+    if (f === 'mentions') return notifs.filter(n => n.type === 'comment' || n.type === 'reply')
+    return notifs
+  })
+
+  function markAllRead() {
+    notifications.set(notifications().map(n => ({ ...n, unread: false })))
+  }
+
+  function dismiss(id) {
+    notifications.set(notifications().filter(n => n.id !== id))
+  }
+</script>
+
+@extends('layouts/default')
+@section('title', 'Notifications - Bench Review')
+@section('content')
+<div class="min-h-screen">
+  <div class="mx-auto px-4 py-12 sm:px-6 lg:px-8 max-w-4xl">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="font-bold text-3xl text-gray-900 tracking-tight">Notifications</h1>
+        <p class="mt-1 text-gray-600 text-sm">Stay up to date on activity related to you and the judges you follow.</p>
+      </div>
+      <button
+        @click="markAllRead"
+        class="hidden sm:block font-medium text-gray-700 text-sm hover:text-gray-900"
+      >
+        Mark all read
+      </button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="mt-8 border-b border-gray-200">
+      <nav class="flex -mb-px space-x-8" aria-label="Tabs">
+        <button
+          type="button"
+          @click="filter.set('all')"
+          class="px-1 py-3 font-medium text-sm whitespace-nowrap border-b-2"
+          :class="[filter() === 'all' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
+        >
+          All
+        </button>
+        <button
+          type="button"
+          @click="filter.set('unread')"
+          class="px-1 py-3 font-medium text-sm whitespace-nowrap border-b-2"
+          :class="[filter() === 'unread' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
+        >
+          Unread
+        </button>
+        <button
+          type="button"
+          @click="filter.set('mentions')"
+          class="px-1 py-3 font-medium text-sm whitespace-nowrap border-b-2"
+          :class="[filter() === 'mentions' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
+        >
+          Mentions
+        </button>
+      </nav>
+    </div>
+
+    <!-- Notifications list -->
+    <ul role="list" class="mt-4 bg-white border border-gray-100 divide-gray-100 divide-y rounded-2xl shadow-sm">
+      <li
+        :for="notif in filtered"
+        :key="notif.id"
+        class="flex gap-x-4 items-start p-5 hover:bg-gray-50"
+      >
+        <div class="relative flex-shrink-0">
+          <img class="h-10 w-10 rounded-full" :src="notif.user.imageUrl" :alt="notif.user.name">
+          <span :show="notif.unread" class="absolute h-2.5 w-2.5 bg-blue-500 ring-2 ring-white rounded-full -right-0.5 -top-0.5"></span>
+        </div>
+        <a :href="notif.link" class="flex-1 min-w-0">
+          <p class="text-gray-900 text-sm">
+            <span class="font-semibold" x-text="notif.user.name"></span>
+            <span x-text="' ' + notif.message"></span>
+          </p>
+          <p class="mt-1 text-gray-500 text-xs" x-text="notif.time"></p>
+        </a>
+        <div class="flex-shrink-0">
+          <button
+            type="button"
+            class="p-1 text-gray-400 hover:text-gray-600 rounded"
+            title="Dismiss"
+            @click.prevent="dismiss(notif.id)"
+          >
+            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+            </svg>
+          </button>
+        </div>
+      </li>
+    </ul>
+
+    <div :show="filtered().length === 0" class="mt-12 p-12 text-center bg-white border border-dashed border-gray-200 rounded-2xl">
+      <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+      </svg>
+      <h3 class="mt-4 font-semibold text-base text-gray-900">You're all caught up</h3>
+      <p class="mt-2 text-gray-500 text-sm">Nothing new here right now.</p>
+    </div>
+  </div>
+</div>
+@endsection

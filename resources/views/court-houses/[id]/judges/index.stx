@@ -1,0 +1,3 @@
+@section('title', 'Court House Judges - Bench Review')
+
+@include('Bench/Court/CourtJudges')

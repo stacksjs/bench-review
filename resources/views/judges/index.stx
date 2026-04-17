@@ -4,6 +4,6 @@
 
 @section('content')
 <div>
-  @include('components/judge-directory')
+  @include('Bench/Judge/JudgeDirectory')
 </div>
 @endsection

@@ -7,6 +7,6 @@ const post = blogPosts.find(p => p.id === parseInt(params.id))
 
 @extends('layouts/default')
 @section('content')
-  @include('components/blog-header')
-  @include('components/blog')
+  @include('Bench/Blog/BlogHeader')
+  @include('Bench/Blog/Blog')
 @endsection

@@ -91,7 +91,7 @@ const reviews = [
       </div>
 
       <!-- Reviews Feed -->
-      @include('components/review-section')
+      @include('Bench/User/ReviewSection')
     </div>
   </div>
 @endsection

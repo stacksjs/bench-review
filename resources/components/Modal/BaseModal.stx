@@ -1,4 +1,4 @@
-<div x-show="open" class="relative z-10" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+<div :show="open" class="relative z-10" aria-labelledby="modal-title" role="dialog" aria-modal="true">
   <!--
     Background backdrop, show/hide based on modal state.
 
@@ -27,7 +27,7 @@
         <div class="hidden sm:block absolute right-0 top-0 pr-4 pt-4">
           <button
             type="button"
-            @click="open = false"
+            @click="open.set(false)"
             class="text-gray-400 hover:text-gray-500 bg-white rounded-md focus:outline-hidden focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
           >
             <span class="sr-only">Close</span>

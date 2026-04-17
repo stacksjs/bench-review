@@ -8,13 +8,13 @@
     <div class="grid gap-x-16 gap-y-10 grid-cols-1 lg:grid-cols-6">
       <!-- Left Sidebar - Case Categories -->
       <div class="hidden lg:block lg:col-span-2 space-y-6">
-        @include('components/categories-list')
-        @include('components/left-sidebar')
+        @include('Bench/CategoriesList')
+        @include('Bench/LeftSidebar')
       </div>
 
       <!-- Main Feed -->
       <div class="col-span-1 lg:col-span-4">
-        @include('components/reviews-feed')
+        @include('Bench/ReviewsFeed')
       </div>
     </div>
   </div>

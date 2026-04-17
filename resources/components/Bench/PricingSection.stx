@@ -1,11 +1,12 @@
+<script client>
+  const pricingPeriod = state('monthly')
+
+  function togglePricingPeriod() {
+    pricingPeriod.set(pricingPeriod() === 'monthly' ? 'yearly' : 'monthly')
+  }
+</script>
 <div
   class="py-24 sm:py-32"
-  x-data="{
-    pricingPeriod: 'monthly',
-    togglePricingPeriod() {
-      this.pricingPeriod = this.pricingPeriod === 'monthly' ? 'yearly' : 'monthly'
-    }
-  }"
 >
   <div class="mx-auto px-6 lg:px-8 max-w-7xl">
     <div class="mx-auto max-w-4xl text-center">
@@ -19,17 +20,17 @@
     <div class="flex justify-center mt-8">
       <div class="flex gap-x-4 items-center">
         <span
-          :class=": ? 'monthly' 'text-gray-600' 'text-gray-800' === pricingPeriod"
+          :class="[pricingPeriod === 'monthly' ? 'text-gray-800' : 'text-gray-600']"
           class="font-medium text-sm">Monthly</span>
         <button type="button"
           class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer"
-          :class=": ? 'bg-gray-200' 'bg-gray-600' 'yearly' === pricingPeriod" @click="togglePricingPeriod">
+          :class="[pricingPeriod === 'yearly' ? 'bg-gray-600' : 'bg-gray-200']" @click="togglePricingPeriod">
           <span
             class="inline-block h-5 w-5 bg-white ring-0 rounded-full shadow duration-200 ease-in-out transition transform pointer-events-none"
-            :class=": ? 'translate-x-0' 'translate-x-5' 'yearly' === pricingPeriod" />
+            :class="[pricingPeriod === 'yearly' ? 'translate-x-5' : 'translate-x-0']" />
         </button>
         <span
-          :class=": ? 'text-gray-600' 'text-gray-800' 'yearly' === pricingPeriod"
+          :class="[pricingPeriod === 'yearly' ? 'text-gray-800' : 'text-gray-600']"
           class="font-medium text-sm">Yearly</span>
       </div>
     </div>
@@ -40,7 +41,7 @@
         <p class="mt-4 text-gray-600 text-sm/6">Are you a clerk? This is for you.</p>
         <p class="flex gap-x-1 items-baseline mt-6">
           <span class="font-semibold text-4xl text-gray-800 tracking-tight">$0</span>
-          <span class="font-semibold text-gray-600 text-sm/6">/<span x-text="pricingPeriod === 'monthly' ? 'month' : 'year'"></span></span>
+          <span class="font-semibold text-gray-600 text-sm/6">/<span x-text="pricingPeriod() === 'monthly' ? 'month' : 'year'"></span></span>
         </p>
         <StxLink to="/register" aria-describedby="tier-free"
           class="block mt-6 px-2.5 py-1.5 font-semibold text-center text-gray-600 text-sm/6 ring-1 ring-gray-200 ring-inset rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 hover:ring-gray-300">Get
@@ -70,8 +71,8 @@
         <h3 id="tier-hobby" class="font-semibold text-gray-600 text-lg/8">Professional</h3>
         <p class="mt-4 text-gray-600 text-sm/6">For anyone curious about judge reviews.</p>
         <p class="flex gap-x-1 items-baseline mt-6">
-          <span class="font-semibold text-4xl text-gray-800 tracking-tight">$<span x-text="pricingPeriod === 'monthly' ? '10' : '60'"></span></span>
-          <span class="font-semibold text-gray-600 text-sm/6">/<span x-text="pricingPeriod === 'monthly' ? 'month' : 'year'"></span></span>
+          <span class="font-semibold text-4xl text-gray-800 tracking-tight">$<span x-text="pricingPeriod() === 'monthly' ? '10' : '60'"></span></span>
+          <span class="font-semibold text-gray-600 text-sm/6">/<span x-text="pricingPeriod() === 'monthly' ? 'month' : 'year'"></span></span>
         </p>
         <StxLink to="/register" aria-describedby="tier-hobby"
           class="block mt-6 px-2.5 py-1.5 font-semibold text-center text-sm/6 text-white bg-gray-600 hover:bg-gray-500 rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm">Get

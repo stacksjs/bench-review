@@ -2,25 +2,41 @@
 declare module "stx/routes" {
   interface RouteMap {
     '/judges/review': {  }
+    '/judges/submit': {  }
     '/': {  }
+    '/about': {  }
     '/blog': {  }
     '/coming-soon': {  }
+    '/contact': {  }
     '/court-houses': {  }
+    '/faq': {  }
+    '/forgot-password': {  }
+    '/home': {  }
     '/judges': {  }
     '/login': {  }
+    '/notifications': {  }
     '/paywall': {  }
+    '/privacy': {  }
     '/profile': {  }
     '/register': {  }
+    '/reset-password': {  }
     '/review': {  }
     '/reviews': {  }
+    '/search': {  }
     '/secret-marketing': {  }
     '/settings': {  }
+    '/terms': {  }
+    '/verify-email': {  }
+    '/court-houses/:id/judges': { id: string }
+    '/court-houses/:id/profile': { id: string }
+    '/court-houses/:id/reviews': { id: string }
     '/judges/:id/cases': { id: string }
     '/judges/:id/profile': { id: string }
     '/judges/:id/reviews': { id: string }
     '/judges/review/:id': { id: string }
     '/article/:id': { id: string }
     '/blog/:id': { id: string }
+    '/court-houses/:id': { id: string }
     '/judges/:id': { id: string }
     '/review/:id': { id: string }
     '/user/:id': { id: string }

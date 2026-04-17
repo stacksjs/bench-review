@@ -1,0 +1,87 @@
+@extends('layouts/default')
+
+@section('title', 'Terms of Service - Bench Review')
+
+@section('content')
+<div class="min-h-screen">
+  <div class="mx-auto px-6 py-24 lg:px-8 max-w-3xl">
+    <div>
+      <h1 class="font-bold text-4xl text-gray-900 tracking-tight sm:text-5xl">Terms of Service</h1>
+      <p class="mt-4 text-gray-500 text-sm">Last updated April 16, 2026</p>
+    </div>
+
+    <div class="mt-12 space-y-10 leading-7 text-base text-gray-700">
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Acceptance of terms</h2>
+        <p class="mt-4">
+          By creating an account or using Bench Review, you agree to be bound by these Terms of Service. If you don't agree, don't use the service.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Eligibility</h2>
+        <p class="mt-4">
+          You must be at least 18 years old to use Bench Review. By using the service, you represent that the information you submit is true and accurate.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Content standards</h2>
+        <p class="mt-4">When you post a review or comment, you agree:</p>
+        <ul class="mt-4 pl-6 space-y-2 list-disc">
+          <li>It reflects your honest, first-hand experience.</li>
+          <li>It does not contain personal attacks, threats, or harassment.</li>
+          <li>It does not disclose protected case information (sealed records, juvenile cases, etc.).</li>
+          <li>It does not contain defamatory or knowingly false statements.</li>
+          <li>It does not include identifying information about minors, victims, or jurors.</li>
+        </ul>
+        <p class="mt-4">
+          We may remove content that violates these standards and may suspend or terminate accounts for repeated violations.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">License to your content</h2>
+        <p class="mt-4">
+          You retain ownership of the content you post. You grant Bench Review a non-exclusive, worldwide, royalty-free license to display, store, and distribute your content as part of operating the service.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Subscriptions and billing</h2>
+        <p class="mt-4">
+          Paid subscriptions are billed monthly or annually in advance. You can cancel anytime; access continues through the end of the current billing period. Refunds are issued at our discretion.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Disclaimers</h2>
+        <p class="mt-4">
+          Bench Review provides user-generated reviews and information for informational purposes only. We do not endorse any review and we do not provide legal advice. The judges, courts, and case information shown on the site are not affiliated with Bench Review unless explicitly stated.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Limitation of liability</h2>
+        <p class="mt-4">
+          To the fullest extent permitted by law, Bench Review is not liable for indirect, incidental, special, or consequential damages arising from your use of the service.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Changes to these terms</h2>
+        <p class="mt-4">
+          We may update these terms from time to time. Material changes will be communicated by email or in-app notice at least 14 days before they take effect.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Contact</h2>
+        <p class="mt-4">
+          Questions about these terms? Email <a href="mailto:legal@bench.review" class="font-medium text-gray-900 hover:underline">legal@bench.review</a>.
+        </p>
+      </section>
+    </div>
+  </div>
+</div>
+@endsection

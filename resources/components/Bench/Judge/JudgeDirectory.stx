@@ -2,19 +2,11 @@
 import { judges } from '../../../functions/sample'
 </script>
 
-<div class="min-h-screen" x-data="{
-  searchQuery: '',
-  judges: {{ JSON.stringify(judges.value) }},
-  get filteredJudges() {
-    if (!this.searchQuery) return this.judges
-    const query = this.searchQuery.toLowerCase()
-    return this.judges.filter(judge =>
-      judge.name.toLowerCase().includes(query) ||
-      judge.court.name.toLowerCase().includes(query) ||
-      judge.location.toLowerCase().includes(query)
-    )
-  }
-}">
+<script client>
+  const searchQuery = state('')
+</script>
+
+<div class="min-h-screen">
   <div class="mx-auto px-4 py-16 sm:px-6 sm:py-24 lg:px-8 max-w-7xl">
     <!-- Header Section -->
     <div class="mb-16 text-center">

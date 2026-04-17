@@ -1,3 +1,11 @@
+<script client>
+  const mobileSearchQuery = state('')
+
+  function submitMobileSearch() {
+    window.location.href = '/search?q=' + encodeURIComponent(mobileSearchQuery())
+  }
+</script>
+
 @if(isOpen)
   <div class="lg:hidden" role="dialog" aria-modal="true">
     <!-- Background backdrop, show/hide based on slide-over state. -->
@@ -18,41 +26,36 @@
       <div class="flow-root mt-6">
         <div class="-my-6 divide-gray-500/10 divide-y">
           <div class="py-6 space-y-2">
-            <StxLink
-              to="/judges"
-              class="block -mx-3 px-3 py-2 font-semibold text-base/7 border-b-2 rounded-lg duration-200 transition-colors"
-              :class="[
-                currentPath === '/judges'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent hover:border-blue-500 text-gray-900'
-              ]"
+            <form
+              @submit.prevent="submitMobileSearch"
+              class="-mx-3 mb-4 px-3"
             >
-              Find Judges
-            </StxLink>
-            <StxLink
-              to="/review"
-              class="block -mx-3 px-3 py-2 font-semibold text-base/7 border-b-2 rounded-lg duration-200 transition-colors"
-              :class="[
-                currentPath === '/review'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent hover:border-blue-500 text-gray-900'
-              ]"
-            >
-              Write Review
-            </StxLink>
+              <div class="relative">
+                <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                  <svg class="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  x-model="mobileSearchQuery"
+                  placeholder="Search judges or courts..."
+                  class="block pl-9 pr-3 py-2 w-full text-gray-900 sm:text-sm placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-200 ring-inset rounded-lg focus:ring-2 focus:ring-gray-600 focus:ring-inset"
+                >
+              </div>
+            </form>
+
+            <StxLink to="/judges" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Find Judges</StxLink>
+            <StxLink to="/court-houses" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Court Houses</StxLink>
+            <StxLink to="/review" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Write a Review</StxLink>
+            <StxLink to="/reviews" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Reviews</StxLink>
+            <StxLink to="/blog" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Blog</StxLink>
             @if(isAuthenticated)
-              <StxLink
-                to="/feed"
-                class="block -mx-3 px-3 py-2 font-semibold text-base/7 border-b-2 rounded-lg duration-200 transition-colors"
-                :class="[
-                  currentPath === '/feed'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent hover:border-blue-500 text-gray-900'
-                ]"
-              >
-                Feed
-              </StxLink>
+              <StxLink to="/notifications" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Notifications</StxLink>
+              <StxLink to="/profile" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Profile</StxLink>
+              <StxLink to="/settings" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Settings</StxLink>
             @endif
+            <StxLink to="/judges/submit" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Submit a Judge</StxLink>
           </div>
           <div class="py-6">
             @if(!isAuthenticated)

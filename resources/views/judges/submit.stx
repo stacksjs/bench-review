@@ -1,0 +1,173 @@
+<script client>
+  const form = state({
+    judgeName: '',
+    court: '',
+    department: '',
+    city: '',
+    state: '',
+    appointed: '',
+    caseTypes: '',
+    bio: '',
+    sourceUrl: '',
+    submitterRole: 'attorney',
+    submitterEmail: ''
+  })
+  const loading = state(false)
+  const submitted = state(false)
+  const submitError = state('')
+
+  async function submitForm() {
+    loading.set(true)
+    submitError.set('')
+    try {
+      const res = await fetch('/api/judges/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form()),
+      })
+      if (!res.ok) throw new Error('Could not submit — please try again')
+      submitted.set(true)
+    } catch (e) {
+      submitError.set(e.message)
+    } finally {
+      loading.set(false)
+    }
+  }
+</script>
+
+@extends('layouts/default')
+
+@section('title', 'Submit a Judge - Bench Review')
+
+@section('content')
+<div class="min-h-screen">
+  <div class="mx-auto px-4 py-16 sm:px-6 lg:px-8 max-w-3xl">
+    <div>
+      <h1 class="font-bold text-3xl text-gray-900 tracking-tight sm:text-4xl">Submit a judge</h1>
+      <p class="mt-3 text-gray-600">
+        Don't see a judge in our directory? Submit them here. Our team will verify and add the profile within a few business days.
+      </p>
+    </div>
+
+    <div :show="submitted" class="mt-10 p-8 bg-green-50 ring-1 ring-green-600/20 rounded-2xl">
+      <div class="flex gap-x-4 items-start">
+        <div class="flex-shrink-0">
+          <svg class="h-6 w-6 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
+          </svg>
+        </div>
+        <div>
+          <h2 class="font-semibold text-green-900 text-lg">Submission received</h2>
+          <p class="mt-1 text-green-800 text-sm">
+            Thanks for helping make the directory more complete. We'll review the submission and notify you when the profile is live.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <form :show="!submitted" @submit.prevent="submitForm" class="mt-10 space-y-10">
+      <!-- Judge details -->
+      <div class="p-6 sm:p-8 bg-white ring-1 ring-gray-900/5 rounded-2xl shadow-sm">
+        <h2 class="font-semibold text-base text-gray-900">Judge details</h2>
+        <div class="grid gap-6 grid-cols-1 sm:grid-cols-6 mt-6">
+          <div class="sm:col-span-6">
+            <label for="judgeName" class="block font-medium text-gray-700 text-sm">Full name</label>
+            <input id="judgeName" x-model="form.judgeName" type="text" required placeholder="Hon. Sarah Johnson"
+              class="block mt-2 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2">
+          </div>
+
+          <div class="sm:col-span-3">
+            <label for="court" class="block font-medium text-gray-700 text-sm">Court</label>
+            <input id="court" x-model="form.court" type="text" required placeholder="Superior Court"
+              class="block mt-2 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2">
+          </div>
+
+          <div class="sm:col-span-3">
+            <label for="department" class="block font-medium text-gray-700 text-sm">Department / Division</label>
+            <input id="department" x-model="form.department" type="text" placeholder="Department 15"
+              class="block mt-2 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2">
+          </div>
+
+          <div class="sm:col-span-4">
+            <label for="city" class="block font-medium text-gray-700 text-sm">City</label>
+            <input id="city" x-model="form.city" type="text"
+              class="block mt-2 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2">
+          </div>
+
+          <div class="sm:col-span-2">
+            <label for="state" class="block font-medium text-gray-700 text-sm">State</label>
+            <input id="state" x-model="form.state" type="text" placeholder="CA"
+              class="block mt-2 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2">
+          </div>
+
+          <div class="sm:col-span-3">
+            <label for="appointed" class="block font-medium text-gray-700 text-sm">Year appointed</label>
+            <input id="appointed" x-model="form.appointed" type="number" min="1900" max="2100"
+              class="block mt-2 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2">
+          </div>
+
+          <div class="sm:col-span-3">
+            <label for="caseTypes" class="block font-medium text-gray-700 text-sm">Case types</label>
+            <input id="caseTypes" x-model="form.caseTypes" type="text" placeholder="Criminal, Civil"
+              class="block mt-2 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2">
+          </div>
+
+          <div class="sm:col-span-6">
+            <label for="bio" class="block font-medium text-gray-700 text-sm">Background (optional)</label>
+            <textarea id="bio" x-model="form.bio" rows="4" placeholder="Education, prior practice, notable cases..."
+              class="block mt-2 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2"></textarea>
+          </div>
+
+          <div class="sm:col-span-6">
+            <label for="sourceUrl" class="block font-medium text-gray-700 text-sm">Source URL</label>
+            <input id="sourceUrl" x-model="form.sourceUrl" type="url" placeholder="https://courts.ca.gov/..."
+              class="block mt-2 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2">
+            <p class="mt-1 text-gray-500 text-xs">A link to a court bio, bar profile, or judicial directory entry helps us verify quickly.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Submitter -->
+      <div class="p-6 sm:p-8 bg-white ring-1 ring-gray-900/5 rounded-2xl shadow-sm">
+        <h2 class="font-semibold text-base text-gray-900">About you</h2>
+        <p class="mt-1 text-gray-500 text-sm">We use this to follow up only — your info is never shared.</p>
+
+        <div class="grid gap-6 grid-cols-1 sm:grid-cols-6 mt-6">
+          <div class="sm:col-span-3">
+            <label for="submitterRole" class="block font-medium text-gray-700 text-sm">Your role</label>
+            <select id="submitterRole" x-model="form.submitterRole"
+              class="block mt-2 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2">
+              <option value="attorney">Attorney</option>
+              <option value="clerk">Clerk</option>
+              <option value="court-staff">Court staff</option>
+              <option value="party">Party to a case</option>
+              <option value="journalist">Journalist</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <div class="sm:col-span-3">
+            <label for="submitterEmail" class="block font-medium text-gray-700 text-sm">Your email</label>
+            <input id="submitterEmail" x-model="form.submitterEmail" type="email" required
+              class="block mt-2 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2">
+          </div>
+        </div>
+      </div>
+
+      <p :show="submitError" class="text-red-600 text-sm" x-text="submitError"></p>
+
+      <div class="flex gap-x-4 items-center justify-end">
+        <StxLink to="/judges" class="font-semibold text-gray-700 text-sm">Cancel</StxLink>
+        <button
+          type="submit"
+          :disabled="loading"
+          class="px-4 py-2 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <span :show="!loading">Submit judge</span>
+          <span :show="loading">Submitting...</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+@endsection

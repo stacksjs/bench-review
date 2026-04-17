@@ -1,0 +1,65 @@
+<div class="lg:col-span-2 lg:row-end-2 lg:row-span-2 -mx-4 px-4 py-8 sm:mx-0 sm:pb-14 sm:px-8 xl:pb-20 xl:pt-16 xl:px-16 bg-white ring-1 ring-gray-900/5 sm:rounded-lg shadow-sm">
+  <h2 class="font-semibold text-base text-gray-800">About this court</h2>
+  <p class="mt-4 leading-7 text-gray-600">
+    The {{ court.name }} serves the community of {{ court.city }}, {{ court.state }}. It hears a wide range of matters including criminal, civil, family, and probate cases, with judges appointed for a mix of trial and appellate responsibilities.
+  </p>
+
+  <dl class="grid grid-cols-1 sm:grid-cols-2 mt-8 text-sm/6">
+    <div class="sm:pr-4">
+      <dt class="inline text-gray-600">Established</dt>
+      <dd class="inline text-gray-700">1879</dd>
+    </div>
+    <div class="mt-2 sm:mt-0 sm:pl-4">
+      <dt class="inline text-gray-600">Jurisdiction</dt>
+      <dd class="inline text-gray-700">State</dd>
+    </div>
+    <div class="mt-6 pt-6 sm:pr-4 border-gray-900/5 border-t">
+      <dt class="font-semibold text-gray-800">Chief Judge</dt>
+      <dd class="mt-2 text-gray-600">
+        <span class="font-medium text-gray-800">Hon. Sarah Johnson</span><br>
+        Appointed 2018<br>
+      </dd>
+    </div>
+    <div class="mt-8 sm:mt-6 sm:pl-4 sm:pt-6 sm:border-gray-900/5 sm:border-t">
+      <dt class="font-semibold text-gray-800">Departments</dt>
+      <dd class="mt-2 text-gray-600">
+        Criminal · Civil · Family · Probate · Appellate
+      </dd>
+    </div>
+  </dl>
+
+  <div class="mt-12">
+    <h3 class="font-semibold text-base text-gray-800">By the numbers</h3>
+    <dl class="grid gap-4 grid-cols-2 sm:grid-cols-4 mt-4">
+      <div class="px-4 py-3 bg-off-gray rounded-lg">
+        <dt class="text-gray-500 text-xs">Active Judges</dt>
+        <dd class="mt-1 font-semibold text-2xl text-gray-900">24</dd>
+      </div>
+      <div class="px-4 py-3 bg-off-gray rounded-lg">
+        <dt class="text-gray-500 text-xs">Total Reviews</dt>
+        <dd class="mt-1 font-semibold text-2xl text-gray-900">1,287</dd>
+      </div>
+      <div class="px-4 py-3 bg-off-gray rounded-lg">
+        <dt class="text-gray-500 text-xs">Avg Rating</dt>
+        <dd class="mt-1 font-semibold text-2xl text-gray-900">4.4</dd>
+      </div>
+      <div class="px-4 py-3 bg-off-gray rounded-lg">
+        <dt class="text-gray-500 text-xs">Cases / yr</dt>
+        <dd class="mt-1 font-semibold text-2xl text-gray-900">12k</dd>
+      </div>
+    </dl>
+  </div>
+
+  <div class="mt-12">
+    <h3 class="font-semibold text-base text-gray-800">Visit this court</h3>
+    <div class="overflow-hidden mt-4 h-64 w-full bg-gray-100 rounded-lg">
+      <div class="flex flex-col items-center justify-center h-full text-gray-400">
+        <svg class="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+        </svg>
+        <p class="mt-3 text-sm">Map placeholder — {{ court.address }}</p>
+      </div>
+    </div>
+  </div>
+</div>

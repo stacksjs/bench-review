@@ -3,16 +3,17 @@
 @section('title', 'Register - Bench Review')
 
 @section('content')
-<div class="h-screen" x-data="{
-  name: '',
-  email: '',
-  password: '',
-  async submitRegistration() {
+<script client>
+  const name = state('')
+  const email = state('')
+  const password = state('')
+
+  async function submitRegistration() {
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: this.name, email: this.email, password: this.password })
+        body: JSON.stringify({ name: name(), email: email(), password: password() })
       })
       if (!res.ok) throw new Error('Registration failed')
       window.location.href = '/paywall'
@@ -20,7 +21,8 @@
       console.error(error)
     }
   }
-}">
+</script>
+<div class="h-screen">
   <div class="mt-10 sm:mx-auto sm:max-w-[480px] sm:w-full">
     <div class="px-6 py-12 sm:px-12 bg-white sm:rounded-lg shadow">
       <div class="space-y-6">
@@ -46,7 +48,7 @@
         </div>
 
         <div>
-          <button @click="submitRegistration()" type="button" class="flex justify-center px-3 py-1.5 w-full font-semibold text-sm/6 text-white bg-gray-600 hover:bg-gray-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm">Sign up</button>
+          <button @click="submitRegistration" type="button" class="flex justify-center px-3 py-1.5 w-full font-semibold text-sm/6 text-white bg-gray-600 hover:bg-gray-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm">Sign up</button>
         </div>
       </div>
 

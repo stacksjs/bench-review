@@ -1,20 +1,18 @@
-<div
-  x-data="{
-    get shareUrl() {
-      return window.location.href
-    },
-    sharePost() {
-      if (navigator.share) {
-        navigator.share({
-          title: '{{ post.title }}',
-          text: '{{ post.content.substring(0, 160) }}',
-          url: this.shareUrl,
-        })
-      } else {
-        navigator.clipboard.writeText(this.shareUrl)
-      }
+<script client>
+  function sharePost() {
+    const shareUrl = window.location.href
+    if (navigator.share) {
+      navigator.share({
+        title: '{{ post.title }}',
+        text: '{{ post.content.substring(0, 160) }}',
+        url: shareUrl,
+      })
+    } else {
+      navigator.clipboard.writeText(shareUrl)
     }
-  }"
+  }
+</script>
+<div
   class="mx-auto pb-32 px-4 sm:px-6 lg:px-8 max-w-5xl"
 >
   <div class="mt-6 mx-auto text-gray-500">
@@ -26,7 +24,7 @@
     <div class="mt-16 pt-8 border-gray-200 border-t">
       <div class="flex items-center justify-end">
         <button
-          @click="sharePost()"
+          @click="sharePost"
           class="inline-flex items-center space-x-2 text-gray-600 hover:text-gray-900 duration-200 transition-colors"
         >
           <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">

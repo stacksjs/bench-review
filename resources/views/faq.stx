@@ -1,0 +1,96 @@
+<script client>
+  const open = state(0)
+</script>
+
+<script server>
+
+const faqs = [
+  {
+    q: 'Who can write a review?',
+    a: 'Anyone with a verified Bench Review account can submit a review. We prioritize reviews from clerks, attorneys, court staff, and parties to a case — people with first-hand experience appearing before a judge.'
+  },
+  {
+    q: 'Can I review anonymously?',
+    a: 'Yes. When you submit a review, you can toggle "Post anonymously" and your name will not appear publicly. Your identity is never shared with the judge being reviewed or their court.'
+  },
+  {
+    q: 'How are reviews moderated?',
+    a: 'Every review is screened for personal attacks, threats, defamation, and identifying information that could compromise privacy. We focus on substantive observations about courtroom conduct, legal knowledge, and fairness.'
+  },
+  {
+    q: 'Is the content I read free?',
+    a: 'Free accounts can write reviews and read summaries. A Professional subscription ($10/mo) unlocks full review text, advanced search, and analytics. Clerks always get free access — that\'s our way of saying thanks.'
+  },
+  {
+    q: 'Where does the judge data come from?',
+    a: 'Judge profiles are sourced from publicly available court records, bar associations, and judicial directories. Reviews are user-contributed. We invite judges to claim their profile and respond to reviews.'
+  },
+  {
+    q: 'Can a judge get a review removed?',
+    a: 'A judge can flag a review for moderation review. If the review violates our content standards (personal attacks, doxxing, disclosing protected case information), we will remove or edit it. We do not remove reviews simply because they are unflattering.'
+  },
+  {
+    q: 'How do I correct factual information about a judge?',
+    a: 'Use the "Suggest an edit" link on any judge profile, or email us at hello@bench.review with details. We update verified information promptly.'
+  },
+  {
+    q: 'Do you sell my data?',
+    a: 'No. We do not sell user data. We do not share reviewer identities with judges or courts. See our Privacy Policy for full details.'
+  },
+  {
+    q: 'How do I cancel my subscription?',
+    a: 'Visit Settings > Billing and click Cancel. Your access continues through the end of the current billing period.'
+  },
+  {
+    q: 'I want to add a judge that\'s not in your directory.',
+    a: 'Use Submit a Judge from the menu, or visit /judges/submit. We verify and add new judges within a few business days.'
+  }
+]
+</script>
+
+@extends('layouts/default')
+@section('title', 'FAQ - Bench Review')
+@section('content')
+<div class="min-h-screen">
+  <div class="mx-auto px-6 py-24 lg:px-8 max-w-4xl">
+    <div class="text-center">
+      <h1 class="font-bold text-4xl text-gray-900 tracking-tight sm:text-5xl">Frequently asked questions</h1>
+      <p class="mt-4 text-gray-600 text-lg">Everything you need to know about Bench Review.</p>
+    </div>
+
+    <dl class="mt-16 divide-gray-200 divide-y">
+      @foreach(faqs as faq, idx)
+        <div class="py-6">
+          <dt>
+            <button
+              type="button"
+              class="flex items-center justify-between w-full text-gray-900 text-left"
+              @click="open.set(open() === {{ idx }} ? -1 : {{ idx }})"
+            >
+              <span class="font-semibold text-base">{{ faq.q }}</span>
+              <span class="flex items-center ml-6 h-7">
+                <svg
+                  class="h-6 w-6 duration-200 transition-transform"
+                  :class="[open() === {{ idx }} ? 'rotate-180' : '']"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+              </span>
+            </button>
+          </dt>
+          <dd :show="open() === {{ idx }}" class="mt-4 pr-12">
+            <p class="leading-7 text-base text-gray-600">{{ faq.a }}</p>
+          </dd>
+        </div>
+      @endforeach
+    </dl>
+
+    <div class="mt-16 p-8 text-center bg-off-gray rounded-2xl">
+      <h2 class="font-semibold text-gray-900 text-xl">Still have questions?</h2>
+      <p class="mt-2 text-gray-600">We're happy to help.</p>
+      <StxLink to="/contact" class="inline-block mt-4 px-4 py-2 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md">Contact us</StxLink>
+    </div>
+  </div>
+</div>
+@endsection

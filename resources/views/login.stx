@@ -36,7 +36,7 @@
           </div>
 
           <div class="text-sm/6">
-            <a href="#" class="font-semibold text-gray-600 hover:text-gray-500">Forgot password?</a>
+            <StxLink to="/forgot-password" class="font-semibold text-gray-600 hover:text-gray-500">Forgot password?</StxLink>
           </div>
         </div>
 
