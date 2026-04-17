@@ -26,9 +26,7 @@ import { judges } from '../../../functions/sample'
               x-model="searchQuery"
             >
             <div class="flex absolute inset-y-0 left-0 items-center pl-4">
-              <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
-              </svg>
+              <Icon name="search" size="20" class="text-gray-400" />
             </div>
           </div>
         </div>
@@ -93,11 +91,7 @@ import { judges } from '../../../functions/sample'
               <div class="flex items-center justify-center mt-4">
                 <div class="flex items-center">
                   @for(let star = 1; star <= 5; star++)
-                    <svg
-                       x-class="[{{ star }} <= judge.rating ? 'text-yellow-400' : 'text-gray-200', 'h-5 w-5 flex-shrink-0']"
-                          viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" clip-rule="evenodd" />
-                    </svg>
+                    <Icon name="star" size="20" x-class="[{{ star }} <= judge.rating ? 'text-yellow-400' : 'text-gray-200', 'flex-shrink-0']" />
                   @endfor
                 </div>
                 <span class="ml-2 text-gray-500 text-sm">({{ judge.reviewCount }} reviews)</span>
@@ -113,9 +107,7 @@ import { judges } from '../../../functions/sample'
       <nav class="flex items-center justify-between px-4 sm:px-0 border-gray-200 border-t">
         <div class="flex flex-1 -mt-px w-0">
           <a href="#" class="inline-flex items-center pr-1 pt-4 font-medium text-gray-500 text-sm hover:text-gray-700 border-t-2 border-transparent hover:border-gray-300">
-            <svg class="mr-3 h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
-            </svg>
+            <Icon name="chevron-left" size="20" class="mr-3 text-gray-400" />
             Previous
           </a>
       </div>
@@ -127,9 +119,7 @@ import { judges } from '../../../functions/sample'
         <div class="flex flex-1 justify-end -mt-px w-0">
           <a href="#" class="inline-flex items-center pl-1 pt-4 font-medium text-gray-500 text-sm hover:text-gray-700 border-t-2 border-transparent hover:border-gray-300">
             Next
-            <svg class="ml-3 h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
-              </svg>
+            <Icon name="chevron-right" size="20" class="ml-3 text-gray-400" />
             </a>
         </div>
       </nav>

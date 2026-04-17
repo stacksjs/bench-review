@@ -45,13 +45,7 @@
         </StxLink>
         <div class="flex items-center">
           @for(let star = 1; star <= 5; star++)
-            <svg
-              class="h-4 w-4"
-              x-class="[{{ star }} <= review.rating ? 'text-yellow-400' : 'text-gray-300']"
-              xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
-            >
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-            </svg>
+            <Icon name="star" size="16" x-class="[{{ star }} <= review.rating ? 'text-yellow-400' : 'text-gray-300']" />
           @endfor
         </div>
       </div>
@@ -62,14 +56,7 @@
           class="inline-flex items-center text-sm duration-150 ease-in-out transition"
           x-class="[isLiked() ? 'text-blue-600' : 'text-gray-500 hover:text-gray-600']"
         >
-          <svg
-            class="mr-1.5 h-5 w-5 transition-colors"
-            x-class="[isLiked() ? 'text-blue-600' : 'text-gray-500 hover:text-gray-600']"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path fill-rule="evenodd" d="M10 2c-1.716 0-3.408.106-5.07.31C3.806 2.45 3 3.414 3 4.517V17.25a.75.75 0 001.075.676L10 15.082l5.925 2.844A.75.75 0 0017 17.25V4.517c0-1.103-.806-2.068-1.93-2.207A41.403 41.403 0 0010 2z" clip-rule="evenodd" />
-          </svg>
+          <Icon name="bookmark" size="20" class="mr-1.5 transition-colors" x-class="[isLiked() ? 'text-blue-600' : 'text-gray-500 hover:text-gray-600']" />
           <span x-class="[isLiked() ? 'text-blue-600' : 'hover:text-gray-600']">
             {{ review.likes }}
           </span>

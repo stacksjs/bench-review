@@ -45,28 +45,21 @@
           <div class="flex gap-x-4">
             <dt class="flex-none">
               <span class="sr-only">Email</span>
-              <svg class="h-7 w-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-              </svg>
+              <Icon name="mail" size="24" class="text-gray-400" />
             </dt>
             <dd><a href="mailto:hello@bench.review" class="hover:text-gray-900">hello@bench.review</a></dd>
           </div>
           <div class="flex gap-x-4">
             <dt class="flex-none">
               <span class="sr-only">Press</span>
-              <svg class="h-7 w-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 12l2.25 2.25L15 12.75M5.625 21h12.75A1.875 1.875 0 0020.25 19.125V7.875c0-1.036-.84-1.875-1.875-1.875h-2.812c-.297 0-.586.108-.815.285l-.937.75A1.125 1.125 0 0112.937 7.5H8.25c-1.036 0-1.875.84-1.875 1.875v9.75c0 1.036.84 1.875 1.875 1.875z" />
-              </svg>
+              <Icon name="file-check" size="24" class="text-gray-400" />
             </dt>
             <dd><a href="mailto:press@bench.review" class="hover:text-gray-900">press@bench.review</a></dd>
           </div>
           <div class="flex gap-x-4">
             <dt class="flex-none">
               <span class="sr-only">Address</span>
-              <svg class="h-7 w-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-              </svg>
+              <Icon name="map-pin" size="24" class="text-gray-400" />
             </dt>
             <dd>San Francisco, California</dd>
           </div>
@@ -149,9 +142,7 @@
 
         <div :show="sent" class="p-8 text-center bg-white border border-gray-100 rounded-2xl shadow-sm">
           <div class="flex items-center justify-center mx-auto h-12 w-12 bg-green-100 rounded-full">
-            <svg class="h-6 w-6 text-green-600" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
-            </svg>
+            <Icon name="check" size="24" class="text-green-600" />
           </div>
           <h2 class="mt-4 font-semibold text-gray-900 text-lg">Message sent</h2>
           <p class="mt-2 text-gray-600 text-sm">Thanks for reaching out. We'll get back to you within a couple of business days.</p>

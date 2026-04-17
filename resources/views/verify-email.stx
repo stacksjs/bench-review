@@ -47,10 +47,7 @@
     <div class="px-6 py-12 sm:px-12 text-center bg-white sm:rounded-lg shadow">
       <div :show="verifyState() === 'pending'">
         <div class="flex items-center justify-center mx-auto h-12 w-12 bg-gray-100 rounded-full">
-          <svg class="h-6 w-6 text-gray-600" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M3 4a2 2 0 00-2 2v1.161l8.441 4.221a1.25 1.25 0 001.118 0L19 7.162V6a2 2 0 00-2-2H3z" />
-            <path d="M19 8.839l-7.77 3.885a2.75 2.75 0 01-2.46 0L1 8.839V14a2 2 0 002 2h14a2 2 0 002-2V8.839z" />
-          </svg>
+          <Icon name="mail" size="24" class="text-gray-600" />
         </div>
         <h1 class="mt-4 font-bold text-2xl text-gray-900">Verify your email</h1>
         <p class="mt-2 text-gray-600 text-sm">
@@ -78,9 +75,7 @@
 
       <div :show="verifyState() === 'verified'">
         <div class="flex items-center justify-center mx-auto h-12 w-12 bg-green-100 rounded-full">
-          <svg class="h-6 w-6 text-green-600" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
-          </svg>
+          <Icon name="check" size="24" class="text-green-600" />
         </div>
         <h1 class="mt-4 font-bold text-2xl text-gray-900">Email verified</h1>
         <p class="mt-2 text-gray-600 text-sm">Welcome aboard! Redirecting you to your profile...</p>
@@ -88,9 +83,7 @@
 
       <div :show="verifyState() === 'error'">
         <div class="flex items-center justify-center mx-auto h-12 w-12 bg-red-100 rounded-full">
-          <svg class="h-6 w-6 text-red-600" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
-          </svg>
+          <Icon name="x-circle" size="24" class="text-red-600" />
         </div>
         <h1 class="mt-4 font-bold text-2xl text-gray-900">Verification failed</h1>
         <p class="mt-2 text-gray-600 text-sm" x-text="verifyError"></p>

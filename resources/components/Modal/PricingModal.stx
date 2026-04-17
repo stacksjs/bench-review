@@ -11,9 +11,7 @@
             class="text-gray-400 hover:text-gray-500 bg-white rounded-md focus:outline-hidden focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
           >
             <span class="sr-only">Close</span>
-            <svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-            </svg>
+            <Icon name="x" size="24" />
           </button>
         </div>
 
@@ -45,21 +43,15 @@
               </StxLink>
               <ul role="list" class="mt-8 space-y-4 text-base text-gray-600">
                 <li class="flex gap-x-3">
-                  <svg class="flex-none h-6 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" data-slot="icon">
-                    <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
-                  </svg>
+                  <Icon name="check" size="20" class="flex-none text-gray-600" />
                   <span>Unlimited judge reviews</span>
                 </li>
                 <li class="flex gap-x-3">
-                  <svg class="flex-none h-6 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" data-slot="icon">
-                    <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
-                  </svg>
+                  <Icon name="check" size="20" class="flex-none text-gray-600" />
                   <span>Advanced analytics and insights</span>
                 </li>
                 <li class="flex gap-x-3">
-                  <svg class="flex-none h-6 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" data-slot="icon">
-                    <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
-                  </svg>
+                  <Icon name="check" size="20" class="flex-none text-gray-600" />
                   <span>Priority customer support</span>
                 </li>
               </ul>

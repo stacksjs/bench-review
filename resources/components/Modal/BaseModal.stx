@@ -31,9 +31,7 @@
             class="text-gray-400 hover:text-gray-500 bg-white rounded-md focus:outline-hidden focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
           >
             <span class="sr-only">Close</span>
-            <svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-            </svg>
+            <Icon name="x" size="24" />
           </button>
         </div>
         @slot('content')

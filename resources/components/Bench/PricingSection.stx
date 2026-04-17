@@ -48,21 +48,11 @@
           started</StxLink>
         <ul role="list" class="mt-8 space-y-3 text-gray-600 text-sm/6">
           <li class="flex gap-x-3">
-            <svg class="flex-none h-6 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
-              data-slot="icon">
-              <path fill-rule="evenodd"
-                d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
-                clip-rule="evenodd" />
-            </svg>
+            <Icon name="check" size="20" class="flex-none text-gray-600" />
             Review judges
           </li>
           <li class="flex gap-x-3">
-            <svg class="flex-none h-6 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
-              data-slot="icon">
-              <path fill-rule="evenodd"
-                d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
-                clip-rule="evenodd" />
-            </svg>
+            <Icon name="check" size="20" class="flex-none text-gray-600" />
             Help democracy
           </li>
         </ul>
@@ -79,30 +69,15 @@
           started</StxLink>
         <ul role="list" class="mt-8 space-y-3 text-gray-600 text-sm/6">
           <li class="flex gap-x-3">
-            <svg class="flex-none h-6 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
-              data-slot="icon">
-              <path fill-rule="evenodd"
-                d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
-                clip-rule="evenodd" />
-            </svg>
+            <Icon name="check" size="20" class="flex-none text-gray-600" />
             Read any judge review
           </li>
           <li class="flex gap-x-3">
-            <svg class="flex-none h-6 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
-              data-slot="icon">
-              <path fill-rule="evenodd"
-                d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
-                clip-rule="evenodd" />
-            </svg>
+            <Icon name="check" size="20" class="flex-none text-gray-600" />
             Powerful search tools
           </li>
           <li class="flex gap-x-3">
-            <svg class="flex-none h-6 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
-              data-slot="icon">
-              <path fill-rule="evenodd"
-                d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
-                clip-rule="evenodd" />
-            </svg>
+            <Icon name="check" size="20" class="flex-none text-gray-600" />
             Advanced analytics & statistics
           </li>
         </ul>

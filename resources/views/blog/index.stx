@@ -53,9 +53,7 @@ import { blogPosts } from '../../functions/sample'
         <nav class="flex items-center justify-between px-4 sm:px-0 border-gray-200 border-t">
           <div class="flex flex-1 -mt-px w-0">
             <a href="#" class="inline-flex items-center pr-1 pt-4 font-medium text-gray-500 text-sm hover:text-gray-700 border-t-2 border-transparent hover:border-gray-300">
-              <svg class="mr-3 h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.06l-4.5-4.25a.75.75 0 010-1.06l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
-              </svg>
+              <Icon name="chevron-left" size="20" class="mr-3 text-gray-400" />
               Previous
             </a>
           </div>
@@ -67,9 +65,7 @@ import { blogPosts } from '../../functions/sample'
           <div class="flex flex-1 justify-end -mt-px w-0">
             <a href="#" class="inline-flex items-center pl-1 pt-4 font-medium text-gray-500 text-sm hover:text-gray-700 border-t-2 border-transparent hover:border-gray-300">
               Next
-              <svg class="ml-3 h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
-              </svg>
+              <Icon name="chevron-right" size="20" class="ml-3 text-gray-400" />
             </a>
           </div>
         </nav>

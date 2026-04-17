@@ -138,18 +138,14 @@
             title="Dismiss"
             @click.prevent="dismiss(notif.id)"
           >
-            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-            </svg>
+            <Icon name="x" size="20" />
           </button>
         </div>
       </li>
     </ul>
 
     <div :show="filtered().length === 0" class="mt-12 p-12 text-center bg-white border border-dashed border-gray-200 rounded-2xl">
-      <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
-      </svg>
+      <Icon name="bell" size="48" class="mx-auto text-gray-300" />
       <h3 class="mt-4 font-semibold text-base text-gray-900">You're all caught up</h3>
       <p class="mt-2 text-gray-500 text-sm">Nothing new here right now.</p>
     </div>

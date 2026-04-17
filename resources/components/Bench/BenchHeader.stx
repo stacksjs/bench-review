@@ -125,9 +125,7 @@
           <label for="header-search" class="sr-only">Search</label>
           <div class="relative">
             <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-              <svg class="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
-              </svg>
+              <Icon name="search" size="16" class="text-gray-400" />
             </div>
             <input
               id="header-search"
@@ -145,9 +143,7 @@
         <div class="flex lg:hidden">
           <button @click="mobileMenu.set(true)" type="button" class="inline-flex items-center justify-center -m-2.5 p-2.5 text-gray-700 rounded-md">
             <span class="sr-only">Open main menu</span>
-            <svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-            </svg>
+            <Icon name="menu" size="24" />
           </button>
         </div>
         <div class="hidden lg:flex lg:flex-1 lg:justify-end">
@@ -163,9 +159,7 @@
                   @click="isNotificationMenuOpen.set(!isNotificationMenuOpen())"
                 >
                   <span class="sr-only">View notifications</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
-                  </svg>
+                  <Icon name="bell" size="24" />
                   <span :show="unreadNotifications() >= 1" class="flex absolute items-center justify-center h-4 w-4 font-medium text-[10px] text-white bg-red-500 rounded-full -right-1 -top-1" x-text="unreadNotifications"></span>
                 </button>
                 <div
