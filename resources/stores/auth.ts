@@ -1,3 +1,5 @@
+import { defineStore, state, derived } from '@stacksjs/stx'
+
 defineStore('auth', () => {
   const user = state(null)
   const isAuthenticated = derived(() => !!user())

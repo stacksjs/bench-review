@@ -1,3 +1,5 @@
+import { defineStore, state } from '@stacksjs/stx'
+
 defineStore('search', () => {
   const query = state('')
   const location = state('')

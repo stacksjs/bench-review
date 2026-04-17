@@ -51,7 +51,7 @@ import { judges, courtHouses } from '../functions/sample'
         <div class="flex items-center justify-between mt-6">
           <div>
             <h1 class="font-semibold text-2xl text-gray-900">
-              <span :show="search.query">Results for "{{ query }}"</span>
+              <span :show="search.query">Results for "{{ search.query }}"</span>
               <span :show="!search.query">All results</span>
             </h1>
             <p class="mt-1 text-gray-600 text-sm">{{ totalResults() }} results found</p>
@@ -63,25 +63,25 @@ import { judges, courtHouses } from '../functions/sample'
           <nav class="flex -mb-px space-x-8" aria-label="Tabs">
             <button
               type="button"
-              @click="tab.set('all')"
+              @click="search.setTab('all')"
               class="px-1 py-3 font-medium text-sm whitespace-nowrap border-b-2"
-              x-class="[tab === 'all' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
+              x-class="[search.tab === 'all' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
             >
               All <span class="ml-1 text-gray-400">({{ totalResults() }})</span>
             </button>
             <button
               type="button"
-              @click="tab.set('judges')"
+              @click="search.setTab('judges')"
               class="px-1 py-3 font-medium text-sm whitespace-nowrap border-b-2"
-              x-class="[tab === 'judges' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
+              x-class="[search.tab === 'judges' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
             >
               Judges <span class="ml-1 text-gray-400">({{ filteredJudges().length }})</span>
             </button>
             <button
               type="button"
-              @click="tab.set('courts')"
+              @click="search.setTab('courts')"
               class="px-1 py-3 font-medium text-sm whitespace-nowrap border-b-2"
-              x-class="[tab === 'courts' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
+              x-class="[search.tab === 'courts' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
             >
               Courts <span class="ml-1 text-gray-400">({{ filteredCourts().length }})</span>
             </button>
@@ -92,8 +92,8 @@ import { judges, courtHouses } from '../functions/sample'
       <!-- Results -->
       <div class="mt-8">
         <!-- Judges results -->
-        <div :show="tab === 'all' || tab === 'judges'">
-          <h2 :show="tab === 'all'" class="font-semibold text-gray-900 text-lg">Judges</h2>
+        <div :show="search.tab === 'all' || search.tab === 'judges'">
+          <h2 :show="search.tab === 'all'" class="font-semibold text-gray-900 text-lg">Judges</h2>
           <div :show="filteredJudges().length === 0" class="py-12 text-center">
             <p class="text-gray-500 text-sm">No judges match your search.</p>
           </div>
@@ -119,8 +119,8 @@ import { judges, courtHouses } from '../functions/sample'
         </div>
 
         <!-- Courts results -->
-        <div :show="tab === 'all' || tab === 'courts'" x-class="[tab === 'all' ? 'mt-12' : '']">
-          <h2 :show="tab === 'all'" class="font-semibold text-gray-900 text-lg">Court Houses</h2>
+        <div :show="search.tab === 'all' || search.tab === 'courts'" x-class="[search.tab === 'all' ? 'mt-12' : '']">
+          <h2 :show="search.tab === 'all'" class="font-semibold text-gray-900 text-lg">Court Houses</h2>
           <div :show="filteredCourts().length === 0" class="py-12 text-center">
             <p class="text-gray-500 text-sm">No courts match your search.</p>
           </div>

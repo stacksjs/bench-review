@@ -1,48 +1,52 @@
 <script client>
-  const isAuthenticated = state(false)
+  const auth = useStore('auth')
+  const search = useStore('search')
+  const isAuthenticated = auth.isAuthenticated
   const isProfileMenuOpen = state(false)
   const isNotificationMenuOpen = state(false)
   const mobileMenu = state(false)
-  const headerSearchQuery = state('')
-  const headerNotifications = state([
-    {
-      id: 1,
-      user: {
-        name: 'Sarah Johnson',
-        imageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-      },
-      message: 'Sarah Johnson liked your review',
-      time: '2 minutes ago',
-      unread: true
-    },
-    {
-      id: 2,
-      user: {
-        name: 'Michael Chen',
-        imageUrl: 'https://images.unsplash.com/photo-1550525811-e5869dd03032?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-      },
-      message: 'Michael Chen commented on your review',
-      time: '1 hour ago',
-      unread: true
-    },
-    {
-      id: 3,
-      user: {
-        name: 'Robert Davis',
-        imageUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-      },
-      message: 'Robert Davis followed you',
-      time: '3 hours ago',
-      unread: false
-    }
-  ])
 
-  const unreadNotifications = derived(() => {
-    return headerNotifications().filter(n => n.unread).length
-  })
+  // Initialize sample notifications if empty
+  if (auth.notifications().length === 0) {
+    auth.setNotifications([
+      {
+        id: 1,
+        user: {
+          name: 'Sarah Johnson',
+          imageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+        },
+        message: 'Sarah Johnson liked your review',
+        time: '2 minutes ago',
+        unread: true
+      },
+      {
+        id: 2,
+        user: {
+          name: 'Michael Chen',
+          imageUrl: 'https://images.unsplash.com/photo-1550525811-e5869dd03032?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+        },
+        message: 'Michael Chen commented on your review',
+        time: '1 hour ago',
+        unread: true
+      },
+      {
+        id: 3,
+        user: {
+          name: 'Robert Davis',
+          imageUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+        },
+        message: 'Robert Davis followed you',
+        time: '3 hours ago',
+        unread: false
+      }
+    ])
+  }
+
+  const headerNotifications = auth.notifications
+  const unreadNotifications = auth.unreadCount
 
   function submitHeaderSearch() {
-    window.location.href = '/search?q=' + encodeURIComponent(headerSearchQuery())
+    search.navigateToSearch()
   }
 </script>
 <header
@@ -130,7 +134,7 @@
             <input
               id="header-search"
               type="text"
-              x-model="headerSearchQuery"
+              x-model="search.query"
               placeholder="Search judges or courts..."
               class="block pl-9 pr-3 py-2 w-full text-gray-900 sm:text-sm placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-200 ring-inset rounded-lg focus:ring-2 focus:ring-gray-600 focus:ring-inset"
             >
