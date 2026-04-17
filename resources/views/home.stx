@@ -6,14 +6,10 @@ const latestReviews = reviews.slice(0, 3)
 </script>
 
 <script client>
-  const query = state('')
-  const searchLocation = state('')
+  const search = useStore('search')
 
   function submitSearch() {
-    const params = new URLSearchParams()
-    if (query()) params.set('q', query())
-    if (searchLocation()) params.set('location', searchLocation())
-    window.location.href = '/search?' + params.toString()
+    search.navigateToSearch()
   }
 </script>
 
@@ -37,7 +33,7 @@ const latestReviews = reviews.slice(0, 3)
               <input
                 id="search-judge"
                 type="text"
-                x-model="query"
+                x-model="search.query"
                 placeholder="Judge name, court, or case type"
                 class="block pl-10 pr-3 py-3 w-full text-gray-900 sm:text-sm placeholder:text-gray-400 bg-gray-50 border-0 ring-1 ring-gray-200 ring-inset rounded-xl focus:ring-2 focus:ring-gray-600 focus:ring-inset"
               >
@@ -52,7 +48,7 @@ const latestReviews = reviews.slice(0, 3)
               <input
                 id="search-location"
                 type="text"
-                x-model="searchLocation"
+                x-model="search.location"
                 placeholder="City or state"
                 class="block pl-10 pr-3 py-3 w-full text-gray-900 sm:text-sm placeholder:text-gray-400 bg-gray-50 border-0 ring-1 ring-gray-200 ring-inset rounded-xl focus:ring-2 focus:ring-gray-600 focus:ring-inset"
               >

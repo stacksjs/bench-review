@@ -3,42 +3,21 @@ import { judges, courtHouses } from '../functions/sample'
 </script>
 
 <script client>
-  const allJudges = {{ JSON.stringify(judges.value) }}
-  const allCourts = {{ JSON.stringify(courtHouses.value) }}
+  const search = useStore('search')
+  const judgesStore = useStore('judges')
 
-  const query = state(new URLSearchParams(window.location.search).get('q') || '')
-  const tab = state(new URLSearchParams(window.location.search).get('type') || 'all')
+  // Initialize stores with server data and URL params
+  judgesStore.setJudges({{ JSON.stringify(judges.value) }})
+  judgesStore.setCourtHouses({{ JSON.stringify(courtHouses.value) }})
+  search.initFromUrl()
 
-  const filteredJudges = derived(() => {
-    const q = query()
-    if (!q) return allJudges
-    const needle = q.toLowerCase()
-    return allJudges.filter(j =>
-      j.name.toLowerCase().includes(needle) ||
-      j.court.name.toLowerCase().includes(needle) ||
-      j.location.toLowerCase().includes(needle)
-    )
-  })
-
-  const filteredCourts = derived(() => {
-    const q = query()
-    if (!q) return allCourts
-    const needle = q.toLowerCase()
-    return allCourts.filter(c =>
-      c.name.toLowerCase().includes(needle) ||
-      c.city.toLowerCase().includes(needle) ||
-      c.state.toLowerCase().includes(needle)
-    )
-  })
-
-  const totalResults = derived(() => {
-    return filteredJudges().length + filteredCourts().length
-  })
+  // Local aliases for template readability
+  const filteredJudges = judgesStore.filteredJudges
+  const filteredCourts = judgesStore.filteredCourtHouses
+  const totalResults = judgesStore.totalResults
 
   function submitSearch() {
-    const params = new URLSearchParams(window.location.search)
-    params.set('q', query())
-    window.history.replaceState({}, '', '?' + params.toString())
+    search.updateUrlQuery()
   }
 </script>
 
@@ -55,7 +34,7 @@ import { judges, courtHouses } from '../functions/sample'
           </div>
           <input
             type="text"
-            x-model="query"
+            x-model="search.query"
             placeholder="Search judges, courts, or locations..."
             class="block pl-12 pr-32 py-4 w-full text-gray-900 sm:text-base placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-200 ring-inset rounded-xl focus:ring-2 focus:ring-gray-600 focus:ring-inset shadow-sm"
           >
@@ -72,8 +51,8 @@ import { judges, courtHouses } from '../functions/sample'
         <div class="flex items-center justify-between mt-6">
           <div>
             <h1 class="font-semibold text-2xl text-gray-900">
-              <span :show="query">Results for "{{ query }}"</span>
-              <span :show="!query">All results</span>
+              <span :show="search.query">Results for "{{ query }}"</span>
+              <span :show="!search.query">All results</span>
             </h1>
             <p class="mt-1 text-gray-600 text-sm">{{ totalResults() }} results found</p>
           </div>

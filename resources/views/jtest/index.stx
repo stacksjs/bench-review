@@ -1,4 +1,4 @@
 @extends('layouts/default')
 @section('content')
-JUDGES_HELLO
+JTEST_MARKER
 @endsection

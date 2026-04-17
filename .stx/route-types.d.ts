@@ -12,6 +12,7 @@ declare module "stx/routes" {
     '/faq': {  }
     '/forgot-password': {  }
     '/home': {  }
+    '/jtest': {  }
     '/judges': {  }
     '/login': {  }
     '/notifications': {  }
