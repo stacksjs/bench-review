@@ -59,7 +59,7 @@
           <StxLink
             to="/judges"
             class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
-            :class="[
+            x-class="[
               route.path === '/judges'
                 ? 'border-gray-500 text-gray-600'
                 : 'border-transparent hover:border-gray-500'
@@ -71,7 +71,7 @@
           <StxLink
             to="/court-houses"
             class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
-            :class="[
+            x-class="[
               route.path === '/court-houses'
                 ? 'border-gray-500 text-gray-600'
                 : 'border-transparent hover:border-gray-500'
@@ -83,7 +83,7 @@
           <StxLink
             to="/review"
             class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
-            :class="[
+            x-class="[
               route.path === '/review'
                 ? 'border-gray-500 text-gray-600'
                 : 'border-transparent hover:border-gray-500'
@@ -94,7 +94,7 @@
           <StxLink
             to="/reviews"
             class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
-            :class="[
+            x-class="[
               route.path === '/reviews'
                 ? 'border-gray-500 text-gray-600'
                 : 'border-transparent hover:border-gray-500'
@@ -105,7 +105,7 @@
           <StxLink
             to="/blog"
             class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
-            :class="[
+            x-class="[
               route.path === '/blog'
                 ? 'border-gray-500 text-gray-600'
                 : 'border-transparent hover:border-gray-500'
@@ -185,11 +185,11 @@
                         :key="notif.id"
                         href="#"
                         class="block px-4 py-3 hover:bg-gray-50"
-                        :class="'bg-gray-50': { } notif.unread"
+                        x-class="'bg-gray-50': { } notif.unread"
                       >
                         <div class="flex items-start">
                           <div class="flex-shrink-0">
-                            <img class="h-8 w-8 rounded-full" :src="notif.user.imageUrl" :alt="notif.user.name" />
+                            <img class="h-8 w-8 rounded-full" x-src="notif.user.imageUrl" x-alt="notif.user.name" />
                           </div>
                           <div class="flex-1 ml-3 w-0">
                             <p class="text-gray-900 text-sm" x-text="notif.message"></p>

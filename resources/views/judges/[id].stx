@@ -38,23 +38,23 @@ const judge = {
             <div>
               <nav class="flex -mb-px space-x-8" aria-label="Tabs">
                 <StxLink
-                  :to="`/judges/${params.id}/reviews`"
+                  x-to="`/judges/${params.id}/reviews`"
                   class="px-1 py-4 font-medium text-sm whitespace-nowrap border-b-2"
-                  :class="[path.includes('/reviews') ? 'border-gray-500 text-gray-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
+                  x-class="[path.includes('/reviews') ? 'border-gray-500 text-gray-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
                 >
                   Reviews
                 </StxLink>
                 <StxLink
-                  :to="`/judges/${params.id}/cases`"
+                  x-to="`/judges/${params.id}/cases`"
                   class="px-1 py-4 font-medium text-sm whitespace-nowrap border-b-2"
-                  :class="[path.includes('/cases') ? 'border-gray-500 text-gray-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
+                  x-class="[path.includes('/cases') ? 'border-gray-500 text-gray-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
                 >
                   Cases
                 </StxLink>
                 <StxLink
-                  :to="`/judges/${params.id}/profile`"
+                  x-to="`/judges/${params.id}/profile`"
                   class="px-1 py-4 font-medium text-sm whitespace-nowrap border-b-2"
-                  :class="[path.includes('/profile') || !path.includes('/reviews') && !path.includes('/cases') ? 'border-gray-500 text-gray-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
+                  x-class="[path.includes('/profile') || !path.includes('/reviews') && !path.includes('/cases') ? 'border-gray-500 text-gray-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
                 >
                   Profile
                 </StxLink>

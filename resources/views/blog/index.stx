@@ -17,12 +17,12 @@ import { blogPosts } from '../../functions/sample'
       <div class="space-y-12">
         @foreach(blogPosts as post)
           <StxLink
-            :to="`/blog/${post.id}`"
+            x-to="`/blog/${post.id}`"
             class="block group"
           >
             <article class="flex relative flex-col gap-8 lg:flex-row p-6 hover:bg-gray-50 rounded-2xl duration-200 transition-all isolate">
               <div class="aspect-[16/9] relative sm:aspect-[2/1] lg:aspect-square lg:shrink-0 lg:w-64">
-                <img :src="post.author.imageUrl" :alt="post.author.name" class="absolute inset-0 object-cover h-full w-full bg-gray-50 rounded-2xl">
+                <img x-src="post.author.imageUrl" x-alt="post.author.name" class="absolute inset-0 object-cover h-full w-full bg-gray-50 rounded-2xl">
                 <div class="absolute inset-0 ring-1 ring-gray-900/10 ring-inset rounded-2xl"></div>
               </div>
               <div class="flex-1">

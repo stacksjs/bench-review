@@ -10,7 +10,7 @@
     <div class="flex items-center justify-between mt-8 pt-8 border-gray-200 border-t">
       <!-- Author info -->
       <div class="flex items-center">
-        <img class="h-12 w-12 rounded-full" :src="post.author.imageUrl" :alt="post.author.name">
+        <img class="h-12 w-12 rounded-full" x-src="post.author.imageUrl" x-alt="post.author.name">
         <div class="ml-3">
           <p class="font-medium text-gray-900 text-sm">
             <a href="#" class="hover:underline">{{ post.author.name }}</a>

@@ -131,7 +131,7 @@ const cases = [
                     </span>
                   </td>
                   <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap">
-                    <span :class="[
+                    <span x-class="[
                       'inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset',
                       case_.status === 'Active' ? 'bg-green-50 text-green-700 ring-green-600/20' :
                       case_.status === 'Pending' ? 'bg-yellow-50 text-yellow-700 ring-yellow-600/20' :

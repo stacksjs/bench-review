@@ -6,7 +6,7 @@
       <div class="mt-4 space-y-4">
         @foreach(trendingJudges as judge)
           <div class="flex items-center space-x-3">
-            <img class="h-8 w-8 rounded-full grayscale filter" :src="judge.photo" :alt="judge.name" />
+            <img class="h-8 w-8 rounded-full grayscale filter" x-src="judge.photo" x-alt="judge.name" />
             <div class="flex-1 min-w-0">
               <p class="font-medium text-gray-900 text-sm">{{ judge.name }}</p>
               <p class="text-gray-500 text-sm">{{ judge.court }}</p>

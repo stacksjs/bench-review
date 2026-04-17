@@ -46,7 +46,7 @@
           <span :show="!showCopiedFeedback">Share Profile</span>
           <span :show="showCopiedFeedback">Copied!</span>
         </button>
-        <StxLink :to="`/review/judge/${judge.id}`" class="hidden sm:block font-semibold text-gray-900 text-sm/6">Write Review</StxLink>
+        <StxLink x-to="`/review/judge/${judge.id}`" class="hidden sm:block font-semibold text-gray-900 text-sm/6">Write Review</StxLink>
         <a href="#" class="px-3 py-2 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm">Follow</a>
 
         <div class="sm:hidden relative">

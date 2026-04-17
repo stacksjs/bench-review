@@ -65,7 +65,7 @@
       <div class="pb-12">
         <div>
           <div class="mb-8 text-center">
-            <img class="inline-block mb-4 h-24 w-24 ring-2 ring-white rounded-full grayscale filter" :src="judge.photo" :alt="judge.name" />
+            <img class="inline-block mb-4 h-24 w-24 ring-2 ring-white rounded-full grayscale filter" x-src="judge.photo" x-alt="judge.name" />
             <h3 class="font-semibold text-gray-800 text-lg" x-text="judge().name"></h3>
             <p class="text-gray-600 text-sm" x-text="judge().court"></p>
             <p class="text-gray-600 text-sm" x-text="judge().department"></p>
@@ -89,7 +89,7 @@
             name="title"
             id="title"
             x-model="reviewTitle"
-            :disabled="!judge"
+            x-disabled="!judge"
             placeholder="Brief summary of your experience"
             class="block px-3 py-1.5 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-off-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 disabled:opacity-50 disabled:cursor-not-allowed -outline-offset-1 focus:-outline-offset-2"
           >
@@ -104,9 +104,9 @@
               @for(let star = 1; star <= 5; star++)
                 <button
                   type="button"
-                  :disabled="!judge"
+                  x-disabled="!judge"
                   class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="'text-yellow-400': (hoverFairness { {{ } }} <= || fairness) star"
+                  x-class="'text-yellow-400': (hoverFairness { {{ } }} <= || fairness) star"
                   @click="fairness = {{ star }}"
                   @mouseenter="hoverFairness = {{ star }}"
                   @mouseleave="hoverFairness = 0"
@@ -128,9 +128,9 @@
               @for(let star = 1; star <= 5; star++)
                 <button
                   type="button"
-                  :disabled="!judge"
+                  x-disabled="!judge"
                   class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="'text-yellow-400': (hoverKnowledge { {{ } }} <= || knowledge) star"
+                  x-class="'text-yellow-400': (hoverKnowledge { {{ } }} <= || knowledge) star"
                   @click="knowledge = {{ star }}"
                   @mouseenter="hoverKnowledge = {{ star }}"
                   @mouseleave="hoverKnowledge = 0"
@@ -152,9 +152,9 @@
               @for(let star = 1; star <= 5; star++)
                 <button
                   type="button"
-                  :disabled="!judge"
+                  x-disabled="!judge"
                   class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="'text-yellow-400': (hoverDemeanor { {{ } }} <= || demeanor) star"
+                  x-class="'text-yellow-400': (hoverDemeanor { {{ } }} <= || demeanor) star"
                   @click="demeanor = {{ star }}"
                   @mouseenter="hoverDemeanor = {{ star }}"
                   @mouseleave="hoverDemeanor = 0"
@@ -179,7 +179,7 @@
             type="text"
             name="case-number"
             id="case-number"
-            :disabled="!judge"
+            x-disabled="!judge"
             class="block px-3 py-1.5 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-off-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 disabled:opacity-50 disabled:cursor-not-allowed -outline-offset-1 focus:-outline-offset-2"
           >
         </div>
@@ -192,7 +192,7 @@
             type="date"
             name="case-date"
             id="case-date"
-            :disabled="!judge"
+            x-disabled="!judge"
             class="block px-3 py-1.5 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-off-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 disabled:opacity-50 disabled:cursor-not-allowed -outline-offset-1 focus:-outline-offset-2"
           >
         </div>
@@ -204,7 +204,7 @@
           <select
             id="role"
             name="role"
-            :disabled="!judge"
+            x-disabled="!judge"
             class="block px-3 py-1.5 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-off-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 disabled:opacity-50 disabled:cursor-not-allowed -outline-offset-1 focus:-outline-offset-2"
           >
             <option>Attorney</option>
@@ -221,21 +221,21 @@
           <div class="flex items-center h-6">
             <button
               type="button"
-              :disabled="!judge"
+              x-disabled="!judge"
               @click="isAnonymous.set(!isAnonymous())"
-              :class="[
+              x-class="[
                 isAnonymous ? 'bg-gray-600' : 'bg-gray-200',
                 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed'
               ]"
             >
               <span
-                :class="[
+                x-class="[
                   isAnonymous ? 'translate-x-5' : 'translate-x-0',
                   'pointer-events-none relative inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
                 ]"
               >
                 <span
-                  :class="[
+                  x-class="[
                     isAnonymous ? 'opacity-0 duration-100 ease-out' : 'opacity-100 duration-200 ease-in',
                     'absolute inset-0 flex h-full w-full items-center justify-center transition-opacity'
                   ]"
@@ -246,7 +246,7 @@
                   </svg>
                 </span>
                 <span
-                  :class="[
+                  x-class="[
                     isAnonymous ? 'opacity-100 duration-200 ease-in' : 'opacity-0 duration-100 ease-out',
                     'absolute inset-0 flex h-full w-full items-center justify-center transition-opacity'
                   ]"
@@ -275,9 +275,9 @@
             @for(let star = 1; star <= 5; star++)
               <button
                 type="button"
-                :disabled="!judge"
+                x-disabled="!judge"
                 class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                :class="'text-yellow-400': (hoverRating { {{ } }} <= || rating) star"
+                x-class="'text-yellow-400': (hoverRating { {{ } }} <= || rating) star"
                 @click="rating = {{ star }}"
                 @mouseenter="hoverRating = {{ star }}"
                 @mouseleave="hoverRating = 0"
@@ -307,9 +307,9 @@
     <button type="button" @click="handleCancel" class="font-semibold text-gray-700 text-sm/6">Cancel</button>
     <button
       @click="handleSubmit"
-      :disabled="!judge"
+      x-disabled="!judge"
       class="px-2.5 py-1.5 font-semibold text-sm text-white rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm"
-      :class="[
+      x-class="[
         judge
           ? 'bg-gray-600 hover:bg-gray-500'
           : 'bg-gray-300 cursor-not-allowed'

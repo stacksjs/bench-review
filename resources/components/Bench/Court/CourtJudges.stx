@@ -24,8 +24,8 @@ const courtJudges = judges.value.slice(0, 8)
   <ul role="list" class="mt-8 divide-gray-100 divide-y">
     @foreach(courtJudges as judge)
       <li class="flex items-center justify-between py-5">
-        <StxLink :to="`/judges/${judge.id}/profile`" class="flex flex-1 gap-x-4 items-center min-w-0">
-          <img class="object-cover flex-none h-12 w-12 rounded-full grayscale filter" :src="judge.photo" :alt="judge.name">
+        <StxLink x-to="`/judges/${judge.id}/profile`" class="flex flex-1 gap-x-4 items-center min-w-0">
+          <img class="object-cover flex-none h-12 w-12 rounded-full grayscale filter" x-src="judge.photo" x-alt="judge.name">
           <div class="flex-auto min-w-0">
             <p class="font-semibold text-gray-900 text-sm hover:underline">{{ judge.name }}</p>
             <p class="mt-0.5 text-gray-500 text-xs truncate">{{ judge.department }}</p>
@@ -34,13 +34,13 @@ const courtJudges = judges.value.slice(0, 8)
         <div class="flex gap-x-4 items-center sm:gap-x-6">
           <div class="hidden sm:flex sm:items-center">
             @for(let star = 1; star <= 5; star++)
-              <svg :class="[{{ star }} <= judge.rating ? 'text-yellow-400' : 'text-gray-200', 'h-4 w-4']" viewBox="0 0 20 20" fill="currentColor">
+              <svg x-class="[{{ star }} <= judge.rating ? 'text-yellow-400' : 'text-gray-200', 'h-4 w-4']" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
               </svg>
             @endfor
             <span class="ml-2 text-gray-500 text-xs">{{ judge.reviewCount }}</span>
           </div>
-          <StxLink :to="`/judges/${judge.id}/profile`" class="font-semibold text-gray-700 text-sm hover:text-gray-900">
+          <StxLink x-to="`/judges/${judge.id}/profile`" class="font-semibold text-gray-700 text-sm hover:text-gray-900">
             View<span aria-hidden="true"> →</span>
           </StxLink>
         </div>

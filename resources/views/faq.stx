@@ -71,7 +71,7 @@ const faqs = [
               <span class="flex items-center ml-6 h-7">
                 <svg
                   class="h-6 w-6 duration-200 transition-transform"
-                  :class="[open() === {{ idx }} ? 'rotate-180' : '']"
+                  x-class="[open() === {{ idx }} ? 'rotate-180' : '']"
                   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
                 >
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />

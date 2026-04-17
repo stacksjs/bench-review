@@ -60,14 +60,14 @@ import { judges } from '../../../functions/sample'
     <div class="grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
       @foreach(judges.value as judge)
         <StxLink
-          :to="`judges/${judge.id}/profile`"
+          x-to="`judges/${judge.id}/profile`"
           class="overflow-hidden relative bg-off-gray border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-lg duration-300 transition-all group"
         >
           <!-- Background Image Container -->
           <div class="absolute inset-0 z-0">
             <img
-              :src="judge.court.image"
-              :alt="`${judge.court.name} courthouse`"
+              x-src="judge.court.image"
+              x-alt="`${judge.court.name} courthouse`"
               class="object-cover h-full w-full opacity-10 group-hover:opacity-30 duration-300 transition-all"
             >
             <div class="absolute inset-0 bg-gradient-to-b from-white/70 to-white/80 via-white/40 group-hover:from-white/60 group-hover:to-white/70 group-hover:via-white/30 duration-300 transition-all"></div>
@@ -77,7 +77,7 @@ import { judges } from '../../../functions/sample'
           <div class="relative z-10 p-6">
             <div class="relative">
               <div class="overflow-hidden mx-auto h-40 w-40 ring-4 ring-gray-50 rounded-full group-hover:ring-softBrown duration-300 transition-all">
-                <img class="object-cover h-full w-full grayscale group-hover:grayscale-0 duration-300 transition-all filter" :src="judge.photo" :alt="judge.name">
+                <img class="object-cover h-full w-full grayscale group-hover:grayscale-0 duration-300 transition-all filter" x-src="judge.photo" x-alt="judge.name">
               </div>
               <div class="absolute left-1/2 transform -bottom-2 -translate-x-1/2">
                 <span class="inline-flex items-center px-3 py-1 font-medium text-gray-700 text-sm bg-warm-gray ring-1 ring-gray-700/10 ring-inset rounded-full">
@@ -94,7 +94,7 @@ import { judges } from '../../../functions/sample'
                 <div class="flex items-center">
                   @for(let star = 1; star <= 5; star++)
                     <svg
-                       :class="[{{ star }} <= judge.rating ? 'text-yellow-400' : 'text-gray-200', 'h-5 w-5 flex-shrink-0']"
+                       x-class="[{{ star }} <= judge.rating ? 'text-yellow-400' : 'text-gray-200', 'h-5 w-5 flex-shrink-0']"
                           viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" clip-rule="evenodd" />
                     </svg>

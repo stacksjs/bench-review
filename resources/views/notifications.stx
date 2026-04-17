@@ -90,7 +90,7 @@
           type="button"
           @click="filter.set('all')"
           class="px-1 py-3 font-medium text-sm whitespace-nowrap border-b-2"
-          :class="[filter() === 'all' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
+          x-class="[filter() === 'all' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
         >
           All
         </button>
@@ -98,7 +98,7 @@
           type="button"
           @click="filter.set('unread')"
           class="px-1 py-3 font-medium text-sm whitespace-nowrap border-b-2"
-          :class="[filter() === 'unread' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
+          x-class="[filter() === 'unread' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
         >
           Unread
         </button>
@@ -106,7 +106,7 @@
           type="button"
           @click="filter.set('mentions')"
           class="px-1 py-3 font-medium text-sm whitespace-nowrap border-b-2"
-          :class="[filter() === 'mentions' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
+          x-class="[filter() === 'mentions' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
         >
           Mentions
         </button>
@@ -121,10 +121,10 @@
         class="flex gap-x-4 items-start p-5 hover:bg-gray-50"
       >
         <div class="relative flex-shrink-0">
-          <img class="h-10 w-10 rounded-full" :src="notif.user.imageUrl" :alt="notif.user.name">
+          <img class="h-10 w-10 rounded-full" x-src="notif.user.imageUrl" x-alt="notif.user.name">
           <span :show="notif.unread" class="absolute h-2.5 w-2.5 bg-blue-500 ring-2 ring-white rounded-full -right-0.5 -top-0.5"></span>
         </div>
-        <a :href="notif.link" class="flex-1 min-w-0">
+        <a x-href="notif.link" class="flex-1 min-w-0">
           <p class="text-gray-900 text-sm">
             <span class="font-semibold" x-text="notif.user.name"></span>
             <span x-text="' ' + notif.message"></span>

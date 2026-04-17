@@ -9,7 +9,7 @@
     <!-- Author and Judge info -->
     <div class="flex items-center justify-between mt-8 pt-8 border-gray-200 border-t">
       <div class="flex items-center">
-        <img class="h-12 w-12 rounded-full" :src="review.author.imageUrl" :alt="review.author.name">
+        <img class="h-12 w-12 rounded-full" x-src="review.author.imageUrl" x-alt="review.author.name">
         <div class="ml-3">
           <p class="font-medium text-gray-900 text-sm">
             <a href="#" class="hover:underline">{{ review.author.name }}</a>
@@ -27,7 +27,7 @@
           </span>
           <h2 class="font-semibold text-gray-900 text-lg">Reviewing</h2>
           <div class="flex items-center justify-end mt-1">
-            <img class="h-10 w-10 rounded-full" :src="review.judge.photo" :alt="review.judge.name">
+            <img class="h-10 w-10 rounded-full" x-src="review.judge.photo" x-alt="review.judge.name">
             <div class="ml-3">
               <p class="font-medium text-gray-900 text-sm">{{ review.judge.name }}</p>
               <p class="text-gray-500 text-sm">{{ review.judge.court }}</p>

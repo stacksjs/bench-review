@@ -47,7 +47,7 @@ import { judges } from '../../../functions/sample'
               @click="selectJudge(judge)"
             >
               <div class="flex items-center">
-                <img :src="judge.image" class="h-10 w-10 rounded-full grayscale filter" :alt="judge.name">
+                <img x-src="judge.image" class="h-10 w-10 rounded-full grayscale filter" x-alt="judge.name">
                 <div class="ml-3">
                   <p class="font-medium text-gray-900 text-sm" x-text="judge.name"></p>
                   <p class="text-gray-500 text-sm" x-text="judge.court.name"></p>
