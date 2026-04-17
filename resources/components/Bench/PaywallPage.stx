@@ -7,7 +7,7 @@
       // TODO: Implement actual Stripe subscription
       await new Promise(resolve => setTimeout(resolve, 1000))
       // notification handled via server-side or toast library
-      window.location.href = '/dashboard'
+      navigate('/dashboard', true)
     }
     catch (error) {
       console.error('Failed to process subscription. Please try again.')

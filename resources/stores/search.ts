@@ -22,7 +22,7 @@ defineStore('search', () => {
     const params = new URLSearchParams()
     if (query()) params.set('q', query())
     if (location()) params.set('location', location())
-    window.location.href = '/search?' + params.toString()
+    navigate('/search?', true) + params.toString()
   }
 
   function initFromUrl() {

@@ -10,7 +10,7 @@
     isLoading.set(true)
     try {
       await new Promise(resolve => setTimeout(resolve, 1000))
-      window.location.href = '/dashboard'
+      navigate('/dashboard', true)
     } catch (error) {
       console.error('Failed to process subscription.')
     } finally {

@@ -20,7 +20,7 @@
       })
       if (!res.ok) throw new Error('Verification link is invalid or expired')
       verifyState.set('verified')
-      setTimeout(() => { window.location.href = '/profile' }, 2000)
+      setTimeout(() => { navigate('/profile', true) }, 2000)
     } catch (e) {
       verifyError.set(e.message)
       verifyState.set('error')

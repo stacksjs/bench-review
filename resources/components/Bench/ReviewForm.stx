@@ -38,11 +38,11 @@
   })
 
   function handleSubmit() {
-    window.location.href = '/judges/' + judge()?.id + '/reviews'
+    navigate('/judges/', true) + judge()?.id + '/reviews'
   }
 
   function handleCancel() {
-    window.location.href = '/review'
+    navigate('/review', true)
   }
 
   onMount(() => {

@@ -29,7 +29,7 @@ defineStore('auth', () => {
   function logout() {
     user.set(null)
     notifications.set([])
-    window.location.href = '/login'
+    navigate('/login', true)
   }
 
   function setNotifications(notifs) {

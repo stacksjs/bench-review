@@ -2,7 +2,7 @@
   const mobileSearchQuery = state('')
 
   function submitMobileSearch() {
-    window.location.href = '/search?q=' + encodeURIComponent(mobileSearchQuery())
+    navigate('/search?q=', true) + encodeURIComponent(mobileSearchQuery())
   }
 </script>
 

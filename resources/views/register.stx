@@ -16,7 +16,7 @@
         body: JSON.stringify({ name: name(), email: email(), password: password() })
       })
       if (!res.ok) throw new Error('Registration failed')
-      window.location.href = '/paywall'
+      navigate('/paywall', true)
     } catch (error) {
       console.error(error)
     }

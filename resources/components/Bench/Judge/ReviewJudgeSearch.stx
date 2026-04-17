@@ -18,7 +18,7 @@ import { judges } from '../../../functions/sample'
   })
 
   function selectJudge(judge) {
-    window.location.href = `/review/${judge.id}`
+    navigate(`/review/${judge.id}`, true)
   }
 </script>
 
