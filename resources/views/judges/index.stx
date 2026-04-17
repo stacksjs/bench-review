@@ -1,4 +1,9 @@
 @extends('layouts/default')
+
+@section('title', 'Judges - The Chamber of Secrets')
+
 @section('content')
-JUDGES_HELLO
+<div>
+  @include('Bench/Judge/JudgeDirectory')
+</div>
 @endsection
