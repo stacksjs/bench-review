@@ -11,6 +11,7 @@ async function onRequest(req: Request): Promise<Response | null> {
   return Response.json({ error: 'Not found' }, { status: 404 })
 }
 
+// eslint-disable-next-line ts/no-top-level-await
 await serve({
   patterns: ['resources/views/'],
   port: PORT,

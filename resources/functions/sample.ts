@@ -1,5 +1,5 @@
 // Sample data - replace with actual data from your backend
-export const courtHouses = ref([
+export const courtHouses = [
   {
     id: '1',
     name: 'Supreme Court of California',
@@ -45,9 +45,9 @@ export const courtHouses = ref([
     state: 'IL',
     zipCode: '60604',
   },
-])
+]
 
-export const judges = ref([
+export const judges = [
   {
     id: 1,
     name: 'Hon. Sarah Johnson',
@@ -264,7 +264,7 @@ export const judges = ref([
     department: 'San Francisco County, Department 15',
     photo: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
   },
-])
+]
 
 export const categories = [
   { name: 'Criminal', count: 428, current: true, icon: 'ScaleIcon' },
@@ -479,7 +479,7 @@ export const recentActivity = [
   },
 ]
 
-export const blogPosts = ref([
+export const blogPosts = [
   {
     id: 1,
     author: {
@@ -534,4 +534,4 @@ export const blogPosts = ref([
     date: '1d ago',
     dateTime: '2024-02-19T14:30',
   },
-])
+]

@@ -4,9 +4,9 @@ import { judges } from '../../../functions/sample'
 let searchQuery = ''
 
 function filteredJudges() {
-  if (!searchQuery) return judges.value
+  if (!searchQuery) return judges
   const q = searchQuery.toLowerCase()
-  return judges.value.filter(j =>
+  return judges.filter(j =>
     j.name.toLowerCase().includes(q) ||
     j.court.name.toLowerCase().includes(q) ||
     j.location.toLowerCase().includes(q)
@@ -63,7 +63,7 @@ function filteredJudges() {
     </div>
 
     <div class="grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-      @foreach(judges.value as judge)
+      @foreach(judges as judge)
         <StxLink
           :to="`/judges/${judge.id}/profile`"
           class="overflow-hidden relative bg-off-gray border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-lg duration-300 transition-all group"

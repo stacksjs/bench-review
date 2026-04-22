@@ -1,7 +1,7 @@
 <script server>
 import { judges, reviews, categories } from '../functions/sample'
 
-const featuredJudges = judges.value.slice(0, 6)
+const featuredJudges = judges.slice(0, 6)
 const latestReviews = reviews.slice(0, 3)
 </script>
 

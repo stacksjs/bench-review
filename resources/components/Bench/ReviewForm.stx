@@ -286,8 +286,7 @@
 
       <div class="col-span-full">
         <label for="review" class="block font-medium text-gray-700 text-sm/6">Your Review</label>
-        <div class="mt-2">
-          <!-- TODO: Replace with vanilla JS rich text editor (was Tiptap/Vue-based RichTextEditor) -->
+        <div class="mt-2" @richtext:change="reviewContent.set($event.detail.html)">
           @include('Bench/RichTextEditor')
         </div>
         <p class="mt-3 text-gray-600 text-sm/6">Please be specific about your experience and maintain a professional tone.</p>

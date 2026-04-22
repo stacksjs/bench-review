@@ -4,7 +4,7 @@ import { judges } from '../../../functions/sample'
 
 <script client>
   const searchQuery = state('')
-  const allJudges = {{ JSON.stringify(judges.value) }}
+  const allJudges = {{ JSON.stringify(judges) }}
 
   const filteredJudges = derived(() => {
     const q = searchQuery()

@@ -5,3 +5,5 @@
 </main>
 
 @include('Bench/BenchFooter')
+
+<script src="/js/tiptap-bundle.js" defer></script>

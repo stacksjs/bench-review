@@ -30,7 +30,7 @@ const judge = {
               <option>Cases</option>
               <option selected>Profile</option>
             </select>
-            <Icon name="chevron-down" size="20" class="col-start-1 justify-self-end row-start-1 self-center mr-2 pointer-events-none text-gray-500" />
+            <Icon name="chevron-down" size="20" class="col-start-1 justify-self-end row-start-1 self-center mr-2 text-gray-500 pointer-events-none" />
           </div>
           <div class="hidden sm:block">
             <div>

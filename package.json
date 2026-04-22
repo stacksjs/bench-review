@@ -15,6 +15,11 @@
     "typecheck": "bun tsc --noEmit"
   },
   "dependencies": {
+    "@tiptap/core": "^3.22.4",
+    "@tiptap/extension-link": "^3.22.4",
+    "@tiptap/extension-placeholder": "^3.22.4",
+    "@tiptap/pm": "^3.22.4",
+    "@tiptap/starter-kit": "^3.22.4",
     "chart.js": "^4.5.1",
     "ofetch": "^1.5.1",
     "perfect-debounce": "^2.1.0",

@@ -84,6 +84,7 @@ jobs:
         run: bun test
 
   publish-commit:
+    needs: [lint, typecheck, test]
     runs-on: ubuntu-latest
 
     steps:
@@ -105,6 +106,3 @@ jobs:
 
       - name: Build
         run: bun run build
-
-      - name: Publish Commit
-        run: bunx pkg-pr-new publish './packages/rpx' './packages/bun-plugin' './packages/vite-plugin'

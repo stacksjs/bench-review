@@ -7,8 +7,8 @@ import { judges, courtHouses } from '../functions/sample'
   const judgesStore = useStore('judges')
 
   // Initialize stores with server data and URL params
-  judgesStore.setJudges({{ JSON.stringify(judges.value) }})
-  judgesStore.setCourtHouses({{ JSON.stringify(courtHouses.value) }})
+  judgesStore.setJudges({{ JSON.stringify(judges) }})
+  judgesStore.setCourtHouses({{ JSON.stringify(courtHouses) }})
   search.initFromUrl()
 
   // Local aliases for template readability

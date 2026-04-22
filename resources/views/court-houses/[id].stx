@@ -1,7 +1,7 @@
 <script server>
 import { courtHouses } from '../../functions/sample'
 
-const court = courtHouses.value.find(c => c.id === params.id) || courtHouses.value[0]
+const court = courtHouses.find(c => c.id === params.id) || courtHouses[0]
 </script>
 
 @extends('layouts/default')
@@ -39,7 +39,7 @@ const court = courtHouses.value.find(c => c.id === params.id) || courtHouses.val
               <option>Judges</option>
               <option>Reviews</option>
             </select>
-            <Icon name="chevron-down" size="20" class="col-start-1 justify-self-end row-start-1 self-center mr-2 pointer-events-none text-gray-500" />
+            <Icon name="chevron-down" size="20" class="col-start-1 justify-self-end row-start-1 self-center mr-2 text-gray-500 pointer-events-none" />
           </div>
           <div class="hidden sm:block">
             <div>
