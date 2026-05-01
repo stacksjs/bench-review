@@ -8,7 +8,7 @@ The `@stacksjs/env` package has comprehensive test coverage with **99 passing te
 
 ### 1. Crypto Tests (`tests/crypto.test.ts`)
 
-**Coverage: 38 tests**
+#### Coverage: 38 tests
 
 Tests for encryption and decryption functionality:
 
@@ -46,7 +46,7 @@ Tests for encryption and decryption functionality:
 
 ### 2. Parser Tests (`tests/parser.test.ts`)
 
-**Coverage: 36 tests**
+#### Coverage: 36 tests
 
 Tests for .env file parsing:
 
@@ -100,7 +100,7 @@ Tests for .env file parsing:
 
 ### 3. Utils Tests (`tests/utils.test.ts`)
 
-**Coverage: 17 tests**
+#### Coverage: 17 tests
 
 Tests for environment detection utilities:
 
@@ -133,7 +133,7 @@ Tests for environment detection utilities:
 
 ### 4. E2E Tests (`tests/e2e.test.ts`)
 
-**Coverage: 24 tests**
+#### Coverage: 24 tests
 
 End-to-end workflow tests:
 
