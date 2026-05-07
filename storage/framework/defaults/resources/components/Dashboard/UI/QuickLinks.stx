@@ -1,4 +1,4 @@
-<script>
+<script server>
 interface QuickLinksProps {
   title?: string
   links?: any[]
@@ -15,7 +15,7 @@ const { title = 'Quick Links', links = [] } = defineProps<QuickLinksProps>()
       <a href="{{ link.href || '#' }}" class="flex gap-3.5 items-center px-5 py-3.5 hover:bg-neutral-50 dark:hover:bg-white/5 transition-colors group">
         <div class="flex flex-shrink-0 items-center justify-center h-9 w-9 bg-neutral-100 dark:bg-white/10 rounded-lg">
           @if(link.icon)
-            <div class="h-4.5 w-4.5 text-neutral-500 dark:text-neutral-400 {{ }} link.icon"></div>
+            <div class="{{ link.icon }} w-4.5 h-4.5 text-neutral-500 dark:text-neutral-400"></div>
           @else
             <span class="font-semibold text-[13px] text-neutral-500 dark:text-neutral-400">{{ link.title.charAt(0) }}</span>
           @endif

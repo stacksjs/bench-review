@@ -6,7 +6,6 @@
   const isNotificationMenuOpen = state(false)
   const mobileMenu = state(false)
 
-  // Initialize sample notifications if empty
   if (auth.notifications().length === 0) {
     auth.setNotifications([
       {
@@ -63,11 +62,7 @@
           <StxLink
             to="/judges"
             class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
-            x-class="[
-              route.path === '/judges'
-                ? 'border-gray-500 text-gray-600'
-                : 'border-transparent hover:border-gray-500'
-            ]"
+            x-class="route.path === '/judges' ? 'border-gray-500 text-gray-600' : 'border-transparent hover:border-gray-500'"
           >
             Find Judges
           </StxLink>
@@ -75,11 +70,7 @@
           <StxLink
             to="/court-houses"
             class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
-            x-class="[
-              route.path === '/court-houses'
-                ? 'border-gray-500 text-gray-600'
-                : 'border-transparent hover:border-gray-500'
-            ]"
+            x-class="route.path === '/court-houses' ? 'border-gray-500 text-gray-600' : 'border-transparent hover:border-gray-500'"
           >
             Find CourtHouses
           </StxLink>
@@ -87,33 +78,21 @@
           <StxLink
             to="/review"
             class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
-            x-class="[
-              route.path === '/review'
-                ? 'border-gray-500 text-gray-600'
-                : 'border-transparent hover:border-gray-500'
-            ]"
+            x-class="route.path === '/review' ? 'border-gray-500 text-gray-600' : 'border-transparent hover:border-gray-500'"
           >
             Write Review
           </StxLink>
           <StxLink
             to="/reviews"
             class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
-            x-class="[
-              route.path === '/reviews'
-                ? 'border-gray-500 text-gray-600'
-                : 'border-transparent hover:border-gray-500'
-            ]"
+            x-class="route.path === '/reviews' ? 'border-gray-500 text-gray-600' : 'border-transparent hover:border-gray-500'"
           >
             Reviews
           </StxLink>
           <StxLink
             to="/blog"
             class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
-            x-class="[
-              route.path === '/blog'
-                ? 'border-gray-500 text-gray-600'
-                : 'border-transparent hover:border-gray-500'
-            ]"
+            x-class="route.path === '/blog' ? 'border-gray-500 text-gray-600' : 'border-transparent hover:border-gray-500'"
           >
             Blog
           </StxLink>
@@ -152,80 +131,80 @@
         </div>
         <div class="hidden lg:flex lg:flex-1 lg:justify-end">
           <div :if="!isAuthenticated">
-              <StxLink to="/login" class="mr-6 font-semibold text-gray-900 text-sm/6">Log in</StxLink>
-              <StxLink to="/register" class="font-semibold text-gray-900 text-sm/6">Sign up</StxLink>
-            </div>
+            <StxLink to="/login" class="mr-6 font-semibold text-gray-900 text-sm/6">Log in</StxLink>
+            <StxLink to="/register" class="font-semibold text-gray-900 text-sm/6">Sign up</StxLink>
+          </div>
           <div :if="isAuthenticated" class="flex gap-x-4 items-center">
-              <div class="flex relative items-center">
-                <button
-                  type="button"
-                  class="flex items-center text-gray-400 hover:text-gray-500"
-                  @click="isNotificationMenuOpen.set(!isNotificationMenuOpen())"
-                >
-                  <span class="sr-only">View notifications</span>
-                  <Icon name="bell" size="24" />
-                  <span :show="unreadNotifications() >= 1" class="flex absolute items-center justify-center h-4 w-4 font-medium text-[10px] text-white bg-red-500 rounded-full -right-1 -top-1" x-text="unreadNotifications"></span>
-                </button>
-                <div
-                  :show="isNotificationMenuOpen"
-                  class="absolute right-0 z-50 mt-84 py-1 w-80 bg-white ring-1 ring-black ring-opacity-5 rounded-md focus:outline-none shadow-lg origin-top-right"
-                  role="menu"
-                  aria-orientation="vertical"
-                  aria-labelledby="notification-menu-button"
-                  tabindex="-1"
-                >
-                  <div class="px-4 py-2 border-b border-gray-100">
-                    <h3 class="font-semibold text-gray-900 text-sm">Notifications</h3>
-                  </div>
-                  <div class="overflow-y-auto max-h-96">
+            <div class="flex relative items-center">
+              <button
+                type="button"
+                class="flex items-center text-gray-400 hover:text-gray-500"
+                @click="isNotificationMenuOpen.set(!isNotificationMenuOpen())"
+              >
+                <span class="sr-only">View notifications</span>
+                <Icon name="bell" size="24" />
+                <span :if="unreadNotifications() >= 1" class="flex absolute items-center justify-center h-4 w-4 font-medium text-[10px] text-white bg-red-500 rounded-full -right-1 -top-1" :text="unreadNotifications"></span>
+              </button>
+              <div
+                :if="isNotificationMenuOpen()"
+                class="absolute right-0 z-50 mt-84 py-1 w-80 bg-white ring-1 ring-black ring-opacity-5 rounded-md focus:outline-none shadow-lg origin-top-right"
+                role="menu"
+                aria-orientation="vertical"
+                aria-labelledby="notification-menu-button"
+                tabindex="-1"
+              >
+                <div class="px-4 py-2 border-b border-gray-100">
+                  <h3 class="font-semibold text-gray-900 text-sm">Notifications</h3>
+                </div>
+                <div class="overflow-y-auto max-h-96">
+                  <template :for="notif in headerNotifications">
                     <a
-                        :for="notif in headerNotifications"
-                        :key="notif.id"
-                        href="#"
-                        class="block px-4 py-3 hover:bg-gray-50"
-                        x-class="'bg-gray-50': { } notif.unread"
-                      >
-                        <div class="flex items-start">
-                          <div class="flex-shrink-0">
-                            <img class="h-8 w-8 rounded-full" x-src="notif.user.imageUrl" x-alt="notif.user.name" />
-                          </div>
-                          <div class="flex-1 ml-3 w-0">
-                            <p class="text-gray-900 text-sm" x-text="notif.message"></p>
-                            <p class="mt-1 text-gray-500 text-xs" x-text="notif.time"></p>
-                          </div>
+                      href="#"
+                      class="block px-4 py-3 hover:bg-gray-50"
+                      x-class="notif.unread ? 'bg-gray-50' : ''"
+                    >
+                      <div class="flex items-start">
+                        <div class="flex-shrink-0">
+                          <img class="h-8 w-8 rounded-full" x-src="notif.user.imageUrl" x-alt="notif.user.name" />
                         </div>
-                      </a>
-                    <div :show="headerNotifications().length === 0" class="px-4 py-3 text-center text-gray-500 text-sm">
-                      No notifications
-                    </div>
-                  </div>
-                  <div class="px-4 py-2 border-gray-100 border-t">
-                    <a href="#" class="font-medium text-gray-600 text-sm hover:text-gray-500">View all notifications</a>
+                        <div class="flex-1 ml-3 w-0">
+                          <p class="text-gray-900 text-sm" :text="notif.message"></p>
+                          <p class="mt-1 text-gray-500 text-xs" :text="notif.time"></p>
+                        </div>
+                      </div>
+                    </a>
+                  </template>
+                  <div :if="headerNotifications().length === 0" class="px-4 py-3 text-center text-gray-500 text-sm">
+                    No notifications
                   </div>
                 </div>
-              </div>
-              <div class="flex relative items-center">
-                <button
-                  type="button"
-                  class="flex items-center rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-                  @click="isProfileMenuOpen.set(!isProfileMenuOpen())"
-                >
-                  <img class="h-8 w-8 rounded-full" src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="" />
-                </button>
-                <div
-                  :show="isProfileMenuOpen"
-                  class="absolute right-0 z-50 mt-42 py-1 w-48 bg-white ring-1 ring-black ring-opacity-5 rounded-md focus:outline-none shadow-lg origin-top-right"
-                  role="menu"
-                  aria-orientation="vertical"
-                  aria-labelledby="user-menu-button"
-                  tabindex="-1"
-                >
-                  <StxLink to="/profile" class="block px-4 py-2 text-gray-700 text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">Your Profile</StxLink>
-                  <StxLink to="/settings" class="block px-4 py-2 text-gray-700 text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">Settings</StxLink>
-                  <a href="#" class="block px-4 py-2 text-gray-700 text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">Sign out</a>
+                <div class="px-4 py-2 border-gray-100 border-t">
+                  <a href="#" class="font-medium text-gray-600 text-sm hover:text-gray-500">View all notifications</a>
                 </div>
               </div>
             </div>
+            <div class="flex relative items-center">
+              <button
+                type="button"
+                class="flex items-center rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                @click="isProfileMenuOpen.set(!isProfileMenuOpen())"
+              >
+                <img class="h-8 w-8 rounded-full" src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="" />
+              </button>
+              <div
+                :if="isProfileMenuOpen()"
+                class="absolute right-0 z-50 mt-42 py-1 w-48 bg-white ring-1 ring-black ring-opacity-5 rounded-md focus:outline-none shadow-lg origin-top-right"
+                role="menu"
+                aria-orientation="vertical"
+                aria-labelledby="user-menu-button"
+                tabindex="-1"
+              >
+                <StxLink to="/profile" class="block px-4 py-2 text-gray-700 text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">Your Profile</StxLink>
+                <StxLink to="/settings" class="block px-4 py-2 text-gray-700 text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">Settings</StxLink>
+                <a href="#" class="block px-4 py-2 text-gray-700 text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">Sign out</a>
+              </div>
+            </div>
+          </div>
         </div>
       @endif
     </div>

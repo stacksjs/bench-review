@@ -1,4 +1,11 @@
-<script>
+<script server>
+// `<script server>` (not bare `<script>`) so the function declarations and
+// const bindings below — `getBreadcrumb`, `isActiveRoute`, `getUser`,
+// `getNotificationCount`, `defaultUser` — get extracted into this
+// component's render context. Without `server` STX treats the script as
+// client-only and the template's `@foreach(getBreadcrumb(currentPath || '/')
+// as crumb)` evaluates against an empty context, producing
+// `[Foreach Error]: getBreadcrumb is not iterable` on every navigation.
 interface NavbarModernProps {
   currentPath?: string
   user?: Record<string, any>
@@ -91,7 +98,7 @@ function getNotificationCount() {
     <!-- Bug/Errors -->
     <a
       href="/monitoring/errors"
-      class="p-2 dark:text-blue-400 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 bg-blue-50 dark:bg-blue-900/30' hover:bg-neutral-100 dark:hover:bg-neutral-800' rounded-lg transition-colors : ? 'text-blue-600 'text-neutral-500 {{ }} isActiveRoute('/monitoring/errors')"
+      class="p-2 rounded-lg transition-colors {{ isActiveRoute('/monitoring/errors') ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30' : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-neutral-200 dark:hover:bg-neutral-800' }}"
       title="Error Tracking"
     >
       <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -102,7 +109,7 @@ function getNotificationCount() {
     <!-- Health -->
     <a
       href="/health"
-      class="p-2 dark:text-blue-400 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 bg-blue-50 dark:bg-blue-900/30' hover:bg-neutral-100 dark:hover:bg-neutral-800' rounded-lg transition-colors : ? 'text-blue-600 'text-neutral-500 {{ }} isActiveRoute('/health')"
+      class="p-2 rounded-lg transition-colors {{ isActiveRoute('/health') ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30' : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-neutral-200 dark:hover:bg-neutral-800' }}"
       title="System Health"
     >
       <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -113,7 +120,7 @@ function getNotificationCount() {
     <!-- Notifications -->
     <a
       href="/notifications"
-      class="relative p-2 dark:text-blue-400 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 bg-blue-50 dark:bg-blue-900/30' hover:bg-neutral-100 dark:hover:bg-neutral-800' rounded-lg transition-colors : ? 'text-blue-600 'text-neutral-500 {{ }} isActiveRoute('/notifications')"
+      class="relative p-2 rounded-lg transition-colors {{ isActiveRoute('/notifications') ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30' : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-neutral-200 dark:hover:bg-neutral-800' }}"
       title="Notifications"
     >
       <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

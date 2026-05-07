@@ -23,8 +23,8 @@ export function parse(src: string, options: ParseOptions = {}): ParseResult {
   const errors: string[] = []
   const lines = src.split('\n')
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim()
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
 
     // Skip empty lines and comments
     if (!line || line.startsWith('#')) {
@@ -34,7 +34,7 @@ export function parse(src: string, options: ParseOptions = {}): ParseResult {
     // Handle DOTENV_PUBLIC_KEY specially
     if (line.startsWith('DOTENV_PUBLIC_KEY=')) {
       const match = line.match(/^DOTENV_PUBLIC_KEY=["']?([^"'\n]+)["']?/)
-      if (match) {
+      if (match && match[1] !== undefined) {
         parsed.DOTENV_PUBLIC_KEY = match[1]
       }
       continue
@@ -42,7 +42,7 @@ export function parse(src: string, options: ParseOptions = {}): ParseResult {
 
     // Parse key=value
     const match = line.match(/^([^=]+)=(.*)$/)
-    if (!match) {
+    if (!match || match[1] === undefined || match[2] === undefined) {
       continue
     }
 
@@ -60,10 +60,17 @@ export function parse(src: string, options: ParseOptions = {}): ParseResult {
       }
     }
 
-    // Handle encrypted values
-    if (value.startsWith('encrypted:') && options.privateKey) {
+    // Handle encrypted values. Both prefixes are accepted:
+    //   - `encrypted:<b64>` (verbose, mirrors dotenvx)
+    //   - `enc:<b64>` (short alias for ergonomics in long .env files)
+    // Without a privateKey configured, the value is returned untouched
+    // so dev workflows that rely on plaintext .env files continue to work.
+    if (options.privateKey && (value.startsWith('encrypted:') || value.startsWith('enc:'))) {
       try {
-        value = decryptValue(value, options.privateKey)
+        const normalized = value.startsWith('enc:')
+          ? `encrypted:${value.slice(4)}`
+          : value
+        value = decryptValue(normalized, options.privateKey)
       }
       catch (error) {
         errors.push(`Failed to decrypt ${key}: ${error instanceof Error ? error.message : 'Unknown error'}`)

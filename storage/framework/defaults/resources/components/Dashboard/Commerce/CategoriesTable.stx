@@ -33,7 +33,7 @@ const { categories = [], searchQuery = '', featuredFilter = '', sortBy = 'name',
               Category
               <span class="group-hover:visible flex-none ml-2 text-stone-400 rounded group-focus-visible">
                 @if(sortBy == 'name')
-                  <div class="h-3.5 w-3.5 : ? 'asc' 'i-hugeicons-arrow-down-02' 'i-hugeicons-arrow-up-02' {{ }} == sortOrder"></div>
+                  <div class="{{ sortOrder == 'asc' ? 'i-hugeicons-arrow-up-02' : 'i-hugeicons-arrow-down-02' }} h-3.5 w-3.5"></div>
                 @else
                   <div class="h-3.5 w-3.5 i-hugeicons-arrows-up-down"></div>
                 @endif
@@ -46,7 +46,7 @@ const { categories = [], searchQuery = '', featuredFilter = '', sortBy = 'name',
               Display Order
               <span class="group-hover:visible flex-none ml-2 text-stone-400 rounded group-focus-visible">
                 @if(sortBy == 'display_order')
-                  <div class="h-3.5 w-3.5 : ? 'asc' 'i-hugeicons-arrow-down-02' 'i-hugeicons-arrow-up-02' {{ }} == sortOrder"></div>
+                  <div class="{{ sortOrder == 'asc' ? 'i-hugeicons-arrow-up-02' : 'i-hugeicons-arrow-down-02' }} h-3.5 w-3.5"></div>
                 @else
                   <div class="h-3.5 w-3.5 i-hugeicons-arrows-up-down"></div>
                 @endif
@@ -71,7 +71,7 @@ const { categories = [], searchQuery = '', featuredFilter = '', sortBy = 'name',
                     class="object-cover h-10 w-10 border border-stone-200 rounded-full dark:border-neutral-700 shadow-sm"
                   >
                 @else
-                  <div class="flex items-center justify-center h-10 w-10 font-medium text-white rounded-full shadow-sm {{ }} getInitialColor(category.name)">
+                  <div class="h-10 w-10 rounded-full flex items-center justify-center text-white font-medium shadow-sm {{ getInitialColor(category.name) }}">
                     {{ category.name ? category.name.charAt(0).toUpperCase() : '?' }}
                   </div>
                 @endif

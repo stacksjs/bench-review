@@ -1,5 +1,8 @@
 <script client>
-  const activeCategory = state('{{ categories.find(cat => cat.current)?.name || '' }}')
+  import { categories as allCategories } from '../../functions/sample'
+
+  const categories = derived(() => allCategories)
+  const activeCategory = state(allCategories.find(cat => cat.current)?.name || '')
 
   function setActiveCategory(categoryName) {
     activeCategory.set(categoryName)
@@ -11,23 +14,21 @@
 >
   <h2 class="font-semibold text-base text-gray-900">Explore Categories</h2>
   <nav class="mt-4 space-y-1">
-    @foreach(categories as category)
+    <template :for="category in categories">
       <a
-        @click.prevent="setActiveCategory('{{ category.name }}')"
+        @click.prevent="setActiveCategory(category.name)"
         href="#"
         class="flex items-center px-3 py-2 font-medium text-sm rounded-md group"
-        x-class="[activeCategory === '{{ category.name }}' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900']"
+        x-class="activeCategory() === category.name ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
       >
         <span
           class="flex-shrink-0 mr-3 h-5 w-5"
-          x-class="[activeCategory === '{{ category.name }}' ? 'text-gray-500' : 'text-gray-400 group-hover:text-gray-500']"
+          x-class="activeCategory() === category.name ? 'text-gray-500' : 'text-gray-400 group-hover:text-gray-500'"
           aria-hidden="true"
         ></span>
-        {{ category.name }}
-        <span class="inline-block ml-auto px-2 py-0.5 font-medium text-gray-600 text-xs bg-gray-100 rounded-full">
-          {{ category.count }}
-        </span>
+        <span :text="category.name"></span>
+        <span class="inline-block ml-auto px-2 py-0.5 font-medium text-gray-600 text-xs bg-gray-100 rounded-full" :text="category.count"></span>
       </a>
-    @endforeach
+    </template>
   </nav>
 </div>

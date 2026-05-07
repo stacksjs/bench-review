@@ -110,7 +110,7 @@ export function info(hash: string): HashInfo {
   if (algorithm === 'bcrypt') {
     // Bcrypt format: $2a$XX$... where XX is the cost
     const match = hash.match(/^\$2[aby]\$(\d{2})\$/)
-    if (match) {
+    if (match && match[1] !== undefined) {
       options.rounds = Number.parseInt(match[1], 10)
     }
   }
@@ -121,10 +121,10 @@ export function info(hash: string): HashInfo {
     const timeMatch = hash.match(/t=(\d+)/)
     const parallelismMatch = hash.match(/p=(\d+)/)
 
-    if (versionMatch) options.version = Number.parseInt(versionMatch[1], 10)
-    if (memoryMatch) options.memory = Number.parseInt(memoryMatch[1], 10)
-    if (timeMatch) options.rounds = Number.parseInt(timeMatch[1], 10)
-    if (parallelismMatch) options.parallelism = Number.parseInt(parallelismMatch[1], 10)
+    if (versionMatch && versionMatch[1] !== undefined) options.version = Number.parseInt(versionMatch[1], 10)
+    if (memoryMatch && memoryMatch[1] !== undefined) options.memory = Number.parseInt(memoryMatch[1], 10)
+    if (timeMatch && timeMatch[1] !== undefined) options.rounds = Number.parseInt(timeMatch[1], 10)
+    if (parallelismMatch && parallelismMatch[1] !== undefined) options.parallelism = Number.parseInt(parallelismMatch[1], 10)
   }
 
   return { algorithm, options }
@@ -299,6 +299,33 @@ export function base64Verify(password: string, hash: string): boolean {
  */
 export function md5Encode(password: string): string {
   return md5(password)
+}
+
+/**
+ * Constant-time string comparison.
+ *
+ * Use this to compare opaque tokens (CSRF tokens, signed URL signatures,
+ * webhook HMACs, API keys). A naive `a === b` compares character-by-
+ * character and short-circuits on the first mismatch, so the time the
+ * comparison takes leaks information about how many leading characters
+ * matched — enough for a remote attacker to brute-force the rest.
+ *
+ * Strings of different lengths are reported as unequal in constant time
+ * so length itself doesn't leak.
+ */
+export function timingSafeEqualString(a: string, b: string): boolean {
+  // Equalize length first so the timingSafeEqual call below sees buffers
+  // of identical length even when `a.length !== b.length`. We still
+  // return false in that case — the equal-length comparison is just to
+  // keep the work-shape constant.
+  const ab = Buffer.from(a)
+  const bb = Buffer.from(b)
+  if (ab.length !== bb.length) {
+    // Compare against itself to keep timing constant, then return false.
+    timingSafeEqual(ab, ab)
+    return false
+  }
+  return timingSafeEqual(ab, bb)
 }
 
 // Function-based exports (preferred API)

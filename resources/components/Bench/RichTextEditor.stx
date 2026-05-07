@@ -1,280 +1,151 @@
 <script client>
+  import { MediumEditor } from 'ts-medium-editor'
+  import 'ts-medium-editor/css/medium-editor.css'
+  import 'ts-medium-editor/css/themes/default.css'
+
+  const STORAGE_KEY = 'bench-review:compose-draft'
+  const SAVE_DEBOUNCE_MS = 500
+
   const editorMount = useRef('editorMount')
   const editor = state(null)
 
-  // Track active formatting for toolbar highlight
-  const isBold = state(false)
-  const isItalic = state(false)
-  const isStrike = state(false)
-  const isH1 = state(false)
-  const isH2 = state(false)
-  const isBulletList = state(false)
-  const isOrderedList = state(false)
-  const isBlockquote = state(false)
-  const isCode = state(false)
-  const isLink = state(false)
+  let saveTimer = null
 
-  function syncActiveStates(ed) {
-    isBold.set(ed.isActive('bold'))
-    isItalic.set(ed.isActive('italic'))
-    isStrike.set(ed.isActive('strike'))
-    isH1.set(ed.isActive('heading', { level: 1 }))
-    isH2.set(ed.isActive('heading', { level: 2 }))
-    isBulletList.set(ed.isActive('bulletList'))
-    isOrderedList.set(ed.isActive('orderedList'))
-    isBlockquote.set(ed.isActive('blockquote'))
-    isCode.set(ed.isActive('code'))
-    isLink.set(ed.isActive('link'))
+  function loadDraft() {
+    try {
+      return localStorage.getItem(STORAGE_KEY) || ''
+    } catch {
+      return ''
+    }
   }
 
-  function emitChange(ed) {
+  function saveDraft(html) {
+    if (saveTimer)
+      clearTimeout(saveTimer)
+    saveTimer = setTimeout(() => {
+      try {
+        const trimmed = html?.trim()
+        if (trimmed && trimmed !== '<p><br></p>')
+          localStorage.setItem(STORAGE_KEY, html)
+        else
+          localStorage.removeItem(STORAGE_KEY)
+      }
+      catch {
+        // localStorage unavailable (private mode, quota) — fail silently
+      }
+    }, SAVE_DEBOUNCE_MS)
+  }
+
+  function emitChange(html) {
     editorMount.current?.dispatchEvent(new CustomEvent('richtext:change', {
       bubbles: true,
-      detail: {
-        html: ed.getHTML(),
-        text: ed.getText(),
-        json: ed.getJSON(),
-        isEmpty: ed.isEmpty,
-      },
+      detail: { html },
     }))
   }
 
-  function waitForTiptap() {
-    return new Promise(resolve => {
-      if (window.Tiptap) return resolve(window.Tiptap)
-      const check = setInterval(() => {
-        if (window.Tiptap) {
-          clearInterval(check)
-          resolve(window.Tiptap)
-        }
-      }, 30)
-    })
-  }
-
-  onMount(async () => {
+  onMount(() => {
     const el = editorMount.current
-    if (!el) return
+    if (!el)
+      return
 
-    const { Editor, Link, Placeholder, StarterKit } = await waitForTiptap()
+    const draft = loadDraft()
+    if (draft)
+      el.innerHTML = draft
 
-    const tip = new Editor({
-      element: el,
-      extensions: [
-        StarterKit.configure({
-          heading: { levels: [1, 2, 3] },
-        }),
-        Placeholder.configure({
-          placeholder: 'Share your experience. Be specific about courtroom conduct, fairness, and clarity of decisions...',
-        }),
-        Link.configure({
-          openOnClick: false,
-          autolink: true,
-          HTMLAttributes: { class: 'text-gray-700 underline' },
-        }),
-      ],
-      editorProps: {
-        attributes: {
-          class: 'max-w-none focus:outline-none prose prose-sm min-h-[150px] px-3 py-2',
-        },
+    const med = new MediumEditor(el, {
+      placeholder: {
+        text: 'Share your experience. Be specific about courtroom conduct, fairness, and clarity of decisions...',
+        hideOnClick: true,
       },
-      content: '',
-      onUpdate: ({ editor: ed }) => {
-        emitChange(ed)
+      toolbar: {
+        buttons: ['bold', 'italic', 'anchor', 'h2', 'h3', 'quote', 'unorderedlist', 'orderedlist'],
+        static: false,
       },
-      onSelectionUpdate: ({ editor: ed }) => {
-        syncActiveStates(ed)
+      anchor: {
+        linkValidation: true,
+        targetCheckbox: true,
       },
-      onCreate: ({ editor: ed }) => {
-        syncActiveStates(ed)
+      autoLink: true,
+      targetBlank: true,
+      paste: {
+        cleanPastedHTML: true,
+        forcePlainText: false,
       },
+      spellcheck: true,
     })
 
-    editor.set(tip)
+    med.subscribe('editableInput', () => {
+      const html = med.getContent() || ''
+      saveDraft(html)
+      emitChange(html)
+    })
+
+    if (draft)
+      emitChange(draft)
+
+    editor.set(med)
 
     return () => {
-      tip.destroy()
+      med.destroy()
       editor.set(null)
+      if (saveTimer) {
+        clearTimeout(saveTimer)
+        saveTimer = null
+      }
     }
   })
-
-  function run(cmd) {
-    const ed = editor()
-    if (!ed) return
-    cmd(ed.chain().focus()).run()
-  }
-
-  function toggleBold() { run(c => c.toggleBold()) }
-  function toggleItalic() { run(c => c.toggleItalic()) }
-  function toggleStrike() { run(c => c.toggleStrike()) }
-  function toggleH1() { run(c => c.toggleHeading({ level: 1 })) }
-  function toggleH2() { run(c => c.toggleHeading({ level: 2 })) }
-  function toggleBulletList() { run(c => c.toggleBulletList()) }
-  function toggleOrderedList() { run(c => c.toggleOrderedList()) }
-  function toggleBlockquote() { run(c => c.toggleBlockquote()) }
-  function toggleCode() { run(c => c.toggleCode()) }
-  function undo() { run(c => c.undo()) }
-  function redo() { run(c => c.redo()) }
-
-  function toggleLink() {
-    const ed = editor()
-    if (!ed) return
-    if (ed.isActive('link')) {
-      ed.chain().focus().unsetLink().run()
-      return
-    }
-    const previousUrl = ed.getAttributes('link').href
-    const url = window.prompt('Enter URL', previousUrl || 'https://')
-    if (url === null) return
-    if (url === '') {
-      ed.chain().focus().extendMarkRange('link').unsetLink().run()
-      return
-    }
-    ed.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
-  }
 </script>
 
 <div class="block w-full text-base text-gray-900 bg-off-white outline outline-1 outline-gray-300 rounded-md focus-within:outline focus-within:outline-2 focus-within:outline-gray-600 -outline-offset-1 focus-within:-outline-offset-2">
-  <!-- Editor Menu Bar -->
-  <div class="flex flex-wrap gap-1 items-center px-2 py-2 border-b border-gray-200">
-    <button type="button" title="Bold (⌘B)" @click="toggleBold" :class="[isBold() ? 'bg-gray-200 text-gray-900' : 'text-gray-600', 'p-1.5 rounded hover:bg-gray-100']">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor"><path d="M8 11h4.5a2.5 2.5 0 1 0 0-5H8v5zm10 4.5a2.5 2.5 0 0 1-2.5 2.5H8V13h7.5a2.5 2.5 0 0 1 2.5 2.5z"/></svg>
-    </button>
-
-    <button type="button" title="Italic (⌘I)" @click="toggleItalic" :class="[isItalic() ? 'bg-gray-200 text-gray-900' : 'text-gray-600', 'p-1.5 rounded hover:bg-gray-100']">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor"><path d="M15 20H7v-2h2.927l2.116-12H9V4h8v2h-2.927l-2.116 12H15z"/></svg>
-    </button>
-
-    <button type="button" title="Strikethrough" @click="toggleStrike" :class="[isStrike() ? 'bg-gray-200 text-gray-900' : 'text-gray-600', 'p-1.5 rounded hover:bg-gray-100']">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor"><path d="M17.154 14c.23.516.346 1.09.346 1.72 0 1.342-.524 2.392-1.571 3.147C14.88 19.622 13.433 20 11.586 20c-1.64 0-3.263-.381-4.87-1.144V16.6c1.52.877 3.075 1.316 4.666 1.316 2.551 0 3.83-.732 3.839-2.197a2.21 2.21 0 0 0-.648-1.603l-.12-.117H3v-2h18v2h-3.846zm-4.078-3H7.629a4.086 4.086 0 0 1-.481-.522C6.716 9.92 6.5 9.246 6.5 8.452c0-1.236.466-2.287 1.397-3.153C8.83 4.433 10.271 4 12.222 4c1.471 0 2.879.328 4.222.984v2.152c-1.2-.687-2.515-1.03-3.946-1.03-2.48 0-3.719.782-3.719 2.346 0 .42.218.786.654 1.099.436.313.974.562 1.613.75.62.18 1.297.414 2.03.699z"/></svg>
-    </button>
-
-    <span class="mx-1 h-5 w-px bg-gray-200"></span>
-
-    <button type="button" title="Heading 1" @click="toggleH1" :class="[isH1() ? 'bg-gray-200 text-gray-900' : 'text-gray-600', 'p-1.5 rounded hover:bg-gray-100 font-semibold text-xs']">H1</button>
-    <button type="button" title="Heading 2" @click="toggleH2" :class="[isH2() ? 'bg-gray-200 text-gray-900' : 'text-gray-600', 'p-1.5 rounded hover:bg-gray-100 font-semibold text-xs']">H2</button>
-
-    <span class="mx-1 h-5 w-px bg-gray-200"></span>
-
-    <button type="button" title="Bullet List" @click="toggleBulletList" :class="[isBulletList() ? 'bg-gray-200 text-gray-900' : 'text-gray-600', 'p-1.5 rounded hover:bg-gray-100']">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor"><path d="M8 4h13v2H8V4zM4.5 6.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm0 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm0 6.9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM8 11h13v2H8v-2zm0 7h13v2H8v-2z"/></svg>
-    </button>
-
-    <button type="button" title="Numbered List" @click="toggleOrderedList" :class="[isOrderedList() ? 'bg-gray-200 text-gray-900' : 'text-gray-600', 'p-1.5 rounded hover:bg-gray-100']">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor"><path d="M8 4h13v2H8V4zM5 3v3h1v1H3V6h1V4H3V3h2zm2 8h13v2H7v-2zm-3-3h1.5v3.5H3v-1h1V8zm-1 7v-1h2v3H3v-1h1v-.5H3v-1h1V15zm4 1h13v2H7v-2z"/></svg>
-    </button>
-
-    <span class="mx-1 h-5 w-px bg-gray-200"></span>
-
-    <button type="button" title="Quote" @click="toggleBlockquote" :class="[isBlockquote() ? 'bg-gray-200 text-gray-900' : 'text-gray-600', 'p-1.5 rounded hover:bg-gray-100']">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor"><path d="M4.583 17.321C3.553 16.227 3 15 3 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311 1.804.167 3.226 1.648 3.226 3.489a3.5 3.5 0 0 1-3.5 3.5c-1.073 0-2.099-.49-2.748-1.179zm10 0C13.553 16.227 13 15 13 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311 1.804.167 3.226 1.648 3.226 3.489a3.5 3.5 0 0 1-3.5 3.5c-1.073 0-2.099-.49-2.748-1.179z"/></svg>
-    </button>
-
-    <button type="button" title="Inline Code" @click="toggleCode" :class="[isCode() ? 'bg-gray-200 text-gray-900' : 'text-gray-600', 'p-1.5 rounded hover:bg-gray-100']">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor"><path d="M23 12l-7.071 7.071-1.414-1.414L20.172 12l-5.657-5.657 1.414-1.414L23 12zM3.828 12l5.657 5.657-1.414 1.414L1 12l7.071-7.071 1.414 1.414L3.828 12z"/></svg>
-    </button>
-
-    <button type="button" title="Link (⌘K)" @click="toggleLink" :class="[isLink() ? 'bg-gray-200 text-gray-900' : 'text-gray-600', 'p-1.5 rounded hover:bg-gray-100']">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor"><path d="M18.364 15.536L16.95 14.12l1.414-1.414a5 5 0 1 0-7.071-7.071L9.879 7.05 8.464 5.636 9.88 4.222a7 7 0 0 1 9.9 9.9l-1.415 1.414zm-2.828 2.828l-1.415 1.414a7 7 0 0 1-9.9-9.9l1.415-1.414L7.05 9.88l-1.414 1.414a5 5 0 1 0 7.071 7.071l1.414-1.414 1.415 1.414zm-.708-10.607l1.415 1.415-7.071 7.07-1.415-1.414 7.071-7.07z"/></svg>
-    </button>
-
-    <span class="mx-1 h-5 w-px bg-gray-200"></span>
-
-    <button type="button" title="Undo (⌘Z)" @click="undo" class="p-1.5 text-gray-600 hover:bg-gray-100 rounded">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor"><path d="M5.828 7l2.536 2.536L6.95 10.95 2 6l4.95-4.95 1.414 1.414L5.828 5H13a8 8 0 1 1 0 16H4v-2h9a6 6 0 1 0 0-12H5.828z"/></svg>
-    </button>
-
-    <button type="button" title="Redo (⌘⇧Z)" @click="redo" class="p-1.5 text-gray-600 hover:bg-gray-100 rounded">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor"><path d="M18.172 7H11a6 6 0 1 0 0 12h9v2h-9a8 8 0 1 1 0-16h7.172l-2.536-2.536L17.05 1.05 22 6l-4.95 4.95-1.414-1.414L18.172 7z"/></svg>
-    </button>
-  </div>
-
-  <!-- Editor Mount Point — Tiptap injects its contenteditable here -->
-  <div ref="editorMount"></div>
+  <div ref="editorMount" class="medium-editor-element px-3 py-2 min-h-[200px] focus:outline-none"></div>
 </div>
 
 @push('styles')
 <style>
-.tiptap {
-  min-height: 150px;
+.medium-editor-element {
   outline: none;
 }
 
-.tiptap > * + * {
-  margin-top: 0.75em;
-}
-
-.tiptap p:first-child {
+.medium-editor-element p:first-child {
   margin-top: 0;
 }
 
-.tiptap p.is-editor-empty:first-child::before {
-  color: #9ca3af;
-  content: attr(data-placeholder);
-  float: left;
-  height: 0;
-  pointer-events: none;
+.medium-editor-element > * + * {
+  margin-top: 0.75em;
 }
 
-.tiptap h1 {
-  font-size: 1.5em;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.tiptap h2 {
+.medium-editor-element h2 {
   font-size: 1.25em;
   font-weight: 600;
   line-height: 1.3;
 }
 
-.tiptap h3 {
+.medium-editor-element h3 {
   font-size: 1.125em;
   font-weight: 600;
 }
 
-.tiptap ul,
-.tiptap ol {
+.medium-editor-element ul,
+.medium-editor-element ol {
   padding-left: 1.25rem;
 }
 
-.tiptap ul {
+.medium-editor-element ul {
   list-style-type: disc;
 }
 
-.tiptap ol {
+.medium-editor-element ol {
   list-style-type: decimal;
 }
 
-.tiptap blockquote {
+.medium-editor-element blockquote {
   padding-left: 1rem;
   border-left: 3px solid rgba(13, 13, 13, 0.1);
   color: #6b7280;
   font-style: italic;
 }
 
-.tiptap code {
-  background-color: rgba(97, 97, 97, 0.1);
-  color: #4b5563;
-  padding: 0.15rem 0.35rem;
-  border-radius: 0.25rem;
-  font-size: 0.9em;
-}
-
-.tiptap pre {
-  background: #1f2937;
-  color: #f9fafb;
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
-  overflow-x: auto;
-}
-
-.tiptap pre code {
-  background: transparent;
-  color: inherit;
-  padding: 0;
-}
-
-.tiptap a {
+.medium-editor-element a {
   color: #4b5563;
   text-decoration: underline;
 }

@@ -1,17 +1,19 @@
-<script server>
-import { judges } from '../../../functions/sample'
+<script client>
+  import { judges as allJudges } from '../../../functions/sample'
 
-let searchQuery = ''
+  const searchQuery = state('')
+  const stars = [1, 2, 3, 4, 5]
 
-function filteredJudges() {
-  if (!searchQuery) return judges
-  const q = searchQuery.toLowerCase()
-  return judges.filter(j =>
-    j.name.toLowerCase().includes(q) ||
-    j.court.name.toLowerCase().includes(q) ||
-    j.location.toLowerCase().includes(q)
-  )
-}
+  const filteredJudges = derived(() => {
+    const q = searchQuery()
+    if (!q) return allJudges
+    const needle = q.toLowerCase()
+    return allJudges.filter(j =>
+      j.name.toLowerCase().includes(needle) ||
+      j.court.name.toLowerCase().includes(needle) ||
+      j.location.toLowerCase().includes(needle)
+    )
+  })
 </script>
 
 <div class="min-h-screen">
@@ -27,7 +29,7 @@ function filteredJudges() {
           <div class="relative">
             <input
               type="text"
-              @model="searchQuery"
+              x-model="searchQuery"
               placeholder="Search by name, court, or location..."
               class="block pl-12 pr-4 py-3 w-full text-gray-900 sm:leading-6 sm:text-sm placeholder:text-gray-400 bg-gray-50 border-0 ring-1 ring-gray-200 ring-inset rounded-xl focus:ring-2 focus:ring-inset focus:ring-softBrown duration-200 transition-all"
             >
@@ -63,9 +65,9 @@ function filteredJudges() {
     </div>
 
     <div class="grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-      @foreach(judges as judge)
+      <template :for="judge in filteredJudges">
         <StxLink
-          :to="`/judges/${judge.id}/profile`"
+          x-to="`/judges/${judge.id}/profile`"
           class="overflow-hidden relative bg-off-gray border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-lg duration-300 transition-all group"
         >
           <div class="absolute inset-0 z-0">
@@ -83,30 +85,28 @@ function filteredJudges() {
                 <img class="object-cover h-full w-full grayscale group-hover:grayscale-0 duration-300 transition-all filter" x-src="judge.photo" x-alt="judge.name">
               </div>
               <div class="absolute left-1/2 transform -bottom-2 -translate-x-1/2">
-                <span class="inline-flex items-center px-3 py-1 font-medium text-gray-700 text-sm bg-warm-gray ring-1 ring-gray-700/10 ring-inset rounded-full">
-                  {{ judge.court.name }}
-                </span>
+                <span class="inline-flex items-center px-3 py-1 font-medium text-gray-700 text-sm bg-warm-gray ring-1 ring-gray-700/10 ring-inset rounded-full" :text="judge.court.name"></span>
               </div>
             </div>
 
             <div class="mt-8 text-center">
-              <h3 class="font-semibold text-gray-900 text-xl group-hover:text-deep-brown duration-200 transition-colors">{{ judge.name }}</h3>
-              <p class="mt-2 text-gray-500 text-sm">{{ judge.location }}</p>
+              <h3 class="font-semibold text-gray-900 text-xl group-hover:text-deep-brown duration-200 transition-colors" :text="judge.name"></h3>
+              <p class="mt-2 text-gray-500 text-sm" :text="judge.location"></p>
 
               <div class="flex items-center justify-center mt-4">
                 <div class="flex items-center">
-                  @for(let star = 1; star <= 5; star++)
-                    <svg x-class="[{{ star }} <= judge.rating ? 'text-yellow-400' : 'text-gray-200', 'h-5 w-5 flex-shrink-0']" viewBox="0 0 20 20" fill="currentColor">
+                  <template :for="star in stars">
+                    <svg class="h-5 w-5 flex-shrink-0" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" clip-rule="evenodd" />
                     </svg>
-                  @endfor
+                  </template>
                 </div>
-                <span class="ml-2 text-gray-500 text-sm">({{ judge.reviewCount }} reviews)</span>
+                <span class="ml-2 text-gray-500 text-sm" :text="`(${judge.reviewCount} reviews)`"></span>
               </div>
             </div>
           </div>
         </StxLink>
-      @endforeach
+      </template>
     </div>
   </div>
 </div>

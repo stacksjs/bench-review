@@ -50,15 +50,25 @@ export class Schedule implements UntimedSchedule {
 
   constructor(task: () => void) {
     this.task = task
-    // Start job automatically after all chain methods are called
-    setTimeout(() => {
+    // Defer `start()` until the synchronous chain settles. Users write
+    // `schedule(task).daily().withName('x')` — `start()` can't run
+    // inside the constructor because `cronPattern` hasn't been set
+    // yet, but it should run *as soon as* the chain finishes (no
+    // observable delay).
+    //
+    // queueMicrotask is the right primitive here: it runs after the
+    // current synchronous run-to-completion (so all chain methods
+    // have set their fields) but before any I/O turn — measurably
+    // tighter than setTimeout(0), which gets queued behind every
+    // pending timer in the loop.
+    queueMicrotask(() => {
       try {
         this.start()
       }
       catch (error) {
         log.error(`Failed to start scheduled task: ${error}`)
       }
-    }, 0)
+    })
   }
 
   /** Expose the resolved cron pattern (useful for testing/debugging) */
@@ -140,6 +150,17 @@ export class Schedule implements UntimedSchedule {
   }
 
   onDays(days: number[]): TimedSchedule {
+    // Each day-of-week field in cron is 0-6 (Sun-Sat). A typo'd
+    // `[32]` used to silently produce a pattern that never fires;
+    // surface it at definition time instead.
+    if (!Array.isArray(days) || days.length === 0) {
+      throw new Error(`onDays() requires a non-empty array; got ${JSON.stringify(days)}`)
+    }
+    for (const d of days) {
+      if (!Number.isInteger(d) || d < 0 || d > 6) {
+        throw new Error(`onDays(): each day must be an integer 0-6 (Sun-Sat). Got ${d}`)
+      }
+    }
     this.cronPattern = `0 0 * * ${days.join(',')}`
     return this as TimedSchedule
   }
@@ -149,8 +170,8 @@ export class Schedule implements UntimedSchedule {
     if (parts.length !== 2) {
       throw new Error(`Invalid time format "${time}". Expected "HH:MM" (e.g., "14:30")`)
     }
-    const [hour, minute] = parts.map(Number)
-    if (Number.isNaN(hour) || Number.isNaN(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    const [hour, minute] = parts.map(Number) as [number | undefined, number | undefined]
+    if (hour === undefined || minute === undefined || Number.isNaN(hour) || Number.isNaN(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
       throw new Error(`Invalid time "${time}". Hour must be 0-23, minute must be 0-59`)
     }
     this.cronPattern = `${minute} ${hour} * * *`
@@ -380,7 +401,18 @@ export class Schedule implements UntimedSchedule {
       }
       runCount++
       try {
-        task()
+        const result = task() as unknown
+        // Handle promise-returning tasks: a rejection from an async task
+        // would otherwise become an unhandled rejection (the synchronous
+        // try/catch above can't see it). Now those route through the
+        // configured `.catch` handler just like sync errors do.
+        if (result && typeof (result as Promise<unknown>).then === 'function') {
+          (result as Promise<unknown>).catch((error: unknown) => {
+            if (this.options.catch) {
+              this.options.catch(error as Error)
+            }
+          })
+        }
       }
       catch (error) {
         if (this.options.catch) {
@@ -390,11 +422,16 @@ export class Schedule implements UntimedSchedule {
     }
 
     if (this.intervalMs !== null) {
-      // Sub-minute scheduling (everySecond): use setInterval
+      // Sub-minute scheduling (everySecond): use setInterval.
+      // .unref() so the timer doesn't pin the event loop open after
+      // every other work item finishes — without this, a CLI script
+      // that registers a `.everySecond()` schedule blocks the process
+      // from exiting cleanly.
       timer = setInterval(() => {
         if (stopped) return
         executeTask()
       }, this.intervalMs)
+      ;(timer as ReturnType<typeof setInterval> & { unref?: () => void }).unref?.()
     }
     else if (this.cronPattern) {
       // Minute+ scheduling: parse() + setTimeout loop

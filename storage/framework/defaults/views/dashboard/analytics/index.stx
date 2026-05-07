@@ -2,19 +2,11 @@
 
 @section('content')
 <script server>
-definePageMeta({
-  middleware: ['auth'],
-  layout: 'default'
-})
-
 /**
  * Analytics Dashboard - macOS Style
  * Overview of analytics with macOS-inspired design.
  */
-import Card from '../../../components/Dashboard/UI/Card.stx'
-import StatsCard from '../../../components/Dashboard/UI/StatsCard.stx'
-
-let analyticsCards = [
+const analyticsCards = [
   { name: 'Web Analytics', description: 'Page views, sessions, and user behavior', icon: 'i-hugeicons-chart-line-data-02', to: '/analytics/web' },
   { name: 'Blog Analytics', description: 'Post performance and engagement', icon: 'i-hugeicons-edit-02', to: '/analytics/blog' },
   { name: 'Commerce Analytics', description: 'Sales and revenue insights', icon: 'i-hugeicons-shopping-cart-01', to: '/analytics/commerce/sales' },
@@ -76,7 +68,7 @@ let analyticsCards = [
       <Card variant="default" padding="md" hoverable clickable>
         <div class="flex gap-4 items-start">
           <div class="flex-shrink-0 p-2.5 text-blue-600 dark:text-blue-400 bg-blue-500/15 dark:bg-blue-400/20 rounded-lg">
-            <div :class="[card.icon, 'h-5 w-5']" />
+            <div class="{{ card.icon }} h-5 w-5" />
           </div>
           <div class="flex-1 min-w-0">
             <h3 class="font-medium text-[14px] text-neutral-900 dark:text-white">

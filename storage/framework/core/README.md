@@ -2,10 +2,10 @@
 
 # Rapid App & Library Development
 
-[![npm version](https://img.shields.io/npm/v/stacks?style=flat-square)](https://npmjs.com/package/stacks)
-[![GitHub Actions](https://img.shields.io/github/actions/workflow/status/stacksjs/stacks/ci.yml?style=flat-square&branch=main)](https://github.com/stacksjs/stacks/actions?query=workflow%3Aci)
+[![npm version][npm-version-src]][npm-version-href]
+[![GitHub Actions][github-actions-src]][github-actions-href]
 [![Commitizen friendly](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg)](http://commitizen.github.io/cz-cli/)
-[![npm downloads](https://img.shields.io/npm/dm/stacks?style=flat-square)](https://npmjs.com/package/stacks)
+[![npm downloads][npm-downloads-src]][npm-downloads-href]
 <!-- [![Codecov][codecov-src]][codecov-href] -->
 
 > [!WARNING]
@@ -375,6 +375,14 @@ The MIT License (MIT). Please see [LICENSE](LICENSE.md) for more information.
 Made with 💙
 
 <!-- Badges -->
+[npm-version-src]: https://img.shields.io/npm/v/stacks?style=flat-square
+[npm-version-href]: https://npmjs.com/package/stacks
+
+[npm-downloads-src]: https://img.shields.io/npm/dm/stacks?style=flat-square
+[npm-downloads-href]: https://npmjs.com/package/stacks
+
+[github-actions-src]: https://img.shields.io/github/actions/workflow/status/stacksjs/stacks/ci.yml?style=flat-square&branch=main
+[github-actions-href]: https://github.com/stacksjs/stacks/actions?query=workflow%3Aci
 
 <!-- [codecov-src]: https://img.shields.io/codecov/c/gh/stacksjs/stacks/main?style=flat-square
 [codecov-href]: https://codecov.io/gh/stacksjs/buddy -->

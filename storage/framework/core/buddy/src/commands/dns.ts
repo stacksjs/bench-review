@@ -1,6 +1,6 @@
 import type { CLI } from '@stacksjs/types'
 import process from 'node:process'
-import { log } from '@stacksjs/cli'
+import { log, onUnknownSubcommand } from "@stacksjs/cli"
 import { config } from '@stacksjs/config'
 import { DnsClient, formatOutput } from '@stacksjs/dnsx'
 import { ExitCode } from '@stacksjs/types'
@@ -94,8 +94,5 @@ export function dns(buddy: CLI): void {
       process.exit(ExitCode.Success)
     })
 
-  buddy.on('dns:*', () => {
-    console.error('Invalid command: %s\nSee --help for a list of available commands.', buddy.args.join(' '))
-    process.exit(1)
-  })
+  onUnknownSubcommand(buddy, "dns")
 }

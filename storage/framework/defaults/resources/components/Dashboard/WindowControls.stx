@@ -39,11 +39,11 @@ function getVariant() {
 </script>
 @if(getVariant() === 'macos')
     <!-- macOS-style traffic light controls -->
-    <div class="flex items-center {{ }} getGapClass() group">
+    <div class="flex items-center {{ getGapClass() }} group">
       <!-- Close button (red) -->
       <button
         type="button"
-        class="relative bg-[#ff5f57] hover:bg-[#ff5f57] rounded-full focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-colors {{ }} getSizeClass()"
+        class="relative {{ getSizeClass() }} rounded-full bg-[#ff5f57] hover:bg-[#ff5f57] transition-colors focus:outline-none focus:ring-2 focus:ring-red-500/50"
         data-action="window-close"
         title="Close"
       >
@@ -57,7 +57,7 @@ function getVariant() {
       <!-- Minimize button (yellow) -->
       <button
         type="button"
-        class="relative bg-[#febc2e] hover:bg-[#febc2e] rounded-full focus:outline-none focus:ring-2 focus:ring-yellow-500/50 transition-colors {{ }} getSizeClass()"
+        class="relative {{ getSizeClass() }} rounded-full bg-[#febc2e] hover:bg-[#febc2e] transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-500/50"
         data-action="window-minimize"
         title="Minimize"
       >
@@ -71,7 +71,7 @@ function getVariant() {
       <!-- Maximize button (green) -->
       <button
         type="button"
-        class="relative bg-[#28c840] hover:bg-[#28c840] rounded-full focus:outline-none focus:ring-2 focus:ring-green-500/50 transition-colors {{ }} getSizeClass()"
+        class="relative {{ getSizeClass() }} rounded-full bg-[#28c840] hover:bg-[#28c840] transition-colors focus:outline-none focus:ring-2 focus:ring-green-500/50"
         data-action="window-maximize"
         title="Maximize"
       >

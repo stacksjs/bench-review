@@ -104,7 +104,7 @@ const { libraryName = 'hello-world', libraryOwner = '@stacksjs', libraryReposito
                   <div class="mt-2">
                     <button
                       type="button"
-                      class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer : ? 'bg-gray-200' 'bg-indigo-600' {{ }} libraryReleaseable"
+                      class="relative h-6 w-11 inline-flex flex-shrink-0 cursor-pointer border-2 border-transparent rounded-full {{ libraryReleaseable ? 'bg-indigo-600' : 'bg-gray-200' }} transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600"
                       role="switch"
                       aria-checked="{{ libraryReleaseable ? 'true' : 'false' }}"
                       data-action="toggle-releaseable"
@@ -112,7 +112,7 @@ const { libraryName = 'hello-world', libraryOwner = '@stacksjs', libraryReposito
                       <span class="sr-only">Releaseable</span>
                       <span
                         aria-hidden="true"
-                        class="inline-block h-5 w-5 bg-white ring-0 rounded-full shadow duration-200 ease-in-out transition transform pointer-events-none : ? 'translate-x-0' 'translate-x-5' {{ }} libraryReleaseable"
+                        class="pointer-events-none inline-block h-5 w-5 {{ libraryReleaseable ? 'translate-x-5' : 'translate-x-0' }} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
                       ></span>
                     </button>
                   </div>
@@ -161,7 +161,7 @@ const { libraryName = 'hello-world', libraryOwner = '@stacksjs', libraryReposito
                   <div class="mt-2">
                     <button
                       type="button"
-                      class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer : ? 'bg-gray-200' 'bg-indigo-600' {{ }} functionsGenerateSourcemap"
+                      class="relative h-6 w-11 inline-flex flex-shrink-0 cursor-pointer border-2 border-transparent rounded-full {{ functionsGenerateSourcemap ? 'bg-indigo-600' : 'bg-gray-200' }} transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600"
                       role="switch"
                       aria-checked="{{ functionsGenerateSourcemap ? 'true' : 'false' }}"
                       data-action="toggle-sourcemap"
@@ -169,7 +169,7 @@ const { libraryName = 'hello-world', libraryOwner = '@stacksjs', libraryReposito
                       <span class="sr-only">Generate Sourcemap</span>
                       <span
                         aria-hidden="true"
-                        class="inline-block h-5 w-5 bg-white ring-0 rounded-full shadow duration-200 ease-in-out transition transform pointer-events-none : ? 'translate-x-0' 'translate-x-5' {{ }} functionsGenerateSourcemap"
+                        class="pointer-events-none inline-block h-5 w-5 {{ functionsGenerateSourcemap ? 'translate-x-5' : 'translate-x-0' }} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
                       ></span>
                     </button>
                   </div>

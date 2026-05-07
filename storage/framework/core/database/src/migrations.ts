@@ -6,16 +6,20 @@
  */
 
 import type { Result } from '@stacksjs/error-handling'
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { log as _log } from '@stacksjs/logging'
 
-// Defensive log wrapper to handle cases where log methods might not be initialized
+// Defensive log wrapper to handle cases where log methods might not be initialized.
+// Without `error` here, the catch block at runDatabaseMigration() throws
+// "log.error is not a function", which masked the underlying migration error
+// in the dev-server output.
 const log = {
-  info: (...args: any[]) => typeof _log?.info === 'function' ? _log.info(...args) : console.log(...args),
+  info: (...args: any[]) => typeof _log?.info === 'function' ? (_log.info as (...a: any[]) => void)(...args) : console.log(...args),
   success: (msg: string) => typeof _log?.success === 'function' ? _log.success(msg) : console.log(msg),
   warn: (msg: string) => typeof _log?.warn === 'function' ? _log.warn(msg) : console.warn(msg),
-  debug: (...args: any[]) => typeof _log?.debug === 'function' ? _log.debug(...args) : console.debug(...args),
+  error: (...args: any[]) => typeof _log?.error === 'function' ? (_log.error as (...a: any[]) => void)(...args) : console.error(...args),
+  debug: (...args: any[]) => typeof _log?.debug === 'function' ? (_log.debug as (...a: any[]) => void)(...args) : console.debug(...args),
 }
 import { err, handleError, ok } from '@stacksjs/error-handling'
 import { path } from '@stacksjs/path'
@@ -90,7 +94,9 @@ function configureQueryBuilder(): void {
  * - Creating duplicate unique indexes on columns that already have UNIQUE constraints
  *   from inline table definitions (the index name differs but the constraint conflicts)
  *
- * This function rewrites incompatible migration files to no-ops.
+ * Files that would become no-ops are deleted from disk and recorded in the
+ * migrations tracking table so they're treated as "executed" — keeping the
+ * migrations/ directory clean instead of cluttered with `SELECT 1` stubs.
  */
 function preprocessSqliteMigrations(): void {
   const migrationsDir = join(process.cwd(), 'database', 'migrations')
@@ -102,6 +108,16 @@ function preprocessSqliteMigrations(): void {
     return // directory doesn't exist yet
   }
 
+  // Track which migrations we drop so we can mark them executed in the
+  // migrations table (otherwise the next generate run regenerates them).
+  const droppedMigrations: string[] = []
+  const dropMigration = (file: string, filePath: string, reason: string): void => {
+    log.info(`Dropping no-op migration (${reason}): ${file}`)
+    try { unlinkSync(filePath) }
+    catch { /* already gone */ }
+    droppedMigrations.push(file)
+  }
+
   const addConstraintPattern = /^\s*ALTER\s+TABLE\s+.+\s+ADD\s+CONSTRAINT\s+/i
   // Match CREATE UNIQUE INDEX — these are redundant in SQLite when the table
   // already defines the UNIQUE constraint inline during CREATE TABLE.
@@ -109,6 +125,22 @@ function preprocessSqliteMigrations(): void {
   const createUniqueIndexPattern = /^\s*CREATE\s+UNIQUE\s+INDEX\s+/i
   // Match ALTER TABLE ... DROP COLUMN — SQLite fails if the column doesn't exist
   const dropColumnPattern = /^\s*ALTER\s+TABLE\s+["']?(\w+)["']?\s+DROP\s+COLUMN\s+["']?(\w+)["']?\s*$/i
+  // Match CREATE TABLE — used to detect when buddy regenerates a CREATE TABLE
+  // migration for a table that already has an earlier create-table file.
+  const createTablePattern = /^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?(\w+)["']?/i
+
+  // First pass: index every "create-<table>-table.sql" by table name. The
+  // earliest (lowest-timestamp) wins. Anything later for the same table is
+  // a duplicate from buddy regenerating migrations for an already-modeled
+  // table — drop those instead of cluttering the directory.
+  const createTableEarliest = new Map<string, string>()
+  for (const file of files) {
+    const m = file.match(/^\d+-create-(\w+)-table\.sql$/)
+    if (!m || !m[1]) continue
+    const tableName = m[1]
+    const existing = createTableEarliest.get(tableName)
+    if (!existing || file < existing) createTableEarliest.set(tableName, file)
+  }
 
   // Open SQLite DB to check column existence for DROP COLUMN migrations
   const sqliteDbPath = join(process.cwd(), dbConfig.connections.sqlite.database || 'stacks.db')
@@ -134,11 +166,24 @@ function preprocessSqliteMigrations(): void {
 
     if (statements.length === 0) continue
 
+    // Drop duplicate CREATE TABLE migrations — keep only the earliest one
+    // for each table. This handles the case where buddy regenerates a
+    // create-table migration for a table that's already modeled.
+    const firstStatement = statements[0]
+    const createTableMatch = firstStatement ? firstStatement.match(createTablePattern) : null
+    if (createTableMatch && createTableMatch[1]) {
+      const tableName = createTableMatch[1]
+      const earliest = createTableEarliest.get(tableName)
+      if (earliest && earliest !== file) {
+        dropMigration(file, filePath, `duplicate create-table for "${tableName}" (kept ${earliest})`)
+        continue
+      }
+    }
+
     // Skip files that only contain ALTER TABLE ADD CONSTRAINT
     const allAddConstraint = statements.every(s => addConstraintPattern.test(s))
     if (allAddConstraint) {
-      log.info(`Skipping SQLite-incompatible migration: ${file}`)
-      writeFileSync(filePath, '-- Skipped: SQLite does not support ALTER TABLE ADD CONSTRAINT\nSELECT 1;\n')
+      dropMigration(file, filePath, 'SQLite does not support ALTER TABLE ADD CONSTRAINT')
       continue
     }
 
@@ -148,8 +193,7 @@ function preprocessSqliteMigrations(): void {
     // different name triggers SQLITE_CONSTRAINT_UNIQUE.
     const allCreateUniqueIndex = statements.every(s => createUniqueIndexPattern.test(s))
     if (allCreateUniqueIndex) {
-      log.info(`Skipping redundant unique index migration for SQLite: ${file}`)
-      writeFileSync(filePath, '-- Skipped: unique constraints already exist from table creation\nSELECT 1;\n')
+      dropMigration(file, filePath, 'unique constraint already inline on table')
       continue
     }
 
@@ -164,7 +208,7 @@ function preprocessSqliteMigrations(): void {
 
       for (const stmt of statements) {
         const dropColMatch = stmt.match(dropColumnPattern)
-        if (dropColMatch) {
+        if (dropColMatch && dropColMatch[1] && dropColMatch[2]) {
           const tableName = dropColMatch[1]
           const columnName = dropColMatch[2]
 
@@ -206,7 +250,7 @@ function preprocessSqliteMigrations(): void {
 
       if (modified) {
         if (filteredStatements.length === 0) {
-          writeFileSync(filePath, '-- Skipped: columns already absent from table\nSELECT 1;\n')
+          dropMigration(file, filePath, 'columns already absent from table')
         }
         else {
           writeFileSync(filePath, `${filteredStatements.join(';\n')};\n`)
@@ -219,6 +263,32 @@ function preprocessSqliteMigrations(): void {
   if (sqliteDb) {
     try { (sqliteDb as any).close() }
     catch { /* ignore */ }
+  }
+
+  // Record dropped migrations as executed so they don't get regenerated on
+  // the next `buddy generate:migrations` cycle. Without this, the same
+  // unique-index / add-constraint migrations would reappear every run.
+  if (droppedMigrations.length > 0) {
+    try {
+      const dbPath = join(process.cwd(), dbConfig.connections.sqlite.database || 'stacks.db')
+      if (existsSync(dbPath)) {
+        const { Database } = require('bun:sqlite')
+        const writeDb = new Database(dbPath)
+        try {
+          writeDb.exec(`CREATE TABLE IF NOT EXISTS migrations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            migration TEXT NOT NULL UNIQUE,
+            executed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )`)
+          const insert = writeDb.prepare('INSERT OR IGNORE INTO migrations (migration) VALUES (?)')
+          for (const migration of droppedMigrations) insert.run(migration)
+        }
+        finally { writeDb.close() }
+      }
+    }
+    catch (e) {
+      log.debug(`[migration] Could not record dropped migrations as executed: ${e}`)
+    }
   }
 }
 
@@ -305,6 +375,7 @@ async function ensureDatabaseExists(): Promise<void> {
  * Run database migrations
  */
 export async function runDatabaseMigration(): Promise<Result<string, Error>> {
+  const startedAt = Date.now()
   try {
     log.info('Migrating database...')
 
@@ -325,10 +396,17 @@ export async function runDatabaseMigration(): Promise<Result<string, Error>> {
     log.debug(`[migration] Running migrations from: ${modelsDir}`)
     await qbExecuteMigration(modelsDir)
 
-    log.success('Database migration completed.')
+    log.success(`Database migration completed in ${Date.now() - startedAt}ms.`)
     return ok('Database migration completed.')
   }
   catch (error) {
+    // Surface enough context for the user to act on the failure: which
+    // migration directory, how long it ran before crashing, and the
+    // underlying error message. The previous bare "Migration failed"
+    // forced everyone to add their own debug logs.
+    const detail = error instanceof Error ? error.message : String(error)
+    log.error(`[migration] Failed after ${Date.now() - startedAt}ms: ${detail}`)
+    log.info('[migration] Run `./buddy migrate:fresh` to drop and recreate the schema if state is partial.')
     return err(handleError('Migration failed', error))
   }
 }
@@ -445,8 +523,19 @@ async function dropFrameworkTables(dialect: 'sqlite' | 'mysql' | 'postgres'): Pr
 }
 
 /**
- * Generate migrations based on model changes
- * This is the new bun-query-builder style that compares models to generate diffs
+ * Generate migrations based on model changes.
+ *
+ * Compares the current `app/Models/*` definitions to the stored snapshot
+ * (`.qb/model-snapshot.<dialect>.json`) via bun-query-builder, then — if
+ * there are changes — writes the resulting ALTER/CREATE/DROP statements
+ * out to a fresh file in `database/migrations/`. Each statement is
+ * grouped by table + DDL verb and lands in its own file using the
+ * runner's existing naming convention so it picks them up the same way
+ * as a hand-written migration.
+ *
+ * Without this write step the qb generator stages the diff in memory but
+ * the runner never sees it, so model edits silently no-op'd — defeating
+ * the "models are the source of truth" promise.
  */
 export async function generateMigrations(): Promise<Result<string, Error>> {
   try {
@@ -462,7 +551,11 @@ export async function generateMigrations(): Promise<Result<string, Error>> {
     const result = await qbGenerateMigration(modelsDir, { dialect })
 
     if (result.hasChanges) {
-      log.success('Migrations generated')
+      const written = persistGeneratedMigrations(result.sqlStatements ?? [])
+      if (written > 0)
+        log.success(`Migrations generated (${written} file${written === 1 ? '' : 's'})`)
+      else
+        log.success('Migrations generated')
     }
     else {
       log.info('No changes detected')
@@ -473,6 +566,104 @@ export async function generateMigrations(): Promise<Result<string, Error>> {
   catch (error) {
     return err(handleError('Migration generation failed', error))
   }
+}
+
+/**
+ * Write generated SQL to `database/migrations/` so the runner picks it up.
+ * Returns the number of files written.
+ */
+function persistGeneratedMigrations(sqlStatements: string[]): number {
+  if (!sqlStatements?.length)
+    return 0
+
+  const migrationsDir = join(process.cwd(), 'database', 'migrations')
+  try { require('node:fs').mkdirSync(migrationsDir, { recursive: true }) }
+  catch { /* already exists */ }
+
+  // Skip statements already represented in committed migrations. The qb
+  // diff will sometimes restate things after the snapshot gets rewritten,
+  // and we'd rather no-op than create a duplicate file.
+  let existingSql = ''
+  try {
+    for (const f of readdirSync(migrationsDir).filter(f => f.endsWith('.sql')))
+      existingSql += `\n${readFileSync(join(migrationsDir, f), 'utf8')}`
+  }
+  catch { /* nothing committed yet */ }
+  const normalize = (s: string): string => s.replace(/\s+/g, ' ').trim()
+  const haystack = normalize(existingSql)
+
+  const groups = groupGeneratedStatements(sqlStatements)
+  let written = 0
+  let cursor = nextMigrationNumber(migrationsDir)
+
+  for (const group of groups) {
+    const fresh = group.statements.filter(stmt => !haystack.includes(normalize(stmt)))
+    if (fresh.length === 0)
+      continue
+
+    const filename = `${String(cursor).padStart(10, '0')}-${group.label}.sql`
+    const filePath = join(migrationsDir, filename)
+    const body = `${fresh.map(s => s.trim().replace(/;\s*$/, '')).join(';\n')};\n`
+    writeFileSync(filePath, body)
+    log.debug(`[migration] Wrote ${filename} (${fresh.length} stmt${fresh.length === 1 ? '' : 's'})`)
+    written += 1
+    cursor += 1
+  }
+
+  return written
+}
+
+interface GeneratedGroup {
+  label: string
+  statements: string[]
+}
+
+/**
+ * Group generated SQL by the migration filename style the runner already
+ * uses for hand-written files: `create-<table>-table`,
+ * `alter-<table>-<col>`, `create-<index>-index-in-<table>`, or
+ * `drop-<table>-table`. Anything we can't match falls back to `auto-misc`.
+ */
+function groupGeneratedStatements(sqlStatements: string[]): GeneratedGroup[] {
+  const groups = new Map<string, string[]>()
+  const push = (label: string, stmt: string): void => {
+    const list = groups.get(label) ?? []
+    list.push(stmt)
+    groups.set(label, list)
+  }
+
+  for (const raw of sqlStatements) {
+    const stmt = raw.trim()
+    if (!stmt) continue
+
+    const create = stmt.match(/^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["`]?(\w+)["`]?/i)
+    if (create) { push(`create-${create[1]}-table`, stmt); continue }
+
+    const alter = stmt.match(/^\s*ALTER\s+TABLE\s+["`]?(\w+)["`]?\s+(?:ADD\s+COLUMN\s+["`]?(\w+)["`]?|DROP\s+COLUMN\s+["`]?(\w+)["`]?|ADD\s+CONSTRAINT)/i)
+    if (alter) { push(`alter-${alter[1]}-${alter[2] || alter[3] || 'constraint'}`, stmt); continue }
+
+    const idx = stmt.match(/^\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?["`]?(\w+)["`]?\s+ON\s+["`]?(\w+)["`]?/i)
+    if (idx) { push(`create-${idx[1]}-index-in-${idx[2]}`, stmt); continue }
+
+    const drop = stmt.match(/^\s*DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?["`]?(\w+)["`]?/i)
+    if (drop) { push(`drop-${drop[1]}-table`, stmt); continue }
+
+    push('auto-misc', stmt)
+  }
+
+  return [...groups.entries()].map(([label, statements]) => ({ label, statements }))
+}
+
+function nextMigrationNumber(migrationsDir: string): number {
+  let max = 0
+  try {
+    for (const f of readdirSync(migrationsDir)) {
+      const m = f.match(/^(\d+)-/)
+      if (m) max = Math.max(max, Number.parseInt(m[1], 10))
+    }
+  }
+  catch { /* directory missing — start at 1 */ }
+  return max + 1
 }
 
 /**

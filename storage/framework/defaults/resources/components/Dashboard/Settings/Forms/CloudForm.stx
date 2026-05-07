@@ -88,7 +88,7 @@ const { type = 'serverless', driver = 'aws', environments = 'production,staging,
                 <div class="mt-2">
                   <button
                     type="button"
-                    class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer : ? 'bg-gray-200' 'bg-indigo-600' {{ }} enableAI"
+                    class="relative h-6 w-11 inline-flex flex-shrink-0 cursor-pointer border-2 border-transparent rounded-full {{ enableAI ? 'bg-indigo-600' : 'bg-gray-200' }} transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600"
                     role="switch"
                     aria-checked="{{ enableAI ? 'true' : 'false' }}"
                     data-action="toggle-enable-ai"
@@ -96,7 +96,7 @@ const { type = 'serverless', driver = 'aws', environments = 'production,staging,
                     <span class="sr-only">Enable AI</span>
                     <span
                       aria-hidden="true"
-                      class="inline-block h-5 w-5 bg-white ring-0 rounded-full shadow duration-200 ease-in-out transition transform pointer-events-none : ? 'translate-x-0' 'translate-x-5' {{ }} enableAI"
+                      class="pointer-events-none inline-block h-5 w-5 {{ enableAI ? 'translate-x-5' : 'translate-x-0' }} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
                     ></span>
                   </button>
                 </div>
@@ -106,7 +106,7 @@ const { type = 'serverless', driver = 'aws', environments = 'production,staging,
                 <div class="mt-2">
                   <button
                     type="button"
-                    class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer : ? 'bg-gray-200' 'bg-indigo-600' {{ }} enableCLI"
+                    class="relative h-6 w-11 inline-flex flex-shrink-0 cursor-pointer border-2 border-transparent rounded-full {{ enableCLI ? 'bg-indigo-600' : 'bg-gray-200' }} transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600"
                     role="switch"
                     aria-checked="{{ enableCLI ? 'true' : 'false' }}"
                     data-action="toggle-enable-cli"
@@ -114,7 +114,7 @@ const { type = 'serverless', driver = 'aws', environments = 'production,staging,
                     <span class="sr-only">Enable CLI</span>
                     <span
                       aria-hidden="true"
-                      class="inline-block h-5 w-5 bg-white ring-0 rounded-full shadow duration-200 ease-in-out transition transform pointer-events-none : ? 'translate-x-0' 'translate-x-5' {{ }} enableCLI"
+                      class="pointer-events-none inline-block h-5 w-5 {{ enableCLI ? 'translate-x-5' : 'translate-x-0' }} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
                     ></span>
                   </button>
                 </div>
@@ -124,7 +124,7 @@ const { type = 'serverless', driver = 'aws', environments = 'production,staging,
                 <div class="mt-2">
                   <button
                     type="button"
-                    class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer : ? 'bg-gray-200' 'bg-indigo-600' {{ }} enableDocs"
+                    class="relative h-6 w-11 inline-flex flex-shrink-0 cursor-pointer border-2 border-transparent rounded-full {{ enableDocs ? 'bg-indigo-600' : 'bg-gray-200' }} transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600"
                     role="switch"
                     aria-checked="{{ enableDocs ? 'true' : 'false' }}"
                     data-action="toggle-enable-docs"
@@ -132,7 +132,7 @@ const { type = 'serverless', driver = 'aws', environments = 'production,staging,
                     <span class="sr-only">Enable Docs</span>
                     <span
                       aria-hidden="true"
-                      class="inline-block h-5 w-5 bg-white ring-0 rounded-full shadow duration-200 ease-in-out transition transform pointer-events-none : ? 'translate-x-0' 'translate-x-5' {{ }} enableDocs"
+                      class="pointer-events-none inline-block h-5 w-5 {{ enableDocs ? 'translate-x-5' : 'translate-x-0' }} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
                     ></span>
                   </button>
                 </div>
@@ -142,7 +142,7 @@ const { type = 'serverless', driver = 'aws', environments = 'production,staging,
                 <div class="mt-2">
                   <button
                     type="button"
-                    class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer : ? 'bg-gray-200' 'bg-indigo-600' {{ }} enableFileSystem"
+                    class="relative h-6 w-11 inline-flex flex-shrink-0 cursor-pointer border-2 border-transparent rounded-full {{ enableFileSystem ? 'bg-indigo-600' : 'bg-gray-200' }} transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600"
                     role="switch"
                     aria-checked="{{ enableFileSystem ? 'true' : 'false' }}"
                     data-action="toggle-enable-fs"
@@ -150,7 +150,7 @@ const { type = 'serverless', driver = 'aws', environments = 'production,staging,
                     <span class="sr-only">Enable File System</span>
                     <span
                       aria-hidden="true"
-                      class="inline-block h-5 w-5 bg-white ring-0 rounded-full shadow duration-200 ease-in-out transition transform pointer-events-none : ? 'translate-x-0' 'translate-x-5' {{ }} enableFileSystem"
+                      class="pointer-events-none inline-block h-5 w-5 {{ enableFileSystem ? 'translate-x-5' : 'translate-x-0' }} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
                     ></span>
                   </button>
                 </div>
@@ -179,13 +179,13 @@ const { type = 'serverless', driver = 'aws', environments = 'production,staging,
                 <div class="mt-2">
                   <button
                     type="button"
-                    class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer : ? 'bg-gray-200' 'bg-indigo-600' {{ }} apiDeploy"
+                    class="relative h-6 w-11 inline-flex flex-shrink-0 cursor-pointer border-2 border-transparent rounded-full {{ apiDeploy ? 'bg-indigo-600' : 'bg-gray-200' }} transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600"
                     role="switch"
                     aria-checked="{{ apiDeploy ? 'true' : 'false' }}"
                     data-action="toggle-api-deploy"
                   >
                     <span class="sr-only">Api Deploy</span>
-                    <span aria-hidden="true" class="inline-block h-5 w-5 bg-white ring-0 rounded-full shadow duration-200 ease-in-out transition transform pointer-events-none : ? 'translate-x-0' 'translate-x-5' {{ }} apiDeploy"></span>
+                    <span aria-hidden="true" class="pointer-events-none inline-block h-5 w-5 {{ apiDeploy ? 'translate-x-5' : 'translate-x-0' }} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
                   </button>
                 </div>
               </div>
@@ -225,13 +225,13 @@ const { type = 'serverless', driver = 'aws', environments = 'production,staging,
                   <legend class="leading-6 text-gray-900 text-sm">Available Routes</legend>
                   <div class="grid gap-y-6 grid-cols-1 sm:gap-x-4 sm:grid-cols-3 mt-2">
                     @foreach(routes as route)
-                      <label class="flex relative p-4 bg-white border ring-2 ring-indigo-600' rounded-lg focus:outline-none shadow-sm cursor-pointer : ? 'border-gray-300' 'border-indigo-600 {{ }} route.available">
+                      <label class="relative flex cursor-pointer border {{ route.available ? 'border-indigo-600 ring-2 ring-indigo-600' : 'border-gray-300' }} rounded-lg bg-white p-4 shadow-sm focus:outline-none">
                         <input type="radio" name="project-type" value="{{ route.name }}" class="sr-only">
                         <span class="flex flex-1">
                           <span class="flex flex-col">
                             <span class="block font-medium text-gray-900 text-sm">{{ route.name }}</span>
                             <span class="flex items-center mt-1 text-gray-500 text-sm">{{ route.description }}</span>
-                            <span class="mt-6 font-medium text-sm : ? 'text-gray-500' 'text-gray-900' {{ }} route.available">{{ route.available ? 'Available' : 'Not Available' }}</span>
+                            <span class="mt-6 text-sm {{ route.available ? 'text-gray-900' : 'text-gray-500' }} font-medium">{{ route.available ? 'Available' : 'Not Available' }}</span>
                           </span>
                         </span>
                         @if(route.available)
@@ -260,27 +260,27 @@ const { type = 'serverless', driver = 'aws', environments = 'production,staging,
               <div class="col-span-2">
                 <label for="firewall-enabled" class="block font-medium leading-6 text-gray-900 text-sm dark:text-neutral-100 cursor-pointer">Enabled</label>
                 <div class="mt-2">
-                  <button type="button" class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer : ? 'bg-gray-200' 'bg-indigo-600' {{ }} firewallEnabled" role="switch" aria-checked="{{ firewallEnabled ? 'true' : 'false' }}" data-action="toggle-firewall">
+                  <button type="button" class="relative h-6 w-11 inline-flex flex-shrink-0 cursor-pointer border-2 border-transparent rounded-full {{ firewallEnabled ? 'bg-indigo-600' : 'bg-gray-200' }} transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600" role="switch" aria-checked="{{ firewallEnabled ? 'true' : 'false' }}" data-action="toggle-firewall">
                     <span class="sr-only">Firewall Enabled</span>
-                    <span aria-hidden="true" class="inline-block h-5 w-5 bg-white ring-0 rounded-full shadow duration-200 ease-in-out transition transform pointer-events-none : ? 'translate-x-0' 'translate-x-5' {{ }} firewallEnabled"></span>
+                    <span aria-hidden="true" class="pointer-events-none inline-block h-5 w-5 {{ firewallEnabled ? 'translate-x-5' : 'translate-x-0' }} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
                   </button>
                 </div>
               </div>
               <div class="col-span-2">
                 <label for="firewall-ip-rep" class="block font-medium leading-6 text-gray-900 text-sm dark:text-neutral-100 cursor-pointer">Use Ip Reputation Lists</label>
                 <div class="mt-2">
-                  <button type="button" class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer : ? 'bg-gray-200' 'bg-indigo-600' {{ }} firewallIpReputation" role="switch" data-action="toggle-firewall-ip-rep">
+                  <button type="button" class="relative h-6 w-11 inline-flex flex-shrink-0 cursor-pointer border-2 border-transparent rounded-full {{ firewallIpReputation ? 'bg-indigo-600' : 'bg-gray-200' }} transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600" role="switch" data-action="toggle-firewall-ip-rep">
                     <span class="sr-only">Use Ip Reputation Lists</span>
-                    <span aria-hidden="true" class="inline-block h-5 w-5 bg-white ring-0 rounded-full shadow duration-200 ease-in-out transition transform pointer-events-none : ? 'translate-x-0' 'translate-x-5' {{ }} firewallIpReputation"></span>
+                    <span aria-hidden="true" class="pointer-events-none inline-block h-5 w-5 {{ firewallIpReputation ? 'translate-x-5' : 'translate-x-0' }} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
                   </button>
                 </div>
               </div>
               <div class="col-span-2">
                 <label for="firewall-bad-inputs" class="block font-medium leading-6 text-gray-900 text-sm dark:text-neutral-100 cursor-pointer">Use Known Bad Inputs Rule Set</label>
                 <div class="mt-2">
-                  <button type="button" class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer : ? 'bg-gray-200' 'bg-indigo-600' {{ }} firewallBadInputs" role="switch" data-action="toggle-firewall-bad-inputs">
+                  <button type="button" class="relative h-6 w-11 inline-flex flex-shrink-0 cursor-pointer border-2 border-transparent rounded-full {{ firewallBadInputs ? 'bg-indigo-600' : 'bg-gray-200' }} transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600" role="switch" data-action="toggle-firewall-bad-inputs">
                     <span class="sr-only">Use Known Bad Inputs</span>
-                    <span aria-hidden="true" class="inline-block h-5 w-5 bg-white ring-0 rounded-full shadow duration-200 ease-in-out transition transform pointer-events-none : ? 'translate-x-0' 'translate-x-5' {{ }} firewallBadInputs"></span>
+                    <span aria-hidden="true" class="pointer-events-none inline-block h-5 w-5 {{ firewallBadInputs ? 'translate-x-5' : 'translate-x-0' }} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
                   </button>
                 </div>
               </div>
@@ -329,9 +329,9 @@ const { type = 'serverless', driver = 'aws', environments = 'production,staging,
               <div class="sm:col-span-3">
                 <label for="cdn-compress" class="block font-medium leading-6 text-gray-900 text-sm dark:text-neutral-100 cursor-pointer">Compress</label>
                 <div class="mt-2">
-                  <button type="button" class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer : ? 'bg-gray-200' 'bg-indigo-600' {{ }} cdnCompress" role="switch" data-action="toggle-cdn-compress">
+                  <button type="button" class="relative h-6 w-11 inline-flex flex-shrink-0 cursor-pointer border-2 border-transparent rounded-full {{ cdnCompress ? 'bg-indigo-600' : 'bg-gray-200' }} transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600" role="switch" data-action="toggle-cdn-compress">
                     <span class="sr-only">Compress</span>
-                    <span aria-hidden="true" class="inline-block h-5 w-5 bg-white ring-0 rounded-full shadow duration-200 ease-in-out transition transform pointer-events-none : ? 'translate-x-0' 'translate-x-5' {{ }} cdnCompress"></span>
+                    <span aria-hidden="true" class="pointer-events-none inline-block h-5 w-5 {{ cdnCompress ? 'translate-x-5' : 'translate-x-0' }} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
                   </button>
                 </div>
               </div>
@@ -417,9 +417,9 @@ const { type = 'serverless', driver = 'aws', environments = 'production,staging,
               <div class="sm:col-span-2">
                 <label for="cdn-realtime-enabled" class="block font-medium leading-6 text-gray-900 text-sm dark:text-neutral-100 cursor-pointer">Enabled</label>
                 <div class="mt-2">
-                  <button type="button" class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer : ? 'bg-gray-200' 'bg-indigo-600' {{ }} cdnRealTimeLogsEnabled" role="switch" data-action="toggle-cdn-realtime">
+                  <button type="button" class="relative h-6 w-11 inline-flex flex-shrink-0 cursor-pointer border-2 border-transparent rounded-full {{ cdnRealTimeLogsEnabled ? 'bg-indigo-600' : 'bg-gray-200' }} transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600" role="switch" data-action="toggle-cdn-realtime">
                     <span class="sr-only">Enabled</span>
-                    <span aria-hidden="true" class="inline-block h-5 w-5 bg-white ring-0 rounded-full shadow duration-200 ease-in-out transition transform pointer-events-none : ? 'translate-x-0' 'translate-x-5' {{ }} cdnRealTimeLogsEnabled"></span>
+                    <span aria-hidden="true" class="pointer-events-none inline-block h-5 w-5 {{ cdnRealTimeLogsEnabled ? 'translate-x-5' : 'translate-x-0' }} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
                   </button>
                 </div>
               </div>

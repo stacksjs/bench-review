@@ -12,6 +12,8 @@
   const isAnonymous = state(false)
   const judge = state(null)
 
+  const stars = [1, 2, 3, 4, 5]
+
   function loadJudge(id) {
     judge.set({
       id: '1',
@@ -38,7 +40,13 @@
   })
 
   function handleSubmit() {
-    navigate('/judges/', true) + judge()?.id + '/reviews'
+    try {
+      localStorage.removeItem('bench-review:compose-draft')
+    }
+    catch {
+      // localStorage unavailable — fail silently
+    }
+    navigate(`/judges/${judge()?.id}/reviews`, true)
   }
 
   function handleCancel() {
@@ -61,15 +69,14 @@
 
   <!-- Review Form - Only shown when judge is selected -->
   <div :if="judge">
-      <!-- Review Header -->
-      <div class="pb-12">
-        <div>
-          <div class="mb-8 text-center">
-            <img class="inline-block mb-4 h-24 w-24 ring-2 ring-white rounded-full grayscale filter" x-src="judge.photo" x-alt="judge.name" />
-            <h3 class="font-semibold text-gray-800 text-lg" x-text="judge().name"></h3>
-            <p class="text-gray-600 text-sm" x-text="judge().court"></p>
-            <p class="text-gray-600 text-sm" x-text="judge().department"></p>
-          </div>
+    <!-- Review Header -->
+    <div class="pb-12">
+      <div>
+        <div class="mb-8 text-center">
+          <img class="inline-block mb-4 h-24 w-24 ring-2 ring-white rounded-full grayscale filter" x-src="judge().photo" x-alt="judge().name" />
+          <h3 class="font-semibold text-gray-800 text-lg" :text="judge().name"></h3>
+          <p class="text-gray-600 text-sm" :text="judge().court"></p>
+          <p class="text-gray-600 text-sm" :text="judge().department"></p>
         </div>
       </div>
     </div>
@@ -101,21 +108,20 @@
           <label for="fairness" class="font-medium text-gray-700 text-sm/6">Fairness & Impartiality</label>
           <div class="flex items-center space-x-1 w-64">
             <div class="flex items-center space-x-1">
-              @for(let star = 1; star <= 5; star++)
-                <button
-                  type="button"
-                  x-disabled="!judge"
-                  class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  x-class="'text-yellow-400': (hoverFairness { {{ } }} <= || fairness) star"
-                  @click="fairness = {{ star }}"
-                  @mouseenter="hoverFairness = {{ star }}"
-                  @mouseleave="hoverFairness = 0"
-                >
-                  <Icon name="star" size="24" />
-                </button>
-              @endfor
+              <button
+                :for="star in stars"
+                type="button"
+                x-disabled="!judge"
+                class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                x-class="(hoverFairness() || fairness()) >= star ? 'text-yellow-400' : ''"
+                @click="fairness.set(star)"
+                @mouseenter="hoverFairness.set(star)"
+                @mouseleave="hoverFairness.set(0)"
+              >
+                <Icon name="star" size="24" />
+              </button>
             </div>
-            <span class="ml-2 w-24 text-gray-500 text-sm" x-text="fairness() ? getRatingText(fairness()) : ''"></span>
+            <span class="ml-2 w-24 text-gray-500 text-sm" :text="fairness() ? getRatingText(fairness()) : ''"></span>
           </div>
         </div>
 
@@ -123,21 +129,20 @@
           <label for="knowledge" class="font-medium text-gray-700 text-sm/6">Legal Knowledge</label>
           <div class="flex items-center space-x-1 w-64">
             <div class="flex items-center space-x-1">
-              @for(let star = 1; star <= 5; star++)
-                <button
-                  type="button"
-                  x-disabled="!judge"
-                  class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  x-class="'text-yellow-400': (hoverKnowledge { {{ } }} <= || knowledge) star"
-                  @click="knowledge = {{ star }}"
-                  @mouseenter="hoverKnowledge = {{ star }}"
-                  @mouseleave="hoverKnowledge = 0"
-                >
-                  <Icon name="star" size="24" />
-                </button>
-              @endfor
+              <button
+                :for="star in stars"
+                type="button"
+                x-disabled="!judge"
+                class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                x-class="(hoverKnowledge() || knowledge()) >= star ? 'text-yellow-400' : ''"
+                @click="knowledge.set(star)"
+                @mouseenter="hoverKnowledge.set(star)"
+                @mouseleave="hoverKnowledge.set(0)"
+              >
+                <Icon name="star" size="24" />
+              </button>
             </div>
-            <span class="ml-2 w-24 text-gray-500 text-sm" x-text="knowledge() ? getRatingText(knowledge()) : ''"></span>
+            <span class="ml-2 w-24 text-gray-500 text-sm" :text="knowledge() ? getRatingText(knowledge()) : ''"></span>
           </div>
         </div>
 
@@ -145,21 +150,20 @@
           <label for="demeanor" class="font-medium text-gray-700 text-sm/6">Professional Demeanor</label>
           <div class="flex items-center space-x-1 w-64">
             <div class="flex items-center space-x-1">
-              @for(let star = 1; star <= 5; star++)
-                <button
-                  type="button"
-                  x-disabled="!judge"
-                  class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  x-class="'text-yellow-400': (hoverDemeanor { {{ } }} <= || demeanor) star"
-                  @click="demeanor = {{ star }}"
-                  @mouseenter="hoverDemeanor = {{ star }}"
-                  @mouseleave="hoverDemeanor = 0"
-                >
-                  <Icon name="star" size="24" />
-                </button>
-              @endfor
+              <button
+                :for="star in stars"
+                type="button"
+                x-disabled="!judge"
+                class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                x-class="(hoverDemeanor() || demeanor()) >= star ? 'text-yellow-400' : ''"
+                @click="demeanor.set(star)"
+                @mouseenter="hoverDemeanor.set(star)"
+                @mouseleave="hoverDemeanor.set(0)"
+              >
+                <Icon name="star" size="24" />
+              </button>
             </div>
-            <span class="ml-2 w-24 text-gray-500 text-sm" x-text="demeanor() ? getRatingText(demeanor()) : ''"></span>
+            <span class="ml-2 w-24 text-gray-500 text-sm" :text="demeanor() ? getRatingText(demeanor()) : ''"></span>
           </div>
         </div>
       </div>
@@ -266,20 +270,19 @@
         <label for="rating" class="block font-medium text-gray-700 text-sm/6">Overall Rating</label>
         <div class="mt-2">
           <div class="flex items-center space-x-1">
-            @for(let star = 1; star <= 5; star++)
-              <button
-                type="button"
-                x-disabled="!judge"
-                class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                x-class="'text-yellow-400': (hoverRating { {{ } }} <= || rating) star"
-                @click="rating = {{ star }}"
-                @mouseenter="hoverRating = {{ star }}"
-                @mouseleave="hoverRating = 0"
-              >
-                <Icon name="star" size="32" />
-              </button>
-            @endfor
-            <span class="ml-2 text-gray-500 text-sm" x-text="ratingText"></span>
+            <button
+              :for="star in stars"
+              type="button"
+              x-disabled="!judge"
+              class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+              x-class="(hoverRating() || rating()) >= star ? 'text-yellow-400' : ''"
+              @click="rating.set(star)"
+              @mouseenter="hoverRating.set(star)"
+              @mouseleave="hoverRating.set(0)"
+            >
+              <Icon name="star" size="32" />
+            </button>
+            <span class="ml-2 text-gray-500 text-sm" :text="ratingText()"></span>
           </div>
         </div>
       </div>
@@ -311,57 +314,3 @@
   </div>
 </div>
 
-@push('styles')
-<style>
-.ProseMirror {
-  min-height: 150px;
-  padding: 0.5rem 0;
-}
-
-.ProseMirror:focus {
-  outline: none;
-}
-
-.ProseMirror p:first-child {
-  margin-top: 0;
-}
-
-.ProseMirror p.is-empty:first-child::before {
-  color: #9ca3af;
-  content: attr(data-placeholder);
-  float: left;
-  height: 0;
-  pointer-events: none;
-}
-
-/* Basic editor styles */
-.ProseMirror > * + * {
-  margin-top: 0.75em;
-}
-
-.ProseMirror ul,
-.ProseMirror ol {
-  padding: 0 1rem;
-}
-
-.ProseMirror ul {
-  list-style-type: disc;
-}
-
-.ProseMirror ol {
-  list-style-type: decimal;
-}
-
-.ProseMirror code {
-  background-color: rgba(97, 97, 97, 0.1);
-  color: #616161;
-  padding: 0.25rem;
-  border-radius: 0.25rem;
-}
-
-.ProseMirror blockquote {
-  padding-left: 1rem;
-  border-left: 2px solid rgba(13, 13, 13, 0.1);
-}
-</style>
-@endpush

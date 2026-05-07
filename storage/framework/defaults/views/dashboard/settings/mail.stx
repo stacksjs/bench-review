@@ -15,7 +15,7 @@ function handleSubmit(event: Event) {
 fetchSettings()
 </script>
 
-<main>
+<PageLayout variant="bare">
   <SettingsHeader />
 
   <!-- Settings forms -->
@@ -183,6 +183,6 @@ fetchSettings()
       </form>
     </div>
   </div>
-</main>
+</PageLayout>
 
 @endsection

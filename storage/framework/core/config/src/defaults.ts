@@ -1,5 +1,50 @@
 import type { StacksOptions } from '@stacksjs/types'
-import { commandsPath, userDatabasePath } from '@stacksjs/path'
+import { commandsPath, projectPath, userDatabasePath } from '@stacksjs/path'
+
+/**
+ * Framework-wide default scalars. Defining these as named constants
+ * (rather than re-spelling the literal in each config section) keeps
+ * "where do I change the default region?" answerable from a single
+ * line — the previous shape had `'us-east-1'` typed in 4+ places that
+ * could drift when a multi-region future lands.
+ */
+export const FRAMEWORK_DEFAULTS = {
+  /** Default AWS region for SES, S3, DynamoDB, CloudFront origin shield. */
+  awsRegion: 'us-east-1',
+  /** Default scheduler / job timezone. UTC keeps cron predictable across hosts. */
+  timezone: 'UTC',
+  /** No-reply address for transactional email (override via config.email.from). */
+  noReplyEmail: 'no-reply@stacksjs.com',
+  /** Default project domain shape for new scaffolds. */
+  fallbackDomain: 'stacks.localhost',
+} as const
+
+/**
+ * Derive sane app defaults (name, url) from the project's package.json so
+ * a fresh project gets `Drivly` / `drivly.localhost` instead of the
+ * generic `Stacks` / `stacks.localhost` placeholders.
+ *
+ * Falls back to "Stacks"/"stacks.localhost" when package.json is absent
+ * or unreadable — `.env` and `config/app.ts` always win over both.
+ */
+function deriveAppDefaults(): { name: string, url: string } {
+  try {
+    const pkgPath = projectPath('package.json')
+    // eslint-disable-next-line ts/no-require-imports
+    const pkg = require(pkgPath) as { name?: string }
+    const raw = (pkg.name ?? '').trim()
+    if (!raw) return { name: 'Stacks', url: 'stacks.localhost' }
+    // Strip @scope/, replace separators, capitalise.
+    const slug = raw.replace(/^@[^/]+\//, '').toLowerCase()
+    const name = slug.replace(/[-_]+/g, ' ').replace(/(^|\s)\w/g, c => c.toUpperCase())
+    return { name, url: `${slug}.localhost` }
+  }
+  catch {
+    return { name: 'Stacks', url: 'stacks.localhost' }
+  }
+}
+
+const appDefaults = deriveAppDefaults()
 
 export const defaults: StacksOptions = {
   ai: {
@@ -20,7 +65,11 @@ export const defaults: StacksOptions = {
     username: 'email',
     password: 'password',
     defaultTokenName: 'auth-token',
-    tokenExpiry: 30 * 24 * 60 * 60 * 1000, // 30 days
+    // Short-lived access token (1 hour). Pair with the refresh token below
+    // for a standard "rotate-on-refresh" flow. A non-expiring (or 30-day)
+    // bearer token has no recovery path if it leaks — see #1839.
+    tokenExpiry: 60 * 60 * 1000, // 1 hour
+    refreshTokenExpiry: 30 * 24 * 60 * 60 * 1000, // 30 days
     defaultAbilities: ['*'],
   },
 
@@ -46,13 +95,13 @@ export const defaults: StacksOptions = {
   // },
 
   app: {
-    name: 'Stacks',
+    name: appDefaults.name,
     description: 'A Stacks application.',
     env: 'local',
-    url: 'stacks.localhost',
+    url: appDefaults.url,
     debug: true,
     key: '',
-    timezone: 'UTC',
+    timezone: FRAMEWORK_DEFAULTS.timezone,
     locale: 'en',
     fallbackLocale: 'en',
     cipher: 'AES-256-CBC',
@@ -119,7 +168,7 @@ export const defaults: StacksOptions = {
         maxTtl: 31536000,
         compress: true,
         priceClass: 'PriceClass_All',
-        originShieldRegion: 'us-east-1',
+        originShieldRegion: FRAMEWORK_DEFAULTS.awsRegion,
         cookieBehavior: 'none',
         allowList: {
           cookies: [],
@@ -140,6 +189,18 @@ export const defaults: StacksOptions = {
     sites: {
       root: '',
       path: '',
+    },
+  },
+
+  dashboard: {
+    sections: {
+      library: { enabled: true },
+      content: { enabled: true },
+      commerce: { enabled: true },
+      marketing: { enabled: true },
+      analytics: { enabled: true },
+      management: { enabled: true },
+      utilities: { enabled: true },
     },
   },
 
@@ -196,7 +257,7 @@ export const defaults: StacksOptions = {
   email: {
     from: {
       name: 'Stacks',
-      address: 'no-reply@stacksjs.com',
+      address: FRAMEWORK_DEFAULTS.noReplyEmail,
     },
 
     mailboxes: [],
@@ -519,7 +580,7 @@ export const defaults: StacksOptions = {
         prefix: '',
         suffix: '',
         queue: 'default',
-        region: 'us-east-1',
+        region: FRAMEWORK_DEFAULTS.awsRegion,
       },
     },
   } as any,
@@ -619,7 +680,7 @@ export const defaults: StacksOptions = {
       accountId: '',
       appId: '',
       apiKey: '',
-      region: 'us-east-1',
+      region: FRAMEWORK_DEFAULTS.awsRegion,
     },
 
     algolia: {

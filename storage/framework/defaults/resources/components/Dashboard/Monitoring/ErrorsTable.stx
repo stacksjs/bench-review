@@ -66,7 +66,7 @@ function truncateMessage(message, maxLength = 60) {
             Error
             <span class="group-focus:visible group-hover:visible flex-none ml-2 text-gray-400 rounded">
               @if(sortBy == 'type')
-                <div class="h-4 w-4 : ? 'asc' 'i-hugeicons-arrow-down-02' 'i-hugeicons-arrow-up-02' {{ }} == sortOrder"></div>
+                <div class="{{ sortOrder == 'asc' ? 'i-hugeicons-arrow-up-02' : 'i-hugeicons-arrow-down-02' }} h-4 w-4"></div>
               @else
                 <div class="h-4 w-4 i-hugeicons-arrows-up-down"></div>
               @endif
@@ -78,7 +78,7 @@ function truncateMessage(message, maxLength = 60) {
             Events
             <span class="group-focus:visible group-hover:visible flex-none ml-2 text-gray-400 rounded">
               @if(sortBy == 'count')
-                <div class="h-4 w-4 : ? 'asc' 'i-hugeicons-arrow-down-02' 'i-hugeicons-arrow-up-02' {{ }} == sortOrder"></div>
+                <div class="{{ sortOrder == 'asc' ? 'i-hugeicons-arrow-up-02' : 'i-hugeicons-arrow-down-02' }} h-4 w-4"></div>
               @else
                 <div class="h-4 w-4 i-hugeicons-arrows-up-down"></div>
               @endif
@@ -90,7 +90,7 @@ function truncateMessage(message, maxLength = 60) {
             Last Seen
             <span class="group-focus:visible group-hover:visible flex-none ml-2 text-gray-400 rounded">
               @if(sortBy == 'last_seen')
-                <div class="h-4 w-4 : ? 'asc' 'i-hugeicons-arrow-down-02' 'i-hugeicons-arrow-up-02' {{ }} == sortOrder"></div>
+                <div class="{{ sortOrder == 'asc' ? 'i-hugeicons-arrow-up-02' : 'i-hugeicons-arrow-down-02' }} h-4 w-4"></div>
               @else
                 <div class="h-4 w-4 i-hugeicons-arrows-up-down"></div>
               @endif
@@ -111,7 +111,7 @@ function truncateMessage(message, maxLength = 60) {
           <td class="pl-4 pr-3 py-4 sm:pl-6 text-sm">
             <div class="flex flex-col">
               <div class="flex gap-2 items-center">
-                <span class="inline-flex items-center px-2 py-1 font-medium text-xs rounded-md {{ }} getTypeClass(error.type)">
+                <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium {{ getTypeClass(error.type) }}">
                   {{ error.type }}
                 </span>
               </div>
@@ -134,7 +134,7 @@ function truncateMessage(message, maxLength = 60) {
             {{ formatTimeAgo(error.last_seen) }}
           </td>
           <td class="px-3 py-4 text-sm whitespace-nowrap">
-            <span class="inline-flex items-center px-2 py-1 capitalize font-medium text-xs rounded-md {{ }} getStatusClass(error.status)">
+            <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium capitalize {{ getStatusClass(error.status) }}">
               {{ error.status }}
             </span>
           </td>

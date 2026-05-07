@@ -9,7 +9,7 @@
  * model imports needed here.
  */
 
-import { configureBrowser, browserAuth } from 'bun-query-builder'
+import { configureBrowser, browserAuth } from 'bun-query-builder/browser'
 
 /**
  * Initialize the API client with custom configuration
@@ -36,6 +36,7 @@ export function initApi(options?: {
   baseUrl?: string
   onUnauthorized?: () => void
 }): void {
+  // eslint-disable-next-line pickier/no-unused-vars
   const stacksConfig = (globalThis as any).__STACKS_CONFIG__ || {}
   const baseUrl = options?.baseUrl || (
     typeof window !== 'undefined'

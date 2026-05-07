@@ -1,5 +1,5 @@
 import type { Subprocess } from 'bun'
-import { existsSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync, appendFileSync, chmodSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -134,6 +134,32 @@ try {
   const env = await import('@stacksjs/env')
   globalThis.env = env
 } catch {}
+
+// validate() shortcut — paired with schema for fluent validation in REPL.
+try {
+  const { validate } = await import('@stacksjs/validation')
+  globalThis.validate = validate
+} catch {}
+
+// Jobs facade — lets you fire jobs without remembering the dispatch builder.
+try {
+  const { Jobs } = await import('@stacksjs/queue')
+  globalThis.Jobs = Jobs
+} catch {}
+
+// Request introspection — only useful inside an active request, but
+// the proxy is safe to expose: outside a request scope every property
+// returns a typed default (see request-context.ts).
+try {
+  const { request, listRegisteredRoutes } = await import('@stacksjs/router')
+  globalThis.request = request
+  globalThis.routes = listRegisteredRoutes
+} catch {}
+
+// dump/dd helpers for quick inspection — a Laravel-ism that's always
+// nice to have at the REPL when investigating a value.
+globalThis.dump = (...args) => { console.dir(args.length === 1 ? args[0] : args, { depth: 6, colors: true }) }
+globalThis.dd = (...args) => { console.dir(args.length === 1 ? args[0] : args, { depth: 6, colors: true }); process.exit(0) }
 `)
   }
 
@@ -171,10 +197,20 @@ export function readHistory(config?: TinkerConfig): string[] {
 
 /**
  * Append a single entry to the history file.
+ *
+ * The history file lives at `~/.stacks_tinker_history` and accumulates
+ * every expression a developer types — including any one-off pasted
+ * tokens, API keys, or DB credentials. Forcing 0600 permissions keeps
+ * the file readable only by the file's owner so other users on a shared
+ * machine can't grep it for accidentally-committed secrets.
  */
 export function appendHistory(entry: string, config?: TinkerConfig): void {
   const historyPath = getHistoryPath(config)
+  const isNew = !existsSync(historyPath)
   appendFileSync(historyPath, `${entry}\n`)
+  if (isNew) {
+    try { chmodSync(historyPath, 0o600) } catch { /* best-effort */ }
+  }
 
   // Trim history if it exceeds max size
   const maxSize = config?.historySize ?? 5000
@@ -183,6 +219,7 @@ export function appendHistory(entry: string, config?: TinkerConfig): void {
   if (entries.length > maxSize) {
     const trimmed = entries.slice(entries.length - maxSize)
     writeFileSync(historyPath, trimmed.join('\n') + '\n')
+    try { chmodSync(historyPath, 0o600) } catch { /* best-effort */ }
   }
 }
 
@@ -206,7 +243,8 @@ function buildBanner(): string {
     '  Interactive REPL with Stacks framework preloaded.',
     '',
     '  \x1b[2mAvailable globals: db, config, path, storage, log, Str,',
-    '  cache, queue, events, router, auth, collect, env',
+    '  cache, queue, events, router, auth, collect, env, request,',
+    '  validate, Jobs, routes, dump, dd',
     '  + all ORM models (User, Post, etc.)\x1b[0m',
     '',
     '  \x1b[2mType .help for REPL commands. Press Ctrl+D to exit.\x1b[0m',

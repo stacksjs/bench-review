@@ -1,6 +1,6 @@
 import type { CLI } from '@stacksjs/types'
 import process from 'node:process'
-import { bold, dim, green, intro, log } from '@stacksjs/cli'
+import { bold, dim, green, intro, log, onUnknownSubcommand } from "@stacksjs/cli"
 import { storage } from '@stacksjs/storage'
 
 export function about(buddy: CLI): void {
@@ -59,8 +59,5 @@ export function about(buddy: CLI): void {
       }
     })
 
-  buddy.on('about:*', () => {
-    console.error('Invalid command: %s\nSee --help for a list of available commands.', buddy.args.join(' '))
-    process.exit(1)
-  })
+  onUnknownSubcommand(buddy, "about")
 }

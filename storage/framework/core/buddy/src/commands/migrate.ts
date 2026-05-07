@@ -1,11 +1,56 @@
 import type { CLI, MigrateOptions } from '@stacksjs/types'
-import { existsSync, readdirSync } from 'node:fs'
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, rmSync } from 'node:fs'
 import process from 'node:process'
-import { runAction } from '@stacksjs/actions'
-import { intro, log, outro } from '@stacksjs/cli'
+import { intro, log, onUnknownSubcommand, outro } from "@stacksjs/cli"
 import { Action } from '@stacksjs/enums'
-import { appPath, frameworkPath } from '@stacksjs/path'
+import { appPath, frameworkPath, projectPath } from '@stacksjs/path'
 import { ExitCode } from '@stacksjs/types'
+
+// Lazy-load @stacksjs/actions to keep `buddy --help` cheap. The barrel
+// pulls in the database driver setup transitively, which we don't want
+// happening just to render the help screen.
+let _runAction: typeof import('@stacksjs/actions').runAction | undefined
+async function runAction(...args: Parameters<typeof import('@stacksjs/actions').runAction>): ReturnType<typeof import('@stacksjs/actions').runAction> {
+  if (!_runAction) _runAction = (await import('@stacksjs/actions')).runAction
+  return _runAction(...args)
+}
+
+/**
+ * File-based migration lock so two `buddy migrate` runs can't race each
+ * other on the same database. Returns a `release()` callback even when
+ * the lock isn't acquired so callers don't have to special-case.
+ *
+ * O_EXCL guarantees we either create the lockfile atomically or fail —
+ * this is the standard "single-writer" pattern that doesn't depend on
+ * any DB-level advisory lock and works on every supported OS.
+ */
+function acquireMigrationLock(): { acquired: boolean, release: () => void } {
+  const lockDir = projectPath('.stacks')
+  const lockFile = `${lockDir}/migrations.lock`
+  try {
+    if (!existsSync(lockDir)) mkdirSync(lockDir, { recursive: true })
+    // 'wx' = O_WRONLY | O_CREAT | O_EXCL via Node's portable string mode.
+    // The previous numeric flag (0o102) was hard-coded to Linux's bit
+    // layout — on macOS that bit pattern omits O_CREAT entirely, so the
+    // lock acquisition ALWAYS failed with ENOENT (no such file), which
+    // tripped the "already running" branch and silently exited the
+    // entire migrate command via process.exit() with no visible reason.
+    const fd = openSync(lockFile, 'wx')
+    try { closeSync(fd) } catch { /* ignore */ }
+    return {
+      acquired: true,
+      release: () => {
+        try { rmSync(lockFile, { force: true }) } catch { /* ignore */ }
+      },
+    }
+  }
+  catch {
+    return {
+      acquired: false,
+      release: () => {/* never acquired, nothing to free */},
+    }
+  }
+}
 
 /**
  * Count model files in a directory (recursively)
@@ -63,7 +108,8 @@ export function migrate(buddy: CLI): void {
     .alias('db:migrate')
     .option('-d, --diff', 'Show the SQL that would be run', { default: false })
     .option('-p, --project [project]', descriptions.project, { default: false })
-    .option('-a, --auth', descriptions.auth, { default: false })
+    .option('-a, --auth', descriptions.auth, { default: true })
+    .option('--no-auth', 'Skip auth/oauth table migrations')
     .option('--verbose', descriptions.verbose, { default: false })
     .action(async (options: MigrateOptions & { auth?: boolean }) => {
       log.debug('Running `buddy migrate` ...', options)
@@ -77,7 +123,17 @@ export function migrate(buddy: CLI): void {
         process.exit(ExitCode.FatalError)
       }
 
-      const result = await runAction(Action.Migrate, options)
+      // Acquire a project-local migration lock to prevent two concurrent
+      // runs from interleaving DDL on the same database. Two parallel
+      // `buddy migrate` invocations on the same project used to corrupt
+      // the migration table by both inserting the same row name.
+      const lock = acquireMigrationLock()
+      if (!lock.acquired) {
+        log.error('Another migration is already running (.stacks/migrations.lock exists). Wait for it to finish, or remove the lockfile if it is stale.')
+        process.exit(ExitCode.FatalError)
+      }
+
+      const result = await runAction(Action.Migrate, options).finally(() => lock.release())
 
       if (result.isErr) {
         await outro(
@@ -88,8 +144,8 @@ export function migrate(buddy: CLI): void {
         process.exit(ExitCode.FatalError)
       }
 
-      // Run auth table migrations if --auth flag is provided
-      if (options.auth) {
+      // Auth/oauth tables migrate by default. Pass --no-auth to opt out.
+      if (options.auth !== false) {
         log.info('Migrating auth tables...')
         try {
           const { migrateAuthTables } = await import('@stacksjs/database')
@@ -106,7 +162,7 @@ export function migrate(buddy: CLI): void {
 
       const APP_ENV = process.env.APP_ENV || 'local'
 
-      await outro(`Migrated your ${APP_ENV} database.${options.auth ? ' (including auth tables)' : ''}`, {
+      await outro(`Migrated your ${APP_ENV} database.${options.auth !== false ? ' (including auth tables)' : ''}`, {
         startTime: perf,
         useSeconds: true,
       })
@@ -119,7 +175,8 @@ export function migrate(buddy: CLI): void {
     .option('-d, --diff', 'Show the SQL that would be run', { default: false })
     .option('-p, --project [project]', descriptions.project, { default: false })
     .option('-s, --seed', 'Run database seeders after migration', { default: false })
-    .option('-a, --auth', descriptions.auth, { default: false })
+    .option('-a, --auth', descriptions.auth, { default: true })
+    .option('--no-auth', 'Skip auth/oauth table migrations')
     .option('--verbose', descriptions.verbose, { default: false })
     .action(async (options: MigrateOptions & { seed?: boolean, auth?: boolean }) => {
       log.debug('Running `buddy migrate:fresh` ...', options)
@@ -144,8 +201,8 @@ export function migrate(buddy: CLI): void {
         process.exit(ExitCode.FatalError)
       }
 
-      // Run auth table migrations if --auth flag is provided
-      if (options.auth) {
+      // Auth/oauth tables migrate by default. Pass --no-auth to opt out.
+      if (options.auth !== false) {
         log.info('Migrating auth tables...')
         try {
           const { migrateAuthTables } = await import('@stacksjs/database')
@@ -186,7 +243,7 @@ export function migrate(buddy: CLI): void {
       }
 
       const parts: string[] = []
-      if (options.auth) parts.push('auth tables')
+      if (options.auth !== false) parts.push('auth tables')
       if (options.seed) parts.push('seeded')
       const suffix = parts.length > 0 ? ` & ${parts.join(' & ')}` : ''
 
@@ -226,8 +283,5 @@ export function migrate(buddy: CLI): void {
       process.exit(ExitCode.Success)
     })
 
-  buddy.on('migrate:*', () => {
-    console.error('Invalid command: %s\nSee --help for a list of available commands.', buddy.args.join(' '))
-    process.exit(1)
-  })
+  onUnknownSubcommand(buddy, "migrate")
 }

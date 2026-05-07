@@ -14,7 +14,7 @@ const { show = false, type = 'warning', title = 'sample title', position = 'top-
   <div class="fixed inset-0"></div>
 
   <div class="fixed inset-0 overflow-y-auto z-10">
-    <div class="position position position position justify-center justify-center' justify-end justify-start' sm:items-center mt-4' my-8 p-4 sm:p-0 h-full' text-center : : : : ? ? ? ? '' '' '' '' 'center' 'flex 'flex 'flex 'flex 'top-left' 'top-right' 'top' {{ {{ {{ {{ }} }} }} }} == == == ==">
+    <div class="my-8 p-4 text-center sm:items-center sm:p-0 {{ position == 'center' ? 'flex justify-center h-full' : '' }} {{ position == 'top' ? 'flex justify-center' : '' }} {{ position == 'top-right' ? 'flex justify-end mt-4' : '' }} {{ position == 'top-left' ? 'flex justify-start' : '' }}">
       <div aria-live="assertive" class="flex fixed inset-0 items-end sm:items-start px-4 py-6 sm:p-6 pointer-events-none">
         <div class="flex flex-col items-center sm:items-end space-y-4 w-full">
           <div class="overflow-hidden max-w-sm w-full bg-white dark:bg-neutral-700 ring-1 ring-black ring-opacity-5 rounded-lg shadow-lg pointer-events-auto">

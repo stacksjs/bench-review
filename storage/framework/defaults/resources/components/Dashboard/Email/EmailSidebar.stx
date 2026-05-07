@@ -41,7 +41,7 @@ const { activeFolder = 'inbox', folders = [], unreadCounts = {} } = defineProps<
           @foreach(folders as folder)
             <li class="mb-1">
               <button
-                class="flex items-center justify-between px-4 py-2 w-full font-medium' text-gray-900 text-sm dark:text-neutral-300 dark:text-white dark:bg-neutral-700 hover:bg-gray-50 dark:hover:bg-neutral-700' : ? 'bg-gray-100 'text-gray-700 {{ }} == activeFolder folder.id"
+                class="w-full flex items-center justify-between px-4 py-2 text-sm {{ activeFolder == folder.id ? 'bg-gray-100 dark:bg-neutral-700 text-gray-900 dark:text-white font-medium' : 'text-gray-700 dark:text-neutral-300 hover:bg-gray-50 dark:hover:bg-neutral-700' }}"
                 data-action="set-folder"
                 data-folder-id="{{ folder.id }}"
               >

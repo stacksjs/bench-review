@@ -91,7 +91,7 @@ function getButtonBackground() {
     <div class="sm:flex sm:flex-row-reverse mt-5 space-y-4 sm:mt-4 md:space-y-0">
       <button
         type="button"
-        class="flex items-center disabled:opacity-50 disabled:cursor-not-allowed {{ }} buttonBackground primary-button"
+        class="flex items-center primary-button {{ buttonBackground }} disabled:opacity-50 disabled:cursor-not-allowed"
         data-action="confirm"
       >
         <span>{{ confirmationText }}</span>

@@ -2,10 +2,41 @@ import type { ValidationType, Validator } from '@stacksjs/ts-validation'
 import type { Model } from '@stacksjs/types'
 import { HttpError } from '@stacksjs/error-handling'
 import { path } from '@stacksjs/path'
-import { globSync } from '@stacksjs/storage'
 import { snakeCase } from '@stacksjs/strings'
 import { MessageProvider, setCustomMessages } from '@stacksjs/ts-validation'
-import { reportError, schema } from './'
+// Import directly from sibling files instead of the package's own `./` (which
+// would self-circular through `index.ts`'s re-exports and leave `schema` as
+// an empty namespace placeholder for any consumer that arrives mid-eval).
+import { reportError } from './reporter'
+import { schema } from './schema'
+
+// Inlined glob helper. Importing `globSync` from `@stacksjs/storage` would
+// pull in the storage facade, which statically imports `@stacksjs/config`.
+// `@stacksjs/config` has top-level await on every `~/config/*.ts`, including
+// `~/config/env`, which imports this very `@stacksjs/validation` package —
+// creating a static-import cycle through async config loading. The cycle
+// leaves `@stacksjs/router` (and anything else loaded later that goes
+// through @stacksjs/storage) in a TDZ state. Bun.Glob is what storage's
+// `globSync` wraps anyway; using it here makes validation truly leaf-node.
+function globSync(patterns: string[], options: { absolute?: boolean } = {}): string[] {
+  const results: string[] = []
+  for (const pattern of patterns) {
+    const isAbs = pattern.startsWith('/')
+    const slash = isAbs ? pattern.lastIndexOf('/') : -1
+    // Split into a base directory the glob walks from and a relative pattern
+    // it matches against. `Bun.Glob` doesn't accept absolute patterns, so for
+    // absolute inputs we anchor to the deepest static prefix.
+    const wildcardAt = pattern.indexOf('*')
+    const splitAt = wildcardAt === -1 ? slash : pattern.lastIndexOf('/', wildcardAt)
+    const cwd = splitAt > 0 ? pattern.slice(0, splitAt) : '.'
+    const rel = splitAt > 0 ? pattern.slice(splitAt + 1) : pattern
+    const glob = new Bun.Glob(rel)
+    for (const match of glob.scanSync({ cwd, onlyFiles: true })) {
+      results.push(options.absolute ? `${cwd}/${match}` : match)
+    }
+  }
+  return results
+}
 
 interface RequestData {
   [key: string]: any
@@ -43,6 +74,8 @@ export async function validateField(modelFile: string, params: RequestData): Pro
   for (const key in attributes) {
     if (Object.prototype.hasOwnProperty.call(attributes, key)) {
       const attributeKey = attributes[key]
+      if (!attributeKey)
+        continue
 
       const isRequired = 'isRequired' in (attributeKey.validation?.rule ?? {})
         ? (attributeKey.validation?.rule as Validator<any>).isRequired
@@ -54,7 +87,7 @@ export async function validateField(modelFile: string, params: RequestData): Pro
 
       ruleObject[snakeCase(key)] = attributeKey.validation?.rule as Validator<any>
 
-      const validatorMessages = attributes[key]?.validation?.message
+      const validatorMessages = attributeKey.validation?.message
 
       if (validatorMessages) {
         for (const validatorMessageKey in validatorMessages) {
@@ -73,7 +106,7 @@ export async function validateField(modelFile: string, params: RequestData): Pro
 
     if (!result.valid) {
       reportError(result.errors as any)
-      throw new HttpError(422, JSON.stringify(result.errors))
+      throw new HttpError(422, 'Validation failed', { errors: result.errors })
     }
 
     return result
@@ -90,6 +123,7 @@ export async function validateField(modelFile: string, params: RequestData): Pro
  * Async validation rule type.
  * Return true if valid, or a string error message if invalid.
  */
+// eslint-disable-next-line pickier/no-unused-vars
 export type AsyncValidator = (value: unknown, params: RequestData) => Promise<boolean | string>
 
 // Custom rule registry
@@ -116,9 +150,11 @@ export function unique(table: string, column: string, exceptId?: number): AsyncV
   return async (value: unknown): Promise<boolean | string> => {
     try {
       const { db } = await import('@stacksjs/database')
-      let query = db.selectFrom(table as any).where(column as any, '=', value as any)
+      // The query builder uses template-literal types that narrow on every
+      // `.where()`, so chaining loses type compatibility — cast through `any`.
+      let query: any = db.selectFrom(table as any).where(column as any, '=', value as any)
       if (exceptId) query = query.where('id' as any, '!=', exceptId as any)
-      const existing = await (query as any).selectAll().executeTakeFirst()
+      const existing = await query.selectAll().executeTakeFirst()
       return existing ? `The ${column} has already been taken` : true
     }
     catch {
@@ -170,11 +206,133 @@ export async function validateFieldAsync(
     )
 
     if (Object.keys(asyncErrors).length > 0) {
-      throw new HttpError(422, JSON.stringify(asyncErrors))
+      throw new HttpError(422, 'Validation failed', { errors: asyncErrors })
     }
   }
 
   return syncResult
+}
+
+/**
+ * Shape of a validation rule set understood by `validate()`. Each key
+ * maps to either a raw `Validator<T>` (from `@stacksjs/ts-validation`)
+ * or a `{ rule, message }` object that mirrors the model-attribute form.
+ */
+export type ValidationRules = Record<string, Validator<any> | { rule: Validator<any>, message?: string | Record<string, string> }>
+
+interface RequestLike {
+  all?: () => Record<string, unknown> | Promise<Record<string, unknown>>
+  jsonBody?: Record<string, unknown>
+  formBody?: Record<string, unknown>
+  query?: Record<string, unknown>
+  params?: Record<string, unknown>
+  url?: string
+}
+
+async function gatherRequestInput(source: RequestLike | Record<string, unknown>): Promise<Record<string, unknown>> {
+  // Plain object passed directly — no extraction needed.
+  if (!source || typeof source !== 'object') return {}
+  if (typeof (source as RequestLike).all === 'function') {
+    const all = (source as RequestLike).all!()
+    return all instanceof Promise ? await all : all
+  }
+
+  // Otherwise compose from the standard attached fields the router
+  // populates on the request (matches `enhanceRequest` in stacks-router).
+  const r = source as RequestLike
+  const out: Record<string, unknown> = {}
+  if (r.url) {
+    try {
+      const parsed = new URL(r.url)
+      parsed.searchParams.forEach((v, k) => { out[k] = v })
+    }
+    catch { /* malformed URL — ignore */ }
+  }
+  if (r.query && typeof r.query === 'object') Object.assign(out, r.query)
+  if (r.jsonBody && typeof r.jsonBody === 'object') Object.assign(out, r.jsonBody)
+  if (r.formBody && typeof r.formBody === 'object') Object.assign(out, r.formBody)
+  if (r.params && typeof r.params === 'object') Object.assign(out, r.params)
+  // Fallback: source is itself a plain object payload (e.g. test fixture).
+  if (Object.keys(out).length === 0 && !('all' in source) && !('jsonBody' in source)) {
+    return source as Record<string, unknown>
+  }
+  return out
+}
+
+/**
+ * Action-side validation shortcut. Returns the validated input typed as
+ * `T` so callers can drop the post-validate type-cast they used to need.
+ *
+ * Throws `HttpError(422, 'Validation failed', { errors })` on the first
+ * failing field — the router's error handler turns that into a JSON
+ * 422 response automatically.
+ *
+ * @example
+ * ```ts
+ * import { validate, schema } from '@stacksjs/validation'
+ *
+ * type Payload = { email: string; age: number }
+ *
+ * const data = await validate<Payload>(req, {
+ *   email: schema.string().email(),
+ *   age: schema.number().min(0),
+ * })
+ *
+ * // `data.email` is `string`, `data.age` is `number` — no cast needed.
+ * ```
+ */
+export async function validate<T = Record<string, unknown>>(
+  request: RequestLike | Record<string, unknown>,
+  rules: ValidationRules,
+): Promise<T> {
+  const input = await gatherRequestInput(request)
+
+  const ruleObject: Record<string, Validator<any>> = {}
+  const messageObject: Record<string, string> = {}
+
+  for (const [field, def] of Object.entries(rules)) {
+    if (!def) continue
+    if (typeof (def as any).rule === 'object' || typeof (def as any).rule === 'function') {
+      ruleObject[field] = (def as { rule: Validator<any> }).rule
+      const msg = (def as { message?: string | Record<string, string> }).message
+      if (typeof msg === 'string') {
+        messageObject[`${field}.default`] = msg
+      }
+      else if (msg && typeof msg === 'object') {
+        for (const [k, v] of Object.entries(msg)) messageObject[`${field}.${k}`] = v
+      }
+    }
+    else {
+      ruleObject[field] = def as Validator<any>
+    }
+  }
+
+  try {
+    if (Object.keys(messageObject).length > 0) {
+      setCustomMessages(new MessageProvider(messageObject))
+    }
+    const validator = schema.object(ruleObject)
+    const result = await validator.validate(input)
+
+    if (!result.valid) {
+      const errors: Record<string, string[]> = {}
+      for (const e of (result.errors || []) as Array<{ field?: string, message: string }>) {
+        const f = e.field ?? '_'
+        if (!errors[f]) errors[f] = []
+        errors[f].push(e.message)
+      }
+      throw new HttpError(422, 'Validation failed', { errors })
+    }
+
+    // bun-validator's success result exposes `.value` (the cleaned data).
+    // Fall back to the raw input for older versions.
+    const validated = (result as { value?: unknown }).value ?? input
+    return validated as T
+  }
+  catch (error: any) {
+    if (error instanceof HttpError) throw error
+    throw new HttpError(500, error?.message || 'An unexpected validation error occurred')
+  }
 }
 
 export async function customValidate(attributes: CustomAttributes, params: RequestData): Promise<any> {
@@ -201,7 +359,7 @@ export async function customValidate(attributes: CustomAttributes, params: Reque
     const result = await validator.validate(params)
 
     if (!result.valid)
-      throw new HttpError(422, JSON.stringify(result.errors))
+      throw new HttpError(422, 'Validation failed', { errors: result.errors })
 
     return result
   }

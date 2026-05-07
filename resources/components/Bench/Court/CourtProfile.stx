@@ -1,8 +1,6 @@
 <div class="lg:col-span-2 lg:row-end-2 lg:row-span-2 -mx-4 px-4 py-8 sm:mx-0 sm:pb-14 sm:px-8 xl:pb-20 xl:pt-16 xl:px-16 bg-white ring-1 ring-gray-900/5 sm:rounded-lg shadow-sm">
   <h2 class="font-semibold text-base text-gray-800">About this court</h2>
-  <p class="mt-4 leading-7 text-gray-600">
-    The {{ court.name }} serves the community of {{ court.city }}, {{ court.state }}. It hears a wide range of matters including criminal, civil, family, and probate cases, with judges appointed for a mix of trial and appellate responsibilities.
-  </p>
+  <p class="mt-4 leading-7 text-gray-600" :text="`The ${court.name} serves the community of ${court.city}, ${court.state}. It hears a wide range of matters including criminal, civil, family, and probate cases, with judges appointed for a mix of trial and appellate responsibilities.`"></p>
 
   <dl class="grid grid-cols-1 sm:grid-cols-2 mt-8 text-sm/6">
     <div class="sm:pr-4">
@@ -55,7 +53,7 @@
     <div class="overflow-hidden mt-4 h-64 w-full bg-gray-100 rounded-lg">
       <div class="flex flex-col items-center justify-center h-full text-gray-400">
         <Icon name="map-pin" size="48" />
-        <p class="mt-3 text-sm">Map placeholder — {{ court.address }}</p>
+        <p class="mt-3 text-sm" :text="`Map placeholder — ${court.address}`"></p>
       </div>
     </div>
   </div>

@@ -1,6 +1,6 @@
 import type { CLI, ProjectsOptions } from '@stacksjs/types'
 import process from 'node:process'
-import { intro, log } from '@stacksjs/cli'
+import { intro, log, onUnknownSubcommand } from "@stacksjs/cli"
 import { ExitCode } from '@stacksjs/types'
 import { findStacksProjects } from '@stacksjs/utils'
 
@@ -47,8 +47,5 @@ export function projects(buddy: CLI): void {
       process.exit(ExitCode.Success)
     })
 
-  buddy.on('projects:*', () => {
-    console.error('Invalid command: %s\nSee --help for a list of available commands.', buddy.args.join(' '))
-    process.exit(1)
-  })
+  onUnknownSubcommand(buddy, "projects")
 }

@@ -14,7 +14,12 @@ export { Job } from './action'
 // =============================================================================
 // Stacks job helper for dispatching file-based jobs
 // =============================================================================
-export { job, jobBatch, runJob } from './job'
+export { Jobs, job, jobBatch, runJob } from './job'
+
+// =============================================================================
+// Per-job progress + cancellation (cache-backed; safe across processes)
+// =============================================================================
+export { setJobProgress, getJobProgress, cancelJob, isJobCancelled, clearJobState } from './job-progress'
 
 // =============================================================================
 // Job discovery (for app/Jobs directory)

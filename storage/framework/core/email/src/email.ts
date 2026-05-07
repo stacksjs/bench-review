@@ -1,6 +1,7 @@
 import type { EmailDriver, EmailMessage, EmailResult } from '@stacksjs/types'
 import { config } from '@stacksjs/config'
 import type { Message } from './types'
+import { LogEmailDriver } from './drivers/log'
 import { MailgunDriver } from './drivers/mailgun'
 import { MailtrapDriver } from './drivers/mailtrap'
 import { SendGridDriver } from './drivers/sendgrid'
@@ -29,7 +30,13 @@ interface MailConfig {
 export class Email {
   public name: string
   public subject: string
-  public to: string
+  /**
+   * Recipient(s). Accepts either a single address or an array — the underlying
+   * driver fans out a single send across all recipients in one envelope, which
+   * matters for batch notifications (booking digests, marketing) where opening
+   * one transport per recipient would burn quota.
+   */
+  public to: string | string[]
   public from?: EmailFromAddress
   public template: string
   public handle?: () => Promise<EmailHandlerResult>
@@ -70,16 +77,17 @@ export class Email {
     return `<p>${this.template}</p>`
   }
 
-  async send(to?: string): Promise<EmailHandlerResult> {
-    const recipient = to || this.to
-    if (!recipient) {
+  async send(to?: string | string[]): Promise<EmailHandlerResult> {
+    const target = to ?? this.to
+    const recipients = Array.isArray(target) ? target : (target ? [target] : [])
+    if (recipients.length === 0) {
       throw new Error('No recipient specified for email')
     }
 
     try {
       // Use the mail singleton to send
       await mail.send({
-        to: [recipient],
+        to: recipients,
         from: this.from || {
           name: config.email.from?.name || 'Stacks',
           address: config.email.from?.address || 'no-reply@stacksjs.com',
@@ -117,6 +125,7 @@ class Mail {
   }
 
   private registerDefaultDrivers(): void {
+    this.drivers.set('log', new LogEmailDriver())
     this.drivers.set('ses', new SESDriver())
     this.drivers.set('sendgrid', new SendGridDriver())
     this.drivers.set('mailgun', new MailgunDriver())
@@ -127,8 +136,18 @@ class Mail {
   public async send(message: EmailMessage): Promise<EmailResult> {
     const driver = this.drivers.get(this.defaultDriver)
 
-    if (!driver)
-      throw new Error(`Email driver '${this.defaultDriver}' is not available`)
+    if (!driver) {
+      // Surface the typo helpfully — listing what's actually available
+      // is far more useful than a bare "not available". Most of the
+      // time this hits because `MAIL_MAILER` got typo'd in .env or the
+      // user picked a driver name from outdated docs.
+      const available = [...this.drivers.keys()].sort().join(', ')
+      throw new Error(
+        `Email driver '${this.defaultDriver}' is not registered. `
+        + `Available drivers: [${available}]. `
+        + `Check config.email.default or the MAIL_MAILER environment variable.`,
+      )
+    }
 
     const defaultFrom: EmailFromAddress = {
       name: config.email.from?.name || 'Stacks',
@@ -209,5 +228,29 @@ class Mail {
   }
 }
 
-// Export a singleton instance - reads default driver from config
-export const mail: Mail = new Mail({ defaultDriver: config.email.default || 'ses' })
+// Export a singleton instance — reads default driver from config lazily so
+// module-load order doesn't matter. Reading `config.email.default` here at
+// eval time hits a TDZ when the auto-imports barrel pulls in app/Jobs files
+// (which import @stacksjs/email) while @stacksjs/config is still resolving
+// its `await import('~/config/*')` chain. Deferring the read to first method
+// call sidesteps the cycle entirely without changing the public API.
+let _mail: Mail | undefined
+function getMail(): Mail {
+  if (!_mail) {
+    const driver = (config as any)?.email?.default
+      || process.env.MAIL_MAILER
+      || 'ses'
+    _mail = new Mail({ defaultDriver: driver as any })
+  }
+  return _mail
+}
+
+export const mail: Mail = new Proxy({} as Mail, {
+  get(_t, prop) {
+    return (getMail() as any)[prop]
+  },
+  set(_t, prop, value) {
+    ;(getMail() as any)[prop] = value
+    return true
+  },
+}) as Mail

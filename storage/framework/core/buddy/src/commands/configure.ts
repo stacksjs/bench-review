@@ -1,6 +1,6 @@
 import type { CLI, ConfigureOptions } from '@stacksjs/types'
 import process from 'node:process'
-import { log, outro, runCommand } from '@stacksjs/cli'
+import { log, onUnknownSubcommand, outro, runCommand } from "@stacksjs/cli"
 import { path as p } from '@stacksjs/path'
 import { ExitCode } from '@stacksjs/types'
 
@@ -48,10 +48,7 @@ export function configure(buddy: CLI): void {
       process.exit(ExitCode.Success)
     })
 
-  buddy.on('configure:*', () => {
-    console.error('Invalid command: %s\nSee --help for a list of available commands.', buddy.args.join(' '))
-    process.exit(ExitCode.FatalError)
-  })
+  onUnknownSubcommand(buddy, "configure")
 }
 
 async function configureAws(options?: ConfigureOptions) {

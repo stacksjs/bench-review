@@ -1,12 +1,14 @@
-<script server>
-import { judges, reviews, categories } from '../functions/sample'
-
-const featuredJudges = judges.slice(0, 6)
-const latestReviews = reviews.slice(0, 3)
-</script>
-
 <script client>
+  import { judges as allJudges, reviews as allReviews, categories as allCategories } from '../functions/sample'
+
+  useHead({ title: 'Find and Review Judges - Bench Review' })
+
   const search = useStore('search')
+
+  const featuredJudges = derived(() => allJudges.slice(0, 6))
+  const latestReviews = derived(() => allReviews.slice(0, 3))
+  const popularCategories = derived(() => allCategories.slice(0, 5))
+  const stars = [1, 2, 3, 4, 5]
 
   function submitSearch() {
     search.navigateToSearch()
@@ -65,9 +67,9 @@ const latestReviews = reviews.slice(0, 3)
         </form>
         <div class="flex flex-wrap gap-2 mt-4 text-gray-500 text-xs">
           <span class="font-medium">Popular:</span>
-          @foreach(categories.slice(0, 5) as cat)
-            <StxLink x-to="`/search?type=${cat.name}`" class="hover:text-gray-700 hover:underline">{{ cat.name }}</StxLink>
-          @endforeach
+          <template :for="cat in popularCategories">
+            <StxLink x-to="`/search?type=${cat.name}`" class="hover:text-gray-700 hover:underline" :text="cat.name"></StxLink>
+          </template>
         </div>
       </div>
     </div>
@@ -117,7 +119,7 @@ const latestReviews = reviews.slice(0, 3)
         </div>
 
         <div class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-10">
-          @foreach(featuredJudges as judge)
+          <template :for="judge in featuredJudges">
             <StxLink
               x-to="`/judges/${judge.id}/profile`"
               class="overflow-hidden p-6 bg-white border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-md duration-200 transition-all group"
@@ -125,22 +127,22 @@ const latestReviews = reviews.slice(0, 3)
               <div class="flex gap-4 items-center">
                 <img class="object-cover h-16 w-16 ring-2 ring-gray-50 rounded-full grayscale group-hover:grayscale-0 duration-200 transition-all" x-src="judge.photo" x-alt="judge.name">
                 <div class="min-w-0">
-                  <h3 class="font-semibold text-gray-900 truncate group-hover:text-deep-brown duration-200 transition-colors">{{ judge.name }}</h3>
-                  <p class="text-gray-500 text-sm truncate">{{ judge.court.name }}</p>
-                  <p class="text-gray-400 text-xs">{{ judge.location }}</p>
+                  <h3 class="font-semibold text-gray-900 truncate group-hover:text-deep-brown duration-200 transition-colors" :text="judge.name"></h3>
+                  <p class="text-gray-500 text-sm truncate" :text="judge.court.name"></p>
+                  <p class="text-gray-400 text-xs" :text="judge.location"></p>
                 </div>
               </div>
               <div class="flex items-center justify-between mt-4 pt-4 border-gray-100 border-t">
                 <div class="flex items-center">
-                  @for(let star = 1; star <= 5; star++)
-                    <Icon name="star" size="16" x-class="[{{ star }} <= judge.rating ? 'text-yellow-400' : 'text-gray-200']" />
-                  @endfor
-                  <span class="ml-2 font-medium text-gray-700 text-sm">{{ judge.rating }}</span>
+                  <template :for="star in stars">
+                    <Icon name="star" size="16" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" />
+                  </template>
+                  <span class="ml-2 font-medium text-gray-700 text-sm" :text="judge.rating"></span>
                 </div>
-                <span class="text-gray-500 text-xs">{{ judge.reviewCount }} reviews</span>
+                <span class="text-gray-500 text-xs" :text="judge.reviewCount + ' reviews'"></span>
               </div>
             </StxLink>
-          @endforeach
+          </template>
         </div>
 
         <div class="sm:hidden mt-8 text-center">
@@ -164,7 +166,7 @@ const latestReviews = reviews.slice(0, 3)
       </div>
 
       <div class="grid gap-6 grid-cols-1 lg:grid-cols-3 mt-10">
-        @foreach(latestReviews as review)
+        <template :for="review in latestReviews">
           <StxLink
             x-to="`/article/${review.id}`"
             class="block p-6 bg-white border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-md duration-200 transition-all"
@@ -173,23 +175,21 @@ const latestReviews = reviews.slice(0, 3)
               <div class="flex items-center">
                 <img class="h-9 w-9 rounded-full grayscale filter" x-src="review.author.imageUrl" x-alt="review.author.name">
                 <div class="ml-3">
-                  <p class="font-medium text-gray-900 text-sm">{{ review.author.name }}</p>
-                  <p class="text-gray-500 text-xs">{{ review.date }}</p>
+                  <p class="font-medium text-gray-900 text-sm" :text="review.author.name"></p>
+                  <p class="text-gray-500 text-xs" :text="review.date"></p>
                 </div>
               </div>
               <div class="flex items-center">
-                @for(let star = 1; star <= 5; star++)
-                  <Icon name="star" size="16" x-class="[{{ star }} <= review.rating ? 'text-yellow-400' : 'text-gray-200']" />
-                @endfor
+                <template :for="star in stars">
+                  <Icon name="star" size="16" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-200'" />
+                </template>
               </div>
             </div>
-            <h3 class="mt-4 font-semibold line-clamp-2 text-gray-900">{{ review.title }}</h3>
-            <p class="mt-2 line-clamp-3 text-gray-600 text-sm">{{ review.content }}</p>
-            <p class="mt-4 font-medium text-gray-700 text-sm">
-              About {{ review.judge.name }}
-            </p>
+            <h3 class="mt-4 font-semibold line-clamp-2 text-gray-900" :text="review.title"></h3>
+            <p class="mt-2 line-clamp-3 text-gray-600 text-sm" :text="review.content"></p>
+            <p class="mt-4 font-medium text-gray-700 text-sm" :text="'About ' + review.judge.name"></p>
           </StxLink>
-        @endforeach
+        </template>
       </div>
     </div>
 

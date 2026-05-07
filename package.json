@@ -15,19 +15,16 @@
     "typecheck": "bun tsc --noEmit"
   },
   "dependencies": {
-    "@tiptap/core": "^3.22.4",
-    "@tiptap/extension-link": "^3.22.4",
-    "@tiptap/extension-placeholder": "^3.22.4",
-    "@tiptap/pm": "^3.22.4",
-    "@tiptap/starter-kit": "^3.22.4",
     "chart.js": "^4.5.1",
     "ofetch": "^1.5.1",
     "perfect-debounce": "^2.1.0",
     "pretty-bytes": "^7.1.0",
     "stacks": "workspace:*",
-    "ts-broadcasting": "^0.0.4"
+    "ts-broadcasting": "^0.0.4",
+    "ts-medium-editor": "^0.1.0"
   },
   "devDependencies": {
+    "@stacksjs/ts-i18n": "^0.1.7",
     "bun-git-hooks": "^0.3.1"
   },
   "workspaces": [

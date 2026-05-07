@@ -1,70 +1,74 @@
-<script server>
-const user = {
-  id: params.id,
-  name: 'John Doe',
-  imageUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
-  joinDate: 'January 2024'
-}
+<script client>
+  useHead({ title: 'User - Bench' })
 
-const stats = {
-  totalReviews: 24,
-  judgesReviewed: 12,
-  averageRating: 4.2,
-  helpfulVotes: 156
-}
+  const user = derived(() => ({
+    id: params.id,
+    name: 'John Doe',
+    imageUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
+    joinDate: 'January 2024'
+  }))
 
-const reviews = [
-  {
-    id: 1,
-    author: {
+  const stats = derived(() => ({
+    totalReviews: 24,
+    judgesReviewed: 12,
+    averageRating: 4.2,
+    helpfulVotes: 156
+  }))
+
+  const reviews = derived(() => [
+    {
       id: 1,
-      name: 'John Doe',
-      imageUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+      author: {
+        id: 1,
+        name: 'John Doe',
+        imageUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+      },
+      judge: {
+        id: '123',
+        name: 'Hon. Sarah Johnson',
+        court: 'Superior Court',
+        photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+      },
+      title: 'Excellent Experience with Judge Johnson',
+      content: 'Judge Johnson handled my case with exceptional professionalism and fairness. Her attention to detail and clear communication made the process much smoother than expected.',
+      date: '2 days ago',
+      dateTime: '2024-02-18T10:00',
+      rating: 5,
+      likes: 24,
+      comments: 5,
+      type: 'Criminal',
+      status: 'Closed'
     },
-    judge: {
-      id: '123',
-      name: 'Hon. Sarah Johnson',
-      court: 'Superior Court',
-      imageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-    },
-    title: 'Excellent Experience with Judge Johnson',
-    content: 'Judge Johnson handled my case with exceptional professionalism and fairness. Her attention to detail and clear communication made the process much smoother than expected.',
-    date: '2 days ago',
-    dateTime: '2024-02-18T10:00',
-    rating: 5,
-    likes: 24,
-    comments: 5,
-    type: 'Criminal',
-    status: 'Closed'
-  },
-  {
-    id: 2,
-    author: {
-      id: 1,
-      name: 'John Doe',
-      imageUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-    },
-    judge: {
-      id: '456',
-      name: 'Hon. Robert Davis',
-      court: 'Appellate Court',
-      imageUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-    },
-    title: 'Professional and Thorough Proceedings',
-    content: 'Very impressed with the thoroughness of the proceedings. The judge maintained perfect decorum while ensuring all parties were heard.',
-    date: '1 week ago',
-    dateTime: '2024-02-11T15:30',
-    rating: 4,
-    likes: 18,
-    comments: 3,
-    type: 'Civil',
-    status: 'Pending'
-  }
-]
+    {
+      id: 2,
+      author: {
+        id: 1,
+        name: 'John Doe',
+        imageUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+      },
+      judge: {
+        id: '456',
+        name: 'Hon. Robert Davis',
+        court: 'Appellate Court',
+        photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+      },
+      title: 'Professional and Thorough Proceedings',
+      content: 'Very impressed with the thoroughness of the proceedings. The judge maintained perfect decorum while ensuring all parties were heard.',
+      date: '1 week ago',
+      dateTime: '2024-02-11T15:30',
+      rating: 4,
+      likes: 18,
+      comments: 3,
+      type: 'Civil',
+      status: 'Pending'
+    }
+  ])
+
+  const stars = [1, 2, 3, 4, 5]
 </script>
 
 @extends('layouts/default')
-@section('title', `${user.name} - Bench`)
+@section('title', 'User - Bench')
 @section('content')
   <div class="min-h-screen">
     <div class="mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
@@ -75,8 +79,8 @@ const reviews = [
           <div class="flex items-center">
             <img class="h-24 w-24 ring-4 ring-white rounded-full" x-src="user.imageUrl" x-alt="user.name" />
             <div class="ml-6">
-              <h1 class="font-bold text-2xl text-gray-800">{{ user.name }}</h1>
-              <p class="text-gray-700">Member since {{ user.joinDate }}</p>
+              <h1 class="font-bold text-2xl text-gray-800" :text="user.name"></h1>
+              <p class="text-gray-700" :text="`Member since ${user.joinDate}`"></p>
             </div>
           </div>
         </div>
@@ -86,27 +90,27 @@ const reviews = [
       <div class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mt-6">
         <div class="overflow-hidden px-4 py-5 sm:p-6 bg-off-gray rounded-lg shadow">
           <dt class="font-medium text-gray-600 text-sm truncate">Total Reviews</dt>
-          <dd class="mt-1 font-semibold text-3xl text-gray-800 tracking-tight">{{ stats.totalReviews }}</dd>
+          <dd class="mt-1 font-semibold text-3xl text-gray-800 tracking-tight" :text="stats.totalReviews"></dd>
         </div>
         <div class="overflow-hidden px-4 py-5 sm:p-6 bg-off-gray rounded-lg shadow">
           <dt class="font-medium text-gray-600 text-sm truncate">Judges Reviewed</dt>
-          <dd class="mt-1 font-semibold text-3xl text-gray-800 tracking-tight">{{ stats.judgesReviewed }}</dd>
+          <dd class="mt-1 font-semibold text-3xl text-gray-800 tracking-tight" :text="stats.judgesReviewed"></dd>
         </div>
         <div class="overflow-hidden px-4 py-5 sm:p-6 bg-off-gray rounded-lg shadow">
           <dt class="font-medium text-gray-600 text-sm truncate">Average Rating</dt>
-          <dd class="mt-1 font-semibold text-3xl text-gray-800 tracking-tight">{{ stats.averageRating }}/5.0</dd>
+          <dd class="mt-1 font-semibold text-3xl text-gray-800 tracking-tight" :text="`${stats.averageRating}/5.0`"></dd>
         </div>
         <div class="overflow-hidden px-4 py-5 sm:p-6 bg-off-gray rounded-lg shadow">
           <dt class="font-medium text-gray-600 text-sm truncate">Helpful Votes</dt>
-          <dd class="mt-1 font-semibold text-3xl text-gray-800 tracking-tight">{{ stats.helpfulVotes }}</dd>
+          <dd class="mt-1 font-semibold text-3xl text-gray-800 tracking-tight" :text="stats.helpfulVotes"></dd>
         </div>
       </div>
 
       <!-- Reviews Feed -->
       <div class="mt-8">
-        <h2 class="font-medium text-gray-800 text-lg">{{ user.name }}'s Reviews</h2>
+        <h2 class="font-medium text-gray-800 text-lg" :text="`${user.name}'s Reviews`"></h2>
         <div class="mt-6 space-y-6">
-          @foreach(reviews as review)
+          <template :for="review in reviews">
             <div class="bg-off-gray sm:rounded-lg shadow">
               <div class="px-4 py-5 sm:p-6">
                 <div class="flex items-center justify-between">
@@ -114,48 +118,42 @@ const reviews = [
                     <img class="h-10 w-10 rounded-full" x-src="review.judge.photo" x-alt="review.judge.name" />
                     <div class="ml-3">
                       <h3 class="font-medium text-gray-800 text-sm">
-                        <StxLink x-to="`/judges/${review.judge.id}`" class="hover:underline">
-                          {{ review.judge.name }}
-                        </StxLink>
+                        <StxLink x-to="`/judges/${review.judge.id}`" class="hover:underline" :text="review.judge.name"></StxLink>
                       </h3>
-                      <p class="text-gray-600 text-sm">{{ review.judge.court }}</p>
+                      <p class="text-gray-600 text-sm" :text="review.judge.court"></p>
                     </div>
                   </div>
                   <div class="flex items-center space-x-4">
                     <div class="flex items-center">
-                      @for(let star = 1; star <= 5; star++)
-                        <Icon name="star" size="20" x-class="[{{ star }} <= review.rating ? 'text-yellow-400' : 'text-gray-300']" />
-                      @endfor
+                      <template :for="star in stars">
+                        <Icon name="star" size="20" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'" />
+                      </template>
                     </div>
-                    <span class="text-gray-600 text-sm">{{ review.date }}</span>
+                    <span class="text-gray-600 text-sm" :text="review.date"></span>
                   </div>
                 </div>
                 <div class="mt-4">
-                  <p class="text-gray-700 text-sm">{{ review.content }}</p>
+                  <p class="text-gray-700 text-sm" :text="review.content"></p>
                 </div>
                 <div class="flex items-center justify-between mt-4">
                   <div class="flex items-center space-x-4">
                     <button type="button" class="inline-flex items-center text-gray-600 text-sm hover:text-gray-700">
                       <Icon name="bookmark" size="20" class="mr-1.5 text-gray-500" />
-                      {{ review.likes }}
+                      <span :text="review.likes"></span>
                     </button>
                     <button type="button" class="inline-flex items-center text-gray-600 text-sm hover:text-gray-700">
                       <Icon name="message-square" size="20" class="mr-1.5 text-gray-500" />
-                      {{ review.comments }}
+                      <span :text="review.comments"></span>
                     </button>
                   </div>
                   <div class="flex items-center space-x-2">
-                    <span class="inline-flex items-center px-2 py-1 font-medium text-green-700 text-xs bg-green-50 ring-1 ring-green-600/20 ring-inset rounded-full">
-                      {{ review.type }}
-                    </span>
-                    <span class="inline-flex items-center px-2 py-1 font-medium text-blue-700 text-xs bg-blue-50 ring-1 ring-blue-600/20 ring-inset rounded-full">
-                      {{ review.status }}
-                    </span>
+                    <span class="inline-flex items-center px-2 py-1 font-medium text-green-700 text-xs bg-green-50 ring-1 ring-green-600/20 ring-inset rounded-full" :text="review.type"></span>
+                    <span class="inline-flex items-center px-2 py-1 font-medium text-blue-700 text-xs bg-blue-50 ring-1 ring-blue-600/20 ring-inset rounded-full" :text="review.status"></span>
                   </div>
                 </div>
               </div>
             </div>
-          @endforeach
+          </template>
         </div>
       </div>
     </div>

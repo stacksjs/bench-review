@@ -1,4 +1,4 @@
-<script>
+<script server>
 interface ModalProps {
   isOpen?: boolean
   title?: string
@@ -24,7 +24,7 @@ const sizeClasses = {
 
     <!-- Modal container -->
     <div class="flex items-center justify-center p-4 min-h-full">
-      <div class="relative w-full bg-white dark:bg-neutral-900 rounded-xl shadow-2xl {{ }} sizeClasses[size]">
+      <div class="relative w-full rounded-xl bg-white dark:bg-neutral-900 shadow-2xl {{ sizeClasses[size] }}">
         <!-- Header -->
         @if(title || closable)
           <div class="flex gap-4 items-start justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">

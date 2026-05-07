@@ -1,11 +1,13 @@
-@section('title', 'Blog Post - Bench Review')
+<script client>
+  import { blogPosts } from '../../functions/sample'
 
-<script server>
-import { blogPosts } from '../../functions/sample'
-const post = blogPosts.find(p => p.id === parseInt(params.id))
+  useHead({ title: 'Blog Post - Bench Review' })
+
+  const post = derived(() => blogPosts.find(p => p.id === parseInt(params.id)) || blogPosts[0])
 </script>
 
 @extends('layouts/default')
+@section('title', 'Blog Post - Bench Review')
 @section('content')
   @include('Bench/Blog/BlogHeader')
   @include('Bench/Blog/Blog')

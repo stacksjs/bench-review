@@ -71,6 +71,15 @@ export * from './types'
 // Migrations
 export * from './migrations'
 
+// Query logger DI hook (router calls setQueryTracker on init)
+export { setQueryTracker, logQuery } from './query-logger'
+
+// Class-based seeders (supplements the model-attribute auto-seeder)
+export { Seeder, runClassSeeders } from './class-seeder'
+
+// Zero-downtime migration helpers
+export { addColumnSafely, backfillInBatches, renameColumnSafely } from './safe-migrations'
+
 // Seeding
 export * from './seeder'
 
@@ -96,7 +105,7 @@ export {
 export type {
   QueryBuilder,
   QueryBuilderConfig,
-  Seeder,
+  Seeder as QueryBuilderSeeder,
   SupportedDialect,
 } from 'bun-query-builder'
 

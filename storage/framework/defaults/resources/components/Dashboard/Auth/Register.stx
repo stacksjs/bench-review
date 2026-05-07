@@ -1,4 +1,6 @@
-<script>
+@import('../UI/Input', '../UI/Button')
+
+<script server>
 interface RegisterProps {
   title?: string
   subtitle?: string
@@ -188,12 +190,12 @@ function handleSubmit(event) {
           @if(password.length > 0)
             <div class="mt-2">
               <div class="flex gap-1">
-                <div class="flex-1 h-1 rounded-full" :class="dark:bg-neutral-700' : : : : ? ? ? ? 'bg-green-500') 'bg-neutral-200 'bg-orange-500' 'bg-red-500' 'bg-yellow-500' (passwordStrength <= === === >= 1 1 2 3 passwordStrength passwordStrength passwordStrength"></div>
-                <div class="flex-1 h-1 rounded-full" :class="dark:bg-neutral-700' : : : ? ? ? 'bg-green-500') 'bg-neutral-200 'bg-orange-500' 'bg-yellow-500' (passwordStrength === === >= 2 2 3 passwordStrength passwordStrength"></div>
-                <div class="flex-1 h-1 rounded-full" :class="dark:bg-neutral-700' : : ? ? 'bg-green-500') 'bg-neutral-200 'bg-yellow-500' (passwordStrength === >= 3 3 passwordStrength"></div>
-                <div class="flex-1 h-1 rounded-full" :class="dark:bg-neutral-700' : ? 'bg-green-500' 'bg-neutral-200 >= 4 passwordStrength"></div>
+                <div class="flex-1 h-1 rounded-full" :class="passwordStrength >= 1 ? (passwordStrength <= 1 ? 'bg-red-500' : passwordStrength === 2 ? 'bg-orange-500' : passwordStrength === 3 ? 'bg-yellow-500' : 'bg-green-500') : 'bg-neutral-200 dark:bg-neutral-700'"></div>
+                <div class="flex-1 h-1 rounded-full" :class="passwordStrength >= 2 ? (passwordStrength === 2 ? 'bg-orange-500' : passwordStrength === 3 ? 'bg-yellow-500' : 'bg-green-500') : 'bg-neutral-200 dark:bg-neutral-700'"></div>
+                <div class="flex-1 h-1 rounded-full" :class="passwordStrength >= 3 ? (passwordStrength === 3 ? 'bg-yellow-500' : 'bg-green-500') : 'bg-neutral-200 dark:bg-neutral-700'"></div>
+                <div class="flex-1 h-1 rounded-full" :class="passwordStrength >= 4 ? 'bg-green-500' : 'bg-neutral-200 dark:bg-neutral-700'"></div>
               </div>
-              <p class="mt-1 text-xs" :class="dark:text-yellow-400' : : : ? ? ? 'text-green-500' 'text-orange-500' 'text-red-500' 'text-yellow-600 <= === === 1 2 3 passwordStrength passwordStrength passwordStrength">
+              <p class="mt-1 text-xs" :class="passwordStrength <= 1 ? 'text-red-500' : passwordStrength === 2 ? 'text-orange-500' : passwordStrength === 3 ? 'text-yellow-600 dark:text-yellow-400' : 'text-green-500'">
                 {{ passwordStrengthLabel }}
               </p>
             </div>

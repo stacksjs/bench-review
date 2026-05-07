@@ -2,67 +2,66 @@
   const mobileSearchQuery = state('')
 
   function submitMobileSearch() {
-    navigate('/search?q=', true) + encodeURIComponent(mobileSearchQuery())
+    navigate('/search?q=' + encodeURIComponent(mobileSearchQuery()), true)
   }
 </script>
 
-@if(isOpen)
-  <div class="lg:hidden" role="dialog" aria-modal="true">
-    <!-- Background backdrop, show/hide based on slide-over state. -->
-    <div class="fixed inset-0 z-50"></div>
-    <div class="fixed inset-y-0 overflow-y-auto right-0 z-50 px-6 py-6 w-full sm:max-w-sm bg-white sm:ring-1 sm:ring-gray-900/10">
-      <div class="flex items-center justify-between">
-        <StxLink to="/" class="-m-1.5 p-1.5">
-          <span class="sr-only">Judge Review</span>
-          <img class="h-8 w-auto" src="/images/bench/logo.png" alt="">
-        </StxLink>
-        <button @click="$dispatch('close')" type="button" class="-m-2.5 p-2.5 text-gray-700 rounded-md">
-          <span class="sr-only">Close menu</span>
-          <Icon name="x" size="24" />
-        </button>
-      </div>
-      <div class="flow-root mt-6">
-        <div class="-my-6 divide-gray-500/10 divide-y">
-          <div class="py-6 space-y-2">
-            <form
-              @submit.prevent="submitMobileSearch"
-              class="-mx-3 mb-4 px-3"
-            >
-              <div class="relative">
-                <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                  <Icon name="search" size="16" class="text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  x-model="mobileSearchQuery"
-                  placeholder="Search judges or courts..."
-                  class="block pl-9 pr-3 py-2 w-full text-gray-900 sm:text-sm placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-200 ring-inset rounded-lg focus:ring-2 focus:ring-gray-600 focus:ring-inset"
-                >
+<div :if="isOpen" class="lg:hidden" role="dialog" aria-modal="true">
+  <!-- Background backdrop, show/hide based on slide-over state. -->
+  <div class="fixed inset-0 z-50"></div>
+  <div class="fixed inset-y-0 overflow-y-auto right-0 z-50 px-6 py-6 w-full sm:max-w-sm bg-white sm:ring-1 sm:ring-gray-900/10">
+    <div class="flex items-center justify-between">
+      <StxLink to="/" class="-m-1.5 p-1.5">
+        <span class="sr-only">Judge Review</span>
+        <img class="h-8 w-auto" src="/images/bench/logo.png" alt="">
+      </StxLink>
+      <button @click="$dispatch('close')" type="button" class="-m-2.5 p-2.5 text-gray-700 rounded-md">
+        <span class="sr-only">Close menu</span>
+        <Icon name="x" size="24" />
+      </button>
+    </div>
+    <div class="flow-root mt-6">
+      <div class="-my-6 divide-gray-500/10 divide-y">
+        <div class="py-6 space-y-2">
+          <form
+            @submit.prevent="submitMobileSearch"
+            class="-mx-3 mb-4 px-3"
+          >
+            <div class="relative">
+              <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+                <Icon name="search" size="16" class="text-gray-400" />
               </div>
-            </form>
+              <input
+                type="text"
+                x-model="mobileSearchQuery"
+                placeholder="Search judges or courts..."
+                class="block pl-9 pr-3 py-2 w-full text-gray-900 sm:text-sm placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-200 ring-inset rounded-lg focus:ring-2 focus:ring-gray-600 focus:ring-inset"
+              >
+            </div>
+          </form>
 
-            <StxLink to="/judges" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Find Judges</StxLink>
-            <StxLink to="/court-houses" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Court Houses</StxLink>
-            <StxLink to="/review" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Write a Review</StxLink>
-            <StxLink to="/reviews" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Reviews</StxLink>
-            <StxLink to="/blog" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Blog</StxLink>
-            @if(isAuthenticated)
-              <StxLink to="/notifications" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Notifications</StxLink>
-              <StxLink to="/profile" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Profile</StxLink>
-              <StxLink to="/settings" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Settings</StxLink>
-            @endif
-            <StxLink to="/judges/submit" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Submit a Judge</StxLink>
+          <StxLink to="/judges" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Find Judges</StxLink>
+          <StxLink to="/court-houses" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Court Houses</StxLink>
+          <StxLink to="/review" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Write a Review</StxLink>
+          <StxLink to="/reviews" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Reviews</StxLink>
+          <StxLink to="/blog" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Blog</StxLink>
+          <div :if="isAuthenticated">
+            <StxLink to="/notifications" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Notifications</StxLink>
+            <StxLink to="/profile" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Profile</StxLink>
+            <StxLink to="/settings" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Settings</StxLink>
           </div>
-          <div class="py-6">
-            @if(!isAuthenticated)
-              <StxLink to="/register" class="block -mx-3 px-3 py-2.5 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Register</StxLink>
-              <StxLink to="/login" class="block -mx-3 px-3 py-2.5 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Log in</StxLink>
-            @else
-              <StxLink to="/logout" class="block -mx-3 px-3 py-2.5 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Log out</StxLink>
-            @endif
+          <StxLink to="/judges/submit" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Submit a Judge</StxLink>
+        </div>
+        <div class="py-6">
+          <div :if="!isAuthenticated">
+            <StxLink to="/register" class="block -mx-3 px-3 py-2.5 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Register</StxLink>
+            <StxLink to="/login" class="block -mx-3 px-3 py-2.5 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Log in</StxLink>
+          </div>
+          <div :if="isAuthenticated">
+            <StxLink to="/logout" class="block -mx-3 px-3 py-2.5 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Log out</StxLink>
           </div>
         </div>
       </div>
     </div>
   </div>
-@endif
+</div>

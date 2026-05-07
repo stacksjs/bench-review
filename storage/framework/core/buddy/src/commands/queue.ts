@@ -1,7 +1,7 @@
 import type { CLI, CliQueueOptions } from '@stacksjs/types'
 import process from 'node:process'
 import { runAction } from '@stacksjs/actions'
-import { intro, log, outro } from '@stacksjs/cli'
+import { intro, log, onUnknownSubcommand, outro } from "@stacksjs/cli"
 import { Action } from '@stacksjs/enums'
 import { ExitCode } from '@stacksjs/types'
 
@@ -26,6 +26,26 @@ export function queue(buddy: CLI): void {
     .option('--verbose', descriptions.verbose, { default: false })
     .action(async (options: CliQueueOptions & { concurrency?: string }) => {
       log.debug('Running `buddy queue:work` ...', options)
+
+      // Two-phase shutdown for queue workers. SIGTERM lets in-flight jobs
+      // finish (or hand off to retry) before we tear the process down;
+      // a follow-up SIGKILL after a 10-second grace window prevents a
+      // misbehaving job from holding the process forever. Without this,
+      // `Ctrl+C` during dev would orphan the bun-queue Redis connection
+      // and leave reserved jobs locked until their reservation expired.
+      const SHUTDOWN_GRACE_MS = 10_000
+      let shuttingDown = false
+      const cleanup = (signal: NodeJS.Signals) => {
+        if (shuttingDown) return
+        shuttingDown = true
+        log.info(`[queue] Received ${signal}, draining workers (max ${SHUTDOWN_GRACE_MS / 1000}s)…`)
+        setTimeout(() => {
+          log.warn('[queue] Drain timeout exceeded — forcing shutdown.')
+          process.exit(ExitCode.FatalError)
+        }, SHUTDOWN_GRACE_MS).unref()
+      }
+      process.on('SIGINT', () => cleanup('SIGINT'))
+      process.on('SIGTERM', () => cleanup('SIGTERM'))
 
       const perf = await intro('buddy queue:work')
       const result = await runAction(Action.QueueWork, options)
@@ -297,8 +317,5 @@ export function queue(buddy: CLI): void {
       process.exit(ExitCode.Success)
     })
 
-  buddy.on('queue:*', () => {
-    console.error('Invalid command: %s\nSee --help for a list of available commands.', buddy.args.join(' '))
-    process.exit(1)
-  })
+  onUnknownSubcommand(buddy, "queue")
 }

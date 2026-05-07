@@ -6,12 +6,17 @@ function italic(str: string): string {
   return `\x1B[3m${str}\x1B[23m`
 }
 import { app } from '@stacksjs/config'
-import { db } from '@stacksjs/database'
+// Local relative import — see drivers/mysql.ts for the cycle-deadlock rationale.
+import { db } from '../utils'
 import { ok } from '@stacksjs/error-handling'
+// Deep import to the leaf orm/utils file — see drivers/helpers.ts for why
+// we go around the orm barrel.
 import { fetchOtherModelRelations, getModelName, getPivotTables, getTableName } from '@stacksjs/orm'
 import { path } from '@stacksjs/path'
 import { fs, globSync } from '@stacksjs/storage'
 import { snakeCase } from '@stacksjs/strings'
+// Import from `./helpers` (not `.`) to avoid re-entering the drivers
+// barrel — see `./helpers.ts` for the cycle-deadlock rationale.
 import {
   arrangeColumns,
   checkPivotMigration,
@@ -24,7 +29,7 @@ import {
   isArrayEqual,
   mapFieldTypeToColumnType,
   pluckChanges,
-} from '.'
+} from './helpers'
 import { dropCommonTables } from './defaults/traits'
 
 export async function resetSqliteDatabase(): Promise<Ok<string, never>> {
@@ -35,19 +40,63 @@ export async function resetSqliteDatabase(): Promise<Ok<string, never>> {
   return ok('All tables dropped successfully!') as any
 }
 
+/**
+ * Configure SQLite for the Stacks workload. Idempotent — the pragmas are
+ * cheap to re-apply, but each one is a no-op once set so repeated calls
+ * during dev hot-reload don't accumulate state.
+ *
+ * - WAL journaling: lets readers and a single writer proceed in parallel
+ *   instead of serializing every transaction. Critical for dev where the
+ *   API server, queue worker, and dashboard all hit the same file.
+ * - foreign_keys=ON: SQLite ships with FK enforcement OFF by default.
+ *   Without this, FK constraint violations are silently ignored — broken
+ *   relations land in the DB and fail later, far from the original write.
+ * - busy_timeout: backs off when the file is locked by another writer
+ *   instead of failing the whole query immediately.
+ */
+export async function configureSqlitePragmas(): Promise<void> {
+  try {
+    await db.unsafe('PRAGMA journal_mode = WAL').execute()
+    await db.unsafe('PRAGMA foreign_keys = ON').execute()
+    await db.unsafe('PRAGMA busy_timeout = 5000').execute()
+  }
+  catch (err) {
+    log.debug(`[sqlite] Failed to apply pragmas: ${(err as Error).message}`)
+  }
+}
+
 export async function dropSqliteTables(): Promise<void> {
   const userModelFiles = globSync([path.userModelsPath('*.ts'), path.storagePath('framework/defaults/app/Models/**/*.ts')], { absolute: true })
   const tables = await fetchTables()
 
-  for (const table of tables) await db.unsafe(`DROP TABLE IF EXISTS "${table}"`).execute()
-  await db.unsafe('DROP TABLE IF EXISTS "migrations"').execute()
-  await dropCommonTables()
+  // Validate table names are simple identifiers before splicing into raw SQL.
+  // Same defense-in-depth pattern as the MySQL driver — names come from
+  // information_schema today, but a future caller might pass user input.
+  const safeName = /^[a-z_][\w]*$/i
 
-  for (const userModel of userModelFiles) {
-    const userModelPath = (await import(userModel)).default
-    const pivotTables = await getPivotTables(userModelPath, userModel)
+  // Disable FK checks for the duration of the drop so we don't have to
+  // topo-sort the table list. SQLite keeps this off until pragma is reset.
+  await db.unsafe('PRAGMA foreign_keys = OFF').execute()
+  try {
+    for (const table of tables) {
+      if (!safeName.test(table)) throw new Error(`[sqlite] Refusing to drop table with unsafe name: ${table}`)
+      await db.unsafe(`DROP TABLE IF EXISTS "${table}"`).execute()
+    }
+    await db.unsafe('DROP TABLE IF EXISTS "migrations"').execute()
+    await dropCommonTables()
 
-    for (const pivotTable of pivotTables) await db.unsafe(`DROP TABLE IF EXISTS "${pivotTable.table}"`).execute()
+    for (const userModel of userModelFiles) {
+      const userModelPath = (await import(userModel)).default
+      const pivotTables = await getPivotTables(userModelPath, userModel)
+
+      for (const pivotTable of pivotTables) {
+        if (!safeName.test(pivotTable.table)) throw new Error(`[sqlite] Refusing to drop pivot table with unsafe name: ${pivotTable.table}`)
+        await db.unsafe(`DROP TABLE IF EXISTS "${pivotTable.table}"`).execute()
+      }
+    }
+  }
+  finally {
+    await db.unsafe('PRAGMA foreign_keys = ON').execute()
   }
 }
 
@@ -64,29 +113,12 @@ export function fetchTestSqliteFile(): string {
 }
 
 export async function generateSqliteMigration(modelPath: string): Promise<void> {
-  // check if any files are in the database folder
-  // const files = await fs.readdir(path.userMigrationsPath())
-
-  // if (files.length === 0) {
-  //   log.debug('No migrations found in the database folder, deleting all framework/database/*.json files...')
-
-  //   // delete the *.ts files in the models folder
-  //   const modelFiles = await fs.readdir(path.frameworkPath('models'))
-
-  //   if (modelFiles.length) {
-  //     log.debug('No existing model files in framework path...')
-
-  //     for (const file of modelFiles)
-  //       if (file.endsWith('.ts')) await fs.unlink(path.frameworkPath(`models/${file}`))
-  //   }
-  // }
-
   const model = (await import(modelPath)).default as Model
   const fileName = path.basename(modelPath)
   const tableName = await getTableName(model, modelPath)
 
   const fieldsString = JSON.stringify(model.attributes, null, 2) // Pretty print the JSON
-  const copiedModelPath = path.frameworkPath(`models/${fileName}`)
+  const copiedModelPath = path.frameworkPath(`cache/models/${fileName}`)
 
   let haveFieldsChanged = false
 
@@ -110,7 +142,7 @@ export async function generateSqliteMigration(modelPath: string): Promise<void> 
   }
 
   // store the fields of the model to a file
-  await Bun.$`cp ${modelPath} ${copiedModelPath}`
+  await Bun.$`mkdir -p ${path.frameworkPath('cache/models')} && cp ${modelPath} ${copiedModelPath}`
 
   // if the fields have changed, we need to create a new update migration
   // if the fields have not changed, we need to migrate the table
@@ -138,7 +170,7 @@ export async function copyModelFiles(modelPath: string): Promise<void> {
   const tableName = await getTableName(model, modelPath)
 
   const fieldsString = JSON.stringify(model.attributes, null, 2) // Pretty print the JSON
-  const copiedModelPath = path.frameworkPath(`models/${fileName}`)
+  const copiedModelPath = path.frameworkPath(`cache/models/${fileName}`)
 
   // if the file exists, we need to check if the fields have changed
   if (fs.existsSync(copiedModelPath)) {
@@ -154,7 +186,7 @@ export async function copyModelFiles(modelPath: string): Promise<void> {
   }
 
   // store the fields of the model to a file
-  await Bun.$`cp ${modelPath} ${copiedModelPath}`
+  await Bun.$`mkdir -p ${path.frameworkPath('cache/models')} && cp ${modelPath} ${copiedModelPath}`
 }
 
 async function createTableMigration(modelPath: string) {
@@ -181,6 +213,7 @@ async function createTableMigration(modelPath: string) {
 
   let migrationContent = `import type { Database } from '@stacksjs/database'\n`
   migrationContent += `import { sql } from '@stacksjs/database'\n\n`
+  // eslint-disable-next-line pickier/no-unused-vars -- `db` is the parameter name in the generated migration's exported `up()`, not in this scope
   migrationContent += `export async function up(db: Database<any>) {\n`
   migrationContent += `  await (db as any).schema\n`
   migrationContent += `    .createTable('${tableName}')\n`
@@ -328,6 +361,7 @@ async function createPivotTableMigration(model: Model, modelPath: string) {
 
     let migrationContent = `import type { Database } from '@stacksjs/database'\n`
     migrationContent += `import { sql } from '@stacksjs/database'\n\n`
+    // eslint-disable-next-line pickier/no-unused-vars -- `db` is the parameter name in the generated migration's exported `up()`, not in this scope
     migrationContent += `export async function up(db: Database<any>) {\n`
     migrationContent += `  await (db as any).schema\n`
     migrationContent += `    .createTable('${pivotTable.table}')\n`
@@ -356,7 +390,7 @@ async function createAlterTableMigration(modelPath: string) {
   let hasChanged = false
 
   // Get the previous model to compare indexes
-  const oldModelPath = path.frameworkPath(`models/${modelName}.ts`)
+  const oldModelPath = path.frameworkPath(`cache/models/${modelName}.ts`)
   const oldModel = (await import(oldModelPath)).default as Model
 
   // Assuming you have a function to get the fields from the last migration
@@ -371,6 +405,7 @@ async function createAlterTableMigration(modelPath: string) {
 
   let migrationContent = `import type { Database } from '@stacksjs/database'\n`
   migrationContent += `import { sql } from '@stacksjs/database'\n\n`
+  // eslint-disable-next-line pickier/no-unused-vars -- `db` is the parameter name in the generated migration's exported `up()`, not in this scope
   migrationContent += `export async function up(db: Database<any>) {\n`
 
   if (fieldsToAdd.length || fieldsToRemove.length) {

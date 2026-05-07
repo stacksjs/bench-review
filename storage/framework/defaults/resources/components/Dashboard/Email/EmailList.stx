@@ -70,13 +70,13 @@ const { emails = [], activeFolder = 'inbox', searchQuery = '' } = defineProps<Em
       <ul class="divide-gray-200 divide-y dark:divide-neutral-600">
         @foreach(filteredEmails as email)
           <li
-            class="dark:bg-neutral-700' dark:bg-neutral-800' hover:bg-gray-100 dark:hover:bg-neutral-600 cursor-pointer : !email.read ? 'bg-blue-50 'bg-white {{ }}"
+            class="hover:bg-gray-100 dark:hover:bg-neutral-600 cursor-pointer {{ !email.read ? 'bg-blue-50 dark:bg-neutral-800' : 'bg-white dark:bg-neutral-700' }}"
             data-action="open-email"
             data-email-id="{{ email.id }}"
           >
             <div class="px-4 py-3">
               <div class="flex items-center justify-between">
-                <p class="font-medium text-sm dark:text-neutral-300' dark:text-white' : !email.read ? 'text-gray-600 'text-gray-900 {{ }}">
+                <p class="text-sm font-medium {{ !email.read ? 'text-gray-900 dark:text-white' : 'text-gray-600 dark:text-neutral-300' }}">
                   {{ email.from }}
                 </p>
                 <p class="text-gray-500 text-xs dark:text-neutral-400">
@@ -84,7 +84,7 @@ const { emails = [], activeFolder = 'inbox', searchQuery = '' } = defineProps<Em
                 </p>
               </div>
               <div class="flex items-center justify-between mt-1">
-                <p class="font-medium' text-sm dark:text-neutral-300' dark:text-white : !email.read ? 'text-gray-600 'text-gray-900 {{ }}">
+                <p class="text-sm {{ !email.read ? 'text-gray-900 dark:text-white font-medium' : 'text-gray-600 dark:text-neutral-300' }}">
                   {{ email.subject }}
                 </p>
                 <div class="flex items-center space-x-1">

@@ -103,10 +103,10 @@ function getBgColor() {
       <img
         src="{{ src }}"
         alt="{{ alt || name || 'Avatar' }}"
-        class="object-cover {{ {{ }} }} getRadiusClass() getSizeClass()"
+        class="object-cover {{ getSizeClass() }} {{ getRadiusClass() }}"
       >
     @else
-      <div class="inline-flex items-center justify-center font-medium {{ {{ {{ }} }} }} getBgColor() getRadiusClass() getSizeClass()">
+      <div class="inline-flex items-center justify-center font-medium {{ getSizeClass() }} {{ getRadiusClass() }} {{ getBgColor() }}">
         @if(name)
           <span>{{ getInitials(name) }}</span>
         @else
@@ -118,6 +118,6 @@ function getBgColor() {
     @endif
 
     @if(status)
-      <span class="absolute bottom-0 right-0 ring-2 ring-white rounded-full dark:ring-neutral-900 {{ {{ }} }} getStatusColor() getStatusSize()"></span>
+      <span class="absolute bottom-0 right-0 rounded-full ring-2 ring-white dark:ring-neutral-900 {{ getStatusColor() }} {{ getStatusSize() }}"></span>
     @endif
   </div>

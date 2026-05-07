@@ -1,4 +1,4 @@
-<script>
+<script server>
 interface ConfirmDialogProps {
   isOpen?: boolean
   title?: string
@@ -27,8 +27,8 @@ const iconNames = {
     <div class="flex items-center justify-center p-4 min-h-full">
       <div class="relative p-6 max-w-md w-full bg-white dark:bg-neutral-900 rounded-xl shadow-2xl">
         <div class="flex gap-4 items-start">
-          <div class="flex-shrink-0 p-2.5 rounded-lg {{ }} iconClasses[variant]">
-            <div class="h-5 w-5 {{ }} iconNames[variant]"></div>
+          <div class="p-2.5 rounded-lg flex-shrink-0 {{ iconClasses[variant] }}">
+            <div class="{{ iconNames[variant] }} w-5 h-5"></div>
           </div>
           <div class="flex-1 min-w-0">
             <h3 class="font-semibold text-lg text-neutral-900 dark:text-white">

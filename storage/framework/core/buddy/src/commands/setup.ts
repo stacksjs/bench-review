@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import type { CLI, CliOptions } from '@stacksjs/types'
 import process from 'node:process'
 import { runAction, setupSSL } from '@stacksjs/actions'
-import { log, runCommand } from '@stacksjs/cli'
+import { log, onUnknownSubcommand, runCommand } from "@stacksjs/cli"
 import { Action } from '@stacksjs/enums'
 import { handleError } from '@stacksjs/error-handling'
 import { path as p } from '@stacksjs/path'
@@ -103,10 +103,7 @@ export function setup(buddy: CLI): void {
       }
     })
 
-  buddy.on('setup:*', () => {
-    console.error('Invalid command: %s\nSee --help for a list of available commands.', buddy.args.join(' '))
-    process.exit(ExitCode.FatalError)
-  })
+  onUnknownSubcommand(buddy, "setup")
 }
 
 async function isPantryInstalled(): Promise<boolean> {

@@ -66,7 +66,7 @@ const { appName = 'Stacks', appKey = '', appUrl = 'stacks.localhost', descriptio
             <div class="mt-2">
               <button
                 type="button"
-                class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer : ? 'bg-gray-200' 'bg-indigo-600' {{ }} appDebug"
+                class="relative h-6 w-11 inline-flex flex-shrink-0 cursor-pointer border-2 border-transparent rounded-full {{ appDebug ? 'bg-indigo-600' : 'bg-gray-200' }} transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600"
                 role="switch"
                 aria-checked="{{ appDebug ? 'true' : 'false' }}"
                 data-action="toggle-app-debug"
@@ -74,7 +74,7 @@ const { appName = 'Stacks', appKey = '', appUrl = 'stacks.localhost', descriptio
                 <span class="sr-only">App Debug</span>
                 <span
                   aria-hidden="true"
-                  class="inline-block h-5 w-5 bg-white ring-0 rounded-full shadow duration-200 ease-in-out transition transform pointer-events-none : ? 'translate-x-0' 'translate-x-5' {{ }} appDebug"
+                  class="pointer-events-none inline-block h-5 w-5 {{ appDebug ? 'translate-x-5' : 'translate-x-0' }} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
                 ></span>
               </button>
             </div>
@@ -84,7 +84,7 @@ const { appName = 'Stacks', appKey = '', appUrl = 'stacks.localhost', descriptio
             <div class="mt-2">
               <button
                 type="button"
-                class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer : ? 'bg-gray-200' 'bg-indigo-600' {{ }} maintenanceMode"
+                class="relative h-6 w-11 inline-flex flex-shrink-0 cursor-pointer border-2 border-transparent rounded-full {{ maintenanceMode ? 'bg-indigo-600' : 'bg-gray-200' }} transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600"
                 role="switch"
                 aria-checked="{{ maintenanceMode ? 'true' : 'false' }}"
                 data-action="toggle-maintenance"
@@ -92,7 +92,7 @@ const { appName = 'Stacks', appKey = '', appUrl = 'stacks.localhost', descriptio
                 <span class="sr-only">Maintenance Mode</span>
                 <span
                   aria-hidden="true"
-                  class="inline-block h-5 w-5 bg-white ring-0 rounded-full shadow duration-200 ease-in-out transition transform pointer-events-none : ? 'translate-x-0' 'translate-x-5' {{ }} maintenanceMode"
+                  class="pointer-events-none inline-block h-5 w-5 {{ maintenanceMode ? 'translate-x-5' : 'translate-x-0' }} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
                 ></span>
               </button>
             </div>
@@ -102,7 +102,7 @@ const { appName = 'Stacks', appKey = '', appUrl = 'stacks.localhost', descriptio
             <div class="mt-2">
               <button
                 type="button"
-                class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer : ? 'bg-gray-200' 'bg-indigo-600' {{ }} docMode"
+                class="relative h-6 w-11 inline-flex flex-shrink-0 cursor-pointer border-2 border-transparent rounded-full {{ docMode ? 'bg-indigo-600' : 'bg-gray-200' }} transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600"
                 role="switch"
                 aria-checked="{{ docMode ? 'true' : 'false' }}"
                 data-action="toggle-doc-mode"
@@ -110,7 +110,7 @@ const { appName = 'Stacks', appKey = '', appUrl = 'stacks.localhost', descriptio
                 <span class="sr-only">Doc Mode</span>
                 <span
                   aria-hidden="true"
-                  class="inline-block h-5 w-5 bg-white ring-0 rounded-full shadow duration-200 ease-in-out transition transform pointer-events-none : ? 'translate-x-0' 'translate-x-5' {{ }} docMode"
+                  class="pointer-events-none inline-block h-5 w-5 {{ docMode ? 'translate-x-5' : 'translate-x-0' }} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
                 ></span>
               </button>
             </div>

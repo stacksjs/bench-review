@@ -1,6 +1,6 @@
 import type { CLI, CloudCliOptions } from '@stacksjs/types'
 import process from 'node:process'
-import { intro, italic, log, outro, prompts, runCommand, underline } from '@stacksjs/cli'
+import { intro, italic, log, onUnknownSubcommand, outro, prompts, runCommand, underline } from "@stacksjs/cli"
 import {
   addJumpBox,
   deleteCdkRemnants,
@@ -742,8 +742,5 @@ export function cloud(buddy: CLI): void {
       process.exit(ExitCode.Success)
     })
 
-  buddy.on('cloud:*', () => {
-    console.error('Invalid command: %s\nSee --help for a list of available commands.', buddy.args.join(' '))
-    process.exit(1)
-  })
+  onUnknownSubcommand(buddy, "cloud")
 }

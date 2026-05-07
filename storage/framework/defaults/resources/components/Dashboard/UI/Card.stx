@@ -1,4 +1,4 @@
-<script>
+<script server>
 interface CardProps {
   variant?: 'default' | 'elevated' | 'outline' | 'ghost' | 'vibrancy'
   padding?: 'none' | 'sm' | 'md' | 'lg' | 'xl'
@@ -46,6 +46,6 @@ const cardClass = [
   clickableClass
 ].join(' ')
 </script>
-<div class="{{ }} cardClass">
+<div class="{{ cardClass }}">
   <slot />
 </div>

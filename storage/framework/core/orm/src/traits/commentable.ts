@@ -1,8 +1,18 @@
-import { db, sql } from '@stacksjs/database'
+import { db as _db, sql } from '@stacksjs/database'
+
+// See note in categorizable.ts — relax db method types for trait helpers.
+const db = _db as any
+
+function assertId(id: unknown, method: string): asserts id is number {
+  if (typeof id !== 'number' || !Number.isFinite(id) || id <= 0) {
+    throw new Error(`[orm/commentable] ${method} requires a positive numeric id (received ${String(id)})`)
+  }
+}
 
 export function createCommentableMethods(tableName: string) {
   return {
     async comments(id: number): Promise<any[]> {
+      assertId(id, 'comments')
       return await db
         .selectFrom('comments')
         .where('commentables_id', '=', id)
@@ -23,6 +33,13 @@ export function createCommentableMethods(tableName: string) {
     },
 
     async addComment(id: number, comment: { title: string, body: string }): Promise<any> {
+      assertId(id, 'addComment')
+      if (!comment || typeof comment.title !== 'string' || comment.title.trim().length === 0) {
+        throw new Error('[orm/commentable] addComment requires a non-empty comment.title')
+      }
+      if (typeof comment.body !== 'string' || comment.body.trim().length === 0) {
+        throw new Error('[orm/commentable] addComment requires a non-empty comment.body')
+      }
       return await db
         .insertInto('comments')
         .values({
@@ -30,8 +47,8 @@ export function createCommentableMethods(tableName: string) {
           commentables_id: id,
           commentables_type: tableName,
           status: 'pending',
-          created_at: new Date(),
-          updated_at: new Date(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
         .returningAll()
         .executeTakeFirst()

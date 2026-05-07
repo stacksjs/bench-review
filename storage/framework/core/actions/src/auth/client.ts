@@ -1,5 +1,5 @@
 import process from 'node:process'
-import { randomBytes } from 'node:crypto'
+import { randomBytes, scryptSync } from 'node:crypto'
 import { db } from '@stacksjs/database'
 import { HttpError } from '@stacksjs/error-handling'
 import { log } from '@stacksjs/logging'
@@ -9,13 +9,16 @@ const args = process.argv.slice(2)
 const getArg = (name: string): string | undefined => {
   const idx = args.findIndex(a => a.startsWith(`--${name}=`) || a.startsWith(`-${name.charAt(0)}=`))
   if (idx !== -1) {
-    const eqIdx = args[idx].indexOf('=')
-    return eqIdx >= 0 ? args[idx].slice(eqIdx + 1) : undefined
+    const arg = args[idx]
+    if (!arg) return undefined
+    const eqIdx = arg.indexOf('=')
+    return eqIdx >= 0 ? arg.slice(eqIdx + 1) : undefined
   }
 
   const flagIdx = args.findIndex(a => a === `--${name}` || a === `-${name.charAt(0)}`)
-  if (flagIdx !== -1 && args[flagIdx + 1] && !args[flagIdx + 1].startsWith('-')) {
-    return args[flagIdx + 1]
+  const value = flagIdx !== -1 ? args[flagIdx + 1] : undefined
+  if (value && !value.startsWith('-')) {
+    return value
   }
   return undefined
 }
@@ -32,11 +35,13 @@ const isPasswordClient = hasFlag('password')
 log.info(`Creating OAuth client: ${name}`)
 
 const secret = randomBytes(40).toString('hex')
+const salt = randomBytes(16).toString('hex')
+const hashedSecret = `${salt}:${scryptSync(secret, salt, 64).toString('hex')}`
 
 const result = await db.insertInto('oauth_clients')
   .values({
     name,
-    secret,
+    secret: hashedSecret,
     provider: 'local',
     redirect,
     personal_access_client: isPersonalAccess,
@@ -54,7 +59,8 @@ log.success('OAuth client created successfully')
 log.info('')
 log.info('Client Details:')
 log.info(`  Client ID: ${insertId}`)
-log.info(`  Client Secret: ${secret}`)
+log.info('  Client Secret: [REDACTED]')
+process.stdout.write(`Client Secret (save now, shown once): ${secret}\n`)
 log.info(`  Redirect URI: ${redirect}`)
 log.info('')
 log.warn('Make sure to save the client secret. You will not be able to retrieve it again.')

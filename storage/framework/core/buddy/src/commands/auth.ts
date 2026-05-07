@@ -1,7 +1,7 @@
 import type { CLI } from '@stacksjs/types'
 import process from 'node:process'
 import { runAction } from '@stacksjs/actions'
-import { intro, log, outro } from '@stacksjs/cli'
+import { intro, log, onUnknownSubcommand, outro } from "@stacksjs/cli"
 import { Action } from '@stacksjs/enums'
 import { ExitCode } from '@stacksjs/types'
 
@@ -130,8 +130,5 @@ export function auth(buddy: CLI): void {
       process.exit(ExitCode.Success)
     })
 
-  buddy.on('auth:*', () => {
-    console.error('Invalid command: %s\nSee --help for a list of available commands.', buddy.args.join(' '))
-    process.exit(1)
-  })
+  onUnknownSubcommand(buddy, "auth")
 }

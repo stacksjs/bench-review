@@ -57,9 +57,30 @@ export interface SlackAttachment {
 let config: SlackConfig = {}
 
 /**
- * Configure Slack with webhook URL or bot token
+ * Configure Slack with webhook URL or bot token.
+ *
+ * Validates that the webhook URL (when provided) is HTTPS pointing at
+ * Slack's webhook host. A misconfigured `http://` URL would leak the
+ * channel-specific token in plaintext to anyone watching network
+ * traffic; a typo'd domain would silently send messages to whatever
+ * server happens to accept them.
  */
 export function configure(options: SlackConfig): void {
+  if (options.webhookUrl) {
+    let parsed: URL
+    try {
+      parsed = new URL(options.webhookUrl)
+    }
+    catch {
+      throw new Error(`[chat/slack] webhookUrl is not a valid URL: ${options.webhookUrl}`)
+    }
+    if (parsed.protocol !== 'https:') {
+      throw new Error('[chat/slack] webhookUrl must use https:// — Slack does not accept plain HTTP webhooks.')
+    }
+    if (!/(^|\.)slack\.com$/i.test(parsed.hostname)) {
+      throw new Error(`[chat/slack] webhookUrl host "${parsed.hostname}" is not a Slack-owned domain.`)
+    }
+  }
   config = { ...config, ...options }
 }
 
@@ -123,8 +144,18 @@ export class SlackDriver extends BaseChatDriver {
   }
 
   private async sendViaWebhook(message: ChatMessage): Promise<{ ts?: string }> {
+    // Slack rejects messages over 40k characters and silently truncates
+    // `text` for the in-channel preview — wrap the limit so callers see
+    // the truncation explicitly via the `… [truncated]` suffix instead
+    // of mysterious clipped messages.
+    const SLACK_TEXT_LIMIT = 40000
+    const rawText = message.content || message.subject || ''
+    const text = rawText.length > SLACK_TEXT_LIMIT
+      ? `${rawText.slice(0, SLACK_TEXT_LIMIT - 14)}… [truncated]`
+      : rawText
+
     const payload: SlackMessage = {
-      text: message.content || message.subject,
+      text,
       username: message.from as any,
       mrkdwn: true,
     }

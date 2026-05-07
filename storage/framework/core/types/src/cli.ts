@@ -211,6 +211,7 @@ DomainsOptions
 export type BuildOption =
   | 'components'
   | 'webComponents'
+  | 'elements'
   | 'functions'
   | 'docs'
   | 'views'
@@ -291,20 +292,23 @@ export type MakeBooleanOption =
   | 'notification'
   | 'stack'
   | 'middleware'
+  | 'dryRun'
+  | 'withValidation'
+  | 'withAuth'
 export type MakeOptions = {
   [key in MakeBooleanOption]: boolean
 } & {
   [key in MakeStringOption]: string
 } & CliOptions
 
-export type UpgradeBoolean = 'framework' | 'dependencies' | 'bun' | 'shell' | 'binary' | 'all' | 'force' | 'canary' | 'stable'
+export type UpgradeBoolean = 'framework' | 'dependencies' | 'bun' | 'shell' | 'binary' | 'all' | 'force' | 'canary' | 'stable' | 'noPostinstall' | 'postinstall'
 
-export type UpgradeString = 'version'
+export type UpgradeString = 'version' | 'from'
 
 export type UpgradeOptions = {
-  [key in UpgradeBoolean]: boolean
+  [key in UpgradeBoolean]?: boolean
 } & {
-  [key in UpgradeString]: string
+  [key in UpgradeString]?: string
 } & CliOptions
 
 export type ExamplesString = 'version'
@@ -397,6 +401,7 @@ export interface CliQueueOptions extends CliOptions {
 
 export interface ReleaseOptions extends CliOptions {
   dryRun?: boolean
+  bump?: 'patch' | 'minor' | 'major' | 'prepatch' | 'preminor' | 'premajor' | 'prerelease' | string
 }
 export interface ProjectsOptions extends CliOptions {
   list?: boolean

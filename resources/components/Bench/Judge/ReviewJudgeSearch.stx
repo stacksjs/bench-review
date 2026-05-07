@@ -1,10 +1,7 @@
-<script server>
-import { judges } from '../../../functions/sample'
-</script>
-
 <script client>
+  import { judges as allJudges } from '../../../functions/sample'
+
   const searchQuery = state('')
-  const allJudges = {{ JSON.stringify(judges) }}
 
   const filteredJudges = derived(() => {
     const q = searchQuery()
@@ -38,26 +35,26 @@ import { judges } from '../../../functions/sample'
         class="block px-4 py-3 w-full text-gray-900 placeholder:text-gray-400 bg-off-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2"
         placeholder="Search for a judge..."
       >
-      <div :show="searchQuery() && filteredJudges().length" class="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg">
+      <div :if="searchQuery() && filteredJudges().length > 0" class="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg">
         <ul class="overflow-auto py-1 max-h-60 text-base rounded-md">
-          <li
-              :for="judge in filteredJudges"
-              :key="judge.id"
+          <template :for="judge in filteredJudges">
+            <li
               class="relative px-3 py-2 hover:bg-gray-100 cursor-pointer select-none"
               @click="selectJudge(judge)"
             >
               <div class="flex items-center">
-                <img x-src="judge.image" class="h-10 w-10 rounded-full grayscale filter" x-alt="judge.name">
+                <img x-src="judge.photo" class="h-10 w-10 rounded-full grayscale filter" x-alt="judge.name">
                 <div class="ml-3">
-                  <p class="font-medium text-gray-900 text-sm" x-text="judge.name"></p>
-                  <p class="text-gray-500 text-sm" x-text="judge.court.name"></p>
-                  <p class="text-gray-500 text-xs" x-text="judge.department"></p>
+                  <p class="font-medium text-gray-900 text-sm" :text="judge.name"></p>
+                  <p class="text-gray-500 text-sm" :text="judge.court.name"></p>
+                  <p class="text-gray-500 text-xs" :text="judge.department"></p>
                 </div>
               </div>
             </li>
+          </template>
         </ul>
       </div>
-      <div :show="searchQuery() && filteredJudges().length === 0" class="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg">
+      <div :if="searchQuery() && filteredJudges().length === 0" class="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg">
         <div class="px-3 py-4 text-center text-gray-500 text-sm">
           No judges found matching your search.
         </div>

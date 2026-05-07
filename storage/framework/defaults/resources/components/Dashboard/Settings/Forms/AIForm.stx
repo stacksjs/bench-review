@@ -29,7 +29,7 @@ const models = [
             <div class="mt-2">
               <button
                 type="button"
-                class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer : ? 'bg-gray-200' 'bg-indigo-600' {{ }} deployAI"
+                class="relative h-6 w-11 inline-flex flex-shrink-0 cursor-pointer border-2 border-transparent rounded-full {{ deployAI ? 'bg-indigo-600' : 'bg-gray-200' }} transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600"
                 role="switch"
                 aria-checked="{{ deployAI ? 'true' : 'false' }}"
                 data-action="toggle-deploy-ai"
@@ -37,7 +37,7 @@ const models = [
                 <span class="sr-only">Deploy</span>
                 <span
                   aria-hidden="true"
-                  class="inline-block h-5 w-5 bg-white ring-0 rounded-full shadow duration-200 ease-in-out transition transform pointer-events-none : ? 'translate-x-0' 'translate-x-5' {{ }} deployAI"
+                  class="pointer-events-none inline-block h-5 w-5 {{ deployAI ? 'translate-x-5' : 'translate-x-0' }} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
                 ></span>
               </button>
             </div>
@@ -85,8 +85,8 @@ const models = [
                       data-model-id="{{ model.id }}"
                     >
                       <div class="flex items-center">
-                        <span class="inline-block flex-shrink-0 h-2 w-2 rounded-full : ? 'bg-gray-200' 'bg-green-400' {{ }} model.online" aria-hidden="true"></span>
-                        <span class="ml-3 truncate selectedModel : ? '' 'font-semibold' {{ }} == model.id">
+                        <span class="inline-block h-2 w-2 flex-shrink-0 rounded-full {{ model.online ? 'bg-green-400' : 'bg-gray-200' }}" aria-hidden="true"></span>
+                        <span class="ml-3 truncate {{ selectedModel == model.id ? 'font-semibold' : '' }}">
                           {{ model.name }}
                           <span class="sr-only"> is {{ model.online ? 'online' : 'offline' }}</span>
                         </span>

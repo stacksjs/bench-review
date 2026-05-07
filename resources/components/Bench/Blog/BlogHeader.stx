@@ -1,9 +1,15 @@
+<script client>
+  const readingTime = derived(() => {
+    const words = (post()?.content || '').trim().split(/\s+/).length
+    const minutes = Math.max(1, Math.ceil(words / 200))
+    return `${minutes} min read`
+  })
+</script>
+
 <header class="relative">
   <div class="mx-auto pb-8 pt-16 px-4 sm:px-6 lg:px-8 max-w-5xl">
     <div class="text-center">
-      <h1 class="font-bold text-4xl text-gray-900 tracking-tight sm:text-5xl">
-        {{ post.title }}
-      </h1>
+      <h1 class="font-bold text-4xl text-gray-900 tracking-tight sm:text-5xl" :text="post.title"></h1>
     </div>
 
     <!-- Author and meta info -->
@@ -13,16 +19,16 @@
         <img class="h-12 w-12 rounded-full" x-src="post.author.imageUrl" x-alt="post.author.name">
         <div class="ml-3">
           <p class="font-medium text-gray-900 text-sm">
-            <a href="#" class="hover:underline">{{ post.author.name }}</a>
+            <a href="#" class="hover:underline" :text="post.author.name"></a>
           </p>
         </div>
       </div>
 
       <!-- Reading time and date -->
       <div class="flex items-center space-x-4 text-gray-500 text-sm">
-        <span>{{ readingTime }}</span>
+        <span :text="readingTime"></span>
         <span aria-hidden="true">&middot;</span>
-        <time :datetime="post.dateTime">{{ post.date }}</time>
+        <time :datetime="post.dateTime" :text="post.date"></time>
       </div>
     </div>
   </div>

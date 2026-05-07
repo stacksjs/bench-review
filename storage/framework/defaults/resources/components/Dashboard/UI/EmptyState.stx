@@ -1,4 +1,4 @@
-<script>
+<script server>
 interface EmptyStateProps {
   icon?: string
   title?: string
@@ -16,7 +16,7 @@ const { icon = 'i-hugeicons-folder-02', title = '', description = '', actionLabe
       @if(iconSlot)
         {{ iconSlot }}
       @else
-        <div class="h-8 w-8 text-neutral-400 dark:text-neutral-500 {{ }} icon"></div>
+        <div class="{{ icon }} w-8 h-8 text-neutral-400 dark:text-neutral-500"></div>
       @endif
     </div>
 
@@ -39,7 +39,7 @@ const { icon = 'i-hugeicons-folder-02', title = '', description = '', actionLabe
         class="inline-flex gap-2 items-center px-4 py-2 font-medium text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-neutral-900 transition-colors"
       >
         @if(actionIcon)
-          <div class="h-4 w-4 {{ }} actionIcon"></div>
+          <div class="{{ actionIcon }} w-4 h-4"></div>
         @endif
         {{ actionLabel }}
       </a>

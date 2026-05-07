@@ -1,16 +1,19 @@
+<script client>
+  const reviewStars = [1, 2, 3, 4, 5]
+</script>
 <div class="mx-auto pb-32 px-4 sm:px-6 lg:px-8 max-w-5xl">
   <div class="mt-6 mx-auto text-gray-500">
     <div class="flex items-center mb-8">
       <div class="flex items-center">
-        @foreach([1, 2, 3, 4, 5] as star)
-          <Icon name="star" size="20" x-class="[{{ star }} <= review.rating ? 'text-yellow-400' : 'text-gray-300']" />
-        @endforeach
+        <template :for="star in reviewStars">
+          <Icon name="star" size="20" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'" />
+        </template>
       </div>
-      <span class="ml-2 text-gray-500 text-sm">({{ review.rating }})</span>
+      <span class="ml-2 text-gray-500 text-sm" :text="`(${review.rating})`"></span>
     </div>
 
     <div class="relative review-content">
-      <div class="space-y-6 line-clamp-10 text-gray-700 text-lg">{!! review.content !!}</div>
+      <div class="space-y-6 line-clamp-10 text-gray-700 text-lg" :html="review.content"></div>
       @include('Bench/BlurReview')
     </div>
 
@@ -22,11 +25,11 @@
         <div class="flex items-center space-x-4">
           <button class="inline-flex items-center space-x-2 text-gray-600 hover:text-gray-900">
             <Icon name="heart" size="20" />
-            <span>{{ review.likes }}</span>
+            <span :text="review.likes"></span>
           </button>
           <button class="inline-flex items-center space-x-2 text-gray-600 hover:text-gray-900">
             <Icon name="message-square" size="20" />
-            <span>{{ review.comments }}</span>
+            <span :text="review.comments"></span>
           </button>
         </div>
       </div>

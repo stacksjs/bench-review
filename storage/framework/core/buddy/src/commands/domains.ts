@@ -1,7 +1,7 @@
 import type { CLI, DomainsOptions } from '@stacksjs/types'
 import process from 'node:process'
 import { runAction } from '@stacksjs/actions'
-import { bgCyan, bold, intro, italic, log, outro, prompts } from '@stacksjs/cli'
+import { bgCyan, bold, intro, italic, log, onUnknownSubcommand, outro, prompts } from "@stacksjs/cli"
 import { config } from '@stacksjs/config'
 import { addDomain } from '@stacksjs/dns'
 import { Action } from '@stacksjs/enums'
@@ -248,8 +248,5 @@ export function domains(buddy: CLI): void {
       process.exit(ExitCode.Success)
     })
 
-  buddy.on('domains:*', () => {
-    console.error('Invalid command: %s\nSee --help for a list of available commands.', buddy.args.join(' '))
-    process.exit(1)
-  })
+  onUnknownSubcommand(buddy, "domains")
 }

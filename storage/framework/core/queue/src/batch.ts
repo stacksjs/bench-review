@@ -17,19 +17,20 @@
  *   .name('Process Podcasts')
  *   .allowFailures()
  *   .onQueue('podcasts')
- *   .then(async (batch) => {
+ *   .then(async (_batch) => {
  *     console.log('All jobs completed!')
  *   })
- *   .catch(async (batch, error) => {
+ *   .catch(async (_batch, error) => {
  *     console.log('A job failed:', error)
  *   })
- *   .finally(async (batch) => {
+ *   .finally(async (_batch) => {
  *     console.log('Batch finished')
  *   })
  *   .dispatch()
  * ```
  */
 
+/// <reference path="./shims.d.ts" />
 import { log } from '@stacksjs/logging'
 import { env as envVars } from '@stacksjs/env'
 import type { Job } from './action'
@@ -199,7 +200,9 @@ export class PendingBatch {
 
     // Dispatch all jobs with batch metadata
     for (let i = 0; i < this.jobs.length; i++) {
-      const { job, payload } = this.jobs[i]
+      const entry = this.jobs[i]
+      if (!entry) continue
+      const { job, payload } = entry
       const jobPayload = {
         ...payload,
         _batchId: batchId,
@@ -402,7 +405,9 @@ export class DispatchedBatch {
     // Dispatch the new jobs
     const options = JSON.parse(record.options || '{}')
     for (let i = 0; i < batchableJobs.length; i++) {
-      const { job, payload } = batchableJobs[i]
+      const entry = batchableJobs[i]
+      if (!entry) continue
+      const { job, payload } = entry
       const jobPayload = {
         ...payload,
         _batchId: this.id,
@@ -435,7 +440,7 @@ export class DispatchedBatch {
  * ```typescript
  * const batch = Batch.create([job1, job2, job3])
  *   .name('My Batch')
- *   .then(async (batch) => console.log('Done!'))
+ *   .then(async (_batch) => console.log('Done!'))
  *   .dispatch()
  * ```
  */
@@ -581,7 +586,7 @@ async function storeBatchInDatabase(record: BatchRecord): Promise<void> {
 async function getBatchFromDatabase(id: string): Promise<BatchRecord | null> {
   const { db } = await import('@stacksjs/database')
 
-  const result = await db
+  const result = await (db as any)
     .selectFrom('job_batches')
     .where('id', '=', id)
     .selectAll()
@@ -593,7 +598,7 @@ async function getBatchFromDatabase(id: string): Promise<BatchRecord | null> {
 async function getAllBatchesFromDatabase(): Promise<BatchRecord[]> {
   const { db } = await import('@stacksjs/database')
 
-  const results = await db
+  const results = await (db as any)
     .selectFrom('job_batches')
     .selectAll()
     .orderBy('created_at', 'desc')
@@ -848,8 +853,30 @@ async function pruneBatchesFromRedis(olderThanHours: number): Promise<number> {
 /**
  * Record that a job in a batch completed successfully.
  * Called by the worker after a batch job finishes.
+ *
+ * Uses an atomic decrement on the database so two concurrent workers
+ * finishing batch jobs at the same instant don't both read pending=N
+ * and both write pending=N-1 — that race used to leave the counter
+ * stuck above zero and the batch's `then`/`finally` callbacks never
+ * fired. Falls back to read-modify-write (with a debug log) when the
+ * driver doesn't expose atomic SQL.
  */
 export async function recordBatchJobCompletion(batchId: string): Promise<void> {
+  // Try the atomic path first.
+  try {
+    const { db, sql } = await import('@stacksjs/database')
+    const result: any = await (db as any)
+      .updateTable('job_batches')
+      .set({ pending_jobs: sql`GREATEST(pending_jobs - 1, 0)` })
+      .where('id', '=', batchId)
+      .where('pending_jobs', '>', 0)
+      .execute()
+    void result
+  }
+  catch (err) {
+    log.debug(`[Batch] Atomic decrement unavailable, falling back to read-modify-write: ${(err as Error).message}`)
+  }
+
   const record = await getBatchRecord(batchId)
   if (!record) return
 

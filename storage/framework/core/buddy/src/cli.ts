@@ -7,8 +7,12 @@ import { path as p } from '@stacksjs/path'
 const args = process.argv.slice(2)
 const requestedCommand = args[0] || 'help'
 const isHelpFlag = args.includes('--help') || args.includes('-h')
-// Minimal commands that don't need full project setup
-const isMinimalCommand = ['--version', '-v', '--help', '-h', 'help', 'version'].includes(requestedCommand)
+// Pure version queries: print version and exit, no command surface needed.
+const isVersionOnly = ['--version', '-v', 'version'].includes(requestedCommand)
+// Help mode: `./buddy`, `./buddy help`, `./buddy --help`, or `./buddy <cmd> --help`.
+// We still need the full command registry so help output lists every command,
+// but we can skip the APP_KEY check and other project-setup work.
+const isHelpMode = requestedCommand === 'help' || (isHelpFlag && args.length <= 2)
 const skipAppKeyCheck = [
   'build',
   'lint',
@@ -28,8 +32,13 @@ const skipAppKeyCheck = [
   'setup:ssl',
   'setup:oh-my-zsh',
   'deploy',
-].some(cmd => requestedCommand.startsWith(cmd)) || isHelpFlag
-const needsFullSetup = !isMinimalCommand
+  // `new` / `create` scaffold a brand-new project from any cwd, so the host
+  // project's APP_KEY check would either spuriously fail (no .env in cwd) or,
+  // worse, write a key into an unrelated directory.
+  'new',
+  'create',
+].some(cmd => requestedCommand.startsWith(cmd)) || isHelpFlag || isHelpMode
+const needsFullSetup = !isVersionOnly
 
 // Setup global error handlers (skip for minimal commands for performance)
 if (needsFullSetup) {
@@ -66,12 +75,17 @@ async function main() {
 
   // Skip expensive setup for commands that don't need it
   if (needsFullSetup) {
-    // Load required commands for setup and key generation
+    const { loadCommands, getCommandsToLoad, markLoaded } = await import('./lazy-commands.ts')
+
+    // Load required commands for setup and key generation, then tell the
+    // registry we've handled them so the bulk loader doesn't double-register.
     const { setup } = await import('./commands/setup.ts')
     setup(buddy as any)
+    markLoaded(buddy as any, 'setup')
 
     const { key } = await import('./commands/key.ts')
     key(buddy as any)
+    markLoaded(buddy as any, 'key')
 
     // Before running any commands, ensure the project is already initialized
     // Skip APP_KEY check for commands that don't need it (build, lint, test, etc.)
@@ -94,7 +108,6 @@ async function main() {
     }
 
     // Use lazy loading for better cold start performance
-    const { loadCommands, getCommandsToLoad } = await import('./lazy-commands.ts')
     const commandsToLoad = getCommandsToLoad(args)
     await loadCommands(commandsToLoad, buddy as any)
 

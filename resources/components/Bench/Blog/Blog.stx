@@ -1,10 +1,11 @@
 <script client>
   function sharePost() {
     const shareUrl = window.location.href
+    const p = post()
     if (navigator.share) {
       navigator.share({
-        title: '{{ post.title }}',
-        text: '{{ post.content.substring(0, 160) }}',
+        title: p?.title || '',
+        text: (p?.content || '').substring(0, 160),
         url: shareUrl,
       })
     } else {
@@ -17,7 +18,7 @@
 >
   <div class="mt-6 mx-auto text-gray-500">
     <div class="relative blog-content">
-      <div class="space-y-6 text-gray-700 text-lg whitespace-pre-line">{!! post.content !!}</div>
+      <div class="space-y-6 text-gray-700 text-lg whitespace-pre-line" :html="post.content"></div>
     </div>
 
     <!-- Article footer -->

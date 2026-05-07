@@ -18,7 +18,7 @@ const { label = '', open = false, elements = [], id = 'dropdown-nav-' + Math.ran
     <span class="hidden i-hugeicons-minus" data-icon-open></span>
   </a>
 
-  <ul data-list class=": ? '' 'hidden' {{ }} open">
+  <ul data-list class="{{ open ? '' : 'hidden' }}">
     @foreach(elements as element)
       <li>
         <a href="{{ element.to }}" class="block">

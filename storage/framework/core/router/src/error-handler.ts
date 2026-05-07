@@ -66,14 +66,70 @@ const queryBuffer: Array<{ query: string; time?: number; connection?: string } |
 let queryWriteIndex = 0
 let queryCount = 0
 
+// Per-request normalized-query histogram. The signature here is
+// "normalize the query enough that two `SELECT * FROM posts WHERE
+// id = $1` calls collapse to one bucket regardless of bound values"
+// so we can detect when the same shape fires N times in a single
+// request — the canonical N+1 signature.
+const queryShapeCounts = new Map<string, number>()
+const N1_THRESHOLD = 5
+let n1Warned = new Set<string>()
+
+/**
+ * Normalize a query string for shape-comparison. Strips bound values
+ * (`= 1`, `= 'foo'`, `IN (1, 2, 3)`), collapses whitespace, and uppercases
+ * keywords so two queries that differ only in their parameter values
+ * end up in the same bucket.
+ */
+function normalizeQueryShape(query: string): string {
+  return query
+    // Quoted strings (single + double) → ?
+    .replace(/'(?:[^']|'')*'/g, '?')
+    .replace(/"(?:[^"]|"")*"/g, '?')
+    // Numbers → ?
+    .replace(/\b\d+(?:\.\d+)?\b/g, '?')
+    // Multi-value IN lists → IN (?)
+    .replace(/IN\s*\([^)]*\)/gi, 'IN (?)')
+    // Collapse whitespace
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase()
+}
+
 /**
  * Add a query to the recent queries list for error context.
  * Uses a circular buffer for O(1) insert instead of array.shift().
+ *
+ * Also runs N+1 detection: when the same query *shape* (with bound
+ * values normalized away) repeats more than `N1_THRESHOLD` times within
+ * a single request lifecycle, we warn once via `log.warn`. The signal
+ * is highly correlated with missing eager loading.
  */
 export function trackQuery(query: string, time?: number, connection?: string): void {
   queryBuffer[queryWriteIndex] = { query, time, connection }
   queryWriteIndex = (queryWriteIndex + 1) % MAX_QUERIES
   if (queryCount < MAX_QUERIES) queryCount++
+
+  // N+1 heuristic — only active in dev. The check is deliberately cheap
+  // (one normalize + map increment per query) so we can leave it on by
+  // default without measurably increasing query latency.
+  if (process.env.APP_ENV === 'production' || process.env.NODE_ENV === 'production') return
+  const shape = normalizeQueryShape(query)
+  // Skip framework's own bookkeeping queries (query_logs INSERT, EXPLAIN).
+  if (shape.startsWith('INSERT INTO QUERY_LOGS') || shape.startsWith('EXPLAIN')) return
+  const next = (queryShapeCounts.get(shape) ?? 0) + 1
+  queryShapeCounts.set(shape, next)
+  if (next === N1_THRESHOLD + 1 && !n1Warned.has(shape)) {
+    n1Warned.add(shape)
+    // Lazy import so this file stays free of @stacksjs/logging in case
+    // logging is the failing component during error rendering.
+    import('@stacksjs/logging').then(({ log }) => {
+      log.warn(
+        `[orm] Possible N+1 — query shape ran ${next}× in this request:\n  ${shape}\n  `
+        + `Hint: load related rows with .with('relation') or eager-load via includes() before iterating.`,
+      )
+    }).catch(() => { /* logging unavailable — silently skip */ })
+  }
 }
 
 /**
@@ -91,12 +147,22 @@ function getRecentQueries(): Array<{ query: string; time?: number; connection?: 
 }
 
 /**
+ * Snapshot of query shape counts. Useful for tests asserting that an
+ * action ran a single query for `posts` instead of one-per-user.
+ */
+export function getQueryShapeCounts(): ReadonlyMap<string, number> {
+  return new Map(queryShapeCounts)
+}
+
+/**
  * Clear tracked queries (e.g., after successful response)
  */
 export function clearTrackedQueries(): void {
   queryBuffer.fill(null)
   queryWriteIndex = 0
   queryCount = 0
+  queryShapeCounts.clear()
+  n1Warned = new Set<string>()
 }
 
 /**
@@ -153,17 +219,28 @@ const SENSITIVE_PATTERNS = [
 ]
 
 /**
- * Sanitize object by hiding sensitive fields
+ * Sanitize object by hiding sensitive fields.
+ *
+ * Walks objects + arrays, redacting any field whose key matches a
+ * sensitive pattern (token/password/secret/etc). Cycle-safe via a
+ * WeakSet — a circular request body (or an Express-style req object
+ * that links back to itself through `req.connection.server.connections`)
+ * used to send the recursion past `MAX_SANITIZE_DEPTH` and silently
+ * truncate; cycle detection keeps the structure intact while still
+ * bounding work.
  */
 const MAX_SANITIZE_DEPTH = 10
+const CIRCULAR_PLACEHOLDER = '[Circular]'
 
-function sanitizeData(data: unknown, depth = 0): unknown {
+function sanitizeData(data: unknown, depth = 0, seen: WeakSet<object> = new WeakSet()): unknown {
   if (!data || typeof data !== 'object' || depth >= MAX_SANITIZE_DEPTH) {
     return data
   }
+  if (seen.has(data as object)) return CIRCULAR_PLACEHOLDER
+  seen.add(data as object)
 
   if (Array.isArray(data)) {
-    return data.map(item => sanitizeData(item, depth + 1))
+    return data.map(item => sanitizeData(item, depth + 1, seen))
   }
 
   const sanitized: Record<string, unknown> = {}
@@ -173,7 +250,7 @@ function sanitizeData(data: unknown, depth = 0): unknown {
       sanitized[key] = '********'
     }
     else if (typeof value === 'object' && value !== null) {
-      sanitized[key] = sanitizeData(value, depth + 1)
+      sanitized[key] = sanitizeData(value, depth + 1, seen)
     }
     else {
       sanitized[key] = value
@@ -299,30 +376,42 @@ export async function createErrorResponse(
 
     // Check if request wants JSON (API request)
     const acceptHeader = request.headers.get('Accept') || ''
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.APP_ENV === 'production'
     if (acceptHeader.includes('application/json') && !acceptHeader.includes('text/html')) {
-      // Return JSON error for API requests
+      // Return JSON error for API requests. In production, strip the
+      // stack trace and recent-queries log — those leak file paths,
+      // function names, query shapes, and (potentially) parameter
+      // values that an attacker can use to fingerprint the deployment.
+      // The dev/staging response keeps them for fast debugging.
+      const details: Record<string, unknown> = { handler: options?.handlerPath }
+      if (!isProduction) {
+        details.stack = error.stack?.split('\n').slice(0, 10)
+        details.queries = getRecentQueries().slice(-10)
+      }
       return new Response(
         buildErrorJson({
           error: error.name || 'Error',
           message: error.message,
           status,
-          details: {
-            handler: options?.handlerPath,
-            stack: error.stack?.split('\n').slice(0, 10),
-            queries: getRecentQueries().slice(-10),
-          },
+          details,
         }),
         { status, headers: getJsonHeadersFull() },
       )
     }
 
-    // Return HTML error page
+    // Return HTML error page. CORS origin: prefer the configured APP_URL.
+    // Wildcard `*` for CORS on a 5xx response is safe-ish (no credentials),
+    // but it's better DX to reflect the configured origin so curl/Postman
+    // see consistent behavior with successful responses.
+    const corsOrigin = process.env.APP_URL
+      ? (process.env.APP_URL.startsWith('http') ? process.env.APP_URL : `https://${process.env.APP_URL}`)
+      : (isProduction ? request.headers.get('origin') ?? 'null' : '*')
     const html = handler.render(error, status)
     return new Response(html, {
       status,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Access-Control-Allow-Origin': process.env.APP_URL ? `https://${process.env.APP_URL}` : '*',
+        'Access-Control-Allow-Origin': corsOrigin,
       },
     })
   }
@@ -348,12 +437,20 @@ export async function createErrorResponse(
 
 /**
  * Create a middleware error response (401, 403, etc.)
+ *
+ * Reads `statusCode` OR `status` off the error so both shapes are honored:
+ * - middleware that throws `Object.assign(new Error('msg'), { statusCode: 401 })`
+ * - framework HttpError instances where the field is named `status`
+ *
+ * Without the `status` fallback, every `HttpError(401, …)` throw from auth or
+ * validation middleware leaks out as a 500 with an Ignition error page —
+ * which is what we used to ship for `GET /api/me` without a token.
  */
 export async function createMiddlewareErrorResponse(
-  error: Error & { statusCode?: number },
+  error: Error & { statusCode?: number, status?: number },
   request: Request | EnhancedRequest,
 ): Promise<Response> {
-  const status = error.statusCode || 500
+  const status = error.statusCode ?? error.status ?? 500
   const isDevelopment = process.env.APP_ENV !== 'production' && process.env.NODE_ENV !== 'production'
 
   // For 4xx errors, return JSON in both dev and prod

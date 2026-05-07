@@ -1,78 +1,57 @@
-<script server>
-const caseTypes = [
-  {
-    name: 'Criminal',
-    count: 428,
-    percentage: 34,
-    icon: 'ScaleIcon'
-  },
-  {
-    name: 'Civil',
-    count: 312,
-    percentage: 25,
-    icon: 'DocumentTextIcon'
-  },
-  {
-    name: 'Family',
-    count: 256,
-    percentage: 20,
-    icon: 'HomeIcon'
-  },
-  {
-    name: 'Probate',
-    count: 252,
-    percentage: 20,
-    icon: 'DocumentDuplicateIcon'
-  }
-]
+<script client>
+  const cases = derived(() => [
+    {
+      id: 1,
+      number: 'CR-2024-001',
+      title: 'State v. Johnson',
+      type: 'Criminal',
+      status: 'Active',
+      filedDate: 'Jan 15, 2024',
+      nextHearing: 'Mar 1, 2024'
+    },
+    {
+      id: 2,
+      number: 'CV-2024-045',
+      title: 'Smith v. Corporation',
+      type: 'Civil',
+      status: 'Pending',
+      filedDate: 'Feb 1, 2024',
+      nextHearing: 'Mar 15, 2024'
+    },
+    {
+      id: 3,
+      number: 'FM-2024-023',
+      title: 'In re: Williams Family',
+      type: 'Family',
+      status: 'Active',
+      filedDate: 'Jan 30, 2024',
+      nextHearing: 'Mar 10, 2024'
+    },
+    {
+      id: 4,
+      number: 'PR-2024-012',
+      title: 'Estate of Davis',
+      type: 'Probate',
+      status: 'Closed',
+      filedDate: 'Dec 15, 2023',
+      nextHearing: 'N/A'
+    },
+    {
+      id: 5,
+      number: 'CR-2024-078',
+      title: 'State v. Anderson',
+      type: 'Criminal',
+      status: 'Active',
+      filedDate: 'Feb 10, 2024',
+      nextHearing: 'Mar 20, 2024'
+    }
+  ])
 
-const cases = [
-  {
-    id: 1,
-    number: 'CR-2024-001',
-    title: 'State v. Johnson',
-    type: 'Criminal',
-    status: 'Active',
-    filedDate: 'Jan 15, 2024',
-    nextHearing: 'Mar 1, 2024'
-  },
-  {
-    id: 2,
-    number: 'CV-2024-045',
-    title: 'Smith v. Corporation',
-    type: 'Civil',
-    status: 'Pending',
-    filedDate: 'Feb 1, 2024',
-    nextHearing: 'Mar 15, 2024'
-  },
-  {
-    id: 3,
-    number: 'FM-2024-023',
-    title: 'In re: Williams Family',
-    type: 'Family',
-    status: 'Active',
-    filedDate: 'Jan 30, 2024',
-    nextHearing: 'Mar 10, 2024'
-  },
-  {
-    id: 4,
-    number: 'PR-2024-012',
-    title: 'Estate of Davis',
-    type: 'Probate',
-    status: 'Closed',
-    filedDate: 'Dec 15, 2023',
-    nextHearing: 'N/A'
-  },
-  {
-    id: 5,
-    number: 'CR-2024-078',
-    title: 'State v. Anderson',
-    type: 'Criminal',
-    status: 'Active',
-    filedDate: 'Feb 10, 2024',
-    nextHearing: 'Mar 20, 2024'
+  function statusClass(status) {
+    if (status === 'Active') return 'bg-green-50 text-green-700 ring-green-600/20'
+    if (status === 'Pending') return 'bg-yellow-50 text-yellow-700 ring-yellow-600/20'
+    return 'bg-gray-50 text-gray-700 ring-gray-600/20'
   }
-]
 </script>
 
 <div class="lg:col-span-2 lg:row-end-2 lg:row-span-2 -mx-4 px-4 py-6 sm:mx-0 sm:pb-10 sm:px-6 xl:pb-16 xl:pt-12 xl:px-12 ring-1 ring-gray-900/5 sm:rounded-lg shadow-sm">
@@ -117,31 +96,26 @@ const cases = [
               </tr>
             </thead>
             <tbody class="divide-gray-200 divide-y">
-              @foreach(cases as case_)
+              <template :for="case_ in cases">
                 <tr>
-                  <td class="pl-4 pr-3 py-4 sm:pl-0 font-medium text-gray-900 text-sm whitespace-nowrap">{{ case_.number }}</td>
-                  <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap">{{ case_.title }}</td>
+                  <td class="pl-4 pr-3 py-4 sm:pl-0 font-medium text-gray-900 text-sm whitespace-nowrap" :text="case_.number"></td>
+                  <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap" :text="case_.title"></td>
                   <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap">
-                    <span class="inline-flex items-center px-2 py-1 font-medium text-blue-700 text-xs bg-blue-50 ring-1 ring-blue-700/10 ring-inset rounded-md">
-                      {{ case_.type }}
-                    </span>
+                    <span class="inline-flex items-center px-2 py-1 font-medium text-blue-700 text-xs bg-blue-50 ring-1 ring-blue-700/10 ring-inset rounded-md" :text="case_.type"></span>
                   </td>
                   <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap">
-                    <span x-class="[
-                      'inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset',
-                      case_.status === 'Active' ? 'bg-green-50 text-green-700 ring-green-600/20' :
-                      case_.status === 'Pending' ? 'bg-yellow-50 text-yellow-700 ring-yellow-600/20' :
-                      'bg-gray-50 text-gray-700 ring-gray-600/20'
-                    ]">
-                      {{ case_.status }}
-                    </span>
+                    <span
+                      class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset"
+                      x-class="statusClass(case_.status)"
+                      :text="case_.status"
+                    ></span>
                   </td>
-                  <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap">{{ case_.filedDate }}</td>
+                  <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap" :text="case_.filedDate"></td>
                   <td class="relative pl-3 pr-4 py-4 sm:pr-0 font-medium text-right text-sm whitespace-nowrap">
-                    <a href="#" class="text-gray-600 hover:text-gray-900">View<span class="sr-only">, {{ case_.number }}</span></a>
+                    <a href="#" class="text-gray-600 hover:text-gray-900">View<span class="sr-only" :text="`, ${case_.number}`"></span></a>
                   </td>
                 </tr>
-              @endforeach
+              </template>
             </tbody>
           </table>
         </div>

@@ -1,7 +1,7 @@
 import type { CLI, TestingOptions } from '@stacksjs/types'
 import process from 'node:process'
 import { runAction } from '@stacksjs/actions'
-import { intro, log, outro } from '@stacksjs/cli'
+import { intro, log, onUnknownSubcommand, outro } from "@stacksjs/cli"
 import { Action } from '@stacksjs/enums'
 import { projectPath } from '@stacksjs/path'
 import { ExitCode } from '@stacksjs/types'
@@ -101,6 +101,9 @@ export function test(buddy: CLI): void {
         startTime: perf,
         useSeconds: true,
       })
+      // Explicit success exit so CI pipelines see a deterministic 0
+      // instead of relying on the implicit "no thrown error" exit code.
+      process.exit(ExitCode.Success)
     })
 
   buddy
@@ -208,8 +211,5 @@ export function test(buddy: CLI): void {
       })
     })
 
-  buddy.on('test:*', () => {
-    console.error('Invalid command: %s\nSee --help for a list of available commands.', buddy.args.join(' '))
-    process.exit(1)
-  })
+  onUnknownSubcommand(buddy, "test")
 }

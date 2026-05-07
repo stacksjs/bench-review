@@ -2,6 +2,7 @@ import type { CLI, CliOptions } from '@stacksjs/types'
 import process from 'node:process'
 import { generateTypes } from '@stacksjs/actions'
 import { log } from '@stacksjs/logging'
+import { onUnknownSubcommand } from "@stacksjs/cli"
 
 export function types(buddy: CLI): void {
   const descriptions = {
@@ -17,7 +18,11 @@ export function types(buddy: CLI): void {
     .option('--verbose', descriptions.verbose, { default: false })
     .action(async (options: CliOptions) => {
       log.debug('Running `buddy types:generate` ...', options)
-      await generateTypes()
+      // Pass options through so --project / --verbose actually affect
+      // codegen. Previously the generator ran with default config no
+      // matter what the user typed, which was confusing for monorepo
+      // users targeting a specific sub-project via --project.
+      await generateTypes(options as any)
     })
 
   buddy
@@ -28,8 +33,5 @@ export function types(buddy: CLI): void {
       // await fixTypes()
     })
 
-  buddy.on('types:*', () => {
-    console.error('Invalid command: %s\nSee --help for a list of available commands.', buddy.args.join(' '))
-    process.exit(1)
-  })
+  onUnknownSubcommand(buddy, "types")
 }

@@ -4,9 +4,12 @@
  * Laravel-like authorization gates for fine-grained access control.
  * Supports both inline gates and policy classes.
  */
+import type { UserModel as OrmUserModel } from '@stacksjs/orm'
 
-
-type UserModel = typeof User
+// Alias the ORM-derived UserModel under the name this module uses internally.
+// The gate API receives authenticated user objects (rows / instances),
+// not the User class constructor.
+type UserModel = OrmUserModel
 
 /**
  * Gate callback function type
@@ -14,9 +17,12 @@ type UserModel = typeof User
 export type GateCallback<T = any> = (_user: UserModel | null, ..._args: T[]) => boolean | Promise<boolean> | AuthorizationResponse
 
 /**
- * Policy method type
+ * Policy method type. The return type intentionally allows `null` so that
+ * a policy's `before()` hook (which returns `null` to delegate to the
+ * underlying ability check) is index-compatible with the catch-all
+ * `[key: string]: PolicyMethod | undefined` signature on `Policy`.
  */
-export type PolicyMethod<T = any> = (_user: UserModel | null, _model?: T, ..._args: any[]) => boolean | Promise<boolean> | AuthorizationResponse
+export type PolicyMethod<T = any> = (_user: UserModel | null, _model?: T, ..._args: any[]) => boolean | null | Promise<boolean | null> | AuthorizationResponse
 
 /**
  * Authorization response for detailed allow/deny
@@ -149,7 +155,7 @@ export function policy(model: string | { name: string }, policyClass: new () => 
  * Register a callback to run before all gate checks
  *
  * @example
- * before((user, ability) => {
+ * before((user, _ability) => {
  *   if (user?.isSuperAdmin) return true // Super admins can do anything
  *   return null // Continue to normal checks
  * })
@@ -293,7 +299,9 @@ export async function inspect(ability: string, user: UserModel | null, ...args: 
       const method = policyInstance[ability] as PolicyMethod | undefined
       if (method) {
         const result = await method.call(policyInstance, user, ...args)
-        return normalizeResponse(result)
+        // null is treated as "no opinion" — fall through to deny here since
+        // we already exhausted the policy resolution path for this ability.
+        return normalizeResponse(result ?? false)
       }
     }
   }
@@ -328,11 +336,24 @@ async function check(ability: string, user: UserModel | null, ...args: any[]): P
 }
 
 /**
- * Normalize a gate/policy result to AuthorizationResponse
+ * Normalize a gate/policy result to AuthorizationResponse.
+ *
+ * Strictly accepts only boolean or AuthorizationResponse. The previous
+ * `result ? allow() : deny()` form interpreted ANY truthy value as
+ * "allow" — a policy that accidentally returned `await User.find(id)`
+ * (a user object) would be treated as authorization granted, even
+ * though the policy author meant "fetched the user as a side effect,
+ * not deciding on permission". Failing loudly catches the bug.
  */
 function normalizeResponse(result: boolean | AuthorizationResponse): AuthorizationResponse {
   if (result instanceof AuthorizationResponse) {
     return result
+  }
+  if (typeof result !== 'boolean') {
+    throw new TypeError(
+      `[gate] Policy must return boolean or AuthorizationResponse; got ${typeof result}. `
+      + 'If you returned a model/value by mistake, return `true`/`false` instead.',
+    )
   }
   return result ? AuthorizationResponse.allow() : AuthorizationResponse.deny()
 }

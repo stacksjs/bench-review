@@ -1,19 +1,26 @@
+<script client>
+  import { trendingJudges as allTrending, recentActivity as allActivity } from '../../functions/sample'
+
+  const trendingJudges = derived(() => allTrending)
+  const recentActivity = derived(() => allActivity)
+  const lastIndex = derived(() => allActivity.length - 1)
+</script>
 <div class="top-4">
   <!-- Trending Judges -->
   <div class="bg-off-gray border rounded-lg">
     <div class="p-4">
       <h2 class="font-semibold text-base text-gray-900">Trending Judges</h2>
       <div class="mt-4 space-y-4">
-        @foreach(trendingJudges as judge)
+        <template :for="judge in trendingJudges">
           <div class="flex items-center space-x-3">
             <img class="h-8 w-8 rounded-full grayscale filter" x-src="judge.photo" x-alt="judge.name" />
             <div class="flex-1 min-w-0">
-              <p class="font-medium text-gray-900 text-sm">{{ judge.name }}</p>
-              <p class="text-gray-500 text-sm">{{ judge.court }}</p>
+              <p class="font-medium text-gray-900 text-sm" :text="judge.name"></p>
+              <p class="text-gray-500 text-sm" :text="judge.court"></p>
             </div>
             <button type="button" class="font-semibold text-gray-900 text-xs hover:underline">Follow</button>
           </div>
-        @endforeach
+        </template>
       </div>
     </div>
   </div>
@@ -24,31 +31,28 @@
       <h2 class="font-semibold text-base text-gray-900">Recent Activity</h2>
       <div class="flow-root mt-4">
         <ul role="list" class="-mb-8">
-          @foreach(recentActivity as activity, activityIdx)
+          <template :for="(activity, activityIdx) in recentActivity">
             <li>
               <div class="relative pb-8">
-                @if(activityIdx !== recentActivity.length - 1)
-                  <span class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
-                @endif
+                <span :if="activityIdx !== lastIndex()" class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
                 <div class="flex relative space-x-3">
                   <div>
                     <span class="flex items-center justify-center h-8 w-8 bg-gray-400 ring-8 ring-white rounded-full">
-                      <!-- Activity icon rendered server-side -->
-                      <span class="h-5 w-5 text-white" aria-hidden="true">{{ activity.icon }}</span>
+                      <span class="h-5 w-5 text-white" aria-hidden="true" :text="activity.icon"></span>
                     </span>
                   </div>
                   <div class="flex flex-1 justify-between pt-1.5 space-x-4 min-w-0">
                     <div>
-                      <p class="text-gray-500 text-sm">{{ activity.content }}</p>
+                      <p class="text-gray-500 text-sm" :text="activity.content"></p>
                     </div>
                     <div class="text-gray-500 text-right text-sm whitespace-nowrap">
-                      <time :datetime="activity.dateTime">{{ activity.date }}</time>
+                      <time :datetime="activity.dateTime" :text="activity.date"></time>
                     </div>
                   </div>
                 </div>
               </div>
             </li>
-          @endforeach
+          </template>
         </ul>
       </div>
     </div>

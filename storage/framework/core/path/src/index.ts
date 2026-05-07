@@ -467,6 +467,16 @@ export function chatPath(path?: string): string {
 }
 
 /**
+ * Returns the path to the `charts` directory within the core directory.
+ *
+ * @param path - The relative path to the file or directory within the charts directory.
+ * @returns The absolute path to the specified file or directory within the charts directory.
+ */
+export function chartsPath(path?: string): string {
+  return corePath(`charts/${path || ''}`)
+}
+
+/**
  * Returns the path to the `cli` directory within the core directory.
  *
  * @param path - The relative path to the file or directory within the cli directory.
@@ -1362,25 +1372,6 @@ export function socialsPath(path?: string): string {
   return corePath(`socials/${path || ''}`)
 }
 
-/**
- * Returns the path to the `vite-config` directory within the core directory.
- *
- * @param path - The relative path to the file or directory within the vite-config directory.
- * @returns The absolute path to the specified file or directory within the vite-config directory.
- */
-export function viteConfigPath(path?: string): string {
-  return corePath(`vite-config/${path || ''}`)
-}
-
-/**
- * Returns the path to the `vite-plugin` directory within the core directory.
- *
- * @param path - The relative path to the file or directory within the vite directory.
- * @returns The absolute path to the specified file or directory within the vite directory.
- */
-export function vitePluginPath(path?: string): string {
-  return corePath(`vite-plugin/${path || ''}`)
-}
 
 /**
  * Returns the path to the `x-ray` directory within the `stacks` directory of the framework.
@@ -1425,6 +1416,7 @@ export interface Path {
   libsEntriesPath: (path?: string) => string
   buildPath: (path?: string) => string
   cachePath: (path?: string) => string
+  chartsPath: (path?: string) => string
   chatPath: (path?: string) => string
   cliPath: (path?: string) => string
   cloudPath: (path?: string) => string
@@ -1514,14 +1506,13 @@ export interface Path {
   userMigrationsPath: (path?: string) => string
   userEventsPath: (path?: string) => string
   userJobsPath: (path?: string) => string
+  userControllersPath: (path?: string) => string
   userListenersPath: (path?: string) => string
   userMiddlewarePath: (path?: string) => string
   userModelsPath: (path?: string) => string
   userNotificationsPath: (path?: string) => string
   utilsPath: (path?: string) => string
   validationPath: (path?: string) => string
-  viteConfigPath: (path?: string) => string
-  vitePluginPath: (path?: string) => string
   xRayPath: (path?: string) => string
   homeDir: (path?: string) => string
   basename: (path: string) => string
@@ -1561,6 +1552,7 @@ export const path: Path = {
   libsEntriesPath,
   buildPath,
   cachePath,
+  chartsPath,
   chatPath,
   cliPath,
   cloudPath,
@@ -1650,14 +1642,13 @@ export const path: Path = {
   userMigrationsPath,
   userEventsPath,
   userJobsPath,
+  userControllersPath,
   userListenersPath,
   userMiddlewarePath,
   userModelsPath,
   userNotificationsPath,
   utilsPath,
   validationPath,
-  viteConfigPath,
-  vitePluginPath,
   xRayPath,
   homeDir,
 

@@ -1,4 +1,10 @@
-import { db } from '@stacksjs/database'
+import { db as _db } from '@stacksjs/database'
+
+// `db` is a Proxy whose methods are typed via bun-query-builder's generics —
+// resolution to the concrete invocation here can leave methods marked
+// `T | undefined` under strict null checks. Cast through `any` so the trait
+// helpers can call the runtime-defined methods without a guard at every site.
+const db = _db as any
 
 export function createCategorizableMethods(tableName: string) {
   async function getCategoryIds(id: number): Promise<number[]> {
@@ -9,7 +15,7 @@ export function createCategorizableMethods(tableName: string) {
       .selectAll()
       .execute()
 
-    return categoryLinks.map((link) => (link as unknown as { category_id: number }).category_id)
+    return (categoryLinks as Array<{ category_id: number }>).map(link => link.category_id)
   }
 
   return {
@@ -44,8 +50,8 @@ export function createCategorizableMethods(tableName: string) {
             description: category.description,
             slug: category.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
             is_active: true,
-            created_at: new Date(),
-            updated_at: new Date(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           })
           .returningAll()
           .executeTakeFirst()
@@ -57,8 +63,8 @@ export function createCategorizableMethods(tableName: string) {
           categorizable_id: id,
           categorizable_type: tableName,
           category_id: (categoryRecord as any).id,
-          created_at: new Date(),
-          updated_at: new Date(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
         .returningAll()
         .executeTakeFirst()

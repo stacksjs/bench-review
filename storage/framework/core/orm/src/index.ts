@@ -1,4 +1,27 @@
-export * from '../../../orm/src'
+// Force `@stacksjs/validation` to evaluate fully before any user model file
+// runs `import { schema } from '@stacksjs/validation'`. Without this priming
+// import, the auto-imports barrel triggers user models concurrently, and
+// later models in the barrel see `schema` in TDZ (the validator hasn't
+// reached its `export const schema = v` line yet because evaluation jumped
+// into the user model graph first). Pulling it in here at the top of every
+// `@stacksjs/orm` consumer's evaluation guarantees schema is bound first.
+import '@stacksjs/validation'
+
+export * from './utils/prunable'
+export type { PrunableOptions } from './utils/prunable'
+export {
+  collectEncryptedAttributes,
+  decryptValue,
+  encryptValue,
+  isEncrypted,
+} from './utils/encrypted'
+// Audit trait public API: setAuditUser is the queue/cron escape hatch for
+// attributing audit rows to a user when there's no current HTTP request.
+export { setAuditUser, createAuditMethods } from './traits/audit'
+export type { AuditHelpers } from './traits/audit'
+// Re-export soft-delete option types so user code can `satisfies SoftDeleteOptions`.
+export type { SoftDeleteOptions, SoftDeleteHelpers } from './traits/soft-deletes'
+export * from './batch-loader'
 export * from './db'
 export * from './subquery'
 export * from './transaction'
@@ -27,25 +50,269 @@ function autoConfigureOrm(): void {
 
 autoConfigureOrm()
 
-// Re-export all model instances so Actions can use: import { User } from '@stacksjs/orm'
-export * from '../../../auto-imports/models'
+// `@stacksjs/auth` (and other framework packages) statically imports
+// `User from '@stacksjs/orm'`, so we have to provide it here. Loading via
+// `await import` instead of `export *` keeps the rest of the model graph
+// out of orm's evaluation graph — only User is pulled in, and only after
+// orm has finished its own static-import phase. The await pauses orm's
+// module evaluation just long enough to bind User without re-introducing
+// the auto-imports → schema-TDZ cycle that re-exporting the whole barrel
+// would cause.
+//
+// `loadUserlandModel` resolves the project root using `@stacksjs/path`,
+// not a relative `../../../../../` path. The relative depth differs
+// between the two layouts this package can run from:
+//   - workspace: `storage/framework/core/orm/src/index.ts` → 5 ups
+//   - installed: `node_modules/@stacksjs/orm/src/index.ts` → 4 ups
+// projectPath() handles both because it walks up looking for the project
+// root (package.json with no parent), so the same code works regardless.
+async function loadUserlandModel(modelName: string, subdirs: string[] = ['']): Promise<any> {
+  const { path } = await import('@stacksjs/path')
+  // 1) User override at app/Models/<Name>.ts (always wins, no subdir search
+  //    on the user side — projects flatten their model directory).
+  const userPath = path.userModelsPath(`${modelName}.ts`)
+  try {
+    if (await Bun.file(userPath).exists()) {
+      return (await import(userPath)).default
+    }
+  }
+  catch { /* fall through to framework default */ }
+  // 2) Framework default at storage/framework/defaults/app/Models/<Name>.ts
+  //    Defaults are organised in subdirectories (commerce/, Content/,
+  //    realtime/) so each model is searched in the relevant subdir first
+  //    then the root — `subdirs` is the priority list of folders to try.
+  for (const sub of subdirs) {
+    const prefix = sub ? `${sub}/` : ''
+    const defaultPath = path.frameworkPath(`defaults/app/Models/${prefix}${modelName}.ts`)
+    try {
+      if (await Bun.file(defaultPath).exists()) {
+        return (await import(defaultPath)).default
+      }
+    }
+    catch { /* try next subdir */ }
+  }
+  return null
+}
+
+export const User = await loadUserlandModel('User')
+
+// Same lazy-export pattern for the two queue framework models. The CLI
+// commands `buddy queue:status`, `queue:failed`, `queue:flush`,
+// `queue:inspect`, `queue:monitor`, `queue:clear` import them as
+// `import { Job, FailedJob } from '@stacksjs/orm'`. Prefer the userland
+// publication (`app/Models/Job.ts`, dropped in by `buddy publish:model
+// Job`) so projects that customize the queue model — renamed columns,
+// extra observers, custom traits — see their version.
+export const Job = await loadUserlandModel('Job')
+export const FailedJob = await loadUserlandModel('FailedJob')
+
+// ---------------------------------------------------------------------------
+// Auto-load every other framework model. Each name is paired with the
+// subdirectory it lives in under `storage/framework/defaults/app/Models/`.
+// The root namespace is searched first (so a flattened user override wins),
+// then the subdir for the framework default. Loaded sequentially so the
+// schema-TDZ cycle the original `User`-only export was guarding against
+// stays neutralised.
+// ---------------------------------------------------------------------------
+const FRAMEWORK_MODEL_MANIFEST: Array<[name: string, subdirs: string[]]> = [
+  // Auth / core
+  ['Team', ['']],
+  ['Subscriber', ['']],
+  ['SubscriberEmail', ['']],
+  ['Subscription', ['']],
+
+  // Content (note: capital "Content/" subdir on disk)
+  ['Post', ['Content']],
+  ['Page', ['Content']],
+  ['Author', ['Content']],
+  ['Comment', ['']],
+  ['Tag', ['']],
+
+  // App / operations
+  ['Activity', ['']],
+  ['Deployment', ['']],
+  ['Release', ['']],
+  ['Notification', ['']],
+  ['Log', ['']],
+  ['Request', ['']],
+  ['Error', ['']],
+  ['Websocket', ['realtime']],
+
+  // Marketing
+  ['Campaign', ['']],
+  ['EmailList', ['']],
+  ['SocialPost', ['']],
+
+  // Payments (top-level)
+  ['PaymentMethod', ['']],
+  ['PaymentProduct', ['']],
+  ['PaymentTransaction', ['']],
+
+  // Commerce
+  ['Order', ['commerce']],
+  ['OrderItem', ['commerce']],
+  ['Cart', ['commerce']],
+  ['CartItem', ['commerce']],
+  ['Customer', ['commerce']],
+  ['Product', ['commerce']],
+  ['ProductVariant', ['commerce']],
+  ['ProductUnit', ['commerce']],
+  ['Manufacturer', ['commerce']],
+  ['Category', ['commerce']],
+  ['Coupon', ['commerce']],
+  ['GiftCard', ['commerce']],
+  ['LicenseKey', ['commerce']],
+  ['Review', ['commerce']],
+  ['Receipt', ['commerce']],
+  ['PrintDevice', ['commerce']],
+  ['ShippingMethod', ['commerce']],
+  ['ShippingRate', ['commerce']],
+  ['ShippingZone', ['commerce']],
+  ['DeliveryRoute', ['commerce']],
+  ['DigitalDelivery', ['commerce']],
+  ['Driver', ['commerce']],
+  ['TaxRate', ['commerce']],
+  ['WaitlistProduct', ['commerce']],
+  ['WaitlistRestaurant', ['commerce']],
+  ['LoyaltyPoint', ['commerce']],
+  ['LoyaltyReward', ['commerce']],
+  ['Payment', ['commerce']],
+  ['Transaction', ['commerce']],
+]
+
+const _autoLoaded: Record<string, any> = {}
+for (const [name, subdirs] of FRAMEWORK_MODEL_MANIFEST) {
+  // eslint-disable-next-line no-await-in-loop
+  const M = await loadUserlandModel(name, subdirs)
+  if (M) _autoLoaded[name] = M
+}
+
+export const Activity = _autoLoaded.Activity
+export const Author = _autoLoaded.Author
+export const Campaign = _autoLoaded.Campaign
+export const Cart = _autoLoaded.Cart
+export const CartItem = _autoLoaded.CartItem
+export const Category = _autoLoaded.Category
+export const Comment = _autoLoaded.Comment
+export const Coupon = _autoLoaded.Coupon
+export const Customer = _autoLoaded.Customer
+export const DeliveryRoute = _autoLoaded.DeliveryRoute
+export const Deployment = _autoLoaded.Deployment
+export const DigitalDelivery = _autoLoaded.DigitalDelivery
+export const Driver = _autoLoaded.Driver
+export const EmailList = _autoLoaded.EmailList
+export const ErrorModel = _autoLoaded.Error
+export const GiftCard = _autoLoaded.GiftCard
+export const LicenseKey = _autoLoaded.LicenseKey
+export const Log = _autoLoaded.Log
+export const LoyaltyPoint = _autoLoaded.LoyaltyPoint
+export const LoyaltyReward = _autoLoaded.LoyaltyReward
+export const Manufacturer = _autoLoaded.Manufacturer
+export const Notification = _autoLoaded.Notification
+export const Order = _autoLoaded.Order
+export const OrderItem = _autoLoaded.OrderItem
+export const Page = _autoLoaded.Page
+export const Payment = _autoLoaded.Payment
+export const PaymentMethod = _autoLoaded.PaymentMethod
+export const PaymentProduct = _autoLoaded.PaymentProduct
+export const PaymentTransaction = _autoLoaded.PaymentTransaction
+export const Post = _autoLoaded.Post
+export const PrintDevice = _autoLoaded.PrintDevice
+export const Product = _autoLoaded.Product
+export const ProductUnit = _autoLoaded.ProductUnit
+export const ProductVariant = _autoLoaded.ProductVariant
+export const Receipt = _autoLoaded.Receipt
+export const Release = _autoLoaded.Release
+export const Request = _autoLoaded.Request
+export const Review = _autoLoaded.Review
+export const ShippingMethod = _autoLoaded.ShippingMethod
+export const ShippingRate = _autoLoaded.ShippingRate
+export const ShippingZone = _autoLoaded.ShippingZone
+export const SocialPost = _autoLoaded.SocialPost
+export const Subscriber = _autoLoaded.Subscriber
+export const SubscriberEmail = _autoLoaded.SubscriberEmail
+export const Subscription = _autoLoaded.Subscription
+export const Tag = _autoLoaded.Tag
+export const TaxRate = _autoLoaded.TaxRate
+export const Team = _autoLoaded.Team
+export const Transaction = _autoLoaded.Transaction
+export const WaitlistProduct = _autoLoaded.WaitlistProduct
+export const WaitlistRestaurant = _autoLoaded.WaitlistRestaurant
+export const Websocket = _autoLoaded.Websocket
+
+// Inject every loaded model onto globalThis so dashboard `<script server>`
+// blocks can reference them as bare names (e.g. `await Order.all()`) without
+// having to import. The STX engine evaluates server scripts inside an
+// AsyncFunction wrapper, which inherits from globalThis — assigning here
+// makes the names visible to every page render after orm has loaded.
+const _allExports: Record<string, any> = {
+  User,
+  Job,
+  FailedJob,
+  ..._autoLoaded,
+}
+const g = globalThis as Record<string, any>
+for (const [name, M] of Object.entries(_allExports)) {
+  if (M && g[name] === undefined) g[name] = M
+}
+
+// Tiny safety helpers that pair with the model globals. They live on
+// globalThis too so a page can do `const orders = await safeAll(Order)`
+// or `const name = safeGet(user, 'name')` without an import. Assigned
+// only if absent so a userland module can override them.
+async function _safeAll(M: any): Promise<any[]> {
+  if (!M) return []
+  try {
+    if (typeof M.all === 'function') {
+      const rows = await M.all()
+      return Array.isArray(rows) ? rows : []
+    }
+    if (typeof M.get === 'function') {
+      const rows = await M.get()
+      return Array.isArray(rows) ? rows : []
+    }
+  }
+  catch { /* table missing or schema mismatch — render empty */ }
+  return []
+}
+function _safeGet(row: any, key: string, fallback: any = ''): any {
+  if (!row) return fallback
+  try {
+    if (typeof row.get === 'function') {
+      const v = row.get(key)
+      if (v !== undefined && v !== null) return v
+    }
+  }
+  catch { /* fall through to direct property access */ }
+  const direct = row?.[key]
+  return direct !== undefined && direct !== null ? direct : fallback
+}
+
+if (g.safeAll === undefined) g.safeAll = _safeAll
+if (g.safeGet === undefined) g.safeGet = _safeGet
 
 // Re-export type utilities from bun-query-builder so consumers can infer
 // model types directly from defineModel() definitions
 export type {
   InferAttributes,
-  InferFillableAttributes,
   InferPrimaryKey,
-  InferTableName,
   InferRelationNames,
-  InferNumericColumns,
-  InferColumnNames,
+  InferTableName,
   ModelDefinition,
-  ModelRow,
-  ModelRowLoose,
-  ModelCreateData,
-  ModelCreateDataLoose,
 } from 'bun-query-builder'
+
+// The following type utilities are referenced by the framework but are not
+// yet exported by the installed `bun-query-builder` version. Until upstream
+// catches up we ship structural stubs so consumer code still type-checks.
+// These intentionally fall back to `any` to avoid spurious narrowing errors;
+// once `bun-query-builder` exports the real shapes, remove these stubs.
+export type InferFillableAttributes<_M> = any
+export type InferNumericColumns<_M> = string
+export type InferColumnNames<_M> = string
+export type ModelRow<_M> = any
+export type ModelRowLoose<_M> = any
+export type ModelCreateData<_M> = any
+export type ModelCreateDataLoose<_M> = any
 
 // ---------------------------------------------------------------------------
 // Model row types — inferred from model definitions via bun-query-builder.
@@ -53,13 +320,11 @@ export type {
 // Consumers: import type { UserModel, NewUser } from '@stacksjs/orm'
 // ---------------------------------------------------------------------------
 
-import type _User from '../../../auto-imports/models'
-
 /** User model row type — inferred from the User model definition. */
-export type UserModel = ModelRowLoose<typeof _User.User>
+export type UserModel = ModelRowLoose<unknown>
 
 /** Data required to create a new User — inferred fillable attributes. */
-export type NewUser = ModelCreateDataLoose<typeof _User.User>
+export type NewUser = ModelCreateDataLoose<unknown>
 
 // ---------------------------------------------------------------------------
 // Polymorphic trait table types — used by @stacksjs/cms and database drivers.

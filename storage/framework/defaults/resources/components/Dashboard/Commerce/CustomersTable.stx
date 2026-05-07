@@ -34,7 +34,7 @@ function getStatusClass(status) {
               Customer
               <span class="group-focus:visible group-hover:visible flex-none ml-2 text-stone-400 rounded">
                 @if(sortBy == 'name')
-                  <div class="h-3.5 w-3.5 : ? 'asc' 'i-hugeicons-arrow-down-02' 'i-hugeicons-arrow-up-02' {{ }} == sortOrder"></div>
+                  <div class="{{ sortOrder == 'asc' ? 'i-hugeicons-arrow-up-02' : 'i-hugeicons-arrow-down-02' }} h-3.5 w-3.5"></div>
                 @else
                   <div class="h-3.5 w-3.5 i-hugeicons-arrows-up-down"></div>
                 @endif
@@ -47,7 +47,7 @@ function getStatusClass(status) {
               Total Spent
               <span class="group-focus:visible group-hover:visible flex-none ml-2 text-stone-400 rounded">
                 @if(sortBy == 'total_spent')
-                  <div class="h-3.5 w-3.5 : ? 'asc' 'i-hugeicons-arrow-down-02' 'i-hugeicons-arrow-up-02' {{ }} == sortOrder"></div>
+                  <div class="{{ sortOrder == 'asc' ? 'i-hugeicons-arrow-up-02' : 'i-hugeicons-arrow-down-02' }} h-3.5 w-3.5"></div>
                 @else
                   <div class="h-3.5 w-3.5 i-hugeicons-arrows-up-down"></div>
                 @endif
@@ -59,7 +59,7 @@ function getStatusClass(status) {
               Last Order
               <span class="group-hover:visible flex-none ml-2 text-stone-400 rounded group-focus-visible">
                 @if(sortBy == 'last_order')
-                  <div class="h-3.5 w-3.5 : ? 'asc' 'i-hugeicons-arrow-down-02' 'i-hugeicons-arrow-up-02' {{ }} == sortOrder"></div>
+                  <div class="{{ sortOrder == 'asc' ? 'i-hugeicons-arrow-up-02' : 'i-hugeicons-arrow-down-02' }} h-3.5 w-3.5"></div>
                 @else
                   <div class="h-3.5 w-3.5 i-hugeicons-arrows-up-down"></div>
                 @endif
@@ -95,7 +95,7 @@ function getStatusClass(status) {
               {{ customer.last_order || 'Never' }}
             </td>
             <td class="px-3 py-3.5 text-sm whitespace-nowrap">
-              <span class="inline-flex items-center px-2 py-1 font-medium text-xs rounded-md {{ }} getStatusClass(customer.status)">
+              <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium {{ getStatusClass(customer.status) }}">
                 {{ customer.status }}
               </span>
             </td>

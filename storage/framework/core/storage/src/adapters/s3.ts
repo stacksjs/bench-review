@@ -8,6 +8,7 @@ import type {
   ListOptions,
   MimeTypeOptions,
   PublicUrlOptions,
+  SignedUrlOptions,
   StatEntry,
   StorageAdapter,
   StorageAdapterConfig,
@@ -131,7 +132,7 @@ export class S3StorageAdapter implements StorageAdapter {
     const normalizedPrefix = prefix.endsWith('/') ? prefix : `${prefix}/`
 
     const objects = await this.client.listAllObjects({ bucket: this.bucket, prefix: normalizedPrefix })
-    const keys = objects.map(obj => obj.Key)
+    const keys = (objects as Array<{ Key?: string }>).map(obj => obj.Key).filter((k): k is string => typeof k === 'string')
 
     if (keys.length === 0) {
       return
@@ -263,12 +264,40 @@ export class S3StorageAdapter implements StorageAdapter {
     const key = this.prefixPath(path)
     const expiresIn = Math.floor(normalizeExpiryToMilliseconds(options.expiresIn) / 1000)
 
+    // S3 pre-signed URLs are clamped to [60s, 7 days]. Anything outside
+    // that range is silently rejected by AWS at sign time and surfaces as
+    // a 403 to the eventual viewer — better to fail loudly here so the
+    // caller fixes their config.
+    const MIN_EXPIRY = 60
+    const MAX_EXPIRY = 7 * 24 * 60 * 60
+    if (!Number.isFinite(expiresIn) || expiresIn < MIN_EXPIRY || expiresIn > MAX_EXPIRY) {
+      throw new RangeError(`[storage/s3] temporaryUrl expiresIn must be between 60s and 7 days (got ${expiresIn}s)`)
+    }
+
     return await this.client.getSignedUrl({
       bucket: this.bucket,
       key,
       expiresIn,
       operation: 'getObject',
     })
+  }
+
+  /**
+   * Generate an AWS-presigned GET URL for time-limited public access
+   * to a private S3 object. Wraps `temporaryUrl` so callers can use
+   * the unified `signedUrl` API across drivers — for S3 the
+   * implementation is identical (presigned GET), the wrapper just
+   * normalizes the options shape.
+   *
+   * @example
+   * ```ts
+   * const url = await Storage.disk('s3').signedUrl('reports/2024-01.pdf', {
+   *   expiresIn: 3600, // 1 hour
+   * })
+   * ```
+   */
+  async signedUrl(path: string, options: SignedUrlOptions): Promise<string> {
+    return this.temporaryUrl(path, { expiresIn: options.expiresIn })
   }
 
   async checksum(path: string, options: ChecksumOptions = {}): Promise<string> {

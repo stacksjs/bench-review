@@ -1,7 +1,3 @@
-<script server>
-// judge is passed via @include context
-</script>
-
 <script client>
   const showCopiedFeedback = state(false)
   const menuOpen = state(false)
@@ -43,8 +39,8 @@
           class="hidden sm:block font-semibold text-gray-900 text-sm/6"
           @click="shareProfile()"
         >
-          <span :show="!showCopiedFeedback">Share Profile</span>
-          <span :show="showCopiedFeedback">Copied!</span>
+          <span :if="!showCopiedFeedback()">Share Profile</span>
+          <span :if="showCopiedFeedback()">Copied!</span>
         </button>
         <StxLink x-to="`/review/judge/${judge.id}`" class="hidden sm:block font-semibold text-gray-900 text-sm/6">Write Review</StxLink>
         <a href="#" class="px-3 py-2 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm">Follow</a>
@@ -55,7 +51,7 @@
             <Icon name="more-vertical" size="20" class="text-gray-500" />
           </button>
 
-          <div :show="menuOpen" @click.away="menuOpen.set(false)" class="absolute right-0 z-10 mt-0.5 py-2 w-32 bg-white ring-1 ring-gray-900/5 rounded-md focus:outline-none shadow-lg origin-top-right" role="menu" aria-orientation="vertical" aria-labelledby="more-menu-button" tabindex="-1">
+          <div :if="menuOpen()" @click.away="menuOpen.set(false)" class="absolute right-0 z-10 mt-0.5 py-2 w-32 bg-white ring-1 ring-gray-900/5 rounded-md focus:outline-none shadow-lg origin-top-right" role="menu" aria-orientation="vertical" aria-labelledby="more-menu-button" tabindex="-1">
             <button type="button" class="block px-3 py-1 w-full text-gray-900 text-left text-sm/6" role="menuitem" tabindex="-1" id="more-menu-item-0" @click="shareProfile">Share Profile</button>
             <StxLink to="/review" class="block px-3 py-1 text-gray-900 text-sm/6" role="menuitem" tabindex="-1" id="more-menu-item-1">Write Review</StxLink>
           </div>

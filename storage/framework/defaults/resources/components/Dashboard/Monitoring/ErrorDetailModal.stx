@@ -76,10 +76,10 @@ function formatTimeAgo(dateString) {
         <div class="flex items-start justify-between">
           <div class="flex-1">
             <div class="flex gap-3 items-center">
-              <span class="inline-flex items-center px-2 py-1 font-medium text-xs rounded-md {{ }} getTypeClass(error.type)">
+              <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium {{ getTypeClass(error.type) }}">
                 {{ error.type }}
               </span>
-              <span class="inline-flex items-center px-2 py-1 capitalize font-medium text-xs rounded-md {{ }} getStatusClass(error.status)">
+              <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium capitalize {{ getStatusClass(error.status) }}">
                 {{ error.status }}
               </span>
             </div>
@@ -136,10 +136,10 @@ function formatTimeAgo(dateString) {
       <!-- Tabs -->
       <div class="border-b border-gray-200 dark:border-neutral-700">
         <nav class="flex -mb-px">
-          <button class="px-6 py-3 font-medium text-blue-600 text-gray-500 text-sm dark:text-blue-400' dark:text-neutral-400 hover:text-gray-700 dark:hover:text-gray-300' border-b-2 hover:border-gray-300 transition-colors : ? 'border-blue-500 'border-transparent 'details' {{ }} == activeTab" data-action="tab" data-tab="details">
+          <button class="px-6 py-3 text-sm font-medium border-b-2 transition-colors {{ activeTab == 'details' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-neutral-400 dark:hover:text-gray-300' }}" data-action="tab" data-tab="details">
             Details
           </button>
-          <button class="px-6 py-3 font-medium text-blue-600 text-gray-500 text-sm dark:text-blue-400' dark:text-neutral-400 hover:text-gray-700 dark:hover:text-gray-300' border-b-2 hover:border-gray-300 transition-colors : ? 'border-blue-500 'border-transparent 'events' {{ }} == activeTab" data-action="tab" data-tab="events">
+          <button class="px-6 py-3 text-sm font-medium border-b-2 transition-colors {{ activeTab == 'events' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-neutral-400 dark:hover:text-gray-300' }}" data-action="tab" data-tab="events">
             Events ({{ error.count }})
           </button>
         </nav>

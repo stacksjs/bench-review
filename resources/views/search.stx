@@ -1,20 +1,19 @@
-<script server>
-import { judges, courtHouses } from '../functions/sample'
-</script>
-
 <script client>
+  import { judges as allJudges, courtHouses as allCourtHouses } from '../functions/sample'
+
+  useHead({ title: 'Search - Bench Review' })
+
   const search = useStore('search')
   const judgesStore = useStore('judges')
 
-  // Initialize stores with server data and URL params
-  judgesStore.setJudges({{ JSON.stringify(judges) }})
-  judgesStore.setCourtHouses({{ JSON.stringify(courtHouses) }})
+  judgesStore.setJudges(allJudges)
+  judgesStore.setCourtHouses(allCourtHouses)
   search.initFromUrl()
 
-  // Local aliases for template readability
   const filteredJudges = judgesStore.filteredJudges
   const filteredCourts = judgesStore.filteredCourtHouses
   const totalResults = judgesStore.totalResults
+  const stars = [1, 2, 3, 4, 5]
 
   function submitSearch() {
     search.updateUrlQuery()
@@ -51,10 +50,10 @@ import { judges, courtHouses } from '../functions/sample'
         <div class="flex items-center justify-between mt-6">
           <div>
             <h1 class="font-semibold text-2xl text-gray-900">
-              <span :show="search.query">Results for "{{ search.query }}"</span>
-              <span :show="!search.query">All results</span>
+              <span :if="search.query()" :text="`Results for &quot;${search.query()}&quot;`"></span>
+              <span :if="!search.query()">All results</span>
             </h1>
-            <p class="mt-1 text-gray-600 text-sm">{{ totalResults() }} results found</p>
+            <p class="mt-1 text-gray-600 text-sm" :text="totalResults() + ' results found'"></p>
           </div>
         </div>
 
@@ -65,25 +64,25 @@ import { judges, courtHouses } from '../functions/sample'
               type="button"
               @click="search.setTab('all')"
               class="px-1 py-3 font-medium text-sm whitespace-nowrap border-b-2"
-              x-class="[search.tab === 'all' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
+              x-class="search.tab === 'all' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
             >
-              All <span class="ml-1 text-gray-400">({{ totalResults() }})</span>
+              All <span class="ml-1 text-gray-400" :text="`(${totalResults()})`"></span>
             </button>
             <button
               type="button"
               @click="search.setTab('judges')"
               class="px-1 py-3 font-medium text-sm whitespace-nowrap border-b-2"
-              x-class="[search.tab === 'judges' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
+              x-class="search.tab === 'judges' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
             >
-              Judges <span class="ml-1 text-gray-400">({{ filteredJudges().length }})</span>
+              Judges <span class="ml-1 text-gray-400" :text="`(${filteredJudges().length})`"></span>
             </button>
             <button
               type="button"
               @click="search.setTab('courts')"
               class="px-1 py-3 font-medium text-sm whitespace-nowrap border-b-2"
-              x-class="[search.tab === 'courts' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
+              x-class="search.tab === 'courts' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
             >
-              Courts <span class="ml-1 text-gray-400">({{ filteredCourts().length }})</span>
+              Courts <span class="ml-1 text-gray-400" :text="`(${filteredCourts().length})`"></span>
             </button>
           </nav>
         </div>
@@ -92,40 +91,40 @@ import { judges, courtHouses } from '../functions/sample'
       <!-- Results -->
       <div class="mt-8">
         <!-- Judges results -->
-        <div :show="search.tab === 'all' || search.tab === 'judges'">
-          <h2 :show="search.tab === 'all'" class="font-semibold text-gray-900 text-lg">Judges</h2>
-          <div :show="filteredJudges().length === 0" class="py-12 text-center">
+        <div :if="search.tab === 'all' || search.tab === 'judges'">
+          <h2 :if="search.tab === 'all'" class="font-semibold text-gray-900 text-lg">Judges</h2>
+          <div :if="filteredJudges().length === 0" class="py-12 text-center">
             <p class="text-gray-500 text-sm">No judges match your search.</p>
           </div>
-          <ul role="list" :show="filteredJudges().length > 0" class="mt-4 divide-gray-100 divide-y">
-            @foreach(filteredJudges() as judge)
+          <ul role="list" :if="filteredJudges().length > 0" class="mt-4 divide-gray-100 divide-y">
+            <template :for="judge in filteredJudges()">
               <li class="flex items-center justify-between py-5">
                 <StxLink x-to="`/judges/${judge.id}/profile`" class="flex flex-1 gap-x-4 items-center min-w-0">
                   <img class="object-cover flex-none h-12 w-12 rounded-full grayscale filter" x-src="judge.photo" x-alt="judge.name">
                   <div class="flex-auto min-w-0">
-                    <p class="font-semibold text-gray-900 text-sm hover:underline">{{ judge.name }}</p>
-                    <p class="mt-0.5 text-gray-500 text-xs">{{ judge.court.name }} · {{ judge.location }}</p>
+                    <p class="font-semibold text-gray-900 text-sm hover:underline" :text="judge.name"></p>
+                    <p class="mt-0.5 text-gray-500 text-xs" :text="`${judge.court.name} · ${judge.location}`"></p>
                   </div>
                 </StxLink>
                 <div class="flex gap-x-2 items-center">
-                  @for(let star = 1; star <= 5; star++)
-                    <Icon name="star" size="16" x-class="[{{ star }} <= judge.rating ? 'text-yellow-400' : 'text-gray-200']" />
-                  @endfor
-                  <span class="ml-1 text-gray-500 text-xs">({{ judge.reviewCount }})</span>
+                  <template :for="star in stars">
+                    <Icon name="star" size="16" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" />
+                  </template>
+                  <span class="ml-1 text-gray-500 text-xs" :text="`(${judge.reviewCount})`"></span>
                 </div>
               </li>
-            @endforeach
+            </template>
           </ul>
         </div>
 
         <!-- Courts results -->
-        <div :show="search.tab === 'all' || search.tab === 'courts'" x-class="[search.tab === 'all' ? 'mt-12' : '']">
-          <h2 :show="search.tab === 'all'" class="font-semibold text-gray-900 text-lg">Court Houses</h2>
-          <div :show="filteredCourts().length === 0" class="py-12 text-center">
+        <div :if="search.tab === 'all' || search.tab === 'courts'" x-class="search.tab === 'all' ? 'mt-12' : ''">
+          <h2 :if="search.tab === 'all'" class="font-semibold text-gray-900 text-lg">Court Houses</h2>
+          <div :if="filteredCourts().length === 0" class="py-12 text-center">
             <p class="text-gray-500 text-sm">No courts match your search.</p>
           </div>
-          <div :show="filteredCourts().length > 0" class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-4">
-            @foreach(filteredCourts() as court)
+          <div :if="filteredCourts().length > 0" class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-4">
+            <template :for="court in filteredCourts()">
               <StxLink
                 x-to="`/court-houses/${court.id}/profile`"
                 class="overflow-hidden bg-white border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-md duration-200 transition-all group"
@@ -135,11 +134,11 @@ import { judges, courtHouses } from '../functions/sample'
                   <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
                 </div>
                 <div class="p-4">
-                  <h3 class="font-semibold text-gray-900 text-sm group-hover:text-deep-brown">{{ court.name }}</h3>
-                  <p class="mt-1 text-gray-500 text-xs">{{ court.city }}, {{ court.state }}</p>
+                  <h3 class="font-semibold text-gray-900 text-sm group-hover:text-deep-brown" :text="court.name"></h3>
+                  <p class="mt-1 text-gray-500 text-xs" :text="`${court.city}, ${court.state}`"></p>
                 </div>
               </StxLink>
-            @endforeach
+            </template>
           </div>
         </div>
       </div>

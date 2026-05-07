@@ -25,7 +25,7 @@ function getNavbarClasses() {
 }
 </script>
 <div
-  class="flex sticky top-0 z-10 gap-x-4 items-center shrink-0 sm:gap-x-6 px-4 sm:px-6 lg:px-8 h-16 bg-white dark:bg-neutral-900 border-b border-gray-200 dark:border-neutral-600 shadow-sm duration-300 transition-all {{ }} getNavbarClasses()"
+  class="sticky top-0 z-10 h-16 flex shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 dark:border-neutral-600 dark:bg-neutral-900 lg:px-8 sm:px-6 transition-all duration-300 {{ getNavbarClasses() }}"
 >
   <button type="button" class="lg:hidden -m-2.5 p-2.5 text-gray-700" title="Open sidebar">
     <span class="sr-only">Open sidebar</span>
@@ -58,7 +58,7 @@ function getNavbarClasses() {
         <span class="sr-only">View Errors</span>
         <a
           href="/errors"
-          class=": ? '' 'active-header-link' {{ }} header-link isActiveRoute('/errors')"
+          class="header-link {{ isActiveRoute('/errors') ? 'active-header-link' : '' }}"
         >
           <div class="h-6 w-6 duration-150 ease-in-out transition i-hugeicons-alert-01"></div>
         </a>
@@ -68,7 +68,7 @@ function getNavbarClasses() {
         <span class="sr-only">View Health Page</span>
         <a
           href="/health"
-          class=": ? '' 'active-header-link' {{ }} header-link isActiveRoute('/health')"
+          class="header-link {{ isActiveRoute('/health') ? 'active-header-link' : '' }}"
         >
           <div class="h-6 w-6 duration-150 ease-in-out transition i-hugeicons-health"></div>
         </a>
@@ -78,7 +78,7 @@ function getNavbarClasses() {
         <span class="sr-only">View Cloud Insights Page</span>
         <a
           href="/insights"
-          class=": ? '' 'active-header-link' {{ }} header-link isActiveRoute('/insights')"
+          class="header-link {{ isActiveRoute('/insights') ? 'active-header-link' : '' }}"
         >
           <div class="h-6 w-6 duration-150 ease-in-out transition i-hugeicons-pulse-01"></div>
         </a>
@@ -88,7 +88,7 @@ function getNavbarClasses() {
         <span class="sr-only">View Inbox</span>
         <a
           href="/inbox"
-          class=": ? '' 'active-header-link' {{ }} header-link isActiveRoute('/inbox')"
+          class="header-link {{ isActiveRoute('/inbox') ? 'active-header-link' : '' }}"
         >
           <div class="h-6 w-6 duration-150 ease-in-out transition i-hugeicons-mail-02"></div>
         </a>
@@ -98,7 +98,7 @@ function getNavbarClasses() {
         <span class="sr-only">View notifications</span>
         <a
           href="/notifications"
-          class=": ? '' 'active-header-link' {{ }} header-link isActiveRoute('/notifications')"
+          class="header-link {{ isActiveRoute('/notifications') ? 'active-header-link' : '' }}"
         >
           <div class="h-6 w-6 i-hugeicons-notification-02"></div>
         </a>

@@ -1,8 +1,7 @@
 import { projectPath } from '@stacksjs/path'
+import { startServer } from '@stacksjs/bunpress'
 
 const port = Number(process.env.PORT_DOCS) || 3006
-
-const { startServer } = await import('@stacksjs/bunpress')
 
 await startServer({
   port,

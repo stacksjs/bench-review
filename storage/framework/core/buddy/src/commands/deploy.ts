@@ -4,7 +4,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { runAction } from '@stacksjs/actions'
-import { italic, outro, prompts, runCommand } from '@stacksjs/cli'
+import { italic, onUnknownSubcommand, outro, prompts, runCommand } from "@stacksjs/cli"
 import { app, email as emailConfig, cloud as cloudConfig } from '@stacksjs/config'
 import { addDomain, hasUserDomainBeenAddedToCloud } from '@stacksjs/dns'
 import { encryptEnv, env } from '@stacksjs/env'
@@ -584,10 +584,7 @@ export function deploy(buddy: CLI): void {
       await outro('Project deployed.', { startTime, useSeconds: true })
     })
 
-  buddy.on('deploy:*', () => {
-    log.error('Invalid command: %s\nSee --help for a list of available commands.', buddy.args.join(' '))
-    process.exit(1)
-  })
+  onUnknownSubcommand(buddy, "deploy")
 }
 
 async function confirmProductionDeployment() {

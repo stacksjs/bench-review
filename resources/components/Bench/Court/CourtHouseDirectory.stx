@@ -1,20 +1,18 @@
-<script server>
-import { courtHouses } from '../../../functions/sample'
-</script>
-
 <script client>
+  import { courtHouses as allCourtHouses } from '../../../functions/sample'
+
   const searchQuery = state('')
 
-  function filteredCourtHouses(allCourts) {
+  const filteredCourtHouses = derived(() => {
     const q = searchQuery()
-    if (!q) return allCourts
+    if (!q) return allCourtHouses
     const needle = q.toLowerCase()
-    return allCourts.filter(court =>
+    return allCourtHouses.filter(court =>
       court.name.toLowerCase().includes(needle) ||
       court.city.toLowerCase().includes(needle) ||
       court.state.toLowerCase().includes(needle)
     )
-  }
+  })
 </script>
 
 <div class="min-h-screen">
@@ -61,7 +59,7 @@ import { courtHouses } from '../../../functions/sample'
 
     <!-- Court Houses Grid -->
     <div class="grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-      @foreach(filteredCourtHouses(courtHouses) as court)
+      <template :for="court in filteredCourtHouses">
         <StxLink
           x-to="`/court-houses/${court.id}/profile`"
           class="overflow-hidden relative bg-white border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-lg duration-300 transition-all group"
@@ -75,20 +73,20 @@ import { courtHouses } from '../../../functions/sample'
             >
             <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
             <div class="absolute bottom-4 left-4">
-              <span class="inline-flex items-center px-3 py-1 font-medium text-gray-700 text-sm bg-white/90 ring-1 ring-gray-700/10 ring-inset rounded-full">{{ court.state }}</span>
+              <span class="inline-flex items-center px-3 py-1 font-medium text-gray-700 text-sm bg-white/90 ring-1 ring-gray-700/10 ring-inset rounded-full" :text="court.state"></span>
             </div>
           </div>
 
           <!-- Content Container -->
           <div class="p-6">
             <div class="text-center">
-              <h3 class="font-semibold text-gray-900 text-xl group-hover:text-deep-brown duration-200 transition-colors">{{ court.name }}</h3>
-              <p class="mt-2 text-gray-500 text-sm">{{ court.city }}, {{ court.state }}</p>
-              <p class="mt-1 text-gray-500 text-sm">{{ court.address }}</p>
+              <h3 class="font-semibold text-gray-900 text-xl group-hover:text-deep-brown duration-200 transition-colors" :text="court.name"></h3>
+              <p class="mt-2 text-gray-500 text-sm" :text="`${court.city}, ${court.state}`"></p>
+              <p class="mt-1 text-gray-500 text-sm" :text="court.address"></p>
             </div>
           </div>
         </StxLink>
-      @endforeach
+      </template>
     </div>
 
     <!-- Pagination -->

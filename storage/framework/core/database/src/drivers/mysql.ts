@@ -6,13 +6,24 @@ import { log } from '@stacksjs/logging'
 function italic(str: string): string {
   return `\x1B[3m${str}\x1B[23m`
 }
-import { createPasswordResetsTable, db } from '@stacksjs/database'
+// Local relative imports rather than '@stacksjs/database' — the package's
+// own root re-exports `./drivers/*`, so importing it from inside a driver
+// creates a self-cycle that deadlocks bun's module loader (60s @ 99% CPU)
+// when @stacksjs/database is imported at top-level outside the framework's
+// preloader context (e.g. by `bun test`).
+import { db } from '../utils'
+import { createPasswordResetsTable } from './defaults/passwords'
 import { ok } from '@stacksjs/error-handling'
+// Deep import to the leaf orm/utils file — see drivers/helpers.ts for why
+// we go around the orm barrel (the barrel re-exports `./db` which loops
+// back into @stacksjs/database and deadlocks bun's loader).
 import { fetchOtherModelRelations, getModelName, getPivotTables, getTableName } from '@stacksjs/orm'
 
 import { path } from '@stacksjs/path'
 import { fs, globSync } from '@stacksjs/storage'
 import { snakeCase } from '@stacksjs/strings'
+// Import from `./helpers` (not `.`) to avoid re-entering the drivers
+// barrel — see `./helpers.ts` for the cycle-deadlock rationale.
 import {
   arrangeColumns,
   checkPivotMigration,
@@ -26,7 +37,7 @@ import {
   isArrayEqual,
   mapFieldTypeToColumnType,
   pluckChanges,
-} from '.'
+} from './helpers'
 
 import { createCategorizableTable, createCommentablesTable, createCommentUpvoteMigration, createPasskeyMigration, createQueryLogsTable, createTaggablesTable, createTaggableTable, dropCommonTables } from './defaults/traits'
 
@@ -42,42 +53,39 @@ export async function dropMysqlTables(): Promise<void> {
   const modelFiles = globSync([path.userModelsPath('*.ts'), path.storagePath('framework/defaults/app/Models/**/*.ts')], { absolute: true })
   const tables = await fetchTables()
 
-  for (const table of tables) await db.unsafe(`DROP TABLE IF EXISTS \`${table}\``).execute()
+  for (const table of tables) {
+    // Validate table name comes from `fetchTables()` (i.e. information_schema)
+    // and matches a safe identifier pattern before splicing into raw SQL.
+    // Even though our caller is internal, treating this as untrusted input
+    // catches bugs where a name accidentally contains a backtick or
+    // whitespace and protects against future callers passing user input.
+    if (!/^[a-z_][\w]*$/i.test(table)) {
+      throw new Error(`[mysql] Refusing to drop table with unsafe name: ${table}`)
+    }
+    await db.unsafe(`DROP TABLE IF EXISTS \`${table}\``).execute()
+  }
   await dropCommonTables()
 
   for (const userModel of modelFiles) {
     const userModelPath = (await import(userModel)).default
     const pivotTables = await getPivotTables(userModelPath, userModel)
 
-    for (const pivotTable of pivotTables) await db.unsafe(`DROP TABLE IF EXISTS \`${pivotTable.table}\``).execute()
+    for (const pivotTable of pivotTables) {
+      if (!/^[a-z_][\w]*$/i.test(pivotTable.table)) {
+        throw new Error(`[mysql] Refusing to drop pivot table with unsafe name: ${pivotTable.table}`)
+      }
+      await db.unsafe(`DROP TABLE IF EXISTS \`${pivotTable.table}\``).execute()
+    }
   }
 }
 
 export async function generateMysqlMigration(modelPath: string): Promise<void> {
-  // check if any files are in the database folder
-  // const files = await fs.readdir(path.userMigrationsPath())
-
-  // if (files.length === 0) {
-  //   log.debug('No migrations found in the database folder, deleting all framework/database/*.json files...')
-
-  //   // delete the *.ts files in the models folder
-  //   const modelFiles = await fs.readdir(path.frameworkPath('models'))
-
-  //   if (modelFiles.length) {
-  //     log.debug('No existing model files in framework path...')
-
-  //     for (const file of modelFiles) {
-  //       if (file.endsWith('.ts')) await fs.unlink(path.frameworkPath(`models/${file}`))
-  //     }
-  //   }
-  // }
-
   const model = (await import(modelPath)).default as Model
   const fileName = path.basename(modelPath)
   const tableName = getTableName(model, modelPath)
 
   const fieldsString = JSON.stringify(model.attributes, null, 2) // Pretty print the JSON
-  const copiedModelPath = path.frameworkPath(`models/${fileName}`)
+  const copiedModelPath = path.frameworkPath(`cache/models/${fileName}`)
 
   let haveFieldsChanged = false
 
@@ -101,7 +109,7 @@ export async function generateMysqlMigration(modelPath: string): Promise<void> {
   }
 
   // store the fields of the model to a file
-  await Bun.$`cp ${modelPath} ${copiedModelPath}`
+  await Bun.$`mkdir -p ${path.frameworkPath('cache/models')} && cp ${modelPath} ${copiedModelPath}`
 
   // if the fields have changed, we need to create a new update migration
   // if the fields have not changed, we need to migrate the table
@@ -193,6 +201,7 @@ async function createCompositeIndexMigration(model: Model, modelPath: string): P
   return migrationContent
 }
 
+// eslint-disable-next-line pickier/no-unused-vars
 async function createTableMigration(modelPath: string): Promise<void> {
   log.debug('createTableMigration modelPath:', modelPath)
 
@@ -214,7 +223,7 @@ async function createTableMigration(modelPath: string): Promise<void> {
   const useUuid = model.traits?.useUuid || false
 
   if (useBillable && (tableName as string) === 'users')
-    await createTableMigration(path.storagePath('framework/models/generated/Subscription.ts'))
+    await createTableMigration(path.frameworkPath('defaults/app/Models/Subscription.ts'))
 
   let migrationContent = `import type { Database } from '@stacksjs/database'\n`
   migrationContent += `import { sql } from '@stacksjs/database'\n\n`

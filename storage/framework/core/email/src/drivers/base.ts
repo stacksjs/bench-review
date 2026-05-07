@@ -22,7 +22,13 @@ export abstract class BaseEmailDriver implements EmailDriver {
   public abstract send(message: EmailMessage, options?: TemplateOptions): Promise<EmailResult>
 
   /**
-   * Validates email message fields
+   * Validates email message fields.
+   *
+   * Includes structural address validation — `to`/`cc`/`bcc`/`from` are
+   * checked against a regex that rejects whitespace, control chars, and
+   * the angle-bracket-comma-quote characters that SMTP relays misparse.
+   * The previous version accepted "" / "user" / "victim@x\r\nBCC:y@x"
+   * and surfaced the resulting failure deep in the SMTP transaction.
    */
   protected validateMessage(message: EmailMessage): boolean {
     if (!message.from?.address && !appConfig.email.from?.address) {
@@ -37,11 +43,38 @@ export abstract class BaseEmailDriver implements EmailDriver {
       throw new Error('Email subject is required')
     }
 
+    // Loose RFC 5321 envelope check: no whitespace / control chars / quotes /
+    // angle brackets / backslash; must contain a single @.
+    const ENVELOPE_RE = /^[^\s<>"\\\r\n\t]+@[^\s<>"\\\r\n\t]+$/
+    const checkAddress = (raw: string | undefined, role: string) => {
+      if (!raw) return
+      if (!ENVELOPE_RE.test(raw)) {
+        throw new Error(`Email ${role} address is malformed or contains forbidden characters: ${JSON.stringify(raw)}`)
+      }
+    }
+    const flatten = (v: unknown): string[] => {
+      if (!v) return []
+      if (typeof v === 'string') return [v]
+      if (Array.isArray(v)) return v.flatMap(item => typeof item === 'string' ? [item] : (item as { address?: string })?.address ? [(item as { address: string }).address] : [])
+      const obj = v as { address?: string }
+      return obj.address ? [obj.address] : []
+    }
+    if (message.from) checkAddress((message.from as { address?: string }).address, 'from')
+    for (const addr of flatten(message.to)) checkAddress(addr, 'to')
+    for (const addr of flatten((message as { cc?: unknown }).cc)) checkAddress(addr, 'cc')
+    for (const addr of flatten((message as { bcc?: unknown }).bcc)) checkAddress(addr, 'bcc')
+
     return true
   }
 
   /**
-   * Formats email addresses to standard format
+   * Formats email addresses to standard format.
+   *
+   * Display names that contain quotes, commas, parentheses, brackets, or
+   * angle brackets violate RFC 5322 unless wrapped in double quotes —
+   * otherwise SMTP servers may misparse "Smith, John <j@x.com>" as two
+   * recipients ("Smith" and "John <j@x.com>"). Quote-wrap any name that
+   * contains a special character.
    */
   protected formatAddresses(addresses: string | string[] | EmailAddress[] | undefined): string[] {
     if (!addresses)
@@ -51,10 +84,15 @@ export abstract class BaseEmailDriver implements EmailDriver {
       return [addresses]
     }
 
-    return addresses.map((addr) => {
+    return addresses.map((_addr) => {
       if (typeof addr === 'string')
         return addr
-      return addr.name ? `${addr.name} <${addr.address}>` : addr.address
+      if (!addr.name) return addr.address
+      const needsQuoting = /[",()<>[\]:;@\\]/.test(addr.name)
+      const safeName = needsQuoting
+        ? `"${addr.name.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+        : addr.name
+      return `${safeName} <${addr.address}>`
     })
   }
 

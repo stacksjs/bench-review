@@ -1,4 +1,4 @@
-<script>
+<script server>
 interface TextareaProps {
   value?: string
   label?: string
@@ -71,7 +71,7 @@ const textareaId = id || 'textarea-' + Math.random().toString(36).slice(2, 11)
         name="{{ name }}"
         rows="{{ rows }}"
         placeholder="{{ placeholder }}"
-        class="textareaClass {{ }}"
+        class="{{ textareaClass }}"
         @if(disabled) disabled @endif
         @if(readonly) readonly @endif
         @if(required) required @endif

@@ -1,3 +1,42 @@
+<script>
+// Dashboard-wide chart helpers exposed on window so feature pages can call
+// `useChart(...)` / `useCharts(...)` without importing the composables
+// module. The page's `<script client>` blocks run inside a non-module
+// `<script data-stx-scoped>` tag, so an ES `import` at the top of the
+// file is a syntax error. Exposing these globals here lets every page
+// drop the import and call the helper directly.
+;(function () {
+  if (typeof window === 'undefined') return
+  if (window.useChart) return
+
+  function useChart(opts) {
+    if (typeof document === 'undefined')
+      return { instance: null, destroy: function () {} }
+    var el = document.getElementById(opts.id)
+    if (!el) {
+      console.warn('[useChart] no element with id "' + opts.id + '" — chart not initialised')
+      return { instance: null, destroy: function () {} }
+    }
+    var instance = new opts.Chart(el, { type: opts.type, data: opts.data, options: opts.options })
+    return {
+      instance: instance,
+      destroy: function () { instance.destroy() },
+    }
+  }
+
+  function useCharts(specs) {
+    var handles = specs.map(useChart)
+    return {
+      handles: handles,
+      destroyAll: function () { handles.forEach(function (h) { h.destroy() }) },
+    }
+  }
+
+  window.useChart = useChart
+  window.useCharts = useCharts
+})()
+</script>
+
 <script client>
 // Craft native sidebar integration
 // Maps sidebar itemIds to STX page routes for SPA navigation
@@ -25,6 +64,7 @@ const sidebarRoutes = {
   'commands': '/app/commands',
   'queue': '/app/queue',
   'jobs': '/app/jobs',
+  'inbox': '/app/inbox',
   'queries': '/app/queries',
   'notifications': '/app/notifications',
   'data-dashboard': '/data/dashboard',

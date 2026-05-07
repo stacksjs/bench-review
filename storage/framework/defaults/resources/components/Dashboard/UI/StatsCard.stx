@@ -1,4 +1,4 @@
-<script>
+<script server>
 interface StatsCardProps {
   title?: string
   value?: string
@@ -45,7 +45,7 @@ const trendClasses = {
             </p>
 
             @if(trend !== null)
-              <span class="inline-flex items-center font-medium text-[12px] {{ }} trendClasses[trendDirection]">
+              <span class="inline-flex items-center text-[12px] font-medium {{ trendClasses[trendDirection] }}">
                 @if(trendDirection == 'up')
                   <svg class="mr-0.5 h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 15l7-7 7 7"></path>
@@ -69,8 +69,8 @@ const trendClasses = {
       </div>
 
       @if(icon)
-        <div class="flex-shrink-0 p-2.5 rounded-lg {{ }} iconBgClasses[iconBg]">
-          <div class="h-5 w-5 {{ }} icon"></div>
+        <div class="p-2.5 rounded-lg flex-shrink-0 {{ iconBgClasses[iconBg] }}">
+          <div class="{{ icon }} h-5 w-5"></div>
         </div>
       @endif
     </div>

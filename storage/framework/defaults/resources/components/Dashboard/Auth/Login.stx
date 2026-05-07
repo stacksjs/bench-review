@@ -1,4 +1,6 @@
-<script>
+@import('../UI/Input', '../UI/Button')
+
+<script server>
 interface LoginProps {
   title?: string
   subtitle?: string

@@ -1,6 +1,6 @@
 import type { CLI } from '@stacksjs/types'
 import process from 'node:process'
-import { log } from '@stacksjs/cli'
+import { log, onUnknownSubcommand } from "@stacksjs/cli"
 import { decryptEnv, encryptEnv, getEnv, getKeypair, rotateKeypair, setEnv } from '@stacksjs/env'
 import { ExitCode } from '@stacksjs/types'
 
@@ -278,7 +278,14 @@ export function env(buddy: CLI): void {
           const hasAppKey = lines.some(line => line.startsWith('APP_KEY='))
           if (hasAppKey) {
             const appKeyLine = lines.find(line => line.startsWith('APP_KEY='))
-            const appKeyValue = appKeyLine?.split('=')[1]?.trim()
+            // `split('=')[1]` truncates at the first `=`, which loses
+            // everything after it. Base64-encoded keys often end with
+            // `=` padding (e.g. `APP_KEY=abc=`) and the key itself can
+            // contain literal `=` chars. Take everything after the first
+            // `=` instead, then strip optional surrounding quotes.
+            const eq = appKeyLine?.indexOf('=') ?? -1
+            const raw = (eq >= 0 ? appKeyLine!.slice(eq + 1) : '').trim()
+            const appKeyValue = raw.replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1')
             if (appKeyValue && appKeyValue.length > 0) {
               checks.push({
                 name: 'APP_KEY',
@@ -411,8 +418,5 @@ export function env(buddy: CLI): void {
       }
     })
 
-  buddy.on('env:*', () => {
-    console.error('Invalid command: %s\nSee --help for a list of available commands.', buddy.args.join(' '))
-    process.exit(1)
-  })
+  onUnknownSubcommand(buddy, "env")
 }

@@ -1,7 +1,7 @@
 @extends('layouts/default')
 
 @section('content')
-<script>
+<script server>
 const tokens = [
   {
     name: 'Mobile App Token',
@@ -170,6 +170,5 @@ const tokens = [
     </div>
   </div>
 </div>
-
 
 @endsection

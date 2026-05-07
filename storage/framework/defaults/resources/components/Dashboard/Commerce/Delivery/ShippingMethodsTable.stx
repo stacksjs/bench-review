@@ -61,7 +61,7 @@ function formatCurrency(amount) {
               </div>
             </td>
             <td class="px-4 py-3.5 text-sm whitespace-nowrap">
-              <span class="inline-flex items-center px-3 py-1 font-medium text-gray-800 text-green-800 text-xs dark:text-green-300' dark:text-neutral-300' dark:bg-green-900 dark:bg-neutral-700 rounded-full : ? 'active' 'bg-gray-100 'bg-green-100 {{ }} == method.status">
+              <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium {{ method.status == 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-neutral-700 dark:text-neutral-300' }}">
                 {{ method.status }}
               </span>
             </td>

@@ -74,7 +74,7 @@ function formatDate(date) {
               {{ driver.license }}
             </td>
             <td class="px-4 py-3.5 text-sm whitespace-nowrap">
-              <span class="inline-flex items-center px-2 py-1 font-medium text-xs rounded-md {{ }} getStatusClass(driver.status)">
+              <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium {{ getStatusClass(driver.status) }}">
                 {{ driver.status }}
               </span>
             </td>

@@ -1,6 +1,9 @@
 import type { CLI } from '@stacksjs/types'
 import { readFileSync, existsSync } from 'node:fs'
+import process from 'node:process'
 import { email as emailConfig } from '@stacksjs/config'
+import { ExitCode } from '@stacksjs/types'
+import { onUnknownSubcommand } from '@stacksjs/cli'
 
 const TIMEOUT_MS = 30000 // 30 second timeout for AWS operations
 
@@ -17,16 +20,89 @@ async function withTimeout<T>(promise: Promise<T>, ms: number = TIMEOUT_MS): Pro
   }
 }
 
-// Load AWS credentials from .env.production
-function loadAwsCredentials(): void {
-  const envPath = '.env.production'
-  if (existsSync(envPath)) {
-    const content = readFileSync(envPath, 'utf-8')
-    for (const line of content.split('\n')) {
-      const eq = line.indexOf('=')
-      if (eq > 0 && !line.startsWith('#')) {
-        process.env[line.slice(0, eq).trim()] = line.slice(eq + 1).trim()
+// Cache the parsed credentials so subcommands sharing a process don't
+// re-read and re-parse `.env.production` on every invocation.
+let _awsCredsLoaded = false
+
+/**
+ * Validate that an S3 bucket exists and is accessible from the
+ * current AWS credentials. Returns a structured result so callers
+ * can render an actionable error message instead of letting the
+ * underlying S3 error bubble up as an opaque InternalServerError.
+ *
+ * The previous shape ran `getObject(bucket, key)` directly and let
+ * AWS's "NoSuchBucket / AccessDenied / region mismatch" surface as
+ * a generic catch-all "Error fetching email" — which sent users on
+ * a goose chase. This precheck distinguishes the three common
+ * failure modes upfront.
+ */
+async function validateS3Bucket(bucket: string, region: string): Promise<{ ok: true } | { ok: false, reason: string, hint: string }> {
+  try {
+    const { S3Client } = await import('@stacksjs/ts-cloud')
+    const s3 = new S3Client(region)
+    // headBucket is the canonical "does this exist + can I see it" check.
+    // The ts-cloud client may not expose it directly; fall back to a
+    // listObjects with maxKeys: 1 which is the same API call shape
+    // most SDKs use for the existence probe.
+    const list = (s3 as { listObjects?: (opts: { bucket: string, prefix?: string, maxKeys?: number }) => Promise<unknown> }).listObjects
+    if (typeof list !== 'function') return { ok: true } // can't probe; assume ok
+    await withTimeout(list.call(s3, { bucket, maxKeys: 1 }), 5000)
+    return { ok: true }
+  }
+  catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    if (/NoSuchBucket/i.test(message)) {
+      return {
+        ok: false,
+        reason: `Bucket '${bucket}' does not exist in region '${region}'.`,
+        hint: 'Run `buddy deploy` to create email infrastructure, or pass --bucket <name> if you know the correct bucket.',
       }
+    }
+    if (/AccessDenied|Forbidden/i.test(message)) {
+      return {
+        ok: false,
+        reason: `Access denied to bucket '${bucket}'.`,
+        hint: 'Check that AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (or your IAM role) have s3:ListBucket permission for this bucket.',
+      }
+    }
+    if (/region/i.test(message) || /PermanentRedirect/i.test(message)) {
+      return {
+        ok: false,
+        reason: `Bucket '${bucket}' is not in region '${region}'.`,
+        hint: 'Set AWS_REGION to the bucket\'s actual region, or pass the right bucket for this region.',
+      }
+    }
+    // Connectivity / DNS / unknown — surface the message verbatim so
+    // the user can google it.
+    return {
+      ok: false,
+      reason: message,
+      hint: 'Check AWS connectivity and credentials.',
+    }
+  }
+}
+
+/**
+ * Load AWS credentials from `.env.production`.
+ *
+ * The previous shape used a hand-rolled `split('=')` parser that
+ * silently corrupted any value containing `=` (common in base64
+ * tokens, JWTs, Stripe keys, etc.) — and didn't honor quoted values
+ * or escape sequences. Routing through `@stacksjs/env`'s parser
+ * gets us proper handling of `KEY="value with = sign"`, multiline
+ * strings, and `enc:` decryption when the project has set a key.
+ */
+async function loadAwsCredentials(): Promise<void> {
+  if (_awsCredsLoaded) return
+  _awsCredsLoaded = true
+  const envPath = '.env.production'
+  if (!existsSync(envPath)) return
+  const { parse } = await import('@stacksjs/env')
+  const content = readFileSync(envPath, 'utf-8')
+  const { parsed } = parse(content)
+  for (const [key, value] of Object.entries(parsed)) {
+    if (process.env[key] === undefined) {
+      process.env[key] = value
     }
   }
 }
@@ -62,7 +138,7 @@ export function email(buddy: CLI): void {
     .command('email:verify', descriptions.verify)
     .action(async () => {
       console.log('\n📧 Checking Email Domain Verification...\n')
-      loadAwsCredentials()
+      await loadAwsCredentials()
 
       try {
         const { SESClient } = await import('@stacksjs/ts-cloud')
@@ -102,7 +178,7 @@ export function email(buddy: CLI): void {
     .action(async (recipient?: string) => {
       const to = recipient || emailConfig?.from?.address || 'test@example.com'
       console.log(`\n📧 Sending Test Email to ${to}...\n`)
-      loadAwsCredentials()
+      await loadAwsCredentials()
 
       try {
         const { SESClient } = await import('@stacksjs/ts-cloud')
@@ -193,7 +269,7 @@ export function email(buddy: CLI): void {
     .option('-n, --lines <count>', 'Number of log lines to show', { default: '20' })
     .action(async (options: { lines?: string }) => {
       console.log('\n📧 Email Processing Logs\n')
-      loadAwsCredentials()
+      await loadAwsCredentials()
 
       try {
         const { CloudWatchLogsClient } = await import('@stacksjs/ts-cloud')
@@ -257,7 +333,7 @@ export function email(buddy: CLI): void {
     .command('email:status', descriptions.status)
     .action(async () => {
       console.log('\n📧 Email Server Status\n')
-      loadAwsCredentials()
+      await loadAwsCredentials()
 
       try {
         const { AWSCloudFormationClient } = await import('@stacksjs/ts-cloud')
@@ -308,12 +384,23 @@ export function email(buddy: CLI): void {
     .option('--raw <id>', 'Show raw email content for a specific message ID')
     .option('--bucket <name>', 'S3 bucket name override')
     .action(async (mailbox?: string, options?: { limit?: string; raw?: string; bucket?: string }) => {
-      loadAwsCredentials()
+      await loadAwsCredentials()
 
       const region = process.env.AWS_REGION || 'us-east-1'
       const appName = (process.env.APP_NAME || 'stacks').toLowerCase().replace(/[^a-z0-9-]/g, '-')
       const emailDomain = (emailConfig?.from?.address?.includes('@') ? emailConfig.from.address.split('@')[1] : undefined) || 'stacksjs.com'
       const bucketName = options?.bucket || `${appName}-production-email`
+
+      // Precheck the bucket so failures surface with actionable hints
+      // instead of opaque AWS error chains buried 5 lines into the
+      // S3 client. This is the #1 source of "buddy email:inbox doesn't
+      // work" reports — usually a misconfigured AWS_REGION or the
+      // user hasn't run `buddy deploy` yet.
+      const probe = await validateS3Bucket(bucketName, region)
+      if (!probe.ok) {
+        console.error(`\n❌ ${probe.reason}\n💡 ${probe.hint}\n`)
+        process.exit(ExitCode.FatalError)
+      }
 
       // If --raw flag, show raw email content
       if (options?.raw) {
@@ -482,7 +569,7 @@ export function email(buddy: CLI): void {
     .option('--prefix <prefix>', 'S3 prefix to scan', { default: 'inbox/' })
     .option('--domain <domain>', 'Email domain', { default: 'stacksjs.com' })
     .action(async (options?: { bucket?: string; prefix?: string; domain?: string }) => {
-      loadAwsCredentials()
+      await loadAwsCredentials()
 
       const region = process.env.AWS_REGION || 'us-east-1'
       const appName = (process.env.APP_NAME || 'stacks').toLowerCase().replace(/[^a-z0-9-]/g, '-')
@@ -636,6 +723,8 @@ export function email(buddy: CLI): void {
       }
       process.exit(0)
     })
+
+  onUnknownSubcommand(buddy, 'email')
 }
 
 // Helper: parse headers from raw email string

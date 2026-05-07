@@ -9,7 +9,8 @@
 
 import type { Attribute, Model, SeedOptions } from '@stacksjs/types'
 import { log } from '@stacksjs/logging'
-import { db } from '@stacksjs/database'
+// Local relative import — see drivers/mysql.ts for the cycle-deadlock rationale.
+import { db } from './utils'
 import { faker } from '@stacksjs/faker'
 import { path } from '@stacksjs/path'
 import { hashMake } from '@stacksjs/security'
@@ -243,7 +244,9 @@ async function generateRecord(
     // Use factory function if defined
     if (attr.factory && typeof attr.factory === 'function') {
       try {
-        value = attr.factory(faker)
+        // Cast: the faker singleton is a wrapped object that exposes additional helpers
+        // beyond the BaseFaker type used in the factory signature.
+        value = attr.factory(faker as any)
       }
       catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err)
@@ -352,7 +355,7 @@ async function seedModel(model: SeederModel, options: SeederConfig): Promise<See
     catch (tableErr: any) {
       const msg = tableErr?.message || ''
       // Only skip for missing table errors, not for other connection issues
-      if (msg.includes('does not exist') || msg.includes('no such table') || msg.includes("doesn't exist")) {
+      if (msg.includes('does not exist') || msg.includes('no such table') || msg.includes('doesn\'t exist')) {
         log.info(`  Skipping ${model.name}: table "${model.table}" does not exist`)
         return {
           model: model.name,

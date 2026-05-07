@@ -1,36 +1,44 @@
-<script server>
-const reviews = [
-  {
-    id: 1,
-    name: 'Michael Chen',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
-    rating: 5,
-    date: '2 weeks ago',
-    content: 'Judge Johnson was extremely thorough and fair in handling my case. She took the time to understand all the details and made sure everyone had a chance to be heard. Her knowledge of the law is impressive, and she maintains a professional yet approachable demeanor in the courtroom.',
-    helpfulCount: 12
-  },
-  {
-    id: 2,
-    name: 'Sarah Williams',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
-    rating: 4,
-    date: '1 month ago',
-    content: 'While I didn\'t get the outcome I was hoping for, I appreciate Judge Johnson\'s clear explanation of her decision and the legal reasoning behind it. She was respectful to all parties involved and maintained excellent control of the courtroom.',
-    helpfulCount: 8
-  },
-  {
-    id: 3,
-    name: 'Robert Davis',
-    avatar: 'https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
-    rating: 5,
-    date: '2 months ago',
-    content: 'One of the most prepared and knowledgeable judges I\'ve appeared before. She asks insightful questions and ensures that all legal procedures are followed correctly. Her courtroom is well-organized and efficient.',
-    helpfulCount: 15
-  }
-]
+<script client>
+  const stars = [1, 2, 3, 4, 5]
+  const ratingBuckets = [
+    { stars: 5, percentage: 100 },
+    { stars: 4, percentage: 80 },
+    { stars: 3, percentage: 60 },
+    { stars: 2, percentage: 40 },
+    { stars: 1, percentage: 20 },
+  ]
 
-// Route params would be available from server context
-const routeId = route.params.id
+  const reviews = derived(() => [
+    {
+      id: 1,
+      name: 'Michael Chen',
+      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
+      rating: 5,
+      date: '2 weeks ago',
+      content: 'Judge Johnson was extremely thorough and fair in handling my case. She took the time to understand all the details and made sure everyone had a chance to be heard. Her knowledge of the law is impressive, and she maintains a professional yet approachable demeanor in the courtroom.',
+      helpfulCount: 12
+    },
+    {
+      id: 2,
+      name: 'Sarah Williams',
+      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
+      rating: 4,
+      date: '1 month ago',
+      content: 'While I didn\'t get the outcome I was hoping for, I appreciate Judge Johnson\'s clear explanation of her decision and the legal reasoning behind it. She was respectful to all parties involved and maintained excellent control of the courtroom.',
+      helpfulCount: 8
+    },
+    {
+      id: 3,
+      name: 'Robert Davis',
+      avatar: 'https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
+      rating: 5,
+      date: '2 months ago',
+      content: 'One of the most prepared and knowledgeable judges I\'ve appeared before. She asks insightful questions and ensures that all legal procedures are followed correctly. Her courtroom is well-organized and efficient.',
+      helpfulCount: 15
+    }
+  ])
+
+  const routeId = derived(() => params.id)
 </script>
 
 <div class="lg:col-span-2 lg:row-end-2 lg:row-span-2 -mx-4 px-4 py-8 sm:mx-0 sm:pb-14 sm:px-8 xl:pb-20 xl:pt-16 xl:px-16 bg-white ring-1 ring-gray-900/5 sm:rounded-lg shadow-sm">
@@ -40,9 +48,9 @@ const routeId = route.params.id
       <h2 class="font-semibold text-2xl text-gray-900">4.8</h2>
       <div class="flex items-center">
         <div class="flex items-center">
-          @for(let i = 1; i <= 5; i++)
-            <Icon name="star" size="20" x-class="[{{ i }} <= 5 ? 'text-yellow-400' : 'text-gray-300']" />
-          @endfor
+          <template :for="star in stars">
+            <Icon name="star" size="20" x-class="star <= 5 ? 'text-yellow-400' : 'text-gray-300'" />
+          </template>
         </div>
         <p class="ml-2 text-gray-500 text-sm">Based on 128 reviews</p>
       </div>
@@ -58,17 +66,17 @@ const routeId = route.params.id
   <div class="mt-8">
     <h3 class="font-semibold text-base text-gray-900">Rating Distribution</h3>
     <div class="mt-4 space-y-3">
-      @for(let rating = 1; rating <= 5; rating++)
+      <template :for="bucket in ratingBuckets">
         <div class="flex items-center">
-          <span class="text-gray-500 text-sm">{{ 6 - rating }} stars</span>
+          <span class="text-gray-500 text-sm" :text="`${bucket.stars} stars`"></span>
           <div class="flex-1 ml-4">
             <div class="h-2 bg-gray-200 rounded-full">
-              <div class="h-2 bg-yellow-400 rounded-full" style="width: {{ (6 - rating) * 20 }}%"></div>
+              <div class="h-2 bg-yellow-400 rounded-full" x-style="`width: ${bucket.percentage}%`"></div>
             </div>
           </div>
-          <span class="ml-4 text-gray-500 text-sm">{{ Math.floor((6 - rating) * 20) }}%</span>
+          <span class="ml-4 text-gray-500 text-sm" :text="`${bucket.percentage}%`"></span>
         </div>
-      @endfor
+      </template>
     </div>
   </div>
 
@@ -76,20 +84,20 @@ const routeId = route.params.id
   <div class="mt-8">
     <h3 class="font-semibold text-base text-gray-900">Reviews</h3>
     <div class="mt-6 space-y-8">
-      @foreach(reviews as review)
+      <template :for="review in reviews">
         <div class="pb-8 border-b border-gray-200">
           <div class="flex items-center justify-between">
             <div class="flex items-center">
               <img x-src="review.avatar" x-alt="review.name" class="h-10 w-10 rounded-full">
               <div class="ml-4">
-                <h4 class="font-semibold text-gray-900 text-sm">{{ review.name }}</h4>
+                <h4 class="font-semibold text-gray-900 text-sm" :text="review.name"></h4>
                 <div class="flex items-center">
                   <div class="flex items-center">
-                    @for(let i = 1; i <= 5; i++)
-                      <Icon name="star" size="16" x-class="[{{ i }} <= review.rating ? 'text-yellow-400' : 'text-gray-300']" />
-                    @endfor
+                    <template :for="star in stars">
+                      <Icon name="star" size="16" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'" />
+                    </template>
                   </div>
-                  <span class="ml-2 text-gray-500 text-sm">{{ review.date }}</span>
+                  <span class="ml-2 text-gray-500 text-sm" :text="review.date"></span>
                 </div>
               </div>
             </div>
@@ -99,7 +107,7 @@ const routeId = route.params.id
           </div>
           <div class="mt-4 text-gray-500 text-sm">
             <div class="relative">
-              <p class="line-clamp-4">{{ review.content }}</p>
+              <p class="line-clamp-4" :text="review.content"></p>
               @include('Bench/BlurReview', { color: 'white' })
             </div>
             <div class="mt-2">
@@ -112,12 +120,10 @@ const routeId = route.params.id
             </div>
           </div>
           <div class="flex items-center mt-4 space-x-4">
-            <button type="button" class="font-semibold text-gray-500 text-sm hover:text-gray-700">
-              Helpful ({{ review.helpfulCount }})
-            </button>
+            <button type="button" class="font-semibold text-gray-500 text-sm hover:text-gray-700" :text="`Helpful (${review.helpfulCount})`"></button>
           </div>
         </div>
-      @endforeach
+      </template>
     </div>
   </div>
 </div>
