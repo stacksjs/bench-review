@@ -1,11 +1,41 @@
 <script client>
   const email = state('')
   const loading = state(false)
+  // Toast state. We don't use `<Notification>` from @stacksjs/components
+  // here because that component is server-rendered (`<script server>`,
+  // `@if(show)`) — its `show` prop is captured once at render time, so
+  // a fetch-driven toggle would never actually appear in the DOM.
+  // Instead we drive a client-rendered toast from these signals,
+  // matching the package's visual style for consistency.
+  const toastVisible = state(false)
+  const toastType = state('success') // 'success' | 'error'
+  const toastTitle = state('')
+  const toastMessage = state('')
+  const TOAST_DURATION_MS = 5000
+  let toastTimer = null
+
+  function showToast(type, title, message) {
+    toastType.set(type)
+    toastTitle.set(title)
+    toastMessage.set(message)
+    toastVisible.set(true)
+    if (toastTimer) clearTimeout(toastTimer)
+    toastTimer = setTimeout(dismissToast, TOAST_DURATION_MS)
+  }
+
+  function dismissToast() {
+    toastVisible.set(false)
+    if (toastTimer) {
+      clearTimeout(toastTimer)
+      toastTimer = null
+    }
+  }
 
   async function submitEmail() {
     loading.set(true)
+    dismissToast()
     try {
-      const response = await fetch('http://localhost:3008/api/email/subscribe', {
+      const response = await fetch('/api/email/subscribe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -14,15 +44,15 @@
         body: JSON.stringify({ email: email() }),
       })
       if (!response.ok) {
-        const errs = await response.json()
-        notification.error(errs.errors[0]?.message || 'An error occurred. Please try again.')
+        const errs = await response.json().catch(() => ({}))
+        showToast('error', 'Something went wrong', errs?.errors?.[0]?.message || 'Please try again.')
       } else {
-        notification.success('Thanks! Stay tuned for more updates.')
+        showToast('success', 'Thanks!', 'Stay tuned for more updates.')
+        email.set('')
       }
-    } catch (error) {
-      notification.error('An error occurred. Please try again.')
+    } catch {
+      showToast('error', 'Network error', 'Please try again.')
     }
-    email.set('')
     loading.set(false)
   }
 </script>
@@ -59,17 +89,49 @@
       </p>
 
       <div class="mt-12">
-        <form @submit.prevent="submitEmail" class="flex gap-x-4 max-w-md">
+        <form @submit.prevent="submitEmail()" class="flex gap-x-4 max-w-md">
           <div class="relative flex-auto">
             <input type="email" x-model="email" placeholder="Enter your email" required x-disabled="loading"
               class="block px-4 py-3 w-full text-gray-900 sm:leading-6 sm:text-sm placeholder:text-gray-400 bg-off-gray border-0 ring-1 ring-gray-300 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset shadow-sm">
           </div>
           <button type="submit" x-disabled="loading"
             class="flex-none px-3.5 py-2.5 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm"
-            x-text="loading ? 'Subscribing...' : 'Notify me'">
+            :text="loading() ? 'Subscribing...' : 'Notify me'">
             Notify me
           </button>
         </form>
+      </div>
+      <!--
+        Top-right toast. Styled via the dedicated `<style>` block at the
+        bottom of this file because Crosswind only generates utility CSS
+        for class names it can find literally in `class="..."` source —
+        the prior `x-class` array using `bg-green-50` / `bg-red-50` etc.
+        produced no CSS, leaving the toast transparent.
+      -->
+      <div
+        role="alert"
+        aria-live="polite"
+        class="bench-toast"
+        x-bind:data-toast-type="toastType()"
+        x-bind:data-toast-visible="toastVisible() ? 'true' : 'false'"
+      >
+        <div class="bench-toast__body">
+          <div class="bench-toast__content">
+            <p class="bench-toast__title" :text="toastTitle()"></p>
+            <p class="bench-toast__message" :text="toastMessage()"></p>
+          </div>
+          <button
+            type="button"
+            @click="dismissToast()"
+            class="bench-toast__close"
+            aria-label="Dismiss notification"
+          >
+            <span class="sr-only">Close</span>
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
     <div class="flex mt-16 mx-auto sm:mt-24 lg:ml-10 lg:mr-0 lg:mt-0 xl:ml-32">
@@ -83,3 +145,106 @@
     </div>
   </div>
 </div>
+
+<style>
+  .bench-toast {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 50;
+    width: 100%;
+    max-width: 24rem;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    box-shadow:
+      0 10px 15px -3px rgb(0 0 0 / 0.1),
+      0 4px 6px -4px rgb(0 0 0 / 0.1);
+    box-shadow:
+      0 10px 15px -3px rgb(0 0 0 / 0.1),
+      0 4px 6px -4px rgb(0 0 0 / 0.1),
+      inset 0 0 0 1px rgb(0 0 0 / 0.05);
+    pointer-events: auto;
+    transition: opacity 200ms ease, transform 200ms ease;
+    opacity: 1;
+    transform: translateY(0);
+    background: #ffffff;
+    color: #111827;
+  }
+
+  /* Hidden state — element stays mounted so x-bind can flip it back. */
+  .bench-toast[data-toast-visible='false'] {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+    pointer-events: none;
+  }
+
+  .bench-toast[data-toast-type='success'] {
+    background: #f0fdf4;
+    color: #14532d;
+  }
+
+  .bench-toast[data-toast-type='error'] {
+    background: #fef2f2;
+    color: #7f1d1d;
+  }
+
+  .bench-toast__body {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .bench-toast__content {
+    flex: 1 1 0%;
+    min-width: 0;
+  }
+
+  .bench-toast__title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .bench-toast__message {
+    font-size: 0.875rem;
+    margin: 0.25rem 0 0;
+    opacity: 0.9;
+  }
+
+  /* Hide the message paragraph when there's no text — avoids an empty
+     line of vertical rhythm on title-only toasts. Same trick for title. */
+  .bench-toast__title:empty,
+  .bench-toast__message:empty {
+    display: none;
+  }
+
+  .bench-toast__close {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 0.375rem;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.7;
+  }
+
+  .bench-toast__close:hover {
+    opacity: 1;
+  }
+
+  .bench-toast__close:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+    opacity: 1;
+  }
+
+  .bench-toast__close svg {
+    width: 1rem;
+    height: 1rem;
+  }
+</style>

@@ -15,6 +15,7 @@
     "typecheck": "bun tsc --noEmit"
   },
   "dependencies": {
+    "@stacksjs/components": "^0.2.35",
     "chart.js": "^4.5.1",
     "ofetch": "^1.5.1",
     "perfect-debounce": "^2.1.0",
@@ -24,7 +25,8 @@
     "ts-medium-editor": "^0.1.0"
   },
   "devDependencies": {
-    "@stacksjs/ts-i18n": "^0.1.7",
+    "@stacksjs/stx": "0.2.52",
+    "@stacksjs/ts-i18n": "0.1.8",
     "bun-git-hooks": "^0.3.1"
   },
   "workspaces": [
@@ -36,10 +38,10 @@
   ],
   "git-hooks": {
     "pre-commit": {
-      "staged-lint": {
+      "stagedLint": {
         "*.{js,ts,json,yaml,yml,md}": "bunx --bun pickier lint --fix"
       }
     },
-    "commit-msg": "bunx gitlint --edit .git/COMMIT_EDITMSG"
+    "commit-msg": "bunx --bun @stacksjs/gitlint --edit .git/COMMIT_EDITMSG"
   }
 }

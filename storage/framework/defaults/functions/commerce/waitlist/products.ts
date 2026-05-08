@@ -1,10 +1,11 @@
 import type { WaitlistProduct } from '../../../types/defaults'
 import { useStorage } from '@stacksjs/browser'
+import { pushToast } from '../../toasts'
 
 // Create a persistent waitlist products array using VueUse's useStorage
 const waitlistProducts = useStorage<WaitlistProduct[]>('waitlist_products', [])
 
-const baseURL = `${process.env.VITE_API_URL || `http://localhost:${process.env.PORT_API || '3008'}`}/api`
+const baseURL = process.env.VITE_API_URL || `http://localhost:${process.env.PORT_API || '3008'}`
 
 // Basic fetch function to get all waitlist products
 async function fetchWaitlistProducts() {
@@ -20,12 +21,12 @@ async function fetchWaitlistProducts() {
       return data
     }
     else {
-      console.error('Expected array of waitlist products but received:', typeof data)
+      pushToast('error', 'Couldn\'t load waitlist products', { detail: 'Server returned a non-array response' })
       return []
     }
   }
   catch (error) {
-    console.error('Error fetching waitlist products:', error)
+    pushToast('error', 'Error fetching waitlist products', { detail: String(error) })
     return []
   }
 }
@@ -52,7 +53,7 @@ async function createWaitlistProduct(waitlistProduct: WaitlistProduct) {
     return null
   }
   catch (error) {
-    console.error('Error creating waitlist product:', error)
+    pushToast('error', 'Error creating waitlist product', { detail: String(error) })
     return null
   }
 }
@@ -82,7 +83,7 @@ async function updateWaitlistProduct(waitlistProduct: WaitlistProduct) {
     return null
   }
   catch (error) {
-    console.error('Error updating waitlist product:', error)
+    pushToast('error', 'Error updating waitlist product', { detail: String(error) })
     return null
   }
 }
@@ -105,7 +106,7 @@ async function deleteWaitlistProduct(id: number) {
     return true
   }
   catch (error) {
-    console.error('Error deleting waitlist product:', error)
+    pushToast('error', 'Error deleting waitlist product', { detail: String(error) })
     return false
   }
 }

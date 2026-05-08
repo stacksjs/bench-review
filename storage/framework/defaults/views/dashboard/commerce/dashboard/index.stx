@@ -2,31 +2,149 @@
 
 @section('content')
 <script server>
+import { orders, payments, products as productsModule } from '@stacksjs/commerce'
+
 const timeRanges = ['Today', 'Last 7 days', 'Last 30 days', 'Last 90 days', 'Last year', 'All time'] as const
 
-const topProducts = [
-  { id: 1, name: 'Premium Headphones', price: '$199.99', sales: 1245, stock: 78 },
-  { id: 2, name: 'Wireless Keyboard', price: '$89.99', sales: 987, stock: 124 },
-  { id: 3, name: 'Smart Watch', price: '$249.99', sales: 876, stock: 45 },
-  { id: 4, name: 'Bluetooth Speaker', price: '$129.99', sales: 765, stock: 92 },
-  { id: 5, name: 'USB-C Hub', price: '$59.99', sales: 654, stock: 210 },
-]
+// Live aggregates. The time-range select above is currently a UI-only
+// control — the queries below always look at the last 30 days. Wiring
+// the selector to re-query is a follow-up that needs a refresh path
+// (likely a dedicated endpoint + composable) since `<script server>`
+// only runs at render time.
+let revenueLabel = '$0.00'
+let revenueChange: { sign: '+' | '-', percent: string } | null = null
+let totalOrdersLabel = '0'
+let ordersChange: { sign: '+' | '-', percent: string } | null = null
+let avgOrderValueLabel = '$0.00'
+let avgChange: { sign: '+' | '-', percent: string } | null = null
+let recentOrders: Array<{
+  id: string
+  customer: string
+  date: string
+  total: string
+  status: string
+}> = []
+let topProducts: Array<{
+  id: number
+  name: string
+  unitsSold: string
+  revenue: string
+  inventoryClass: string
+  inventoryLabel: string
+}> = []
+let chartData: {
+  revenue: { labels: string[], values: number[] }
+  orders: { labels: string[], values: number[] }
+} = {
+  revenue: { labels: [], values: [] },
+  orders: { labels: [], values: [] },
+}
 
-const recentOrders = [
-  { id: '#ORD-5432', customer: 'John Smith', date: '2023-12-01', total: '$349.97', status: 'Completed' },
-  { id: '#ORD-5431', customer: 'Sarah Johnson', date: '2023-12-01', total: '$129.99', status: 'Processing' },
-  { id: '#ORD-5430', customer: 'Michael Brown', date: '2023-11-30', total: '$459.98', status: 'Completed' },
-  { id: '#ORD-5429', customer: 'Emily Davis', date: '2023-11-30', total: '$89.99', status: 'Shipped' },
-  { id: '#ORD-5428', customer: 'David Wilson', date: '2023-11-29', total: '$199.99', status: 'Completed' },
-]
+try {
+  const [paymentStats, orderStats, topProductRows, monthlyTrends, dailyTrends] = await Promise.all([
+    payments.fetchPaymentStats(30),
+    orders.fetchStats(),
+    productsModule.items.fetchTopProducts(5),
+    payments.fetchMonthlyPaymentTrends(),
+    orders.fetchDailyOrderTrends(30),
+  ])
 
-function orderStatusClass(status) {
+  const formatUSD = (n: number) => `$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const formatChange = (cmp?: { is_increase: boolean, percentage: number }) =>
+    cmp ? { sign: cmp.is_increase ? '+' as const : '-' as const, percent: Number(cmp.percentage).toFixed(1) } : null
+
+  revenueLabel = formatUSD(paymentStats.total_revenue)
+  revenueChange = formatChange(paymentStats.comparison?.revenue)
+  totalOrdersLabel = String(orderStats.total)
+  ordersChange = formatChange(paymentStats.comparison?.transactions)
+  avgOrderValueLabel = formatUSD(paymentStats.average_transaction)
+  avgChange = formatChange(paymentStats.comparison?.average)
+
+  recentOrders = (orderStats.recent ?? []).slice(0, 5).map((o: any) => ({
+    id: `#ORD-${String(o.id).padStart(4, '0')}`,
+    customer: o.customer_id ? `Customer ${o.customer_id}` : '—',
+    date: o.created_at ? new Date(o.created_at).toISOString().slice(0, 10) : '',
+    total: formatUSD(Number(o.total_amount) || 0),
+    status: String(o.status || 'pending'),
+  }))
+
+  // Inventory tier thresholds are intentionally simple — high (≥50),
+  // medium (10–49), low (<10). When inventory tracking gets a proper
+  // low-stock-threshold per product, switch to that signal.
+  const inventoryTier = (n: number) => {
+    if (n >= 50) return { cls: 'text-green-600 dark:text-green-400', label: 'In stock' }
+    if (n >= 10) return { cls: 'text-yellow-600 dark:text-yellow-400', label: 'Low' }
+    return { cls: 'text-red-600 dark:text-red-400', label: 'Critical' }
+  }
+
+  topProducts = topProductRows.map((p) => {
+    const tier = inventoryTier(p.inventory_count)
+    return {
+      id: p.id,
+      name: p.name,
+      unitsSold: p.units_sold.toLocaleString('en-US'),
+      revenue: formatUSD(p.revenue),
+      inventoryClass: tier.cls,
+      inventoryLabel: `${p.inventory_count.toLocaleString('en-US')} • ${tier.label}`,
+    }
+  })
+
+  // Monthly revenue (12 months back, ending current month) for the
+  // line chart. fetchMonthlyPaymentTrends returns an entry only for
+  // months that had completed payments — so a gap month doesn't show
+  // a zero. That's intentional: zero would look like a real dip.
+  chartData.revenue = {
+    labels: monthlyTrends.map(t => `${t.month} ${t.year}`),
+    values: monthlyTrends.map(t => Number(t.revenue) || 0),
+  }
+
+  // Daily order counts for the last 30 days. fetchDailyOrderTrends
+  // only returns days that have orders, so use a date label from
+  // the row directly. The chart is a bar chart — intentionally
+  // sparse rather than padded with 0s for the same reason as above.
+  chartData.orders = {
+    labels: dailyTrends.map(t => t.date),
+    values: dailyTrends.map(t => Number(t.order_count) || 0),
+  }
+}
+catch {
+  // DB unavailable / query failed — render zeros rather than fake numbers.
+  // Empty-state UX is better than confidently-wrong numbers.
+}
+
+// TODO(commerce-dashboard-tile-3): Conversion rate needs a session/visit
+// counter (orders ÷ unique_sessions). We don't track sessions in this
+// repo yet — the tile renders a placeholder until ts-analytics or an
+// equivalent feeds in.
+
+function orderStatusClass(status: string): string {
   switch (status) {
+    case 'completed':
     case 'Completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+    case 'processing':
     case 'Processing': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
+    case 'shipped':
     case 'Shipped': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
     default: return 'bg-gray-100 text-gray-800 dark:bg-neutral-700 dark:text-neutral-300'
   }
+}
+
+function changeIcon(change: { sign: '+' | '-', percent: string } | null): string {
+  if (!change) return ''
+  return change.sign === '+' ? 'i-hugeicons-analytics-up' : 'i-hugeicons-analytics-down'
+}
+
+function changeClass(change: { sign: '+' | '-', percent: string } | null): string {
+  if (!change) return 'text-gray-500 dark:text-neutral-400'
+  return change.sign === '+'
+    ? 'text-green-600 dark:text-green-400'
+    : 'text-red-600 dark:text-red-400'
+}
+
+function changeLabel(change: { sign: '+' | '-', percent: string } | null, suffix: string): string {
+  if (!change) return ''
+  const direction = change.sign === '+' ? 'increase' : 'decrease'
+  return `${change.percent}% ${direction}${suffix ? ` ${suffix}` : ''}`
 }
 </script>
 
@@ -42,46 +160,59 @@ function orderStatusClass(status) {
           </template>
         </PageHeader>
 
-        <!-- Stats — currently canned numbers; wire to derived(orders) once a real source is plumbed in. -->
+        <!-- Stats — server-rendered from payments.fetchPaymentStats(30) + orders.fetchStats(). -->
         <dl class="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mt-5">
           <div class="overflow-hidden px-4 py-5 sm:p-6 bg-white dark:bg-neutral-800 rounded-lg shadow">
-            <dt class="font-medium text-gray-500 text-sm truncate dark:text-neutral-300">Total Revenue</dt>
-            <dd class="mt-1 font-semibold text-3xl text-gray-900 tracking-tight dark:text-white">$548,290</dd>
-            <dd class="flex items-center mt-2 text-green-600 text-sm dark:text-green-400">
-              <div class="mr-1 h-4 w-4 i-hugeicons-analytics-up"></div>
-              <span>12.5% increase</span>
+            <dt class="font-medium text-gray-500 text-sm truncate dark:text-neutral-300">Total Revenue (30d)</dt>
+            <dd class="mt-1 font-semibold text-3xl text-gray-900 tracking-tight dark:text-white">{{ revenueLabel }}</dd>
+            <dd class="flex items-center mt-2 text-sm {{ changeClass(revenueChange) }}">
+              @if(revenueChange)
+                <div class="mr-1 h-4 w-4 {{ changeIcon(revenueChange) }}"></div>
+                <span>{{ changeLabel(revenueChange, 'vs prior 30d') }}</span>
+              @else
+                <span>—</span>
+              @endif
             </dd>
           </div>
 
           <div class="overflow-hidden px-4 py-5 sm:p-6 bg-white dark:bg-neutral-800 rounded-lg shadow">
             <dt class="font-medium text-gray-500 text-sm truncate dark:text-neutral-300">Total Orders</dt>
-            <dd class="mt-1 font-semibold text-3xl text-gray-900 tracking-tight dark:text-white">2,456</dd>
-            <dd class="flex items-center mt-2 text-green-600 text-sm dark:text-green-400">
-              <div class="mr-1 h-4 w-4 i-hugeicons-analytics-up"></div>
-              <span>8.2% increase</span>
+            <dd class="mt-1 font-semibold text-3xl text-gray-900 tracking-tight dark:text-white">{{ totalOrdersLabel }}</dd>
+            <dd class="flex items-center mt-2 text-sm {{ changeClass(ordersChange) }}">
+              @if(ordersChange)
+                <div class="mr-1 h-4 w-4 {{ changeIcon(ordersChange) }}"></div>
+                <span>{{ changeLabel(ordersChange, 'vs prior 30d') }}</span>
+              @else
+                <span>—</span>
+              @endif
             </dd>
           </div>
 
           <div class="overflow-hidden px-4 py-5 sm:p-6 bg-white dark:bg-neutral-800 rounded-lg shadow">
-            <dt class="font-medium text-gray-500 text-sm truncate dark:text-neutral-300">Average Order Value</dt>
-            <dd class="mt-1 font-semibold text-3xl text-gray-900 tracking-tight dark:text-white">$223.25</dd>
-            <dd class="flex items-center mt-2 text-green-600 text-sm dark:text-green-400">
-              <div class="mr-1 h-4 w-4 i-hugeicons-analytics-up"></div>
-              <span>3.7% increase</span>
+            <dt class="font-medium text-gray-500 text-sm truncate dark:text-neutral-300">Average Order Value (30d)</dt>
+            <dd class="mt-1 font-semibold text-3xl text-gray-900 tracking-tight dark:text-white">{{ avgOrderValueLabel }}</dd>
+            <dd class="flex items-center mt-2 text-sm {{ changeClass(avgChange) }}">
+              @if(avgChange)
+                <div class="mr-1 h-4 w-4 {{ changeIcon(avgChange) }}"></div>
+                <span>{{ changeLabel(avgChange, 'vs prior 30d') }}</span>
+              @else
+                <span>—</span>
+              @endif
             </dd>
           </div>
 
           <div class="overflow-hidden px-4 py-5 sm:p-6 bg-white dark:bg-neutral-800 rounded-lg shadow">
             <dt class="font-medium text-gray-500 text-sm truncate dark:text-neutral-300">Conversion Rate</dt>
-            <dd class="mt-1 font-semibold text-3xl text-gray-900 tracking-tight dark:text-white">3.6%</dd>
-            <dd class="flex items-center mt-2 text-red-600 text-sm dark:text-red-400">
-              <div class="mr-1 h-4 w-4 i-hugeicons-analytics-down"></div>
-              <span>0.8% decrease</span>
+            <dd class="mt-1 font-semibold text-3xl text-gray-400 tracking-tight dark:text-neutral-500">—</dd>
+            <dd class="flex items-center mt-2 text-gray-400 text-sm dark:text-neutral-500">
+              <span>session tracking pending</span>
             </dd>
           </div>
         </dl>
 
-        <!-- Charts -->
+        <!-- Charts — still fed by canned monthly arrays in the client block.
+             Wiring real data needs payments.fetchMonthlyPaymentTrends() and
+             a daily orders trend; tracked in the TODO at the top of this file. -->
         <div class="grid gap-5 grid-cols-1 lg:grid-cols-2 mt-8">
           <div class="overflow-hidden bg-white dark:bg-neutral-800 rounded-lg shadow">
             <div class="p-6">
@@ -102,36 +233,45 @@ function orderStatusClass(status) {
           </div>
         </div>
 
-        <!-- Top Products -->
+        <!-- Top Selling Products — by units sold over all time, joined back to
+             current product info. Empty state shows when there are no orders yet. -->
         <div class="mt-8">
           <div class="overflow-hidden bg-white dark:bg-neutral-800 rounded-lg shadow">
             <div class="px-4 py-5 sm:px-6">
               <h3 class="font-semibold leading-6 text-base text-gray-900 dark:text-white">Top Selling Products</h3>
+              <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">Ranked by units sold across all orders.</p>
             </div>
             <div class="border-gray-200 border-t dark:border-neutral-700">
-              <table class="min-w-full divide-gray-200 divide-y dark:divide-neutral-700">
-                <thead class="bg-gray-50 dark:bg-neutral-700">
-                  <tr>
-                    <th scope="col" class="px-6 py-3 font-medium text-gray-500 text-left text-xs tracking-wider uppercase dark:text-neutral-300">Product</th>
-                    <th scope="col" class="px-6 py-3 font-medium text-gray-500 text-left text-xs tracking-wider uppercase dark:text-neutral-300">Price</th>
-                    <th scope="col" class="px-6 py-3 font-medium text-gray-500 text-left text-xs tracking-wider uppercase dark:text-neutral-300">Sales</th>
-                    <th scope="col" class="px-6 py-3 font-medium text-gray-500 text-left text-xs tracking-wider uppercase dark:text-neutral-300">Stock</th>
-                  </tr>
-                </thead>
-                <tbody class="bg-white dark:bg-neutral-800 divide-gray-200 divide-y dark:divide-neutral-700">
-                  @foreach(topProducts as product)
+              @if(topProducts.length === 0)
+                <div class="px-6 py-10 text-center text-gray-500 text-sm dark:text-neutral-400">
+                  No sales recorded yet.
+                </div>
+              @else
+                <table class="min-w-full divide-gray-200 divide-y dark:divide-neutral-700">
+                  <thead class="bg-gray-50 dark:bg-neutral-700">
                     <tr>
-                      <td class="px-6 py-4 font-medium text-gray-900 text-sm whitespace-nowrap dark:text-white">{{ product.name }}</td>
-                      <td class="px-6 py-4 text-gray-500 text-sm whitespace-nowrap dark:text-neutral-300">{{ product.price }}</td>
-                      <td class="px-6 py-4 text-gray-500 text-sm whitespace-nowrap dark:text-neutral-300">{{ product.sales }}</td>
-                      <td class="px-6 py-4 text-gray-500 text-sm whitespace-nowrap dark:text-neutral-300">{{ product.stock }}</td>
+                      <th scope="col" class="px-6 py-3 font-medium text-gray-500 text-left text-xs tracking-wider uppercase dark:text-neutral-300">Product</th>
+                      <th scope="col" class="px-6 py-3 font-medium text-gray-500 text-left text-xs tracking-wider uppercase dark:text-neutral-300">Units Sold</th>
+                      <th scope="col" class="px-6 py-3 font-medium text-gray-500 text-left text-xs tracking-wider uppercase dark:text-neutral-300">Revenue</th>
+                      <th scope="col" class="px-6 py-3 font-medium text-gray-500 text-left text-xs tracking-wider uppercase dark:text-neutral-300">Inventory</th>
                     </tr>
-                  @endforeach
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody class="bg-white dark:bg-neutral-800 divide-gray-200 divide-y dark:divide-neutral-700">
+                    @foreach(topProducts as product)
+                      <tr>
+                        <td class="px-6 py-4 font-medium text-gray-900 text-sm whitespace-nowrap dark:text-white">{{ product.name }}</td>
+                        <td class="px-6 py-4 text-gray-500 text-sm whitespace-nowrap dark:text-neutral-300">{{ product.unitsSold }}</td>
+                        <td class="px-6 py-4 text-gray-500 text-sm whitespace-nowrap dark:text-neutral-300">{{ product.revenue }}</td>
+                        <td class="px-6 py-4 text-sm whitespace-nowrap {{ product.inventoryClass }}">{{ product.inventoryLabel }}</td>
+                      </tr>
+                    @endforeach
+                  </tbody>
+                </table>
+              @endif
             </div>
           </div>
         </div>
+
 
         <!-- Recent Orders -->
         <div class="mt-8">
@@ -171,12 +311,28 @@ function orderStatusClass(status) {
         </div>
       </div>
 </PageLayout>
+
+<!-- Server-rendered chart payload. Plain `<script>` (no `type="module"`,
+     no `application/json`) so stx interpolates inside it. `{!! ... !!}`
+     emits raw JSON; `{{ }}` would HTML-escape the quotes and break it. -->
+<script>
+window.__commerceChartData = {!! JSON.stringify(chartData) !!}
+</script>
+
 <script client>
 
 const timeRange = state<string>('Last 30 days')
 
+// Live chart payload provided by the server-render block above. Falls
+// back to empty arrays so the chart still mounts (and shows an empty
+// canvas) if something upstream failed.
+const live = (typeof window !== 'undefined' && window.__commerceChartData) || {
+  revenue: { labels: [], values: [] },
+  orders: { labels: [], values: [] },
+}
+
 const revenueData = {
-  labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+  labels: live.revenue.labels,
   datasets: [{
     label: 'Revenue',
     backgroundColor: 'rgba(59, 130, 246, 0.2)',
@@ -188,19 +344,19 @@ const revenueData = {
     pointHoverBorderColor: 'rgba(59, 130, 246, 1)',
     fill: true,
     tension: 0.4,
-    data: [30000, 35000, 32000, 40000, 45000, 43000, 50000, 55000, 58000, 56000, 60000, 65000],
+    data: live.revenue.values,
   }],
 }
 
 const ordersData = {
-  labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+  labels: live.orders.labels,
   datasets: [{
     label: 'Orders',
     backgroundColor: 'rgba(16, 185, 129, 0.8)',
     borderColor: 'rgba(16, 185, 129, 1)',
     borderWidth: 1,
     borderRadius: 4,
-    data: [120, 150, 140, 160, 180, 170, 190, 210, 230, 220, 240, 260],
+    data: live.orders.values,
   }],
 }
 

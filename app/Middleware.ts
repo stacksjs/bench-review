@@ -8,10 +8,28 @@ export interface Middleware {
  * Aliases may be used instead of class names to conveniently assign middleware to routes and groups.
  */
 export default {
-  auth: 'Auth',
-  guest: 'Guest',
-  api: 'Api',
-  team: 'Team',
-  logger: 'Logger',
+  'maintenance': 'Maintenance',
+  'cors': 'Cors',
+  'auth': 'Auth',
+  'guest': 'Guest',
+  'api': 'Api',
+  'team': 'Team',
+  'logger': 'Logger',
+  'abilities': 'Abilities',
+  'can': 'Can',
+  'throttle': 'Throttle',
+  'env': 'Env',
+  'env:local': 'EnvLocal',
+  'env:development': 'EnvDevelopment',
+  'env:dev': 'EnvDevelopment',
+  'env:staging': 'EnvStaging',
+  'env:production': 'EnvProduction',
+  'env:prod': 'EnvProduction',
+  'role': 'Role',
+  'permission': 'Permission',
+  'verified': 'EnsureEmailIsVerified',
+  'csrf': 'Csrf',
+  'compress': 'Compress',
   // Add more middleware aliases here
+  // Note: Use ! prefix for negation (e.g., '!auth', '!env:development')
 } satisfies Middleware
