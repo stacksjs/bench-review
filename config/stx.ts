@@ -6,7 +6,9 @@ export default {
   partialsDir: 'components',
   pagesDir: 'views',
 
-  css: './crosswind.config.ts',
+  // No crosswind config file in this project — bunfig will fall back to
+  // crosswind defaults. Add a `config/crosswind.ts` and point this back
+  // at './crosswind.ts' if the project needs custom Tailwind utilities.
 
   app: {
     head: {
