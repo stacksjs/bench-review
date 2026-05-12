@@ -1,9 +1,15 @@
-import type { Attributes, Model } from '@stacksjs/types'
+import type { Attributes } from '@stacksjs/types'
+import { defineModel } from '@stacksjs/orm'
 import { makeHash } from '@stacksjs/security'
 // soon, these will be auto-imported
 import { schema } from '@stacksjs/validation'
 
-export default {
+// Wrapped with `defineModel` so `@stacksjs/orm` registers a model
+// class with `User.where(...)`, `User.create(...)`, etc. Without the
+// wrapper the default export was a plain object literal and the auth
+// flow blew up with `User.where is not a function` on every register
+// / login attempt.
+export default defineModel({
   name: 'User', // defaults to the sanitized file name
   table: 'users', // defaults to the lowercase, plural name of the model name (or the name of the model file)
   primaryKey: 'id', // defaults to `id`
@@ -47,16 +53,12 @@ export default {
   },
 
   hasOne: ['Driver', 'Author'],
-  hasMany: [
-    {
-      model: 'PersonalAccessToken',
-      foreignKey: 'user_id',
-    },
-    {
-      model: 'OauthAccessToken',
-      foreignKey: 'user_id',
-    },
-  ],
+  // Plain string entries match the framework default's expected shape
+  // (see storage/framework/defaults/app/Models/User.ts). Object-form
+  // entries (`{ model, foreignKey }`) crashed the migration generator
+  // with "str.replace is not a function" because the model-name
+  // resolver was being passed an object instead of a string.
+  hasMany: ['PersonalAccessToken', 'OauthAccessToken'],
 
   attributes: {
     name: {
@@ -118,4 +120,4 @@ export default {
   dashboard: {
     highlight: true,
   },
-} satisfies Model
+} as const)

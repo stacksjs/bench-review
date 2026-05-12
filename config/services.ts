@@ -66,6 +66,20 @@ export default {
     },
   },
 
+  // SMTP driver config — read by `storage/framework/core/email/src/drivers/smtp.ts`
+  // when MAIL_MAILER=smtp. Without this block the driver defaults to
+  // 127.0.0.1:587 with no auth, which silently fails to reach a local
+  // catcher like Helo (which listens on 2525). `MAIL_USERNAME=null` /
+  // `MAIL_PASSWORD=null` in `.env` is the literal string "null" — we
+  // coerce those to empty strings so the driver treats it as no-auth.
+  smtp: {
+    host: env.MAIL_HOST || '127.0.0.1',
+    port: env.MAIL_PORT ? Number(env.MAIL_PORT) : 587,
+    username: env.MAIL_USERNAME && env.MAIL_USERNAME !== 'null' ? env.MAIL_USERNAME : '',
+    password: env.MAIL_PASSWORD && env.MAIL_PASSWORD !== 'null' ? env.MAIL_PASSWORD : '',
+    encryption: env.MAIL_ENCRYPTION && env.MAIL_ENCRYPTION !== 'null' ? env.MAIL_ENCRYPTION : null,
+  },
+
   // lemonSqueezy: {
   //   appId: '',
   //   apiKey: '',

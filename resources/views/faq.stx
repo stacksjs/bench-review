@@ -58,8 +58,7 @@
     </div>
 
     <dl class="mt-16 divide-gray-200 divide-y">
-      <template :for="(faq, idx) in faqs">
-        <div class="py-6">
+      <div :for="(faq, idx) in faqs" class="py-6">
           <dt>
             <button
               type="button"
@@ -75,8 +74,7 @@
           <dd :if="open() === idx" class="mt-4 pr-12">
             <p class="leading-7 text-base text-gray-600" :text="faq.a"></p>
           </dd>
-        </div>
-      </template>
+      </div>
     </dl>
 
     <div class="mt-16 p-8 text-center bg-off-gray rounded-2xl">

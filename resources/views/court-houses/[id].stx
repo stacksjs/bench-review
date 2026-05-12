@@ -1,5 +1,5 @@
 <script client>
-  import { courtHouses } from '../../functions/sample'
+  import { courtHouses } from '~/resources/functions/sample'
 
   useHead({ title: 'Court House - Bench Review' })
 

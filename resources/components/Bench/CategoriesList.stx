@@ -1,5 +1,5 @@
 <script client>
-  import { categories as allCategories } from '../../functions/sample'
+  import { categories as allCategories } from '~/resources/functions/sample'
 
   const categories = derived(() => allCategories)
   const activeCategory = state(allCategories.find(cat => cat.current)?.name || '')
@@ -14,21 +14,20 @@
 >
   <h2 class="font-semibold text-base text-gray-900">Explore Categories</h2>
   <nav class="mt-4 space-y-1">
-    <template :for="category in categories">
-      <a
-        @click.prevent="setActiveCategory(category.name)"
-        href="#"
-        class="flex items-center px-3 py-2 font-medium text-sm rounded-md group"
-        x-class="activeCategory() === category.name ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
-      >
-        <span
-          class="flex-shrink-0 mr-3 h-5 w-5"
-          x-class="activeCategory() === category.name ? 'text-gray-500' : 'text-gray-400 group-hover:text-gray-500'"
-          aria-hidden="true"
-        ></span>
-        <span :text="category.name"></span>
-        <span class="inline-block ml-auto px-2 py-0.5 font-medium text-gray-600 text-xs bg-gray-100 rounded-full" :text="category.count"></span>
-      </a>
-    </template>
+    <a
+      :for="category in categories"
+      @click.prevent="setActiveCategory(category.name)"
+      href="#"
+      class="flex items-center px-3 py-2 font-medium text-sm rounded-md group"
+      x-class="activeCategory() === category.name ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
+    >
+      <span
+        class="flex-shrink-0 mr-3 h-5 w-5"
+        x-class="activeCategory() === category.name ? 'text-gray-500' : 'text-gray-400 group-hover:text-gray-500'"
+        aria-hidden="true"
+      ></span>
+      <span :text="category.name"></span>
+      <span class="inline-block ml-auto px-2 py-0.5 font-medium text-gray-600 text-xs bg-gray-100 rounded-full" :text="category.count"></span>
+    </a>
   </nav>
 </div>

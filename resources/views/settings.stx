@@ -3,6 +3,9 @@
 @section('title', 'Settings - Bench Review')
 
 @section('content')
+<script server>
+  definePageMeta({ middleware: ['auth'] })
+</script>
 <script client>
   const firstName = state('John')
   const lastName = state('Doe')

@@ -35,7 +35,7 @@
     loading.set(true)
     dismissToast()
     try {
-      const response = await fetch('/api/email/subscribe', {
+      const response = await fetch('/subscribe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -102,32 +102,41 @@
         </form>
       </div>
       <!--
-        Top-right toast. Styled via the dedicated `<style>` block at the
-        bottom of this file because Crosswind only generates utility CSS
-        for class names it can find literally in `class="..."` source —
-        the prior `x-class` array using `bg-green-50` / `bg-red-50` etc.
-        produced no CSS, leaving the toast transparent.
+        Toast styled with the same utility classes @stacksjs/components's
+        `<Notification>` SFC uses. We can't render that component
+        directly with reactive props because it's server-rendered
+        (props captured at SSG time), but a copy lives at
+        resources/components/Notification.stx so Crosswind scans it and
+        emits the exact `bg-{type}-50 text-{type}-900` utilities the
+        package depends on — those are then applied here via `x-class`.
+        End result: the package's design tokens, driven by client signals.
       -->
       <div
+        :if="toastVisible()"
+        x-cloak
         role="alert"
         aria-live="polite"
-        class="bench-toast"
-        x-bind:data-toast-type="toastType()"
-        x-bind:data-toast-visible="toastVisible() ? 'true' : 'false'"
+        class="fixed z-50 m-4 max-w-md w-full rounded-lg p-4 shadow-lg ring-1 ring-black ring-opacity-5 top-0 right-0"
+        x-class="[
+          toastType() === 'success' ? 'bg-green-50 text-green-900' : '',
+          toastType() === 'error' ? 'bg-red-50 text-red-900' : '',
+          toastType() === 'info' ? 'bg-blue-50 text-blue-900' : '',
+          toastType() === 'warning' ? 'bg-yellow-50 text-yellow-900' : '',
+        ]"
       >
-        <div class="bench-toast__body">
-          <div class="bench-toast__content">
-            <p class="bench-toast__title" :text="toastTitle()"></p>
-            <p class="bench-toast__message" :text="toastMessage()"></p>
+        <div class="flex items-start">
+          <div class="flex-1">
+            <p class="text-sm font-medium" :text="toastTitle()"></p>
+            <p class="mt-1 text-sm opacity-90" :text="toastMessage()"></p>
           </div>
           <button
             type="button"
             @click="dismissToast()"
-            class="bench-toast__close"
+            class="ml-4 inline-flex rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2"
             aria-label="Dismiss notification"
           >
             <span class="sr-only">Close</span>
-            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
             </svg>
           </button>
@@ -146,105 +155,3 @@
   </div>
 </div>
 
-<style>
-  .bench-toast {
-    position: fixed;
-    top: 1rem;
-    right: 1rem;
-    z-index: 50;
-    width: 100%;
-    max-width: 24rem;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    box-shadow:
-      0 10px 15px -3px rgb(0 0 0 / 0.1),
-      0 4px 6px -4px rgb(0 0 0 / 0.1);
-    box-shadow:
-      0 10px 15px -3px rgb(0 0 0 / 0.1),
-      0 4px 6px -4px rgb(0 0 0 / 0.1),
-      inset 0 0 0 1px rgb(0 0 0 / 0.05);
-    pointer-events: auto;
-    transition: opacity 200ms ease, transform 200ms ease;
-    opacity: 1;
-    transform: translateY(0);
-    background: #ffffff;
-    color: #111827;
-  }
-
-  /* Hidden state — element stays mounted so x-bind can flip it back. */
-  .bench-toast[data-toast-visible='false'] {
-    opacity: 0;
-    transform: translateY(-0.5rem);
-    pointer-events: none;
-  }
-
-  .bench-toast[data-toast-type='success'] {
-    background: #f0fdf4;
-    color: #14532d;
-  }
-
-  .bench-toast[data-toast-type='error'] {
-    background: #fef2f2;
-    color: #7f1d1d;
-  }
-
-  .bench-toast__body {
-    display: flex;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-
-  .bench-toast__content {
-    flex: 1 1 0%;
-    min-width: 0;
-  }
-
-  .bench-toast__title {
-    font-size: 0.875rem;
-    font-weight: 600;
-    margin: 0;
-  }
-
-  .bench-toast__message {
-    font-size: 0.875rem;
-    margin: 0.25rem 0 0;
-    opacity: 0.9;
-  }
-
-  /* Hide the message paragraph when there's no text — avoids an empty
-     line of vertical rhythm on title-only toasts. Same trick for title. */
-  .bench-toast__title:empty,
-  .bench-toast__message:empty {
-    display: none;
-  }
-
-  .bench-toast__close {
-    flex: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.5rem;
-    height: 1.5rem;
-    border-radius: 0.375rem;
-    background: transparent;
-    border: 0;
-    cursor: pointer;
-    color: inherit;
-    opacity: 0.7;
-  }
-
-  .bench-toast__close:hover {
-    opacity: 1;
-  }
-
-  .bench-toast__close:focus-visible {
-    outline: 2px solid currentColor;
-    outline-offset: 2px;
-    opacity: 1;
-  }
-
-  .bench-toast__close svg {
-    width: 1rem;
-    height: 1rem;
-  }
-</style>

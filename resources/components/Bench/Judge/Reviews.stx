@@ -48,9 +48,7 @@
       <h2 class="font-semibold text-2xl text-gray-900">4.8</h2>
       <div class="flex items-center">
         <div class="flex items-center">
-          <template :for="star in stars">
-            <Icon name="star" size="20" x-class="star <= 5 ? 'text-yellow-400' : 'text-gray-300'" />
-          </template>
+          <Icon :for="star in stars" name="star" size="20" x-class="star <= 5 ? 'text-yellow-400' : 'text-gray-300'" />
         </div>
         <p class="ml-2 text-gray-500 text-sm">Based on 128 reviews</p>
       </div>
@@ -66,8 +64,7 @@
   <div class="mt-8">
     <h3 class="font-semibold text-base text-gray-900">Rating Distribution</h3>
     <div class="mt-4 space-y-3">
-      <template :for="bucket in ratingBuckets">
-        <div class="flex items-center">
+      <div :for="bucket in ratingBuckets" class="flex items-center">
           <span class="text-gray-500 text-sm" :text="`${bucket.stars} stars`"></span>
           <div class="flex-1 ml-4">
             <div class="h-2 bg-gray-200 rounded-full">
@@ -75,8 +72,7 @@
             </div>
           </div>
           <span class="ml-4 text-gray-500 text-sm" :text="`${bucket.percentage}%`"></span>
-        </div>
-      </template>
+      </div>
     </div>
   </div>
 
@@ -84,8 +80,7 @@
   <div class="mt-8">
     <h3 class="font-semibold text-base text-gray-900">Reviews</h3>
     <div class="mt-6 space-y-8">
-      <template :for="review in reviews">
-        <div class="pb-8 border-b border-gray-200">
+      <div :for="review in reviews" class="pb-8 border-b border-gray-200">
           <div class="flex items-center justify-between">
             <div class="flex items-center">
               <img x-src="review.avatar" x-alt="review.name" class="h-10 w-10 rounded-full">
@@ -93,9 +88,7 @@
                 <h4 class="font-semibold text-gray-900 text-sm" :text="review.name"></h4>
                 <div class="flex items-center">
                   <div class="flex items-center">
-                    <template :for="star in stars">
-                      <Icon name="star" size="16" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'" />
-                    </template>
+                    <Icon :for="star in stars" name="star" size="16" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'" />
                   </div>
                   <span class="ml-2 text-gray-500 text-sm" :text="review.date"></span>
                 </div>
@@ -122,8 +115,7 @@
           <div class="flex items-center mt-4 space-x-4">
             <button type="button" class="font-semibold text-gray-500 text-sm hover:text-gray-700" :text="`Helpful (${review.helpfulCount})`"></button>
           </div>
-        </div>
-      </template>
+      </div>
     </div>
   </div>
 </div>

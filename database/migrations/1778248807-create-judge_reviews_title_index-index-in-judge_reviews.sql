@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "judge_reviews_judge_reviews_title_index" ON "judge_reviews" ("title");

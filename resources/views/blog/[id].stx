@@ -1,5 +1,5 @@
 <script client>
-  import { blogPosts } from '../../functions/sample'
+  import { blogPosts } from '~/resources/functions/sample'
 
   useHead({ title: 'Blog Post - Bench Review' })
 

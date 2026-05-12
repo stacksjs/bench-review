@@ -1,3 +1,6 @@
+<script server>
+  definePageMeta({ middleware: ['auth'] })
+</script>
 <script client>
   const filter = state('all')
   const notifications = state([

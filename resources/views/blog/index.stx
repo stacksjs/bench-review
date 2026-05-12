@@ -1,5 +1,5 @@
 <script client>
-  import { blogPosts } from '../../functions/sample'
+  import { blogPosts } from '~/resources/functions/sample'
 
   useHead({ title: 'Blog - The Chamber of Secrets' })
 
@@ -19,11 +19,11 @@
 
       <!-- Blog Posts List -->
       <div class="space-y-12">
-        <template :for="post in posts">
-          <StxLink
-            x-to="`/blog/${post.id}`"
-            class="block group"
-          >
+        <StxLink
+          :for="post in posts"
+          x-to="`/blog/${post.id}`"
+          class="block group"
+        >
             <article class="flex relative flex-col gap-8 lg:flex-row p-6 hover:bg-gray-50 rounded-2xl duration-200 transition-all isolate">
               <div class="aspect-[16/9] relative sm:aspect-[2/1] lg:aspect-square lg:shrink-0 lg:w-64">
                 <img x-src="post.author.imageUrl" x-alt="post.author.name" class="absolute inset-0 object-cover h-full w-full bg-gray-50 rounded-2xl">
@@ -44,8 +44,7 @@
                 </div>
               </div>
             </article>
-          </StxLink>
-        </template>
+        </StxLink>
       </div>
 
       <!-- Pagination -->

@@ -1,5 +1,5 @@
 <script client>
-  import { judges as allJudges, reviews as allReviews, categories as allCategories } from '../functions/sample'
+  import { judges as allJudges, reviews as allReviews, categories as allCategories } from '~/resources/functions/sample'
 
   useHead({ title: 'Find and Review Judges - Bench Review' })
 
@@ -67,9 +67,7 @@
         </form>
         <div class="flex flex-wrap gap-2 mt-4 text-gray-500 text-xs">
           <span class="font-medium">Popular:</span>
-          <template :for="cat in popularCategories">
-            <StxLink x-to="`/search?type=${cat.name}`" class="hover:text-gray-700 hover:underline" :text="cat.name"></StxLink>
-          </template>
+          <StxLink :for="cat in popularCategories" x-to="`/search?type=${cat.name}`" class="hover:text-gray-700 hover:underline" :text="cat.name"></StxLink>
         </div>
       </div>
     </div>
@@ -119,11 +117,11 @@
         </div>
 
         <div class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-10">
-          <template :for="judge in featuredJudges">
-            <StxLink
-              x-to="`/judges/${judge.id}/profile`"
-              class="overflow-hidden p-6 bg-white border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-md duration-200 transition-all group"
-            >
+          <StxLink
+            :for="judge in featuredJudges"
+            x-to="`/judges/${judge.id}/profile`"
+            class="overflow-hidden p-6 bg-white border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-md duration-200 transition-all group"
+          >
               <div class="flex gap-4 items-center">
                 <img class="object-cover h-16 w-16 ring-2 ring-gray-50 rounded-full grayscale group-hover:grayscale-0 duration-200 transition-all" x-src="judge.photo" x-alt="judge.name">
                 <div class="min-w-0">
@@ -134,15 +132,12 @@
               </div>
               <div class="flex items-center justify-between mt-4 pt-4 border-gray-100 border-t">
                 <div class="flex items-center">
-                  <template :for="star in stars">
-                    <Icon name="star" size="16" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" />
-                  </template>
+                  <Icon :for="star in stars" name="star" size="16" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" />
                   <span class="ml-2 font-medium text-gray-700 text-sm" :text="judge.rating"></span>
                 </div>
                 <span class="text-gray-500 text-xs" :text="judge.reviewCount + ' reviews'"></span>
               </div>
-            </StxLink>
-          </template>
+          </StxLink>
         </div>
 
         <div class="sm:hidden mt-8 text-center">
@@ -166,11 +161,11 @@
       </div>
 
       <div class="grid gap-6 grid-cols-1 lg:grid-cols-3 mt-10">
-        <template :for="review in latestReviews">
-          <StxLink
-            x-to="`/article/${review.id}`"
-            class="block p-6 bg-white border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-md duration-200 transition-all"
-          >
+        <StxLink
+          :for="review in latestReviews"
+          x-to="`/article/${review.id}`"
+          class="block p-6 bg-white border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-md duration-200 transition-all"
+        >
             <div class="flex items-center justify-between">
               <div class="flex items-center">
                 <img class="h-9 w-9 rounded-full grayscale filter" x-src="review.author.imageUrl" x-alt="review.author.name">
@@ -180,16 +175,13 @@
                 </div>
               </div>
               <div class="flex items-center">
-                <template :for="star in stars">
-                  <Icon name="star" size="16" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-200'" />
-                </template>
+                <Icon :for="star in stars" name="star" size="16" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-200'" />
               </div>
             </div>
             <h3 class="mt-4 font-semibold line-clamp-2 text-gray-900" :text="review.title"></h3>
             <p class="mt-2 line-clamp-3 text-gray-600 text-sm" :text="review.content"></p>
             <p class="mt-4 font-medium text-gray-700 text-sm" :text="'About ' + review.judge.name"></p>
-          </StxLink>
-        </template>
+        </StxLink>
       </div>
     </div>
 

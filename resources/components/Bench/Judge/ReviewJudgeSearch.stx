@@ -1,5 +1,5 @@
 <script client>
-  import { judges as allJudges } from '../../../functions/sample'
+  import { judges as allJudges } from '~/resources/functions/sample'
 
   const searchQuery = state('')
 
@@ -37,11 +37,11 @@
       >
       <div :if="searchQuery() && filteredJudges().length > 0" class="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg">
         <ul class="overflow-auto py-1 max-h-60 text-base rounded-md">
-          <template :for="judge in filteredJudges">
-            <li
-              class="relative px-3 py-2 hover:bg-gray-100 cursor-pointer select-none"
-              @click="selectJudge(judge)"
-            >
+          <li
+            :for="judge in filteredJudges"
+            class="relative px-3 py-2 hover:bg-gray-100 cursor-pointer select-none"
+            @click="selectJudge(judge)"
+          >
               <div class="flex items-center">
                 <img x-src="judge.photo" class="h-10 w-10 rounded-full grayscale filter" x-alt="judge.name">
                 <div class="ml-3">
@@ -50,8 +50,7 @@
                   <p class="text-gray-500 text-xs" :text="judge.department"></p>
                 </div>
               </div>
-            </li>
-          </template>
+          </li>
         </ul>
       </div>
       <div :if="searchQuery() && filteredJudges().length === 0" class="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg">

@@ -1,5 +1,5 @@
 <script client>
-  import { trendingJudges as allTrending, recentActivity as allActivity } from '../../functions/sample'
+  import { trendingJudges as allTrending, recentActivity as allActivity } from '~/resources/functions/sample'
 
   const trendingJudges = derived(() => allTrending)
   const recentActivity = derived(() => allActivity)
@@ -11,16 +11,14 @@
     <div class="p-4">
       <h2 class="font-semibold text-base text-gray-900">Trending Judges</h2>
       <div class="mt-4 space-y-4">
-        <template :for="judge in trendingJudges">
-          <div class="flex items-center space-x-3">
+        <div :for="judge in trendingJudges" class="flex items-center space-x-3">
             <img class="h-8 w-8 rounded-full grayscale filter" x-src="judge.photo" x-alt="judge.name" />
             <div class="flex-1 min-w-0">
               <p class="font-medium text-gray-900 text-sm" :text="judge.name"></p>
               <p class="text-gray-500 text-sm" :text="judge.court"></p>
             </div>
             <button type="button" class="font-semibold text-gray-900 text-xs hover:underline">Follow</button>
-          </div>
-        </template>
+        </div>
       </div>
     </div>
   </div>
@@ -31,8 +29,7 @@
       <h2 class="font-semibold text-base text-gray-900">Recent Activity</h2>
       <div class="flow-root mt-4">
         <ul role="list" class="-mb-8">
-          <template :for="(activity, activityIdx) in recentActivity">
-            <li>
+          <li :for="(activity, activityIdx) in recentActivity">
               <div class="relative pb-8">
                 <span :if="activityIdx !== lastIndex()" class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
                 <div class="flex relative space-x-3">
@@ -51,8 +48,7 @@
                   </div>
                 </div>
               </div>
-            </li>
-          </template>
+          </li>
         </ul>
       </div>
     </div>

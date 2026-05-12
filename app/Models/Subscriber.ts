@@ -7,7 +7,7 @@ export default defineModel({
   primaryKey: 'id',
   autoIncrement: true,
   belongsTo: ['User'],
-  hasMany: ['SubscriberEmail', 'EmailListSubscriber', 'CampaignSend'],
+  hasMany: ['EmailListSubscriber', 'CampaignSend'],
 
   traits: {
     useUuid: true,

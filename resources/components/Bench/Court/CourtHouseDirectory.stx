@@ -1,5 +1,5 @@
 <script client>
-  import { courtHouses as allCourtHouses } from '../../../functions/sample'
+  import { courtHouses as allCourtHouses } from '~/resources/functions/sample'
 
   const searchQuery = state('')
 
@@ -59,11 +59,11 @@
 
     <!-- Court Houses Grid -->
     <div class="grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-      <template :for="court in filteredCourtHouses">
-        <StxLink
-          x-to="`/court-houses/${court.id}/profile`"
-          class="overflow-hidden relative bg-white border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-lg duration-300 transition-all group"
-        >
+      <StxLink
+        :for="court in filteredCourtHouses"
+        x-to="`/court-houses/${court.id}/profile`"
+        class="overflow-hidden relative bg-white border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-lg duration-300 transition-all group"
+      >
           <!-- Main Image Container -->
           <div class="relative h-48 w-full">
             <img
@@ -85,8 +85,7 @@
               <p class="mt-1 text-gray-500 text-sm" :text="court.address"></p>
             </div>
           </div>
-        </StxLink>
-      </template>
+      </StxLink>
     </div>
 
     <!-- Pagination -->

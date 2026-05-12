@@ -1,7 +1,7 @@
-import type { Model } from '@stacksjs/types'
+import { defineModel } from '@stacksjs/orm'
 import { schema } from '@stacksjs/validation'
 
-export default {
+export default defineModel({
   name: 'OauthClient',
   description: 'An OAuth 2.0 client application',
   table: 'oauth_clients',
@@ -106,4 +106,4 @@ export default {
       factory: () => false,
     },
   },
-} satisfies Model
+} as const)

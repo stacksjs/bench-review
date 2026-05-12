@@ -1,5 +1,5 @@
 <script client>
-  import { judges as allJudges } from '../../../functions/sample'
+  import { judges as allJudges } from '~/resources/functions/sample'
 
   const courtJudges = derived(() => allJudges.slice(0, 8))
   const stars = [1, 2, 3, 4, 5]
@@ -23,8 +23,7 @@
   </div>
 
   <ul role="list" class="mt-8 divide-gray-100 divide-y">
-    <template :for="judge in courtJudges">
-      <li class="flex items-center justify-between py-5">
+    <li :for="judge in courtJudges" class="flex items-center justify-between py-5">
         <StxLink x-to="`/judges/${judge.id}/profile`" class="flex flex-1 gap-x-4 items-center min-w-0">
           <img class="object-cover flex-none h-12 w-12 rounded-full grayscale filter" x-src="judge.photo" x-alt="judge.name">
           <div class="flex-auto min-w-0">
@@ -34,9 +33,7 @@
         </StxLink>
         <div class="flex gap-x-4 items-center sm:gap-x-6">
           <div class="hidden sm:flex sm:items-center">
-            <template :for="star in stars">
-              <Icon name="star" size="16" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" />
-            </template>
+            <Icon :for="star in stars" name="star" size="16" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" />
             <span class="ml-2 text-gray-500 text-xs" :text="judge.reviewCount"></span>
           </div>
           <StxLink x-to="`/judges/${judge.id}/profile`" class="font-semibold text-gray-700 text-sm hover:text-gray-900">
@@ -44,6 +41,5 @@
           </StxLink>
         </div>
       </li>
-    </template>
   </ul>
 </div>

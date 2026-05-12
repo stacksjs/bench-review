@@ -1,5 +1,5 @@
 <script client>
-  import { reviews as allReviews } from '../../../functions/sample'
+  import { reviews as allReviews } from '~/resources/functions/sample'
 
   const courtReviews = derived(() => allReviews.slice(0, 5))
   const stars = [1, 2, 3, 4, 5]
@@ -11,9 +11,7 @@
       <h2 class="font-semibold text-2xl text-gray-900">4.4</h2>
       <div class="flex items-center">
         <div class="flex items-center">
-          <template :for="star in stars">
-            <Icon name="star" size="20" x-class="star <= 4 ? 'text-yellow-400' : 'text-gray-300'" />
-          </template>
+          <Icon :for="star in stars" name="star" size="20" x-class="star <= 4 ? 'text-yellow-400' : 'text-gray-300'" />
         </div>
         <p class="ml-2 text-gray-500 text-sm">Based on 1,287 reviews</p>
       </div>
@@ -26,8 +24,7 @@
   <div class="mt-8">
     <h3 class="font-semibold text-base text-gray-900">Reviews of judges at this court</h3>
     <div class="mt-6 space-y-8">
-      <template :for="review in courtReviews">
-        <div class="pb-8 border-b border-gray-200">
+      <div :for="review in courtReviews" class="pb-8 border-b border-gray-200">
           <div class="flex items-center justify-between">
             <div class="flex items-center">
               <img x-src="review.author.imageUrl" x-alt="review.author.name" class="h-10 w-10 rounded-full">
@@ -35,9 +32,7 @@
                 <h4 class="font-semibold text-gray-900 text-sm" :text="review.author.name"></h4>
                 <div class="flex items-center">
                   <div class="flex items-center">
-                    <template :for="star in stars">
-                      <Icon name="star" size="16" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'" />
-                    </template>
+                    <Icon :for="star in stars" name="star" size="16" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'" />
                   </div>
                   <span class="ml-2 text-gray-500 text-sm" :text="review.date"></span>
                 </div>
@@ -55,8 +50,7 @@
               Read more →
             </StxLink>
           </div>
-        </div>
-      </template>
+      </div>
     </div>
   </div>
 </div>

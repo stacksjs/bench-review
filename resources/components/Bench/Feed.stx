@@ -41,9 +41,7 @@
       <div class="flex items-center space-x-3">
         <StxLink x-to="`/judges/${review.judge.id}/profile`" class="font-semibold text-base text-gray-900 hover:underline" :text="review.judge.name"></StxLink>
         <div class="flex items-center">
-          <template :for="star in stars">
-            <Icon name="star" size="16" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'" />
-          </template>
+          <Icon :for="star in stars" name="star" size="16" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'" />
         </div>
       </div>
       <div class="flex items-center space-x-4">

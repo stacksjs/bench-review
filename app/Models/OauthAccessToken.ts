@@ -1,21 +1,16 @@
-import type { Model } from '@stacksjs/types'
+import { defineModel } from '@stacksjs/orm'
 import { schema } from '@stacksjs/validation'
 
-export default {
+export default defineModel({
   name: 'OauthAccessToken',
   description: 'An OAuth 2.0 access token for third-party applications',
   table: 'oauth_access_tokens',
   primaryKey: 'id',
-  belongsTo: [
-    {
-      model: 'User',
-      foreignKey: 'user_id',
-    },
-    {
-      model: 'OauthClient',
-      foreignKey: 'oauth_client_id',
-    },
-  ],
+  // Plain string entries — the migration generator's snake_case
+  // helper crashes ("str.replace is not a function") on object literals
+  // where it expects a model name. Default FK columns (`user_id`,
+  // `oauth_client_id`) match the convention so no override is needed.
+  belongsTo: ['User', 'OauthClient'],
   traits: {
     useTimestamps: true,
     useSeeder: {
@@ -79,4 +74,4 @@ export default {
       },
     },
   },
-} satisfies Model
+} as const)

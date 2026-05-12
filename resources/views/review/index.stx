@@ -3,6 +3,9 @@
 @section('title', 'Review - The Chamber of Secrets')
 
 @section('content')
+<script server>
+  definePageMeta({ middleware: ['auth'] })
+</script>
 <div class="py-10 min-h-screen bg-off-white">
   <div class="mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl">
     @include('Bench/ReviewForm')

@@ -5,9 +5,7 @@
   <div class="mt-6 mx-auto text-gray-500">
     <div class="flex items-center mb-8">
       <div class="flex items-center">
-        <template :for="star in reviewStars">
-          <Icon name="star" size="20" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'" />
-        </template>
+        <Icon :for="star in reviewStars" name="star" size="20" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'" />
       </div>
       <span class="ml-2 text-gray-500 text-sm" :text="`(${review.rating})`"></span>
     </div>

@@ -110,8 +110,7 @@
       <div class="mt-8">
         <h2 class="font-medium text-gray-800 text-lg" :text="`${user.name}'s Reviews`"></h2>
         <div class="mt-6 space-y-6">
-          <template :for="review in reviews">
-            <div class="bg-off-gray sm:rounded-lg shadow">
+          <div :for="review in reviews" class="bg-off-gray sm:rounded-lg shadow">
               <div class="px-4 py-5 sm:p-6">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
@@ -125,9 +124,7 @@
                   </div>
                   <div class="flex items-center space-x-4">
                     <div class="flex items-center">
-                      <template :for="star in stars">
-                        <Icon name="star" size="20" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'" />
-                      </template>
+                      <Icon :for="star in stars" name="star" size="20" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'" />
                     </div>
                     <span class="text-gray-600 text-sm" :text="review.date"></span>
                   </div>
@@ -152,8 +149,7 @@
                   </div>
                 </div>
               </div>
-            </div>
-          </template>
+          </div>
         </div>
       </div>
     </div>

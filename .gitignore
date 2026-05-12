@@ -21,6 +21,10 @@ custom-cli
 .fleet
 .idea
 .stacks
+.stx
+.qb
+.claude
+pantry
 .vscode
 .cursor
 .zed

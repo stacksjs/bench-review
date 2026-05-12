@@ -1,0 +1,15 @@
+<!--
+  Bench-review Logo placeholder.
+
+  Stx layouts (e.g. resources/layouts/404.stx) `@include('Logo')` to put
+  the brand mark above page content. Until a final logo is dropped in,
+  this stub renders the wordmark in plain text so layouts still resolve.
+  Replace the inner markup with the SVG / asset whenever the brand asset
+  is ready.
+-->
+<span
+  class="font-semibold text-gray-900 text-lg tracking-tight select-none"
+  aria-label="Bench Review"
+>
+  Bench Review
+</span>

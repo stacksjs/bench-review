@@ -1,5 +1,5 @@
 <script client>
-  import { judges as allJudges, courtHouses as allCourtHouses } from '../functions/sample'
+  import { judges as allJudges, courtHouses as allCourtHouses } from '~/resources/functions/sample'
 
   useHead({ title: 'Search - Bench Review' })
 
@@ -97,8 +97,7 @@
             <p class="text-gray-500 text-sm">No judges match your search.</p>
           </div>
           <ul role="list" :if="filteredJudges().length > 0" class="mt-4 divide-gray-100 divide-y">
-            <template :for="judge in filteredJudges()">
-              <li class="flex items-center justify-between py-5">
+              <li :for="judge in filteredJudges()" class="flex items-center justify-between py-5">
                 <StxLink x-to="`/judges/${judge.id}/profile`" class="flex flex-1 gap-x-4 items-center min-w-0">
                   <img class="object-cover flex-none h-12 w-12 rounded-full grayscale filter" x-src="judge.photo" x-alt="judge.name">
                   <div class="flex-auto min-w-0">
@@ -107,13 +106,10 @@
                   </div>
                 </StxLink>
                 <div class="flex gap-x-2 items-center">
-                  <template :for="star in stars">
-                    <Icon name="star" size="16" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" />
-                  </template>
+                  <Icon :for="star in stars" name="star" size="16" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" />
                   <span class="ml-1 text-gray-500 text-xs" :text="`(${judge.reviewCount})`"></span>
                 </div>
               </li>
-            </template>
           </ul>
         </div>
 
@@ -124,8 +120,8 @@
             <p class="text-gray-500 text-sm">No courts match your search.</p>
           </div>
           <div :if="filteredCourts().length > 0" class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-4">
-            <template :for="court in filteredCourts()">
               <StxLink
+                :for="court in filteredCourts()"
                 x-to="`/court-houses/${court.id}/profile`"
                 class="overflow-hidden bg-white border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-md duration-200 transition-all group"
               >
@@ -138,7 +134,6 @@
                   <p class="mt-1 text-gray-500 text-xs" :text="`${court.city}, ${court.state}`"></p>
                 </div>
               </StxLink>
-            </template>
           </div>
         </div>
       </div>

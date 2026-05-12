@@ -23,5 +23,10 @@ export default {
     scan: true, // scans for spam and viruses
   },
 
-  default: env.MAIL_DRIVER || 'ses',
+  // `MAIL_MAILER` is the env var the .env template actually sets. The
+  // earlier `MAIL_DRIVER` lookup never matched and silently fell back
+  // to `ses`, which refuses to talk to a local SMTP catcher like
+  // Helo / Mailpit. Default `smtp` when nothing's set so a freshly
+  // cloned project still hits a sensible local target out of the box.
+  default: env.MAIL_MAILER || env.MAIL_DRIVER || 'smtp',
 } satisfies EmailConfig

@@ -1,7 +1,5 @@
 <script client>
   import { MediumEditor } from 'ts-medium-editor'
-  import 'ts-medium-editor/css/medium-editor.css'
-  import 'ts-medium-editor/css/themes/default.css'
 
   const STORAGE_KEY = 'bench-review:compose-draft'
   const SAVE_DEBOUNCE_MS = 500

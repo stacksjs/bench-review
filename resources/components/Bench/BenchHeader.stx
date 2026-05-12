@@ -2,214 +2,40 @@
   const auth = useStore('auth')
   const search = useStore('search')
   const isAuthenticated = auth.isAuthenticated
-  const isProfileMenuOpen = state(false)
-  const isNotificationMenuOpen = state(false)
-  const mobileMenu = state(false)
-
-  if (auth.notifications().length === 0) {
-    auth.setNotifications([
-      {
-        id: 1,
-        user: {
-          name: 'Sarah Johnson',
-          imageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-        },
-        message: 'Sarah Johnson liked your review',
-        time: '2 minutes ago',
-        unread: true
-      },
-      {
-        id: 2,
-        user: {
-          name: 'Michael Chen',
-          imageUrl: 'https://images.unsplash.com/photo-1550525811-e5869dd03032?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-        },
-        message: 'Michael Chen commented on your review',
-        time: '1 hour ago',
-        unread: true
-      },
-      {
-        id: 3,
-        user: {
-          name: 'Robert Davis',
-          imageUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-        },
-        message: 'Robert Davis followed you',
-        time: '3 hours ago',
-        unread: false
-      }
-    ])
-  }
-
-  const headerNotifications = auth.notifications
-  const unreadNotifications = auth.unreadCount
 
   function submitHeaderSearch() {
     search.navigateToSearch()
   }
 </script>
-<header
-  class="z-10"
->
+<header class="z-10">
   <nav class="flex items-center justify-between mx-auto p-6 lg:px-8 bg-off-white border-b" aria-label="Global">
     <div class="flex gap-x-16 items-center">
       <StxLink to="/">
         <span class="sr-only">Judge Review</span>
         <img class="h-16" src="/images/bench/logo.png" alt="">
       </StxLink>
-      @if(!comingSoon)
-        <div class="hidden lg:flex lg:gap-x-8">
-          <StxLink
-            to="/judges"
-            class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
-            x-class="route.path === '/judges' ? 'border-gray-500 text-gray-600' : 'border-transparent hover:border-gray-500'"
-          >
-            Find Judges
-          </StxLink>
-
-          <StxLink
-            to="/court-houses"
-            class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
-            x-class="route.path === '/court-houses' ? 'border-gray-500 text-gray-600' : 'border-transparent hover:border-gray-500'"
-          >
-            Find CourtHouses
-          </StxLink>
-
-          <StxLink
-            to="/review"
-            class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
-            x-class="route.path === '/review' ? 'border-gray-500 text-gray-600' : 'border-transparent hover:border-gray-500'"
-          >
-            Write Review
-          </StxLink>
-          <StxLink
-            to="/reviews"
-            class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
-            x-class="route.path === '/reviews' ? 'border-gray-500 text-gray-600' : 'border-transparent hover:border-gray-500'"
-          >
-            Reviews
-          </StxLink>
-          <StxLink
-            to="/blog"
-            class="font-semibold text-gray-900 text-sm/6 border-b-2 duration-200 transition-colors"
-            x-class="route.path === '/blog' ? 'border-gray-500 text-gray-600' : 'border-transparent hover:border-gray-500'"
-          >
-            Blog
-          </StxLink>
-        </div>
-      @endif
-    </div>
-    @if(!comingSoon)
-      <div class="hidden lg:flex flex-1 justify-center mx-8 max-w-md">
-        <form
-          class="w-full"
-          @submit.prevent="submitHeaderSearch"
-        >
-          <label for="header-search" class="sr-only">Search</label>
-          <div class="relative">
-            <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-              <Icon name="search" size="16" class="text-gray-400" />
-            </div>
-            <input
-              id="header-search"
-              type="text"
-              x-model="search.query"
-              placeholder="Search judges or courts..."
-              class="block pl-9 pr-3 py-2 w-full text-gray-900 sm:text-sm placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-200 ring-inset rounded-lg focus:ring-2 focus:ring-gray-600 focus:ring-inset"
-            >
-          </div>
-        </form>
+      <div class="hidden lg:flex lg:gap-x-8">
+        <StxLink to="/judges" class="font-semibold text-gray-900 text-sm/6 border-b-2 border-transparent hover:border-gray-500 duration-200 transition-colors">Find Judges</StxLink>
+        <StxLink to="/court-houses" class="font-semibold text-gray-900 text-sm/6 border-b-2 border-transparent hover:border-gray-500 duration-200 transition-colors">Find CourtHouses</StxLink>
+        <StxLink to="/review" class="font-semibold text-gray-900 text-sm/6 border-b-2 border-transparent hover:border-gray-500 duration-200 transition-colors">Write Review</StxLink>
+        <StxLink to="/reviews" class="font-semibold text-gray-900 text-sm/6 border-b-2 border-transparent hover:border-gray-500 duration-200 transition-colors">Reviews</StxLink>
+        <StxLink to="/blog" class="font-semibold text-gray-900 text-sm/6 border-b-2 border-transparent hover:border-gray-500 duration-200 transition-colors">Blog</StxLink>
       </div>
-    @endif
-    <div class="flex items-center">
-      @if(!comingSoon)
-        <div class="flex lg:hidden">
-          <button @click="mobileMenu.set(true)" type="button" class="inline-flex items-center justify-center -m-2.5 p-2.5 text-gray-700 rounded-md">
-            <span class="sr-only">Open main menu</span>
-            <Icon name="menu" size="24" />
-          </button>
-        </div>
-        <div class="hidden lg:flex lg:flex-1 lg:justify-end">
-          <div :if="!isAuthenticated">
-            <StxLink to="/login" class="mr-6 font-semibold text-gray-900 text-sm/6">Log in</StxLink>
-            <StxLink to="/register" class="font-semibold text-gray-900 text-sm/6">Sign up</StxLink>
-          </div>
-          <div :if="isAuthenticated" class="flex gap-x-4 items-center">
-            <div class="flex relative items-center">
-              <button
-                type="button"
-                class="flex items-center text-gray-400 hover:text-gray-500"
-                @click="isNotificationMenuOpen.set(!isNotificationMenuOpen())"
-              >
-                <span class="sr-only">View notifications</span>
-                <Icon name="bell" size="24" />
-                <span :if="unreadNotifications() >= 1" class="flex absolute items-center justify-center h-4 w-4 font-medium text-[10px] text-white bg-red-500 rounded-full -right-1 -top-1" :text="unreadNotifications"></span>
-              </button>
-              <div
-                :if="isNotificationMenuOpen()"
-                class="absolute right-0 z-50 mt-84 py-1 w-80 bg-white ring-1 ring-black ring-opacity-5 rounded-md focus:outline-none shadow-lg origin-top-right"
-                role="menu"
-                aria-orientation="vertical"
-                aria-labelledby="notification-menu-button"
-                tabindex="-1"
-              >
-                <div class="px-4 py-2 border-b border-gray-100">
-                  <h3 class="font-semibold text-gray-900 text-sm">Notifications</h3>
-                </div>
-                <div class="overflow-y-auto max-h-96">
-                  <template :for="notif in headerNotifications">
-                    <a
-                      href="#"
-                      class="block px-4 py-3 hover:bg-gray-50"
-                      x-class="notif.unread ? 'bg-gray-50' : ''"
-                    >
-                      <div class="flex items-start">
-                        <div class="flex-shrink-0">
-                          <img class="h-8 w-8 rounded-full" x-src="notif.user.imageUrl" x-alt="notif.user.name" />
-                        </div>
-                        <div class="flex-1 ml-3 w-0">
-                          <p class="text-gray-900 text-sm" :text="notif.message"></p>
-                          <p class="mt-1 text-gray-500 text-xs" :text="notif.time"></p>
-                        </div>
-                      </div>
-                    </a>
-                  </template>
-                  <div :if="headerNotifications().length === 0" class="px-4 py-3 text-center text-gray-500 text-sm">
-                    No notifications
-                  </div>
-                </div>
-                <div class="px-4 py-2 border-gray-100 border-t">
-                  <a href="#" class="font-medium text-gray-600 text-sm hover:text-gray-500">View all notifications</a>
-                </div>
-              </div>
-            </div>
-            <div class="flex relative items-center">
-              <button
-                type="button"
-                class="flex items-center rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-                @click="isProfileMenuOpen.set(!isProfileMenuOpen())"
-              >
-                <img class="h-8 w-8 rounded-full" src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="" />
-              </button>
-              <div
-                :if="isProfileMenuOpen()"
-                class="absolute right-0 z-50 mt-42 py-1 w-48 bg-white ring-1 ring-black ring-opacity-5 rounded-md focus:outline-none shadow-lg origin-top-right"
-                role="menu"
-                aria-orientation="vertical"
-                aria-labelledby="user-menu-button"
-                tabindex="-1"
-              >
-                <StxLink to="/profile" class="block px-4 py-2 text-gray-700 text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">Your Profile</StxLink>
-                <StxLink to="/settings" class="block px-4 py-2 text-gray-700 text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">Settings</StxLink>
-                <a href="#" class="block px-4 py-2 text-gray-700 text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">Sign out</a>
-              </div>
-            </div>
-          </div>
-        </div>
-      @endif
+    </div>
+    <div class="hidden lg:flex flex-1 justify-center mx-8 max-w-md">
+      <form class="w-full" @submit.prevent="submitHeaderSearch">
+        <label for="header-search" class="sr-only">Search</label>
+        <input id="header-search" type="text" x-model="search.query" placeholder="Search judges or courts..." class="block px-3 py-2 w-full text-gray-900 sm:text-sm placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-200 ring-inset rounded-lg focus:ring-2 focus:ring-gray-600 focus:ring-inset">
+      </form>
+    </div>
+    <div class="hidden lg:flex lg:flex-1 lg:justify-end gap-x-4 items-center">
+      <div :if="!isAuthenticated">
+        <StxLink to="/login" class="mr-6 font-semibold text-gray-900 text-sm/6">Log in</StxLink>
+        <StxLink to="/register" class="font-semibold text-gray-900 text-sm/6">Sign up</StxLink>
+      </div>
+      <div :if="isAuthenticated">
+        <StxLink to="/profile" class="font-semibold text-gray-900 text-sm/6">Profile</StxLink>
+      </div>
     </div>
   </nav>
-  @if(!comingSoon)
-    @include('Bench/MobileMenu', { isOpen: mobileMenu, isAuthenticated: isAuthenticated })
-  @endif
 </header>

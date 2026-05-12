@@ -306,7 +306,13 @@ export async function createErrorResponse(
     }
   },
 ): Promise<Response> {
-  const status = options?.status || 500
+  // Fall back to the error's own status before defaulting to 500. The
+  // action-handler catch path calls us without an explicit options.status,
+  // so an `HttpError(422, …)` thrown from an action used to surface as a
+  // 500 here — the middleware path reads `statusCode ?? status` already,
+  // mirror that so both code paths honor the declared HTTP status.
+  const errWithStatus = error as Error & { statusCode?: number, status?: number }
+  const status = options?.status ?? errWithStatus.statusCode ?? errWithStatus.status ?? 500
   log.debug(`[error] ${status} ${error.message}`)
   const isDevelopment = process.env.APP_ENV !== 'production' && process.env.NODE_ENV !== 'production'
 

@@ -1,5 +1,5 @@
 <script client>
-  import { judges as allJudges } from '../../../functions/sample'
+  import { judges as allJudges } from '~/resources/functions/sample'
 
   const searchQuery = state('')
   const stars = [1, 2, 3, 4, 5]
@@ -65,11 +65,11 @@
     </div>
 
     <div class="grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-      <template :for="judge in filteredJudges">
-        <StxLink
-          x-to="`/judges/${judge.id}/profile`"
-          class="overflow-hidden relative bg-off-gray border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-lg duration-300 transition-all group"
-        >
+      <StxLink
+        :for="judge in filteredJudges"
+        x-to="`/judges/${judge.id}/profile`"
+        class="overflow-hidden relative bg-off-gray border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-lg duration-300 transition-all group"
+      >
           <div class="absolute inset-0 z-0">
             <img
               x-src="judge.court.image"
@@ -95,18 +95,15 @@
 
               <div class="flex items-center justify-center mt-4">
                 <div class="flex items-center">
-                  <template :for="star in stars">
-                    <svg class="h-5 w-5 flex-shrink-0" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" clip-rule="evenodd" />
-                    </svg>
-                  </template>
+                  <svg :for="star in stars" class="h-5 w-5 flex-shrink-0" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" clip-rule="evenodd" />
+                  </svg>
                 </div>
                 <span class="ml-2 text-gray-500 text-sm" :text="`(${judge.reviewCount} reviews)`"></span>
               </div>
             </div>
           </div>
-        </StxLink>
-      </template>
+      </StxLink>
     </div>
   </div>
 </div>

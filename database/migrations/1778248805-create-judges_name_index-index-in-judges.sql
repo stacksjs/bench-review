@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "judges_judges_name_index" ON "judges" ("name");
