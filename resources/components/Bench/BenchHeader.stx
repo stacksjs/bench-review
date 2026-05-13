@@ -1,7 +1,10 @@
 <script client>
   const auth = useStore('auth')
   const search = useStore('search')
-  const isAuthenticated = auth.isAuthenticated
+
+  function isAuthed(): boolean {
+    return !!auth.user()
+  }
 
   function submitHeaderSearch(): void {
     search.navigateToSearch()
@@ -29,11 +32,11 @@
       </form>
     </div>
     <div class="hidden lg:flex lg:flex-1 lg:justify-end gap-x-4 items-center">
-      <div :if="!isAuthenticated">
+      <div :if="!isAuthed()">
         <StxLink to="/login" class="mr-6 font-semibold text-gray-900 text-sm/6">Log in</StxLink>
         <StxLink to="/register" class="font-semibold text-gray-900 text-sm/6">Sign up</StxLink>
       </div>
-      <div :if="isAuthenticated">
+      <div :if="isAuthed()">
         <StxLink to="/profile" class="font-semibold text-gray-900 text-sm/6">Profile</StxLink>
       </div>
     </div>

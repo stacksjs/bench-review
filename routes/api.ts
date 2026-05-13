@@ -23,7 +23,7 @@ route.get('/coming-soon', 'Controllers/ComingSoonController@index')
 // defaults. For now `Actions/SubscriberEmailAction` resolves via the
 // `app/` → `storage/framework/defaults/app/` fallback to the framework's
 // implementation, which writes both `subscribers` and `subscriber_emails`.
-route.post('/subscribe', 'Actions/SubscriberEmailAction')
+route.post('/api/subscribe', 'Actions/SubscriberEmailAction')
   .name('bench.email.subscribe')
   .skipCsrf()
 
@@ -37,25 +37,25 @@ route.post('/subscribe', 'Actions/SubscriberEmailAction')
 // themselves still hash passwords + issue session tokens; CSRF
 // protection at the API layer doesn't add anything for unauthenticated
 // endpoints driven from same-origin fetch.
-route.post('/login', 'Actions/Auth/LoginAction')
+route.post('/api/auth/login', 'Actions/Auth/LoginAction')
   .name('bench.auth.login')
   .skipCsrf()
 
-route.post('/register', 'Actions/Auth/RegisterAction')
+route.post('/api/auth/register', 'Actions/Auth/RegisterAction')
   .name('bench.auth.register')
   .skipCsrf()
 
-route.post('/logout', 'Actions/Auth/LogoutAction')
+route.post('/api/auth/logout', 'Actions/Auth/LogoutAction')
   .name('bench.auth.logout')
   .skipCsrf()
 
 // Password reset. Both endpoints are intentionally unauthenticated —
 // you can't have an active session if you've forgotten your password.
 // Same skipCsrf rationale as login/register.
-route.post('/password/send-password-reset-email', 'Actions/Password/SendPasswordResetEmailAction')
+route.post('/api/auth/password/forgot', 'Actions/Password/SendPasswordResetEmailAction')
   .name('bench.password.email')
   .skipCsrf()
 
-route.post('/password/reset', 'Actions/Password/PasswordResetAction')
+route.post('/api/auth/password/reset', 'Actions/Password/PasswordResetAction')
   .name('bench.password.reset')
   .skipCsrf()

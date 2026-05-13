@@ -203,18 +203,25 @@ export async function runAction(action: Action, options?: ActionOptions): Promis
         // scaffolds put them at resources/layouts and resources/components,
         // so we prefer the new layout when present and fall back to the
         // legacy paths otherwise.
-        const firstExisting = async (candidates: string[]): Promise<string> => {
+        // `Bun.file(dir).exists()` returns false for directories, so the
+        // legacy `resources/{layouts,components}` paths never matched and
+        // the function silently fell through to `candidates[0]` —
+        // pointing partialsDir/layoutsDir at the new `resources/views/...`
+        // location even when only the legacy dirs existed. `existsSync`
+        // doesn't share that quirk.
+        const { existsSync } = await import('node:fs')
+        const firstExisting = (candidates: string[]): string => {
           for (const candidate of candidates) {
             try {
-              if (await Bun.file(p.projectPath(candidate)).exists())
+              if (existsSync(p.projectPath(candidate)))
                 return candidate
             }
             catch { /* ignore */ }
           }
           return candidates[0]
         }
-        const layoutsDir = await firstExisting(['resources/views/layouts', 'resources/layouts'])
-        const partialsDir = await firstExisting(['resources/views/components', 'resources/components'])
+        const layoutsDir = firstExisting(['resources/views/layouts', 'resources/layouts'])
+        const partialsDir = firstExisting(['resources/views/components', 'resources/components'])
 
         await serve({
           patterns: ['resources/views', 'storage/framework/defaults/resources/views'],

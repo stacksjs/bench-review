@@ -71,7 +71,7 @@ defineStore('auth', () => {
   }
 
   async function login(email: string, password: string): Promise<LoginResponse> {
-    const res = await fetch('/login', {
+    const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -109,7 +109,7 @@ defineStore('auth', () => {
       const headers: Record<string, string> = { Accept: 'application/json' }
       if (token())
         headers.Authorization = `Bearer ${token()}`
-      await fetch('/logout', { method: 'POST', headers })
+      await fetch('/api/auth/logout', { method: 'POST', headers })
     }
     catch {}
 
