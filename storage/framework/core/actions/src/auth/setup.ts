@@ -167,7 +167,11 @@ try {
   log.success('OAuth tables ready')
 }
 catch (error) {
-  log.error('Failed to create OAuth tables', error)
+  // `log.error(msg, error)` treats the 2nd arg as LogErrorOptions and
+  // drops it, so the underlying cause never reaches the terminal. Print
+  // the real error first, then log a header that's useful in CI.
+  console.error('[auth:setup] Failed to create OAuth tables:', error)
+  log.error('Failed to create OAuth tables')
   process.exit(1)
 }
 
