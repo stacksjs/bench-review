@@ -4,15 +4,15 @@
 
 @section('content')
 <script client>
-  const contactName = state('')
-  const contactEmail = state('')
-  const topic = state('general')
-  const contactMessage = state('')
-  const loading = state(false)
-  const sent = state(false)
-  const submitError = state('')
+  const contactName = state<string>('')
+  const contactEmail = state<string>('')
+  const topic = state<string>('general')
+  const contactMessage = state<string>('')
+  const loading = state<boolean>(false)
+  const sent = state<boolean>(false)
+  const submitError = state<string>('')
 
-  async function submit() {
+  async function submit(): Promise<void> {
     loading.set(true)
     submitError.set('')
     try {
@@ -23,9 +23,11 @@
       })
       if (!res.ok) throw new Error('Could not send message — please try again')
       sent.set(true)
-    } catch (e) {
-      submitError.set(e.message)
-    } finally {
+    }
+    catch (e) {
+      submitError.set(e instanceof Error ? e.message : String(e))
+    }
+    finally {
       loading.set(false)
     }
   }

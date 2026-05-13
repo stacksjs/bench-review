@@ -1,7 +1,24 @@
 <script client>
+  interface ArticleAuthor { id: number, name: string, imageUrl: string }
+  interface ArticleJudge { id: string, name: string, court: string, photo: string }
+  interface ArticleReview {
+    id: number
+    title: string
+    author: ArticleAuthor
+    judge: ArticleJudge
+    date: string
+    dateTime: string
+    rating: number
+    status: string
+    likes: number
+    comments: number
+    type: string
+    content: string
+  }
+
   useHead({ title: 'Review - A Masterclass in Judicial Excellence' })
 
-  const review = derived(() => ({
+  const review = derived<ArticleReview>(() => ({
     id: 1,
     title: 'A Masterclass in Judicial Excellence: My Experience with Judge Sarah Johnson',
     author: {

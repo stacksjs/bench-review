@@ -1,39 +1,52 @@
 <script client>
-  const email = state('')
-  const loading = state(false)
-  // Toast state. We don't use `<Notification>` from @stacksjs/components
-  // here because that component is server-rendered (`<script server>`,
-  // `@if(show)`) — its `show` prop is captured once at render time, so
-  // a fetch-driven toggle would never actually appear in the DOM.
-  // Instead we drive a client-rendered toast from these signals,
-  // matching the package's visual style for consistency.
-  const toastVisible = state(false)
-  const toastType = state('success') // 'success' | 'error'
-  const toastTitle = state('')
-  const toastMessage = state('')
-  const TOAST_DURATION_MS = 5000
-  let toastTimer = null
+  type ToastKind = 'success' | 'error'
 
-  function showToast(type, title, message) {
-    toastType.set(type)
-    toastTitle.set(title)
-    toastMessage.set(message)
-    toastVisible.set(true)
-    if (toastTimer) clearTimeout(toastTimer)
-    toastTimer = setTimeout(dismissToast, TOAST_DURATION_MS)
+  interface ApiErrorBody {
+    errors?: Array<{ message?: string }>
+    message?: string
   }
 
-  function dismissToast() {
-    toastVisible.set(false)
-    if (toastTimer) {
-      clearTimeout(toastTimer)
-      toastTimer = null
+  const email = state<string>('')
+  const loading = state<boolean>(false)
+  // Toast state. <Notification> from @stacksjs/components renders the
+  // visual; we drive its visibility from outside via the wrapping :if
+  // because stx's ref store only holds DOM elements, not the
+  // component's defineExpose'd `show`/`close` methods. The slot content
+  // uses :text so title/message stay reactive across separate shows.
+  const successVisible = state<boolean>(false)
+  const errorVisible = state<boolean>(false)
+  const toastTitle = state<string>('')
+  const toastMessage = state<string>('')
+  const TOAST_DURATION_MS = 5000
+  let toastTimer: ReturnType<typeof setTimeout> | null = null
+
+  function showToast(type: ToastKind, title: string, message: string): void {
+    toastTitle.set(title)
+    toastMessage.set(message)
+    if (type === 'error') { errorVisible.set(true); successVisible.set(false) }
+    else { successVisible.set(true); errorVisible.set(false) }
+    if (toastTimer) clearTimeout(toastTimer)
+    toastTimer = setTimeout(() => { successVisible.set(false); errorVisible.set(false) }, TOAST_DURATION_MS)
+  }
+
+  function parseApiErrorMessage(text: string): string {
+    if (!text) return 'Please try again.'
+    // The dev API returns an HTML error page for 4xx/5xx. Pull the page
+    // title (`<title>422 - Unprocessable Entity</title>`) when we can't
+    // parse JSON — anything else is a generic fallback.
+    try {
+      const json = JSON.parse(text) as ApiErrorBody
+      return json?.errors?.[0]?.message || json?.message || 'Please try again.'
+    } catch {
+      const match = text.match(/<title>([^<]+)<\/title>/i)
+      return match ? match[1].trim() : 'Please try again.'
     }
   }
 
-  async function submitEmail() {
+  async function submitEmail(): Promise<void> {
     loading.set(true)
-    dismissToast()
+    successVisible.set(false)
+    errorVisible.set(false)
     try {
       const response = await fetch('/subscribe', {
         method: 'POST',
@@ -44,10 +57,10 @@
         body: JSON.stringify({ email: email() }),
       })
       if (!response.ok) {
-        const errs = await response.json().catch(() => ({}))
-        showToast('error', 'Something went wrong', errs?.errors?.[0]?.message || 'Please try again.')
+        const body = await response.text().catch(() => '')
+        showToast('error', `Subscription failed (${response.status})`, parseApiErrorMessage(body))
       } else {
-        showToast('success', 'Thanks!', 'Stay tuned for more updates.')
+        showToast('success', 'Thanks!', "You're on the list. Stay tuned for more updates.")
         email.set('')
       }
     } catch {
@@ -101,46 +114,17 @@
           </button>
         </form>
       </div>
-      <!--
-        Toast styled with the same utility classes @stacksjs/components's
-        `<Notification>` SFC uses. We can't render that component
-        directly with reactive props because it's server-rendered
-        (props captured at SSG time), but a copy lives at
-        resources/components/Notification.stx so Crosswind scans it and
-        emits the exact `bg-{type}-50 text-{type}-900` utilities the
-        package depends on — those are then applied here via `x-class`.
-        End result: the package's design tokens, driven by client signals.
-      -->
-      <div
-        :if="toastVisible()"
-        x-cloak
-        role="alert"
-        aria-live="polite"
-        class="fixed z-50 m-4 max-w-md w-full rounded-lg p-4 shadow-lg ring-1 ring-black ring-opacity-5 top-0 right-0"
-        x-class="[
-          toastType() === 'success' ? 'bg-green-50 text-green-900' : '',
-          toastType() === 'error' ? 'bg-red-50 text-red-900' : '',
-          toastType() === 'info' ? 'bg-blue-50 text-blue-900' : '',
-          toastType() === 'warning' ? 'bg-yellow-50 text-yellow-900' : '',
-        ]"
-      >
-        <div class="flex items-start">
-          <div class="flex-1">
-            <p class="text-sm font-medium" :text="toastTitle()"></p>
-            <p class="mt-1 text-sm opacity-90" :text="toastMessage()"></p>
-          </div>
-          <button
-            type="button"
-            @click="dismissToast()"
-            class="ml-4 inline-flex rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2"
-            aria-label="Dismiss notification"
-          >
-            <span class="sr-only">Close</span>
-            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-            </svg>
-          </button>
-        </div>
+      <div :if="successVisible()" @close="successVisible.set(false)">
+        <Notification type="success" position="top-right" :show="true" :duration="0">
+          <p class="text-sm font-medium" :text="toastTitle()"></p>
+          <p class="mt-1 text-sm opacity-90" :text="toastMessage()"></p>
+        </Notification>
+      </div>
+      <div :if="errorVisible()" @close="errorVisible.set(false)">
+        <Notification type="error" position="top-right" :show="true" :duration="0">
+          <p class="text-sm font-medium" :text="toastTitle()"></p>
+          <p class="mt-1 text-sm opacity-90" :text="toastMessage()"></p>
+        </Notification>
       </div>
     </div>
     <div class="flex mt-16 mx-auto sm:mt-24 lg:ml-10 lg:mr-0 lg:mt-0 xl:ml-32">

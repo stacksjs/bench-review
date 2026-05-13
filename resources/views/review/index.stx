@@ -8,7 +8,9 @@
 </script>
 <div class="py-10 min-h-screen bg-off-white">
   <div class="mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl">
-    @include('Bench/ReviewForm')
+    <div class="p-6 sm:p-8 bg-white ring-1 ring-gray-200 rounded-2xl shadow-sm">
+      @include('Bench/ReviewForm')
+    </div>
   </div>
 </div>
 @endsection

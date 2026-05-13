@@ -1,6 +1,17 @@
 <script client>
-  const stars = [1, 2, 3, 4, 5]
-  const ratingBuckets = [
+  interface RatingBucket { stars: number, percentage: number }
+  interface JudgeReview {
+    id: number
+    name: string
+    avatar: string
+    rating: number
+    date: string
+    content: string
+    helpfulCount: number
+  }
+
+  const stars: number[] = [1, 2, 3, 4, 5]
+  const ratingBuckets: RatingBucket[] = [
     { stars: 5, percentage: 100 },
     { stars: 4, percentage: 80 },
     { stars: 3, percentage: 60 },
@@ -8,7 +19,7 @@
     { stars: 1, percentage: 20 },
   ]
 
-  const reviews = derived(() => [
+  const reviews = derived<JudgeReview[]>(() => [
     {
       id: 1,
       name: 'Michael Chen',
@@ -38,7 +49,7 @@
     }
   ])
 
-  const routeId = derived(() => params.id)
+  const routeId = derived<string>(() => params.id)
 </script>
 
 <div class="lg:col-span-2 lg:row-end-2 lg:row-span-2 -mx-4 px-4 py-8 sm:mx-0 sm:pb-14 sm:px-8 xl:pb-20 xl:pt-16 xl:px-16 bg-white ring-1 ring-gray-900/5 sm:rounded-lg shadow-sm">

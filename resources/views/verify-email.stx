@@ -4,11 +4,13 @@
 
 @section('content')
 <script client>
-  const verifyState = state('pending')
-  const verifyError = state('')
-  const resending = state(false)
+  type VerifyStatus = 'pending' | 'verifying' | 'verified' | 'error'
 
-  async function verify() {
+  const verifyState = state<VerifyStatus>('pending')
+  const verifyError = state<string>('')
+  const resending = state<boolean>(false)
+
+  async function verify(): Promise<void> {
     const token = new URLSearchParams(window.location.search).get('token') || ''
     if (!token) return
     verifyState.set('verifying')
@@ -21,17 +23,19 @@
       if (!res.ok) throw new Error('Verification link is invalid or expired')
       verifyState.set('verified')
       setTimeout(() => { navigate('/profile', true) }, 2000)
-    } catch (e) {
-      verifyError.set(e.message)
+    }
+    catch (e) {
+      verifyError.set(e instanceof Error ? e.message : String(e))
       verifyState.set('error')
     }
   }
 
-  async function resend() {
+  async function resend(): Promise<void> {
     resending.set(true)
     try {
       await fetch('/api/auth/resend-verification', { method: 'POST' })
-    } finally {
+    }
+    finally {
       resending.set(false)
     }
   }

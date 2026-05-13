@@ -1,9 +1,10 @@
 <script client>
+  import type { BlogPost } from '~/resources/types'
   import { blogPosts } from '~/resources/functions/sample'
 
   useHead({ title: 'Blog Post - Bench Review' })
 
-  const post = derived(() => blogPosts.find(p => p.id === parseInt(params.id)) || blogPosts[0])
+  const post = derived<BlogPost>(() => blogPosts.find(p => p.id === Number.parseInt(params.id)) || blogPosts[0])
 </script>
 
 @extends('layouts/default')

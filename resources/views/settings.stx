@@ -7,11 +7,11 @@
   definePageMeta({ middleware: ['auth'] })
 </script>
 <script client>
-  const firstName = state('John')
-  const lastName = state('Doe')
-  const currentPassword = state('')
-  const newPassword = state('')
-  const confirmPassword = state('')
+  const firstName = state<string>('John')
+  const lastName = state<string>('Doe')
+  const currentPassword = state<string>('')
+  const newPassword = state<string>('')
+  const confirmPassword = state<string>('')
 </script>
 <div class="min-h-screen">
   <div class="mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">

@@ -1,74 +1,79 @@
-import { defineStore, useStore, state, derived } from '@stacksjs/stx'
+import type { CourtHouse, Judge } from '~/resources/types'
+import { defineStore, derived, state, useStore } from '@stacksjs/stx'
 
 defineStore('judges', () => {
-  const judges = state([])
-  const courtHouses = state([])
-  const loading = state(false)
+  const judges = state<Judge[]>([])
+  const courtHouses = state<CourtHouse[]>([])
+  const loading = state<boolean>(false)
 
-  function setJudges(data) {
+  function setJudges(data: Judge[]): void {
     judges.set(data)
   }
 
-  function setCourtHouses(data) {
+  function setCourtHouses(data: CourtHouse[]): void {
     courtHouses.set(data)
   }
 
-  const filteredJudges = derived(() => {
+  const filteredJudges = derived<Judge[]>(() => {
     const search = useStore('search')
     const q = search.query()
     const all = judges()
     if (!q) return all
     const needle = q.toLowerCase()
     return all.filter(j =>
-      j.name.toLowerCase().includes(needle) ||
-      j.court.name.toLowerCase().includes(needle) ||
-      j.location.toLowerCase().includes(needle)
+      j.name.toLowerCase().includes(needle)
+      || j.court.name.toLowerCase().includes(needle)
+      || j.location.toLowerCase().includes(needle),
     )
   })
 
-  const filteredCourtHouses = derived(() => {
+  const filteredCourtHouses = derived<CourtHouse[]>(() => {
     const search = useStore('search')
     const q = search.query()
     const all = courtHouses()
     if (!q) return all
     const needle = q.toLowerCase()
     return all.filter(c =>
-      c.name.toLowerCase().includes(needle) ||
-      c.city.toLowerCase().includes(needle) ||
-      c.state.toLowerCase().includes(needle)
+      c.name.toLowerCase().includes(needle)
+      || c.city.toLowerCase().includes(needle)
+      || c.state.toLowerCase().includes(needle),
     )
   })
 
-  const totalResults = derived(() => {
+  const totalResults = derived<number>(() => {
     return filteredJudges().length + filteredCourtHouses().length
   })
 
-  async function fetchJudges() {
+  async function fetchJudges(): Promise<void> {
     loading.set(true)
     try {
       const res = await fetch('/api/judges')
       if (res.ok) {
-        const data = await res.json()
+        const data = await res.json() as Judge[]
         judges.set(data)
       }
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to fetch judges:', error)
-    } finally {
+    }
+    finally {
       loading.set(false)
     }
   }
 
-  async function fetchCourtHouses() {
+  async function fetchCourtHouses(): Promise<void> {
     loading.set(true)
     try {
       const res = await fetch('/api/court-houses')
       if (res.ok) {
-        const data = await res.json()
+        const data = await res.json() as CourtHouse[]
         courtHouses.set(data)
       }
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to fetch court houses:', error)
-    } finally {
+    }
+    finally {
       loading.set(false)
     }
   }

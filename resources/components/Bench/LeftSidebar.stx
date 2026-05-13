@@ -1,9 +1,10 @@
 <script client>
-  import { trendingJudges as allTrending, recentActivity as allActivity } from '~/resources/functions/sample'
+  import type { Activity, TrendingJudge } from '~/resources/types'
+  import { recentActivity as allActivity, trendingJudges as allTrending } from '~/resources/functions/sample'
 
-  const trendingJudges = derived(() => allTrending)
-  const recentActivity = derived(() => allActivity)
-  const lastIndex = derived(() => allActivity.length - 1)
+  const trendingJudges = derived<TrendingJudge[]>(() => allTrending)
+  const recentActivity = derived<Activity[]>(() => allActivity)
+  const lastIndex = derived<number>(() => allActivity.length - 1)
 </script>
 <div class="top-4">
   <!-- Trending Judges -->

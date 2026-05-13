@@ -1,7 +1,22 @@
 <script client>
+  interface JudgeSummary {
+    id: number
+    name: string
+    court: {
+      id: number
+      name: string
+      image: string
+      address: string
+      city: string
+      state: string
+      zipCode: string
+    }
+    photo: string
+  }
+
   useHead({ title: 'Judge Profile' })
 
-  const judge = derived(() => ({
+  const judge = derived<JudgeSummary>(() => ({
     id: 1,
     name: 'John Doe',
     court: {

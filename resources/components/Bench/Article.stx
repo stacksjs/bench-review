@@ -1,5 +1,5 @@
 <script client>
-  const reviewStars = [1, 2, 3, 4, 5]
+  const reviewStars: number[] = [1, 2, 3, 4, 5]
 </script>
 <div class="mx-auto pb-32 px-4 sm:px-6 lg:px-8 max-w-5xl">
   <div class="mt-6 mx-auto text-gray-500">

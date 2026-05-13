@@ -1,5 +1,5 @@
 <script client>
-  const searchQuery = state('')
+  const searchQuery = state<string>('')
 </script>
 <div class="flex flex-col lg:flex-row min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
   <!-- Left side content -->

@@ -1,9 +1,10 @@
 <script client>
+  import type { CourtHouse } from '~/resources/types'
   import { courtHouses } from '~/resources/functions/sample'
 
   useHead({ title: 'Court House - Bench Review' })
 
-  const court = derived(() => courtHouses.find(c => c.id === params.id) || courtHouses[0])
+  const court = derived<CourtHouse>(() => courtHouses.find(c => c.id === params.id) || courtHouses[0])
 </script>
 
 @extends('layouts/default')

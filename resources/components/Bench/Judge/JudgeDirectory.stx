@@ -1,17 +1,18 @@
 <script client>
+  import type { Judge } from '~/resources/types'
   import { judges as allJudges } from '~/resources/functions/sample'
 
-  const searchQuery = state('')
-  const stars = [1, 2, 3, 4, 5]
+  const searchQuery = state<string>('')
+  const stars: number[] = [1, 2, 3, 4, 5]
 
-  const filteredJudges = derived(() => {
+  const filteredJudges = derived<Judge[]>(() => {
     const q = searchQuery()
     if (!q) return allJudges
     const needle = q.toLowerCase()
     return allJudges.filter(j =>
-      j.name.toLowerCase().includes(needle) ||
-      j.court.name.toLowerCase().includes(needle) ||
-      j.location.toLowerCase().includes(needle)
+      j.name.toLowerCase().includes(needle)
+      || j.court.name.toLowerCase().includes(needle)
+      || j.location.toLowerCase().includes(needle),
     )
   })
 </script>

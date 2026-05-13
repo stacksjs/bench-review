@@ -1,30 +1,40 @@
 <script client>
-  const reviewTitle = state('')
-  const reviewContent = state('')
-  const rating = state(0)
-  const hoverRating = state(0)
-  const fairness = state(0)
-  const hoverFairness = state(0)
-  const knowledge = state(0)
-  const hoverKnowledge = state(0)
-  const demeanor = state(0)
-  const hoverDemeanor = state(0)
-  const isAnonymous = state(false)
-  const judge = state(null)
+  interface SelectedJudge {
+    id: string
+    name: string
+    court: string
+    department: string
+    photo: string
+  }
 
-  const stars = [1, 2, 3, 4, 5]
+  type StarRating = 0 | 1 | 2 | 3 | 4 | 5
 
-  function loadJudge(id) {
+  const reviewTitle = state<string>('')
+  const reviewContent = state<string>('')
+  const rating = state<StarRating>(0)
+  const hoverRating = state<StarRating>(0)
+  const fairness = state<StarRating>(0)
+  const hoverFairness = state<StarRating>(0)
+  const knowledge = state<StarRating>(0)
+  const hoverKnowledge = state<StarRating>(0)
+  const demeanor = state<StarRating>(0)
+  const hoverDemeanor = state<StarRating>(0)
+  const isAnonymous = state<boolean>(false)
+  const judge = state<SelectedJudge | null>(null)
+
+  const stars: StarRating[] = [1, 2, 3, 4, 5]
+
+  function loadJudge(id: string): void {
     judge.set({
-      id: '1',
+      id,
       name: 'Hon. Sarah Johnson',
       court: 'Superior Court of California',
       department: 'San Francisco County, Department 15',
-      photo: 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&h=200&q=80'
+      photo: 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&h=200&q=80',
     })
   }
 
-  function getRatingText(value) {
+  function getRatingText(value: StarRating): string {
     switch (value) {
       case 1: return 'Poor'
       case 2: return 'Fair'
@@ -35,11 +45,11 @@
     }
   }
 
-  const ratingText = derived(() => {
-    return getRatingText(hoverRating() || rating())
+  const ratingText = derived<string>(() => {
+    return getRatingText((hoverRating() || rating()) as StarRating)
   })
 
-  function handleSubmit() {
+  function handleSubmit(): void {
     try {
       localStorage.removeItem('bench-review:compose-draft')
     }
@@ -49,15 +59,14 @@
     navigate(`/judges/${judge()?.id}/reviews`, true)
   }
 
-  function handleCancel() {
+  function handleCancel(): void {
     navigate('/review', true)
   }
 
   onMount(() => {
     const judgeId = new URLSearchParams(window.location.search).get('judgeId')
-    if (judgeId) {
+    if (judgeId)
       loadJudge(judgeId)
-    }
   })
 </script>
 <div
@@ -98,7 +107,7 @@
             x-model="reviewTitle"
             x-disabled="!judge"
             placeholder="Brief summary of your experience"
-            class="block px-3 py-1.5 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-off-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 disabled:opacity-50 disabled:cursor-not-allowed -outline-offset-1 focus:-outline-offset-2"
+            class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-300 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
         </div>
       </div>
@@ -178,7 +187,7 @@
             name="case-number"
             id="case-number"
             x-disabled="!judge"
-            class="block px-3 py-1.5 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-off-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 disabled:opacity-50 disabled:cursor-not-allowed -outline-offset-1 focus:-outline-offset-2"
+            class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-300 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
         </div>
       </div>
@@ -191,7 +200,7 @@
             name="case-date"
             id="case-date"
             x-disabled="!judge"
-            class="block px-3 py-1.5 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-off-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 disabled:opacity-50 disabled:cursor-not-allowed -outline-offset-1 focus:-outline-offset-2"
+            class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-300 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
         </div>
       </div>
@@ -203,7 +212,7 @@
             id="role"
             name="role"
             x-disabled="!judge"
-            class="block px-3 py-1.5 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-off-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 disabled:opacity-50 disabled:cursor-not-allowed -outline-offset-1 focus:-outline-offset-2"
+            class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-300 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
             <option>Attorney</option>
             <option>Party to the Case</option>

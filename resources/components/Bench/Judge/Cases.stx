@@ -1,5 +1,15 @@
 <script client>
-  const cases = derived(() => [
+  interface Case {
+    id: number
+    number: string
+    title: string
+    type: string
+    status: string
+    filedDate: string
+    nextHearing: string
+  }
+
+  const cases = derived<Case[]>(() => [
     {
       id: 1,
       number: 'CR-2024-001',

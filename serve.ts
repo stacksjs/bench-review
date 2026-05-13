@@ -13,8 +13,11 @@ catch {
 }
 
 const PORT = Number.parseInt(process.env.PORT || '3000')
-const API_PORT = Number.parseInt(process.env.API_PORT || '3008')
-const API_ORIGIN = `http://localhost:${API_PORT}`
+const API_PORT = Number.parseInt(process.env.PORT_API || '4008')
+// Bind to IPv4 explicitly — on macOS, Bun's fetch resolves `localhost`
+// to ::1 (IPv6) first, but `Bun.serve` listens on IPv4 only by default.
+// Result: ConnectionRefused even though the API is up.
+const API_ORIGIN = `http://127.0.0.1:${API_PORT}`
 
 /**
  * Why this file exists at all
@@ -27,7 +30,7 @@ const API_ORIGIN = `http://localhost:${API_PORT}`
  *     routes/api.ts          → declares the route + middleware
  *     app/Actions/*.ts       → handles the request, talks to ORM/mailer
  *
- * The API itself listens on port 3008 (`./buddy dev:api` / the
+ * The API itself listens on port 4008 (`./buddy dev:api` / the
  * `bun --watch storage/framework/core/actions/src/dev/api.ts` process).
  *
  * The only thing this file does for `/api/**` (and any non-GET verb) is

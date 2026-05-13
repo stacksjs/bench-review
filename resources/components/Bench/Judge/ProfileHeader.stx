@@ -1,17 +1,19 @@
 <script client>
-  const showCopiedFeedback = state(false)
-  const menuOpen = state(false)
+  const showCopiedFeedback = state<boolean>(false)
+  const menuOpen = state<boolean>(false)
 
-  async function shareProfile() {
+  async function shareProfile(): Promise<void> {
     const url = window.location.href
     const title = 'Judge Profile'
     if (navigator.share) {
       try {
         await navigator.share({ title, url })
-      } catch (err) {
+      }
+      catch (err) {
         console.error('Error sharing:', err)
       }
-    } else {
+    }
+    else {
       navigator.clipboard.writeText(url)
       showCopiedFeedback.set(true)
       setTimeout(() => { showCopiedFeedback.set(false) }, 2000)

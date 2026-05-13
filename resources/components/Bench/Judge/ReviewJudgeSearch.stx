@@ -1,20 +1,21 @@
 <script client>
+  import type { Judge } from '~/resources/types'
   import { judges as allJudges } from '~/resources/functions/sample'
 
-  const searchQuery = state('')
+  const searchQuery = state<string>('')
 
-  const filteredJudges = derived(() => {
+  const filteredJudges = derived<Judge[]>(() => {
     const q = searchQuery()
     if (!q) return []
     const needle = q.toLowerCase()
     return allJudges.filter(judge =>
-      judge.name.toLowerCase().includes(needle) ||
-      judge.court.name.toLowerCase().includes(needle) ||
-      judge.department.toLowerCase().includes(needle)
+      judge.name.toLowerCase().includes(needle)
+      || judge.court.name.toLowerCase().includes(needle)
+      || judge.department.toLowerCase().includes(needle),
     )
   })
 
-  function selectJudge(judge) {
+  function selectJudge(judge: Judge): void {
     navigate(`/review/${judge.id}`, true)
   }
 </script>
@@ -32,7 +33,7 @@
       <input
         type="text"
         x-model="searchQuery"
-        class="block px-4 py-3 w-full text-gray-900 placeholder:text-gray-400 bg-off-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2"
+        class="block px-4 py-3 w-full text-gray-900 placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-300 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset shadow-sm"
         placeholder="Search for a judge..."
       >
       <div :if="searchQuery() && filteredJudges().length > 0" class="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg">

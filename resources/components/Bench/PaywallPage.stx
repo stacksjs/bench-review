@@ -1,7 +1,7 @@
 <script client>
-  const isLoading = state(false)
+  const isLoading = state<boolean>(false)
 
-  async function handleSubscribe() {
+  async function handleSubscribe(): Promise<void> {
     isLoading.set(true)
     try {
       // TODO: Implement actual Stripe subscription
@@ -10,7 +10,7 @@
       navigate('/dashboard', true)
     }
     catch (error) {
-      console.error('Failed to process subscription. Please try again.')
+      console.error('Failed to process subscription. Please try again.', error)
     }
     finally {
       isLoading.set(false)

@@ -1,7 +1,9 @@
 <script client>
-  const pricingPeriod = state('monthly')
+  type PricingPeriod = 'monthly' | 'yearly'
 
-  function togglePricingPeriod() {
+  const pricingPeriod = state<PricingPeriod>('monthly')
+
+  function togglePricingPeriod(): void {
     pricingPeriod.set(pricingPeriod() === 'monthly' ? 'yearly' : 'monthly')
   }
 </script>

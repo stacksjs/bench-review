@@ -4,16 +4,18 @@
 
 @section('content')
 <script client>
-  const isLoading = state(false)
+  const isLoading = state<boolean>(false)
 
-  async function handleSubscribe() {
+  async function handleSubscribe(): Promise<void> {
     isLoading.set(true)
     try {
       await new Promise(resolve => setTimeout(resolve, 1000))
       navigate('/dashboard', true)
-    } catch (error) {
-      console.error('Failed to process subscription.')
-    } finally {
+    }
+    catch (error) {
+      console.error('Failed to process subscription.', error)
+    }
+    finally {
       isLoading.set(false)
     }
   }

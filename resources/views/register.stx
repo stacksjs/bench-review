@@ -4,16 +4,23 @@
 
 @section('content')
 <script client>
+  interface RegisterResponse {
+    token?: string
+    user?: { id: number, name: string, email: string }
+    errors?: Array<{ message: string }>
+    message?: string
+  }
+
   useHead({ title: 'Create your account - Bench Review' })
 
-  const name = state('')
-  const email = state('')
-  const password = state('')
-  const passwordConfirmation = state('')
-  const loading = state(false)
-  const submitError = state('')
+  const name = state<string>('')
+  const email = state<string>('')
+  const password = state<string>('')
+  const passwordConfirmation = state<string>('')
+  const loading = state<boolean>(false)
+  const submitError = state<string>('')
 
-  async function submit() {
+  async function submit(): Promise<void> {
     loading.set(true)
     submitError.set('')
 
@@ -45,7 +52,7 @@
           password_confirmation: passwordConfirmation(),
         }),
       })
-      const body = await res.json().catch(() => ({}))
+      const body = await res.json().catch(() => ({})) as RegisterResponse
       if (!res.ok) {
         const msg = body?.errors?.[0]?.message
           || body?.message

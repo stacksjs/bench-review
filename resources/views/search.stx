@@ -1,5 +1,5 @@
 <script client>
-  import { judges as allJudges, courtHouses as allCourtHouses } from '~/resources/functions/sample'
+  import { courtHouses as allCourtHouses, judges as allJudges } from '~/resources/functions/sample'
 
   useHead({ title: 'Search - Bench Review' })
 
@@ -13,9 +13,9 @@
   const filteredJudges = judgesStore.filteredJudges
   const filteredCourts = judgesStore.filteredCourtHouses
   const totalResults = judgesStore.totalResults
-  const stars = [1, 2, 3, 4, 5]
+  const stars: number[] = [1, 2, 3, 4, 5]
 
-  function submitSearch() {
+  function submitSearch(): void {
     search.updateUrlQuery()
   }
 </script>

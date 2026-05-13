@@ -2,8 +2,21 @@
   definePageMeta({ middleware: ['auth'] })
 </script>
 <script client>
-  const filter = state('all')
-  const notifications = state([
+  type NotificationType = 'like' | 'comment' | 'follow' | 'reply' | 'system'
+  type FilterKind = 'all' | 'unread' | 'mentions'
+
+  interface Notification {
+    id: number
+    type: NotificationType
+    user: { name: string, imageUrl: string }
+    message: string
+    link: string
+    time: string
+    unread: boolean
+  }
+
+  const filter = state<FilterKind>('all')
+  const notifications = state<Notification[]>([
     {
       id: 1,
       type: 'like',
@@ -51,7 +64,7 @@
     }
   ])
 
-  const filtered = derived(() => {
+  const filtered = derived<Notification[]>(() => {
     const f = filter()
     const notifs = notifications()
     if (f === 'unread') return notifs.filter(n => n.unread)
@@ -59,11 +72,11 @@
     return notifs
   })
 
-  function markAllRead() {
+  function markAllRead(): void {
     notifications.set(notifications().map(n => ({ ...n, unread: false })))
   }
 
-  function dismiss(id) {
+  function dismiss(id: number): void {
     notifications.set(notifications().filter(n => n.id !== id))
   }
 </script>

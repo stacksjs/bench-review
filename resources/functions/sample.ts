@@ -1,5 +1,7 @@
 // Sample data - replace with actual data from your backend
-export const courtHouses = [
+import type { Activity, BlogPost, Category, CourtHouse, Judge, Review, TrendingJudge } from '~/resources/types'
+
+export const courtHouses: CourtHouse[] = [
   {
     id: '1',
     name: 'Supreme Court of California',
@@ -47,7 +49,7 @@ export const courtHouses = [
   },
 ]
 
-export const judges = [
+export const judges: Judge[] = [
   {
     id: 1,
     name: 'Hon. Sarah Johnson',
@@ -266,7 +268,7 @@ export const judges = [
   },
 ]
 
-export const categories = [
+export const categories: Category[] = [
   { name: 'Criminal', count: 428, current: true, icon: 'ScaleIcon' },
   { name: 'Civil', count: 312, current: false, icon: 'DocumentTextIcon' },
   { name: 'Family', count: 256, current: false, icon: 'HomeIcon' },
@@ -275,7 +277,7 @@ export const categories = [
   { name: 'Bankruptcy', count: 156, current: false, icon: 'BanknotesIcon' },
 ]
 
-export const reviews = [
+export const reviews: Review[] = [
   {
     id: 1,
     author: {
@@ -413,7 +415,7 @@ export const reviews = [
   },
 ]
 
-export const trendingJudges = [
+export const trendingJudges: TrendingJudge[] = [
   {
     id: 1,
     name: 'Hon. Sarah Johnson',
@@ -434,7 +436,7 @@ export const trendingJudges = [
   },
 ]
 
-export const recentActivity = [
+export const recentActivity: Activity[] = [
   {
     id: 1,
     content: 'New review posted for Hon. Sarah Johnson',
@@ -479,7 +481,7 @@ export const recentActivity = [
   },
 ]
 
-export const blogPosts = [
+export const blogPosts: BlogPost[] = [
   {
     id: 1,
     author: {

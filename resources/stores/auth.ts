@@ -1,4 +1,12 @@
+import type { NotificationItem, UserProfile } from '~/resources/types'
 import { defineStore, derived, state } from '@stacksjs/stx'
+
+interface LoginResponse {
+  token?: string
+  user?: UserProfile
+  errors?: Array<{ message: string }>
+  message?: string
+}
 
 // Cookie name read by stx-serve's page-level auth gate (see
 // `definePageMeta({ middleware: ['auth'] })` in protected views).
@@ -7,7 +15,7 @@ import { defineStore, derived, state } from '@stacksjs/stx'
 const AUTH_COOKIE = 'auth-token'
 const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 30 // 30 days
 
-function setAuthCookie(token) {
+function setAuthCookie(token: string): void {
   if (typeof document === 'undefined') return
   // Same-site Lax so navigations from external referrers still send it
   // (so the server-side auth gate can see the session on a deep-link
@@ -16,25 +24,25 @@ function setAuthCookie(token) {
   document.cookie = `${AUTH_COOKIE}=${encodeURIComponent(token)}; path=/; max-age=${AUTH_COOKIE_MAX_AGE}; SameSite=Lax`
 }
 
-function clearAuthCookie() {
+function clearAuthCookie(): void {
   if (typeof document === 'undefined') return
   // max-age=0 expires the cookie immediately.
   document.cookie = `${AUTH_COOKIE}=; path=/; max-age=0; SameSite=Lax`
 }
 
-function readAuthCookie() {
+function readAuthCookie(): string {
   if (typeof document === 'undefined') return ''
   const match = document.cookie.match(new RegExp(`(?:^|; )${AUTH_COOKIE}=([^;]*)`))
   return match ? decodeURIComponent(match[1]) : ''
 }
 
 defineStore('auth', () => {
-  const user = state(null)
-  const token = state('')
-  const isAuthenticated = derived(() => !!user())
-  const notifications = state([])
+  const user = state<UserProfile | null>(null)
+  const token = state<string>('')
+  const isAuthenticated = derived<boolean>(() => !!user())
+  const notifications = state<NotificationItem[]>([])
 
-  const unreadCount = derived(() => {
+  const unreadCount = derived<number>(() => {
     return notifications().filter(n => n.unread).length
   })
 
@@ -62,7 +70,7 @@ defineStore('auth', () => {
     }
   }
 
-  async function login(email, password) {
+  async function login(email: string, password: string): Promise<LoginResponse> {
     const res = await fetch('/login', {
       method: 'POST',
       headers: {
@@ -71,7 +79,7 @@ defineStore('auth', () => {
       },
       body: JSON.stringify({ email, password }),
     })
-    const data = await res.json().catch(() => ({}))
+    const data = await res.json().catch(() => ({})) as LoginResponse
     if (!res.ok) {
       const msg = data?.errors?.[0]?.message || data?.message || 'Login failed'
       throw new Error(msg)
@@ -93,12 +101,12 @@ defineStore('auth', () => {
     return data
   }
 
-  async function logout() {
+  async function logout(): Promise<void> {
     // Best-effort server-side invalidation. Even if it fails (network
     // hiccup, expired token), we still clear local state so the user
     // ends up on /login as expected.
     try {
-      const headers = { Accept: 'application/json' }
+      const headers: Record<string, string> = { Accept: 'application/json' }
       if (token())
         headers.Authorization = `Bearer ${token()}`
       await fetch('/logout', { method: 'POST', headers })
@@ -118,15 +126,15 @@ defineStore('auth', () => {
     navigate('/login', true)
   }
 
-  function setNotifications(notifs) {
+  function setNotifications(notifs: NotificationItem[]): void {
     notifications.set(notifs)
   }
 
-  function markAllRead() {
+  function markAllRead(): void {
     notifications.set(notifications().map(n => ({ ...n, unread: false })))
   }
 
-  function dismissNotification(id) {
+  function dismissNotification(id: number | string): void {
     notifications.set(notifications().filter(n => n.id !== id))
   }
 

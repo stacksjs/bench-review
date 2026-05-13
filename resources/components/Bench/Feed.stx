@@ -1,9 +1,9 @@
 <script client>
-  const showPricingModal = state(false)
-  const isLiked = state(false)
-  const stars = [1, 2, 3, 4, 5]
+  const showPricingModal = state<boolean>(false)
+  const isLiked = state<boolean>(false)
+  const stars: number[] = [1, 2, 3, 4, 5]
 
-  function toggleLike() {
+  function toggleLike(): void {
     isLiked.set(!isLiked())
   }
 </script>

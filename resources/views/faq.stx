@@ -1,9 +1,11 @@
 <script client>
+  interface Faq { q: string, a: string }
+
   useHead({ title: 'FAQ - Bench Review' })
 
-  const open = state(0)
+  const open = state<number>(0)
 
-  const faqs = [
+  const faqs: Faq[] = [
     {
       q: 'Who can write a review?',
       a: 'Anyone with a verified Bench Review account can submit a review. We prioritize reviews from clerks, attorneys, court staff, and parties to a case — people with first-hand experience appearing before a judge.'

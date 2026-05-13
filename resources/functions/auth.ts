@@ -4,7 +4,7 @@ interface User {
   password: string
 }
 
-const baseUrl = 'http://localhost:3008'
+const baseUrl = `http://localhost:${process.env.PORT_API || '4008'}`
 
 export function useAuth() {
   async function register(user: User) {

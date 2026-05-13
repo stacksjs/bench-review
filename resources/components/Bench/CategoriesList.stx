@@ -1,10 +1,11 @@
 <script client>
+  import type { Category } from '~/resources/types'
   import { categories as allCategories } from '~/resources/functions/sample'
 
-  const categories = derived(() => allCategories)
-  const activeCategory = state(allCategories.find(cat => cat.current)?.name || '')
+  const categories = derived<Category[]>(() => allCategories)
+  const activeCategory = state<string>(allCategories.find(cat => cat.current)?.name || '')
 
-  function setActiveCategory(categoryName) {
+  function setActiveCategory(categoryName: string): void {
     activeCategory.set(categoryName)
     document.dispatchEvent(new CustomEvent('category-changed', { detail: categoryName, bubbles: true }))
   }

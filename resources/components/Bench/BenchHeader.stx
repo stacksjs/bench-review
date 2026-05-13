@@ -3,7 +3,7 @@
   const search = useStore('search')
   const isAuthenticated = auth.isAuthenticated
 
-  function submitHeaderSearch() {
+  function submitHeaderSearch(): void {
     search.navigateToSearch()
   }
 </script>

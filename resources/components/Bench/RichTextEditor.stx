@@ -4,12 +4,12 @@
   const STORAGE_KEY = 'bench-review:compose-draft'
   const SAVE_DEBOUNCE_MS = 500
 
-  const editorMount = useRef('editorMount')
-  const editor = state(null)
+  const editorMount = useRef<HTMLElement>('editorMount')
+  const editor = state<InstanceType<typeof MediumEditor> | null>(null)
 
-  let saveTimer = null
+  let saveTimer: ReturnType<typeof setTimeout> | null = null
 
-  function loadDraft() {
+  function loadDraft(): string {
     try {
       return localStorage.getItem(STORAGE_KEY) || ''
     } catch {
@@ -17,7 +17,7 @@
     }
   }
 
-  function saveDraft(html) {
+  function saveDraft(html: string): void {
     if (saveTimer)
       clearTimeout(saveTimer)
     saveTimer = setTimeout(() => {
@@ -34,7 +34,7 @@
     }, SAVE_DEBOUNCE_MS)
   }
 
-  function emitChange(html) {
+  function emitChange(html: string): void {
     editorMount.current?.dispatchEvent(new CustomEvent('richtext:change', {
       bubbles: true,
       detail: { html },
@@ -94,7 +94,7 @@
   })
 </script>
 
-<div class="block w-full text-base text-gray-900 bg-off-white outline outline-1 outline-gray-300 rounded-md focus-within:outline focus-within:outline-2 focus-within:outline-gray-600 -outline-offset-1 focus-within:-outline-offset-2">
+<div class="block w-full text-base text-gray-900 bg-white border-0 ring-1 ring-gray-300 ring-inset rounded-md focus-within:ring-2 focus-within:ring-gray-600 focus-within:ring-inset shadow-sm">
   <div ref="editorMount" class="medium-editor-element px-3 py-2 min-h-[200px] focus:outline-none"></div>
 </div>
 

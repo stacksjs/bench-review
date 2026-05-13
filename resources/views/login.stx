@@ -4,15 +4,22 @@
 
 @section('content')
 <script client>
+  interface LoginResponse {
+    token?: string
+    user?: { id: number, name: string, email: string }
+    errors?: Array<{ message: string }>
+    message?: string
+  }
+
   useHead({ title: 'Login - The Chamber of Secrets' })
 
-  const email = state('')
-  const password = state('')
-  const rememberMe = state(false)
-  const loading = state(false)
-  const submitError = state('')
+  const email = state<string>('')
+  const password = state<string>('')
+  const rememberMe = state<boolean>(false)
+  const loading = state<boolean>(false)
+  const submitError = state<string>('')
 
-  async function submit() {
+  async function submitLogin(): Promise<void> {
     loading.set(true)
     submitError.set('')
     try {
@@ -28,7 +35,7 @@
           remember_me: rememberMe(),
         }),
       })
-      const body = await res.json().catch(() => ({}))
+      const body = await res.json().catch(() => ({})) as LoginResponse
       if (!res.ok) {
         // Surface the API's first validation/error message when present;
         // fall back to a generic line so the user always sees *something*.
@@ -85,7 +92,7 @@
     <div class="px-6 py-12 sm:px-12 bg-white sm:rounded-lg shadow">
       <h1 class="mb-6 font-bold text-2xl text-gray-900 text-center">Welcome back</h1>
 
-      <form @submit.prevent="submit()" class="space-y-6">
+      <form @submit.prevent="submitLogin()" class="space-y-6">
         <div>
           <label for="email" class="block font-medium text-gray-900 text-sm/6">Email address</label>
           <div class="mt-2">

@@ -1,8 +1,8 @@
 <script client>
-  const mobileSearchQuery = state('')
+  const mobileSearchQuery = state<string>('')
 
-  function submitMobileSearch() {
-    navigate('/search?q=' + encodeURIComponent(mobileSearchQuery()), true)
+  function submitMobileSearch(): void {
+    navigate(`/search?q=${encodeURIComponent(mobileSearchQuery())}`, true)
   }
 </script>
 

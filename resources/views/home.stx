@@ -1,16 +1,17 @@
 <script client>
-  import { judges as allJudges, reviews as allReviews, categories as allCategories } from '~/resources/functions/sample'
+  import type { Category, Judge, Review } from '~/resources/types'
+  import { categories as allCategories, judges as allJudges, reviews as allReviews } from '~/resources/functions/sample'
 
   useHead({ title: 'Find and Review Judges - Bench Review' })
 
   const search = useStore('search')
 
-  const featuredJudges = derived(() => allJudges.slice(0, 6))
-  const latestReviews = derived(() => allReviews.slice(0, 3))
-  const popularCategories = derived(() => allCategories.slice(0, 5))
-  const stars = [1, 2, 3, 4, 5]
+  const featuredJudges = derived<Judge[]>(() => allJudges.slice(0, 6))
+  const latestReviews = derived<Review[]>(() => allReviews.slice(0, 3))
+  const popularCategories = derived<Category[]>(() => allCategories.slice(0, 5))
+  const stars: number[] = [1, 2, 3, 4, 5]
 
-  function submitSearch() {
+  function submitSearch(): void {
     search.navigateToSearch()
   }
 </script>

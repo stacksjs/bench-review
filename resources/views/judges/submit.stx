@@ -1,5 +1,19 @@
 <script client>
-  const form = state({
+  interface JudgeSubmission {
+    judgeName: string
+    court: string
+    department: string
+    city: string
+    state: string
+    appointed: string
+    caseTypes: string
+    bio: string
+    sourceUrl: string
+    submitterRole: string
+    submitterEmail: string
+  }
+
+  const form = state<JudgeSubmission>({
     judgeName: '',
     court: '',
     department: '',
@@ -10,13 +24,13 @@
     bio: '',
     sourceUrl: '',
     submitterRole: 'attorney',
-    submitterEmail: ''
+    submitterEmail: '',
   })
-  const loading = state(false)
-  const submitted = state(false)
-  const submitError = state('')
+  const loading = state<boolean>(false)
+  const submitted = state<boolean>(false)
+  const submitError = state<string>('')
 
-  async function submitForm() {
+  async function submitForm(): Promise<void> {
     loading.set(true)
     submitError.set('')
     try {
@@ -27,9 +41,11 @@
       })
       if (!res.ok) throw new Error('Could not submit — please try again')
       submitted.set(true)
-    } catch (e) {
-      submitError.set(e.message)
-    } finally {
+    }
+    catch (e) {
+      submitError.set(e instanceof Error ? e.message : String(e))
+    }
+    finally {
       loading.set(false)
     }
   }

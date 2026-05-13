@@ -342,10 +342,13 @@ export async function startDevelopmentServer(options: DevOptions, startTime?: nu
   // (e.g. in CI where there's nothing to clean up).
   if (process.env.STACKS_DEV_NO_KILL !== '1') {
     try {
-      // Match `bun --watch storage/framework/core/actions/src/dev/*.ts`
-      // and any older `bun cli.ts dev` from this project. We deliberately
-      // don't use `pkill -f buddy` — the current process matches that.
-      await Bun.spawn(['pkill', '-9', '-f', 'bun --watch storage/framework/core/actions/src/dev/'], { stdout: 'ignore', stderr: 'ignore' }).exited
+      // Match `bun --watch <path>/storage/framework/core/actions/src/dev/*.ts`
+      // and any older `bun cli.ts dev` from this project. The path may be
+      // absolute or relative depending on how the orphan was originally
+      // launched — match the trailing tail so both forms get caught.
+      // We deliberately don't use `pkill -f buddy` — the current process
+      // matches that.
+      await Bun.spawn(['pkill', '-9', '-f', 'storage/framework/core/actions/src/dev/'], { stdout: 'ignore', stderr: 'ignore' }).exited
       await new Promise(r => setTimeout(r, 200))
     }
     catch {
@@ -366,19 +369,37 @@ export async function startDevelopmentServer(options: DevOptions, startTime?: nu
   const cleanup = () => {
     if (isExiting) return
     isExiting = true
+    // Two-phase, three-strategy shutdown. First try a process-group
+    // SIGTERM (works when buddy is the session leader), then fall
+    // through to a targeted pkill on the dev/ watchers we spawned
+    // (catches orphans when buddy was launched via `./buddy` and
+    // doesn't own the group), then SIGKILL anything still alive.
     try { process.kill(-process.pid, 'SIGTERM') }
     catch {
-      // Process group may not exist (e.g., not session leader) — try the
-      // current process only. Worst case the inner SIGKILL below cleans up.
       try { process.kill(0, 'SIGTERM') } catch { /* ignore */ }
     }
+    try {
+      // Don't await — we're on a signal handler and the event loop
+      // is unwinding. pkill is fast and best-effort.
+      Bun.spawn(['pkill', '-TERM', '-f', 'storage/framework/core/actions/src/dev/'], { stdout: 'ignore', stderr: 'ignore' })
+    }
+    catch { /* pkill missing — group SIGTERM above is our only shot */ }
     setTimeout(() => {
-      try { process.kill(0, 'SIGKILL') }
-      catch { process.exit(1) }
+      try { process.kill(0, 'SIGKILL') } catch { /* ignore */ }
+      try { Bun.spawn(['pkill', '-9', '-f', 'storage/framework/core/actions/src/dev/'], { stdout: 'ignore', stderr: 'ignore' }) }
+      catch { /* ignore */ }
+      process.exit(1)
     }, SHUTDOWN_GRACE_MS).unref()
   }
   process.on('SIGINT', cleanup)
   process.on('SIGTERM', cleanup)
+  // Also fire cleanup on the process emitting `exit` (e.g. uncaught
+  // error path) so a crash doesn't leave watchers running either.
+  process.on('exit', () => {
+    if (isExiting) return
+    try { Bun.spawn(['pkill', '-9', '-f', 'storage/framework/core/actions/src/dev/'], { stdout: 'ignore', stderr: 'ignore' }) }
+    catch { /* ignore */ }
+  })
 
   // Start all servers silently — unified banner above handles output
   const quietOpts = { ...options, quiet: true }

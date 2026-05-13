@@ -1,8 +1,9 @@
 <script client>
+  import type { Judge } from '~/resources/types'
   import { judges as allJudges } from '~/resources/functions/sample'
 
-  const courtJudges = derived(() => allJudges.slice(0, 8))
-  const stars = [1, 2, 3, 4, 5]
+  const courtJudges = derived<Judge[]>(() => allJudges.slice(0, 8))
+  const stars: number[] = [1, 2, 3, 4, 5]
 </script>
 
 <div class="lg:col-span-2 lg:row-end-2 lg:row-span-2 -mx-4 px-4 py-8 sm:mx-0 sm:pb-14 sm:px-8 xl:pb-20 xl:pt-16 xl:px-16 bg-white ring-1 ring-gray-900/5 sm:rounded-lg shadow-sm">

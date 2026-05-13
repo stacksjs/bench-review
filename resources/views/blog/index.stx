@@ -1,9 +1,10 @@
 <script client>
+  import type { BlogPost } from '~/resources/types'
   import { blogPosts } from '~/resources/functions/sample'
 
   useHead({ title: 'Blog - The Chamber of Secrets' })
 
-  const posts = derived(() => blogPosts)
+  const posts = derived<BlogPost[]>(() => blogPosts)
 </script>
 
 @extends('layouts/default')
