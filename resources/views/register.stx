@@ -3,16 +3,13 @@
 @section('title', 'Register - Bench Review')
 
 @section('content')
+<script server>
+  definePageMeta({ middleware: ['guest'] })
+</script>
 <script client>
-  interface RegisterResponse {
-    token?: string
-    user?: { id: number, name: string, email: string }
-    errors?: Array<{ message: string }>
-    message?: string
-  }
-
   useHead({ title: 'Create your account - Bench Review' })
 
+  const auth = useStore('auth')
   const name = state<string>('')
   const email = state<string>('')
   const password = state<string>('')
@@ -38,51 +35,18 @@
       return
     }
 
-    try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          name: name(),
-          email: email(),
-          password: password(),
-          password_confirmation: passwordConfirmation(),
-        }),
-      })
-      const body = await res.json().catch(() => ({})) as RegisterResponse
-      if (!res.ok) {
-        const msg = body?.errors?.[0]?.message
-          || body?.message
-          || 'Registration failed. Please try again.'
-        submitError.set(msg)
-        return
-      }
-
-      try {
-        if (body?.token)
-          localStorage.setItem('auth_token', body.token)
-        if (body?.user)
-          localStorage.setItem('auth_user', JSON.stringify(body.user))
-      }
-      catch {}
-      // Cookie write — see login.stx for the rationale; without this
-      // the redirect to /profile bounces straight back to /login
-      // because stx-serve's page auth gate sees no session.
-      if (body?.token && typeof document !== 'undefined') {
-        document.cookie = `auth-token=${encodeURIComponent(body.token)}; path=/; max-age=2592000; SameSite=Lax`
-      }
-
-      navigate('/profile', true)
+    const result = await auth.signUp({
+      name: name(),
+      email: email(),
+      password: password(),
+      password_confirmation: passwordConfirmation(),
+    })
+    loading.set(false)
+    if (!result.ok) {
+      submitError.set(result.error || 'Registration failed. Please try again.')
+      return
     }
-    catch {
-      submitError.set('Network error. Please try again.')
-    }
-    finally {
-      loading.set(false)
-    }
+    navigate('/profile', true)
   }
 </script>
 

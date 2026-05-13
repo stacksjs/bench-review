@@ -223,6 +223,41 @@ export async function runAction(action: Action, options?: ActionOptions): Promis
         const layoutsDir = firstExisting(['resources/views/layouts', 'resources/layouts'])
         const partialsDir = firstExisting(['resources/views/components', 'resources/components'])
 
+        // ── Auto-discover user middleware from `resources/middleware/` ────
+        //
+        // Nuxt-style: each `.ts` file under `resources/middleware/` exports a
+        // default handler `(req, ctx) => Response | null | void`. The
+        // filename (sans extension) becomes the middleware name that pages
+        // reference via `definePageMeta({ middleware: ['<name>'] })`.
+        //
+        // The built-in `auth` / `guest` middleware that stx-serve registers
+        // from the `auth: { cookieName, redirectTo }` option below stays
+        // available — user files can override either by reusing the same
+        // name. No file means no override; the framework default keeps
+        // working out of the box.
+        const { readdirSync } = await import('node:fs')
+        const userMiddleware: Record<string, any> = {}
+        const middlewareDir = p.projectPath('resources/middleware')
+        if (existsSync(middlewareDir)) {
+          for (const file of readdirSync(middlewareDir)) {
+            if (!file.endsWith('.ts') || file.startsWith('_') || file.startsWith('.'))
+              continue
+            const name = file.replace(/\.ts$/, '')
+            try {
+              const mod = await import(`${middlewareDir}/${file}`)
+              const handler = mod.default ?? mod[name]
+              if (typeof handler !== 'function') {
+                console.warn(`[middleware] ${file} has no default export (or named "${name}" export) — skipping`)
+                continue
+              }
+              userMiddleware[name] = handler
+            }
+            catch (err) {
+              console.error(`[middleware] failed to load ${file}:`, err)
+            }
+          }
+        }
+
         await serve({
           patterns: ['resources/views', 'storage/framework/defaults/resources/views'],
           port,
@@ -240,6 +275,12 @@ export async function runAction(action: Action, options?: ActionOptions): Promis
             cookieName: authCookie,
             redirectTo: '/login',
           },
+          // Object.assign order matters: user files win when they share a
+          // name with the built-in `auth` / `guest` handlers. That's the
+          // override seam — drop `resources/middleware/auth.ts` to replace
+          // the cookie-presence check with something stricter (server-
+          // side token validation, role lookup, etc.).
+          middleware: userMiddleware,
           // /api/** → API dev server. Storefront forms posting to local
           // routes need this; without it stx-serve answers with a 404
           // page since it doesn't know about bun-router actions.

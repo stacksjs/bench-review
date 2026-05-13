@@ -66,6 +66,10 @@ const commandRegistry: Record<string, CommandLoader> = {
   'schedule': { path: './commands/schedule.ts', exportName: 'schedule' },
   'search': { path: './commands/search.ts', exportName: 'search' },
   'seed': { path: './commands/seed.ts', exportName: 'seed' },
+  // `factory` lives in the same file as `seed` because they share
+  // helpers (model-existence validation) and both register on the same
+  // CLI instance — the seed() loader registers BOTH subcommands.
+  'factory': { path: './commands/seed.ts', exportName: 'seed' },
   'setup': { path: './commands/setup.ts', exportName: 'setup' },
   'share': { path: './commands/share.ts', exportName: 'share' },
   'stack': { path: './commands/stacks.ts', exportName: 'stacks' },

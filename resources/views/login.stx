@@ -3,16 +3,16 @@
 @section('title', 'Login - The Chamber of Secrets')
 
 @section('content')
+<script server>
+  // Bounce already-authenticated users to /profile so they don't sit
+  // on a login form they don't need. The `guest` middleware lives at
+  // resources/middleware/guest.ts.
+  definePageMeta({ middleware: ['guest'] })
+</script>
 <script client>
-  interface LoginResponse {
-    token?: string
-    user?: { id: number, name: string, email: string }
-    errors?: Array<{ message: string }>
-    message?: string
-  }
-
   useHead({ title: 'Login - The Chamber of Secrets' })
 
+  const auth = useStore('auth')
   const email = state<string>('')
   const password = state<string>('')
   const rememberMe = state<boolean>(false)
@@ -22,68 +22,13 @@
   async function submitLogin(): Promise<void> {
     loading.set(true)
     submitError.set('')
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          email: email(),
-          password: password(),
-          remember_me: rememberMe(),
-        }),
-      })
-      const body = await res.json().catch(() => ({})) as LoginResponse
-      if (!res.ok) {
-        // Surface the API's first validation/error message when present;
-        // fall back to a generic line so the user always sees *something*.
-        const msg = body?.errors?.[0]?.message
-          || body?.message
-          || (res.status === 401 ? 'Incorrect email or password' : 'Login failed. Please try again.')
-        submitError.set(msg)
-        return
-      }
-
-      // Persist the token + minimal user info so subsequent /api calls
-      // can attach `Authorization: Bearer <token>`. Cookie is written
-      // alongside localStorage so stx-serve's page-level auth gate
-      // (see the auth-middleware page-meta on /profile, /settings, etc.)
-      // sees the session on the very next request — without it, the
-      // redirect to /profile would just bounce back to /login.
-      //
-      // NOTE: don't write the page-meta function-call syntax (name +
-      // open-paren + brace-block + close-paren) anywhere in this
-      // file's comments. stx-serve regex-scans the page source for
-      // that pattern and registers the matching middleware against
-      // the route, regardless of whether the match is inside a JS
-      // comment — gating /login behind auth would cause an infinite
-      // redirect loop on every visit.
-      try {
-        if (body?.token)
-          localStorage.setItem('auth_token', body.token)
-        if (body?.user)
-          localStorage.setItem('auth_user', JSON.stringify(body.user))
-      }
-      catch {
-        // Private-mode browsers may block localStorage. Silent — the
-        // cookie below is what actually authenticates the next request.
-      }
-      if (body?.token && typeof document !== 'undefined') {
-        // Matches `config/auth.ts.defaultTokenName` and the cookie name
-        // resources/stores/auth.ts writes. SameSite=Lax + 30-day max-age.
-        document.cookie = `auth-token=${encodeURIComponent(body.token)}; path=/; max-age=2592000; SameSite=Lax`
-      }
-
-      navigate('/profile', true)
+    const result = await auth.signIn(email(), password())
+    loading.set(false)
+    if (!result.ok) {
+      submitError.set(result.error || 'Login failed. Please try again.')
+      return
     }
-    catch {
-      submitError.set('Network error. Please try again.')
-    }
-    finally {
-      loading.set(false)
-    }
+    navigate('/profile', true)
   }
 </script>
 

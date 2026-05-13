@@ -2,8 +2,19 @@
   const auth = useStore('auth')
   const search = useStore('search')
 
-  function isAuthed(): boolean {
-    return !!auth.user()
+  // `auth.isAuthenticated` is a derived signal that reads `token()` —
+  // capturing it here keeps the :if bindings reactive without us having
+  // to call it. The auto-unwrap proxy in stx's expression evaluator
+  // pulls the value out at read time.
+  const isAuthenticated = auth.isAuthenticated
+
+  // Display name comes from the user cookie/state. Wrapped in a derived
+  // so a fresh signIn that calls `user.set(...)` immediately re-renders
+  // the chip — no page reload needed.
+  const userName = derived<string>(() => auth.user()?.name || '')
+
+  async function handleLogout(): Promise<void> {
+    await auth.logout()
   }
 
   function submitHeaderSearch(): void {
@@ -32,12 +43,17 @@
       </form>
     </div>
     <div class="hidden lg:flex lg:flex-1 lg:justify-end gap-x-4 items-center">
-      <div :if="!isAuthed()">
-        <StxLink to="/login" class="mr-6 font-semibold text-gray-900 text-sm/6">Log in</StxLink>
+      <div :if="!isAuthenticated" class="flex gap-x-6 items-center">
+        <StxLink to="/login" class="font-semibold text-gray-900 text-sm/6">Log in</StxLink>
         <StxLink to="/register" class="font-semibold text-gray-900 text-sm/6">Sign up</StxLink>
       </div>
-      <div :if="isAuthed()">
-        <StxLink to="/profile" class="font-semibold text-gray-900 text-sm/6">Profile</StxLink>
+      <div :if="isAuthenticated" class="flex gap-x-4 items-center">
+        <StxLink to="/profile" class="font-semibold text-gray-900 text-sm/6 hover:text-gray-600" :text="userName"></StxLink>
+        <button
+          type="button"
+          @click="handleLogout()"
+          class="font-semibold text-gray-500 text-sm/6 hover:text-red-600 transition-colors"
+        >Log out</button>
       </div>
     </div>
   </nav>

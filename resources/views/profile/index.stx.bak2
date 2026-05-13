@@ -2,11 +2,6 @@
 @section('title', 'Profile - The Chamber of Secrets')
 @section('content')
 <script server>
-  // Page-level middleware. Names resolve in this order:
-  //   1. user files under `resources/middleware/<name>.ts` (Nuxt-style)
-  //   2. stx-serve's built-in `auth` / `guest` (cookie-presence checks)
-  // `auth` here is the built-in — drop `resources/middleware/auth.ts` if
-  // you need stricter server-side validation (token lookup, role check).
   definePageMeta({ middleware: ['auth'] })
 </script>
 <script client>
@@ -19,16 +14,11 @@
   }
 
   useHead({ title: 'Profile - The Chamber of Secrets' })
-  // The layout's BenchHeader.stx already declares `const auth = useStore('auth')`
-  // at the top of its <script client>. stx merges every layout/page
-  // setup into a single function scope, so a second top-level
-  // `const auth = …` here would shadow it; rename to keep both
-  // declarations distinct and explicit.
-  const authStore = useStore('auth')
+  const auth = useStore('auth')
   const stats = state<ProfileStats>({ totalReviews: 24, judgesReviewed: 12, averageRating: 4.2, helpfulVotes: 156, monthlyDelta: 3 })
-  function displayName(): string { return authStore.user()?.name || 'Guest' }
+  function displayName(): string { return auth.user()?.name || 'Guest' }
   function memberSince(): string {
-    const u = authStore.user()
+    const u = auth.user()
     if (!u) return 'Sign in to see your profile'
     const created = u.created_at || u.createdAt
     if (!created) return 'Member'
@@ -37,7 +27,7 @@
     return `Member since ${d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}`
   }
   function avatarUrl(): string {
-    return authStore.user()?.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+    return auth.user()?.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
   }
 </script>
 

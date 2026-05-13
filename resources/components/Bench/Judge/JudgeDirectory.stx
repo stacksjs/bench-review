@@ -69,39 +69,51 @@
       <StxLink
         :for="judge in filteredJudges"
         x-to="`/judges/${judge.id}/profile`"
-        class="overflow-hidden relative bg-off-gray border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-lg duration-300 transition-all group"
+        class="overflow-hidden relative flex flex-col bg-white border border-gray-200 rounded-2xl hover:border-gray-300 shadow-sm hover:shadow-lg hover:-translate-y-0.5 duration-300 transition-all group"
       >
-          <div class="absolute inset-0 z-0">
+          <!-- Banner strip: courthouse photo behind a strong scrim so the
+               card stays readable and the photo just hints at scale. The
+               avatar centers OVER this band so the court chip sits cleanly
+               in the white area below — no overlap with the avatar disc. -->
+          <div class="relative h-28 bg-gradient-to-br from-gray-100 to-gray-50">
             <img
               x-src="judge.court.image"
               x-alt="`${judge.court.name} courthouse`"
-              class="object-cover h-full w-full opacity-10 group-hover:opacity-30 duration-300 transition-all"
+              class="absolute inset-0 object-cover h-full w-full opacity-20 group-hover:opacity-30 duration-300 transition-opacity"
             >
-            <div class="absolute inset-0 bg-gradient-to-b from-white/70 to-white/80 via-white/40 group-hover:from-white/60 group-hover:to-white/70 group-hover:via-white/30 duration-300 transition-all"></div>
+            <div class="absolute inset-0 bg-gradient-to-b from-transparent to-white"></div>
           </div>
 
-          <div class="relative z-10 p-6">
-            <div class="relative">
-              <div class="overflow-hidden mx-auto h-40 w-40 ring-4 ring-gray-50 rounded-full group-hover:ring-softBrown duration-300 transition-all">
-                <img class="object-cover h-full w-full grayscale group-hover:grayscale-0 duration-300 transition-all filter" x-src="judge.photo" x-alt="judge.name">
-              </div>
-              <div class="absolute left-1/2 transform -bottom-2 -translate-x-1/2">
-                <span class="inline-flex items-center px-3 py-1 font-medium text-gray-700 text-sm bg-warm-gray ring-1 ring-gray-700/10 ring-inset rounded-full" :text="judge.court.name"></span>
-              </div>
+          <!-- Avatar pulled up so it straddles the banner / body line.
+               -mt-16 keeps the bottom half of the disc in the white body
+               where the chip + text live, avoiding the readability problem. -->
+          <div class="relative flex flex-col items-center px-6 pb-6 -mt-16">
+            <div class="overflow-hidden h-28 w-28 ring-4 ring-white rounded-full bg-white shadow-md">
+              <img
+                class="object-cover h-full w-full grayscale group-hover:grayscale-0 duration-300 transition-all filter"
+                x-src="judge.photo"
+                x-alt="judge.name"
+              >
             </div>
 
-            <div class="mt-8 text-center">
-              <h3 class="font-semibold text-gray-900 text-xl group-hover:text-deep-brown duration-200 transition-colors" :text="judge.name"></h3>
-              <p class="mt-2 text-gray-500 text-sm" :text="judge.location"></p>
+            <span
+              class="inline-flex items-center mt-3 px-3 py-1 font-medium text-gray-700 text-xs bg-gray-50 ring-1 ring-gray-200 ring-inset rounded-full"
+              :text="judge.court.name"
+            ></span>
 
-              <div class="flex items-center justify-center mt-4">
-                <div class="flex items-center">
-                  <svg :for="star in stars" class="h-5 w-5 flex-shrink-0" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" clip-rule="evenodd" />
-                  </svg>
-                </div>
-                <span class="ml-2 text-gray-500 text-sm" :text="`(${judge.reviewCount} reviews)`"></span>
+            <h3
+              class="mt-3 font-semibold text-gray-900 text-lg group-hover:text-gray-700 duration-200 transition-colors"
+              :text="judge.name"
+            ></h3>
+            <p class="mt-1 text-gray-500 text-sm" :text="judge.location"></p>
+
+            <div class="flex items-center justify-center mt-3">
+              <div class="flex items-center">
+                <svg :for="star in stars" class="h-4 w-4 flex-shrink-0" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" clip-rule="evenodd" />
+                </svg>
               </div>
+              <span class="ml-2 text-gray-400 text-xs" :text="`(${judge.reviewCount} reviews)`"></span>
             </div>
           </div>
       </StxLink>
