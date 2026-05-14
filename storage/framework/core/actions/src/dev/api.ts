@@ -56,6 +56,18 @@ catch (err) {
   log.warn(`[api:dev] failed to bootstrap event listeners — dispatched events will be ignored: ${(err as Error).message}`)
 }
 
+// Turn off bun-router's file-based stx page routing on the API port.
+// Without this, bun-router auto-discovers every `resources/views/*.stx`
+// and registers a GET route for it — so `GET :PORT_API/login` returns
+// the rendered login page from the API process (with its own renderer
+// that doesn't honour stx.config.ts). The API should only serve
+// bun-router routes from routes/api.ts; the frontend stx-serve owns
+// page rendering. `disableFileRouting()` exists but the `enabled: false`
+// flag isn't read by `_initFileRoutes` in older bun-router builds, so
+// flip `_fileRoutesInitialized = true` on the inner bun-router instance
+// directly — that short-circuits the init unconditionally.
+;(route as any).bunRouter._fileRoutesInitialized = true
+
 // Enable CORS middleware
 route.use(cors().handle.bind(cors()) as any)
 
