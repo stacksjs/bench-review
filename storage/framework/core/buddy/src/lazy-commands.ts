@@ -33,6 +33,21 @@ const commandRegistry: Record<string, CommandLoader> = {
   'domains': { path: './commands/domains.ts', exportName: 'domains' },
   'email': { path: './commands/email.ts', exportName: 'email' },
   'env': { path: './commands/env.ts', exportName: 'env' },
+  // Feature install / uninstall — single file registers all pairs.
+  'dashboard:install': { path: './commands/features.ts', exportName: 'features' },
+  'dashboard:uninstall': { path: './commands/features.ts', exportName: 'features' },
+  'commerce:install': { path: './commands/features.ts', exportName: 'features' },
+  'commerce:uninstall': { path: './commands/features.ts', exportName: 'features' },
+  'cms:install': { path: './commands/features.ts', exportName: 'features' },
+  'cms:uninstall': { path: './commands/features.ts', exportName: 'features' },
+  'marketing:install': { path: './commands/features.ts', exportName: 'features' },
+  'marketing:uninstall': { path: './commands/features.ts', exportName: 'features' },
+  'monitoring:install': { path: './commands/features.ts', exportName: 'features' },
+  'monitoring:uninstall': { path: './commands/features.ts', exportName: 'features' },
+  'realtime:install': { path: './commands/features.ts', exportName: 'features' },
+  'realtime:uninstall': { path: './commands/features.ts', exportName: 'features' },
+  'queue:install': { path: './commands/features.ts', exportName: 'features' },
+  'queue:uninstall': { path: './commands/features.ts', exportName: 'features' },
   'fresh': { path: './commands/fresh.ts', exportName: 'fresh' },
   'generate': { path: './commands/generate.ts', exportName: 'generate' },
   'http': { path: './commands/http.ts', exportName: 'http' },
@@ -66,10 +81,6 @@ const commandRegistry: Record<string, CommandLoader> = {
   'schedule': { path: './commands/schedule.ts', exportName: 'schedule' },
   'search': { path: './commands/search.ts', exportName: 'search' },
   'seed': { path: './commands/seed.ts', exportName: 'seed' },
-  // `factory` lives in the same file as `seed` because they share
-  // helpers (model-existence validation) and both register on the same
-  // CLI instance — the seed() loader registers BOTH subcommands.
-  'factory': { path: './commands/seed.ts', exportName: 'seed' },
   'setup': { path: './commands/setup.ts', exportName: 'setup' },
   'share': { path: './commands/share.ts', exportName: 'share' },
   'stack': { path: './commands/stacks.ts', exportName: 'stacks' },

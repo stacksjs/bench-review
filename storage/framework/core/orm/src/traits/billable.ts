@@ -1,13 +1,7 @@
 import { db as _db } from '@stacksjs/database'
 
 // See note in categorizable.ts — relax db method types for trait helpers.
-// Wrapped in a Proxy so each property access reads `_db` at call time, not
-// at module-load time. Reading `_db` at the top level triggers a TDZ
-// "Cannot access '_db' before initialization" when this module loads during
-// the @stacksjs/database → @stacksjs/orm → @stacksjs/database import cycle.
-const db: any = new Proxy({} as any, {
-  get(_target, prop) { return (_db as any)[prop] },
-})
+const db = _db as any
 
 export function createBillableMethods(_tableName: string) {
   return {

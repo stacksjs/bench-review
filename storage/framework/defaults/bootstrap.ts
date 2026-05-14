@@ -5,9 +5,11 @@
  * boot. Each entry below either:
  *
  *   1. Imports a framework package whose `index.ts` self-registers via
- *      `route.register(...)` on import — the Stacks analogue of a
- *      Laravel service provider's `boot()` method. This is the preferred
- *      shape for packages that own their own routes/migrations/etc.
+ *      `route.register(...)` on import — analogous to the service
+ *      provider pattern other frameworks (competitors) use to give
+ *      packages a chance to wire themselves up at boot. This is the
+ *      preferred shape for packages that own their own routes,
+ *      migrations, etc.
  *
  *   2. Registers a framework routes file directly via `route.register()`
  *      — used when a routes file isn't yet wrapped in its own package.
@@ -19,12 +21,46 @@
  * @see storage/framework/core/router/src/route-loader.ts:loadFrameworkRoutes
  */
 
+import { feature } from '@stacksjs/config'
 import { frameworkPath } from '@stacksjs/path'
 import { route } from '@stacksjs/router'
+import MaintenanceMiddleware from './app/Middleware/Maintenance'
 
-// Dashboard, auth, password, email, etc. Currently lives as a single
-// 687-line routes file under defaults/routes/dashboard.ts. As each
-// subdomain grows it can split into smaller files (auth.ts, email.ts,
-// commerce.ts) and each gets its own register() line — or moves into a
-// dedicated workspace package whose index.ts self-registers.
-await route.register(frameworkPath('defaults/routes/dashboard.ts'))
+// Global maintenance / coming-soon gate. Registered first so the
+// `buddy down` / `buddy coming-soon` (and their env-var equivalents)
+// state files intercept every request before any other middleware or
+// route runs.
+//
+// The middleware is a thin wrapper around `maintenanceGate()` in
+// @stacksjs/server, which is also called from the dev server's
+// `onRequest` hook — so dev and prod use one implementation. The gate
+// itself reads `activeSiteModePayload()` so it covers both maintenance
+// and coming-soon modes (plus `APP_MAINTENANCE` / `APP_COMING_SOON`
+// env overrides) without the bootstrap needing to know the details.
+route.use(MaintenanceMiddleware.handle.bind(MaintenanceMiddleware) as any)
+
+// Feature-gated route registration. The dashboard.ts file currently bundles
+// ~687 lines covering auth, password reset, email subscribe, storefront
+// cart/checkout, reviews, sitemap, AI, voice, and the admin dashboard's
+// REST surface. Until that file is split per-feature (auth.ts, marketing.ts,
+// commerce.ts, monitoring.ts), the whole thing loads when `dashboard` is
+// activated and stays inert otherwise.
+//
+// Apps that need only a slice — e.g. a marketing site that wants
+// `/api/email/subscribe` and `/api/contact` but not the rest — can either
+//   1. Activate `dashboard` and live with the over-broad register; the
+//      action handlers for routes you don't hit never fire, and their
+//      models stay un-loaded as long as the corresponding feature flag
+//      (`commerce`, `cms`, `monitoring`) is off, so there's no hidden
+//      cost beyond the bun-router route-table entries.
+//   2. Define the routes they want directly in `routes/api.ts` —
+//      first-registration-wins means the user version takes priority.
+//
+// Once the per-feature route split lands, each `if (feature('X'))` block
+// below registers just the X-specific routes file.
+if (feature('dashboard')) {
+  await route.register(frameworkPath('defaults/routes/dashboard.ts'))
+  // JSON endpoints for the dev dashboard UI. Kept separate from the view
+  // routes above so the data layer is one obvious file to grep.
+  await route.register(frameworkPath('defaults/routes/dashboard-api.ts'))
+}
