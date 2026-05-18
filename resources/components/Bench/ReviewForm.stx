@@ -59,14 +59,59 @@
     return getRatingText((hoverRating() || rating()) as StarRating)
   })
 
-  function handleSubmit(): void {
+  function ratingType(value: number): 'positive' | 'negative' | 'neutral' {
+    if (value >= 4) return 'positive'
+    if (value <= 2) return 'negative'
+    return 'neutral'
+  }
+
+  async function handleSubmit(): Promise<void> {
+    submitError.set(null)
+
+    const j = judge()
+    if (!j) {
+      submitError.set('Pick a judge first.')
+      return
+    }
+
+    const title = reviewTitle().trim()
+    if (!title) {
+      submitError.set('Add a review title.')
+      return
+    }
+
+    const content = reviewContent().trim()
+    if (!content) {
+      submitError.set('Write a review before submitting.')
+      return
+    }
+
+    const overall = rating()
+    if (!overall || overall < 1) {
+      submitError.set('Give the judge an overall rating.')
+      return
+    }
+
+    const result = await reviewsStore.submit({
+      judge_id: Number(j.id),
+      title,
+      content,
+      rating: overall,
+      type: ratingType(overall),
+    })
+
+    if (!result.ok) {
+      submitError.set(result.error || 'Failed to submit review.')
+      return
+    }
+
     try {
       localStorage.removeItem('bench-review:compose-draft')
     }
     catch {
       // localStorage unavailable — fail silently
     }
-    navigate(`/judges/${judge()?.id}/reviews`, true)
+    navigate(`/judges/${j.id}/reviews`, true)
   }
 
   function handleCancel(): void {
