@@ -1,4 +1,5 @@
 import type { CLI, DevOptions } from '@stacksjs/types'
+import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { bold, cyan, dim, green, intro, log, onUnknownSubcommand, outro, prompts, runCommand } from "@stacksjs/cli"
 import { Action } from '@stacksjs/enums'
@@ -19,6 +20,7 @@ export function dev(buddy: CLI): void {
     frontend: 'Start the frontend development server',
     components: 'Start the Components development server',
     desktop: 'Start the Desktop App development server',
+    native: 'Start the app in a native Craft window',
     dashboard: 'Start the Dashboard development server',
     api: 'Start the local API development server',
     email: 'Start the Email development server',
@@ -39,6 +41,7 @@ export function dev(buddy: CLI): void {
     .option('-c, --components', descriptions.components)
     .option('-d, --dashboard', descriptions.dashboard)
     .option('-k, --desktop', descriptions.desktop)
+    .option('-n, --native', descriptions.native)
     .option('-o, --docs', descriptions.docs)
     .option('-s, --system-tray', descriptions.systemTray)
     .option('-i, --interactive', descriptions.interactive, { default: false })
@@ -64,6 +67,7 @@ export function dev(buddy: CLI): void {
         || (options.components ? 'components' : undefined)
         || ((options as any).dashboard ? 'dashboard' : undefined)
         || (options.desktop ? 'desktop' : undefined)
+        || (options.native ? 'native' : undefined)
         || ((options as any).systemTray || (options as any)['system-tray'] ? 'system-tray' : undefined)
         || (options.docs ? 'docs' : undefined)
 
@@ -71,6 +75,9 @@ export function dev(buddy: CLI): void {
         const serverOptions = { ...options }
         const a = await actions()
         switch (target) {
+          case 'native':
+            await startDevelopmentServer({ ...serverOptions, native: true }, perf)
+            break
           case 'frontend':
             await a.runFrontendDevServer(serverOptions)
             break
@@ -108,6 +115,7 @@ export function dev(buddy: CLI): void {
             { value: 'api', title: 'Backend' },
             { value: 'dashboard', title: 'Dashboard' },
             { value: 'desktop', title: 'Desktop' },
+            { value: 'native', title: 'Native App' },
             { value: 'email', title: 'Email' },
             { value: 'components', title: 'Components' },
             { value: 'docs', title: 'Documentation' },
@@ -124,6 +132,9 @@ export function dev(buddy: CLI): void {
         }
         else if (selectedValue === 'dashboard') {
           await (await actions()).runDashboardDevServer(options)
+        }
+        else if (selectedValue === 'native') {
+          await startDevelopmentServer({ ...options, native: true }, perf)
         }
         // else if (selectedValue === 'email')
         //   await runEmailDevServer(options)
@@ -194,6 +205,15 @@ export function dev(buddy: CLI): void {
       console.log('')
       await outro('Exited', { startTime: perf, useSeconds: true })
       process.exit(ExitCode.Success)
+    })
+
+  buddy
+    .command('dev:native', descriptions.native)
+    .option('-p, --project [project]', descriptions.project, { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (options: DevOptions) => {
+      const perf = await intro('buddy dev:native')
+      await startDevelopmentServer({ ...options, native: true }, perf)
     })
 
   buddy
@@ -285,8 +305,11 @@ export function dev(buddy: CLI): void {
   onUnknownSubcommand(buddy, "dev")
 }
 
-export async function startDevelopmentServer(options: DevOptions, startTime?: number): Promise<void> {
+export async function startDevelopmentServer(_options: DevOptions, _startTime?: number): Promise<void> {
+  const options = _options
+  const startedAt = _startTime
   const appUrl = process.env.APP_URL
+  const nativeMode = options.native === true
   const frontendPort = Number(process.env.PORT) || 3000
   const apiPort = Number(process.env.PORT_API) || 3008
   const docsPort = Number(process.env.PORT_DOCS) || 3006
@@ -297,7 +320,7 @@ export async function startDevelopmentServer(options: DevOptions, startTime?: nu
   // `STACKS_DEV_DASHBOARD=1 ./buddy dev` (or `./buddy dev:dashboard` to
   // run it standalone) when you actually want the dashboard up.
   const includeDashboard = process.env.STACKS_DEV_DASHBOARD === '1'
-  const hasCustomDomain = appUrl && appUrl !== 'localhost' && !appUrl.includes('localhost:')
+  const hasCustomDomain = !nativeMode && appUrl && appUrl !== 'localhost' && !appUrl.includes('localhost:')
   const domain = hasCustomDomain ? appUrl.replace(/^https?:\/\//, '') : null
   const apiDomain = domain ? `api.${domain}` : null
   const docsDomain = domain ? `docs.${domain}` : null
@@ -306,6 +329,12 @@ export async function startDevelopmentServer(options: DevOptions, startTime?: nu
   const apiUrl = apiDomain ? `https://${apiDomain}` : `http://localhost:${apiPort}`
   const docsUrl = docsDomain ? `https://${docsDomain}` : `http://localhost:${docsPort}`
   const dashboardUrl = dashboardDomain ? `https://${dashboardDomain}` : `http://localhost:${dashboardPort}`
+  const managedPorts = [
+    frontendPort,
+    apiPort,
+    docsPort,
+    ...(includeDashboard ? [dashboardPort] : []),
+  ]
 
   // Print Vite-style unified output. Banner first so the user has the URLs
   // while servers boot — the "ready" line lands later, once each backend
@@ -314,6 +343,9 @@ export async function startDevelopmentServer(options: DevOptions, startTime?: nu
   console.log(`  ${bold(cyan('stacks'))} ${dim(`v${version}`)}`)
   console.log()
   console.log(`  ${green('➜')}  ${bold('Frontend')}:    ${cyan(frontendUrl)}`)
+  if (nativeMode) {
+    console.log(`  ${green('➜')}  ${bold('Native')}:      ${cyan(`Craft → http://localhost:${frontendPort}`)}`)
+  }
   console.log(`  ${green('➜')}  ${bold('API')}:         ${cyan(apiUrl)}`)
   console.log(`  ${green('➜')}  ${bold('Docs')}:        ${cyan(docsUrl)}`)
   if (includeDashboard) {
@@ -341,19 +373,7 @@ export async function startDevelopmentServer(options: DevOptions, startTime?: nu
   // ports are already taken. Skipped when `STACKS_DEV_NO_KILL` is set
   // (e.g. in CI where there's nothing to clean up).
   if (process.env.STACKS_DEV_NO_KILL !== '1') {
-    try {
-      // Match `bun --watch <path>/storage/framework/core/actions/src/dev/*.ts`
-      // and any older `bun cli.ts dev` from this project. The path may be
-      // absolute or relative depending on how the orphan was originally
-      // launched — match the trailing tail so both forms get caught.
-      // We deliberately don't use `pkill -f buddy` — the current process
-      // matches that.
-      await Bun.spawn(['pkill', '-9', '-f', 'storage/framework/core/actions/src/dev/'], { stdout: 'ignore', stderr: 'ignore' }).exited
-      await new Promise(r => setTimeout(r, 200))
-    }
-    catch {
-      // pkill not available or no matches — fine, just continue
-    }
+    await cleanupStaleDevProcesses(managedPorts)
   }
 
   // Clean up child processes on exit to prevent orphaned processes.
@@ -365,41 +385,25 @@ export async function startDevelopmentServer(options: DevOptions, startTime?: nu
   // previous "SIGKILL immediately" path corrupted dev sqlite files
   // every now and then because writes were mid-flight.
   let isExiting = false
+  let closeNativeApp: (() => void) | undefined
   const SHUTDOWN_GRACE_MS = 1500
   const cleanup = () => {
     if (isExiting) return
     isExiting = true
-    // Two-phase, three-strategy shutdown. First try a process-group
-    // SIGTERM (works when buddy is the session leader), then fall
-    // through to a targeted pkill on the dev/ watchers we spawned
-    // (catches orphans when buddy was launched via `./buddy` and
-    // doesn't own the group), then SIGKILL anything still alive.
+    closeNativeApp?.()
     try { process.kill(-process.pid, 'SIGTERM') }
     catch {
+      // Process group may not exist (e.g., not session leader) — try the
+      // current process only. Worst case the inner SIGKILL below cleans up.
       try { process.kill(0, 'SIGTERM') } catch { /* ignore */ }
     }
-    try {
-      // Don't await — we're on a signal handler and the event loop
-      // is unwinding. pkill is fast and best-effort.
-      Bun.spawn(['pkill', '-TERM', '-f', 'storage/framework/core/actions/src/dev/'], { stdout: 'ignore', stderr: 'ignore' })
-    }
-    catch { /* pkill missing — group SIGTERM above is our only shot */ }
     setTimeout(() => {
-      try { process.kill(0, 'SIGKILL') } catch { /* ignore */ }
-      try { Bun.spawn(['pkill', '-9', '-f', 'storage/framework/core/actions/src/dev/'], { stdout: 'ignore', stderr: 'ignore' }) }
-      catch { /* ignore */ }
-      process.exit(1)
+      try { process.kill(0, 'SIGKILL') }
+      catch { process.exit(1) }
     }, SHUTDOWN_GRACE_MS).unref()
   }
   process.on('SIGINT', cleanup)
   process.on('SIGTERM', cleanup)
-  // Also fire cleanup on the process emitting `exit` (e.g. uncaught
-  // error path) so a crash doesn't leave watchers running either.
-  process.on('exit', () => {
-    if (isExiting) return
-    try { Bun.spawn(['pkill', '-9', '-f', 'storage/framework/core/actions/src/dev/'], { stdout: 'ignore', stderr: 'ignore' }) }
-    catch { /* ignore */ }
-  })
 
   // Start all servers silently — unified banner above handles output
   const quietOpts = { ...options, quiet: true }
@@ -417,6 +421,18 @@ export async function startDevelopmentServer(options: DevOptions, startTime?: nu
   ]
   const readinessTimeoutMs = 30000
   let readyAnnounced = false
+  const nativeUrl = `http://localhost:${frontendPort}`
+  const nativeWindowReady = nativeMode
+    ? waitForPort(frontendPort, readinessTimeoutMs).then(async (ready) => {
+      if (!ready) {
+        log.warn(`Native window skipped because the frontend did not answer within ${readinessTimeoutMs / 1000}s`)
+        return
+      }
+
+      closeNativeApp = await launchNativeAppWindow(nativeUrl, options)
+    })
+    : Promise.resolve()
+
   Promise.all(ports.map(p => waitForPort(p.port, readinessTimeoutMs)))
     .then(async (results) => {
       if (readyAnnounced) return
@@ -424,8 +440,8 @@ export async function startDevelopmentServer(options: DevOptions, startTime?: nu
       const failed = results
         .map((ok, i) => ok ? null : ports[i].name)
         .filter((x): x is string => x !== null)
-      if (startTime) {
-        const elapsedMs = (Bun.nanoseconds() - startTime) / 1_000_000
+      if (startedAt) {
+        const elapsedMs = (Bun.nanoseconds() - startedAt) / 1_000_000
         const summary = failed.length
           ? `ready in ${(elapsedMs / 1000).toFixed(1)}s — ${failed.join(', ')} did not bind within ${readinessTimeoutMs / 1000}s`
           : `ready in ${(elapsedMs / 1000).toFixed(1)}s`
@@ -461,6 +477,10 @@ export async function startDevelopmentServer(options: DevOptions, startTime?: nu
           log.error(`Dashboard: ${error}`)
       })
       : Promise.resolve(),
+    nativeWindowReady.catch((error) => {
+      if (options.verbose)
+        log.warn(`Native window: ${error}`)
+    }),
     hasCustomDomain
       ? startReverseProxy(options).catch((error) => {
         if (options.verbose)
@@ -468,6 +488,201 @@ export async function startDevelopmentServer(options: DevOptions, startTime?: nu
       })
       : Promise.resolve(),
   ])
+}
+
+async function launchNativeAppWindow(url: string, options: DevOptions): Promise<(() => void) | undefined> {
+  let createApp: ((_opts: any) => { show: () => Promise<void>, close: () => void }) | undefined
+
+  try {
+    const craft = await importCraftSdk()
+    createApp = craft.createApp
+  }
+  catch (error) {
+    if (options.verbose)
+      log.warn(`Native window unavailable: ${error}`)
+
+    console.log(`  ${dim('Native window unavailable. Install craft-native or set CRAFT_BIN to a Craft binary.')}\n`)
+    return undefined
+  }
+
+  if (!createApp) {
+    console.log(`  ${dim('Native window unavailable. The Craft SDK did not export createApp.')}\n`)
+    return undefined
+  }
+
+  const craftBinaryPath = resolveCraftBinaryPath()
+  if (!craftBinaryPath) {
+    console.log(`  ${dim('Native window unavailable. Set CRAFT_BIN to a Craft binary, or install Craft in ~/Code/Tools/craft.')}\n`)
+    return undefined
+  }
+
+  const appIconPath = resolveNativeAppIconPath()
+  const app = createApp({
+    url,
+    quiet: !options.verbose,
+    craftPath: craftBinaryPath,
+    window: {
+      title: await resolveNativeAppTitle(),
+      width: 1280,
+      height: 860,
+      titlebarHidden: true,
+      webSidebarMaterial: true,
+      webSidebarWidth: 286,
+      webSidebarMaterialOpacity: 0.78,
+      ...(appIconPath && { icon: appIconPath }),
+    },
+  })
+
+  app.show().catch((error) => {
+    if (options.verbose)
+      log.warn(`Native window exited: ${error}`)
+  })
+
+  return () => app.close()
+}
+
+async function importCraftSdk(): Promise<{ createApp?: (_opts: any) => { show: () => Promise<void>, close: () => void } }> {
+  const localCraftSdk = process.env.HOME
+    ? `${process.env.HOME}/Code/Tools/craft/packages/typescript/src/index.ts`
+    : undefined
+
+  if (localCraftSdk && existsSync(localCraftSdk))
+    return await import(localCraftSdk)
+
+  try {
+    return await import('craft-native')
+  }
+  catch (primaryError) {
+    try {
+      return await import('@craft-native/craft')
+    }
+    catch {
+      try {
+        return await import('@stacksjs/ts-craft')
+      }
+      catch {
+        throw primaryError
+      }
+    }
+  }
+}
+
+async function cleanupStaleDevProcesses(ports: number[]): Promise<void> {
+  const projectRoot = projectPath()
+  const actionDevPath = projectPath('storage/framework/core/actions/src/dev/')
+  const pids = new Set<number>()
+
+  for (const port of ports) {
+    for (const pid of await listenerPids(port)) {
+      if (pid === process.pid)
+        continue
+
+      const command = await commandForPid(pid)
+      if (!command.includes(projectRoot))
+        continue
+
+      const isStacksDevProcess = command.includes('storage/framework/core/buddy/src/cli.ts dev')
+        || command.includes('storage/framework/core/actions/src/dev/')
+        || command.includes(actionDevPath)
+
+      if (isStacksDevProcess)
+        pids.add(pid)
+    }
+  }
+
+  if (pids.size === 0)
+    return
+
+  for (const pid of pids) {
+    try { process.kill(pid, 'SIGTERM') }
+    catch { /* stale process already exited */ }
+  }
+
+  await new Promise(r => setTimeout(r, 250))
+
+  for (const pid of pids) {
+    try { process.kill(pid, 'SIGKILL') }
+    catch { /* stale process already exited */ }
+  }
+
+  await new Promise(r => setTimeout(r, 150))
+}
+
+async function listenerPids(port: number): Promise<number[]> {
+  try {
+    const proc = Bun.spawn(['lsof', '-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'], {
+      stdout: 'pipe',
+      stderr: 'ignore',
+    })
+    const output = await new Response(proc.stdout).text()
+    await proc.exited
+
+    return output
+      .split(/\s+/)
+      .map(value => Number(value))
+      .filter(pid => Number.isInteger(pid) && pid > 0)
+  }
+  catch {
+    return []
+  }
+}
+
+async function commandForPid(pid: number): Promise<string> {
+  try {
+    const proc = Bun.spawn(['ps', '-p', String(pid), '-o', 'command='], {
+      stdout: 'pipe',
+      stderr: 'ignore',
+    })
+    const output = await new Response(proc.stdout).text()
+    await proc.exited
+    return output.trim()
+  }
+  catch {
+    return ''
+  }
+}
+
+function resolveCraftBinaryPath(): string | undefined {
+  const home = process.env.HOME
+  const candidates = [
+    process.env.CRAFT_BIN,
+    home ? `${home}/Code/Tools/craft/craft` : undefined,
+    home ? `${home}/Code/Tools/craft/bin/craft` : undefined,
+    home ? `${home}/Code/Tools/craft/packages/zig/zig-out/bin/craft` : undefined,
+    home ? `${home}/Documents/Projects/craft/packages/zig/zig-out/bin/craft` : undefined,
+  ].filter((candidate): candidate is string => Boolean(candidate))
+
+  return candidates.find(candidate => existsSync(candidate))
+}
+
+function resolveNativeAppIconPath(): string | undefined {
+  const candidates = [
+    projectPath('resources/assets/images/app-icon.png'),
+    projectPath('resources/assets/images/icon.png'),
+    projectPath('public/icon.png'),
+  ]
+
+  return candidates.find(candidate => existsSync(candidate))
+}
+
+async function resolveNativeAppTitle(): Promise<string> {
+  try {
+    const pkg = await Bun.file(projectPath('package.json')).json()
+    const name = typeof pkg.productName === 'string' ? pkg.productName : pkg.name
+
+    if (typeof name === 'string' && name.length > 0) {
+      return name
+        .split(/[-_\s]+/)
+        .filter(Boolean)
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ')
+    }
+  }
+  catch {
+    // package.json is optional for framework internals.
+  }
+
+  return 'Stacks App'
 }
 
 const METHOD_COLORS: Record<string, (s: string) => string> = {
@@ -540,9 +755,14 @@ async function waitForPort(port: number, timeoutMs: number): Promise<boolean> {
 }
 
 /**
- * Start the reverse proxies (rpx) to enable HTTPS with custom domains.
- * Proxies frontend, API, docs, and dashboard subdomains.
- * rpx wraps tlsx and handles SSL (certs, hosts, trust) automatically.
+ * Register this stacks project's frontends with the rpx daemon so each app is
+ * reachable at `https://<subdomain>.<APP_URL>` over the daemon's shared :443.
+ *
+ * Why daemon vs. in-process: with the legacy in-process mode, two concurrent
+ * `./buddy dev` invocations (e.g. pet-store + training) would fight over :443
+ * and the second one would fail to bind. The daemon owns :443 once and
+ * routes by Host header. PID-GC reaps our entries automatically when this
+ * buddy process exits, so we don't need explicit cleanup on shutdown.
  */
 async function startReverseProxy(options: DevOptions): Promise<void> {
   const appUrl = process.env.APP_URL
@@ -560,7 +780,6 @@ async function startReverseProxy(options: DevOptions): Promise<void> {
   const apiPort = Number(process.env.PORT_API) || 3008
   const docsPort = Number(process.env.PORT_DOCS) || 3006
   const dashboardPort = Number(process.env.PORT_ADMIN) || 3002
-  const sslBasePath = `${process.env.HOME}/.stacks/ssl`
   const verbose = options.verbose ?? false
 
   // Mirror the dashboard opt-in from startDevelopmentServer — when the
@@ -570,34 +789,32 @@ async function startReverseProxy(options: DevOptions): Promise<void> {
   const includeDashboard = process.env.STACKS_DEV_DASHBOARD === '1'
 
   try {
-    const { startProxies } = await import('@stacksjs/rpx')
+    const { runViaDaemon } = await import('@stacksjs/rpx')
 
-    // Use multi-proxy mode so rpx generates a SINGLE cert covering all domains
-    await startProxies({
+    await runViaDaemon({
       proxies: [
         // Forward /api/** straight to the API server, preserving the prefix.
-        // The API registers its routes as /api/cart/add, /api/checkout/place,
-        // etc., so stripPrefix must be false — otherwise the API would see
-        // /cart/add and 404. The frontend's stx-serve also has a fallback
-        // proxy for direct localhost:PORT access.
-        { from: `localhost:${frontendPort}`, to: domain, cleanUrls: false, pathRewrites: [{ from: '/api', to: `localhost:${apiPort}`, stripPrefix: false }] },
-        { from: `localhost:${apiPort}`, to: apiDomain, cleanUrls: false },
-        { from: `localhost:${docsPort}`, to: docsDomain, cleanUrls: false },
+        // API routes are registered as /api/cart/add, /api/checkout/place,
+        // etc. — stripPrefix must stay false or the API would see /cart/add
+        // and 404. The frontend's stx-serve still has a fallback proxy for
+        // direct localhost:PORT access.
+        { id: `${domain}-frontend`, from: `localhost:${frontendPort}`, to: domain, pathRewrites: [{ from: '/api', to: `localhost:${apiPort}`, stripPrefix: false }] },
+        { id: `${domain}-api`, from: `localhost:${apiPort}`, to: apiDomain },
+        { id: `${domain}-docs`, from: `localhost:${docsPort}`, to: docsDomain },
         ...(includeDashboard
-          ? [{ from: `localhost:${dashboardPort}`, to: dashboardDomain, cleanUrls: false }]
+          ? [{ id: `${domain}-dashboard`, from: `localhost:${dashboardPort}`, to: dashboardDomain }]
           : []),
       ],
-      https: {
-        basePath: sslBasePath,
-        validityDays: 825,
-      },
-      regenerateUntrustedCerts: false,
+      // Don't park — buddy needs to keep running its other startup tasks.
+      // The entries carry our PID, so when buddy exits the daemon's PID-GC
+      // reaps them within ~5s.
+      detached: true,
       verbose,
     })
   }
   catch (error) {
     if (options.verbose) {
-      log.warn('Reverse proxy not available, skipping HTTPS')
+      log.warn('rpx daemon not available, skipping HTTPS')
       log.warn(String(error))
     }
   }

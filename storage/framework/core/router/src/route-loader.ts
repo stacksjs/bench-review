@@ -64,8 +64,9 @@ export async function loadRoutes(registry: RouteRegistry): Promise<void> {
  * The bootstrap file is the single source of truth for which framework
  * packages participate in route registration. It either imports each
  * package (whose own entry calls `route.register(...)` on import — the
- * Laravel service-provider analogue) or registers routes files directly
- * via `route.register(...)`. Adding a new framework package = add a line
+ * service-provider pattern competing frameworks use to let packages
+ * self-wire at boot) or registers routes files directly via
+ * `route.register(...)`. Adding a new framework package = add a line
  * to bootstrap.ts; the loader stays untouched.
  *
  * Resolved through @stacksjs/path so the same import works whether this
@@ -79,7 +80,13 @@ async function loadFrameworkRoutes(): Promise<void> {
   // of which references actions that pull in models like `Product`,
   // `Coupon`, `WaitlistRestaurant`, `Error` — and projects that don't
   // ship those models flood their API boot with
-  // `[Router] Failed to import action ...` for every missing one.
+  // `[Router] Failed to import action ...` lines for every missing one.
+  //
+  // The per-route override pattern (declare the same path first in
+  // `routes/api.ts`) only scales when you want a handful of overrides;
+  // for projects that want none of the bundled domain at all this gate
+  // is the wholesale escape hatch. Pattern matches the existing
+  // `STACKS_DEV_DASHBOARD=1` opt-in on the dev-server side.
   if (process.env.STACKS_SKIP_DEFAULT_ROUTES === '1') return
   try {
     const { frameworkPath } = await import('@stacksjs/path')

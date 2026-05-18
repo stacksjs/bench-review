@@ -1,7 +1,7 @@
 {
   "name": "@stacksjs/database",
   "type": "module",
-  "version": "0.70.23",
+  "version": "0.70.45",
   "description": "The Stacks database integration.",
   "author": "Chris Breuer",
   "contributors": [
@@ -29,8 +29,8 @@
   ],
   "exports": {
     ".": {
-      "bun": "./src/index.ts",
       "types": "./dist/index.d.ts",
+      "bun": "./src/index.ts",
       "import": "./dist/index.js"
     },
     "./*": {
@@ -50,7 +50,7 @@
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "bun-query-builder": "^0.1.16"
+    "bun-query-builder": "^0.1.21"
   },
   "devDependencies": {
     "@stacksjs/cli": "workspace:*",

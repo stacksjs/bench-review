@@ -77,11 +77,18 @@ try {
   .page-header {
     text-align: center;
     margin-bottom: 3rem;
+    padding: 2.5rem 2rem;
+    border: 1px solid var(--color-border);
+    border-top: 4px solid var(--color-accent);
+    border-radius: 0.5rem;
+    background: var(--color-bg-secondary);
+    box-shadow: var(--color-shadow);
   }
 
   .page-header h1 {
+    font-family: var(--font-display);
     font-size: 2.5rem;
-    font-weight: 700;
+    font-weight: 850;
     margin-bottom: 0.5rem;
   }
 
@@ -98,10 +105,13 @@ try {
 
   .category-card {
     background: var(--color-bg-secondary);
-    border-radius: 1rem;
+    border: 1px solid var(--color-border);
+    border-top: 4px solid var(--color-primary);
+    border-radius: 0.5rem;
     padding: 2rem;
     text-align: center;
     transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: var(--color-shadow);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -109,14 +119,14 @@ try {
 
   .category-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 12px 40px -10px rgba(0,0,0,0.15);
+    box-shadow: 0 18px 38px -24px rgba(53,39,19,0.65);
   }
 
   .category-icon {
     width: 4rem;
     height: 4rem;
     background: var(--color-primary);
-    border-radius: 1rem;
+    border-radius: 0.5rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -130,8 +140,9 @@ try {
   }
 
   .category-name {
+    font-family: var(--font-display);
     font-size: 1.25rem;
-    font-weight: 600;
+    font-weight: 750;
     color: var(--color-text);
     margin-bottom: 0.5rem;
   }
@@ -150,7 +161,8 @@ try {
   .category-count {
     color: var(--color-text-secondary);
     font-size: 0.875rem;
-    background: var(--color-bg);
+    background: var(--color-bg-muted);
+    color: var(--color-primary);
     padding: 0.25rem 0.75rem;
     border-radius: 1rem;
   }

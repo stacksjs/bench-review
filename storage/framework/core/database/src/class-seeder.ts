@@ -70,16 +70,7 @@ export async function runClassSeeders(options: RunOptions = {}): Promise<{ ran: 
     return { ran, skipped }
   }
 
-  // Sort alphabetically so seeders run in deterministic order across
-  // platforms. `fs.readdirSync` returns entries in arbitrary order on
-  // macOS/Linux, which broke dependency chains (e.g. JudgeSeeder
-  // running before CourtHouseSeeder despite the alphabetical filename).
-  // Number-prefix your seeders (`00-CourtHouseSeeder.ts`,
-  // `10-JudgeSeeder.ts`) when you need explicit ordering beyond what
-  // alpha-sort gives you.
-  const files = fs.readdirSync(dir)
-    .filter((f: string) => f.endsWith('.ts') && !f.startsWith('_'))
-    .sort()
+  const files = fs.readdirSync(dir).filter((f: string) => f.endsWith('.ts') && !f.startsWith('_'))
   for (const file of files) {
     const className = file.replace(/\.ts$/, '')
     if (options.class && className !== options.class) {

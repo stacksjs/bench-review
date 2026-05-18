@@ -1,7 +1,7 @@
 {
   "name": "@stacksjs/orm",
   "type": "module",
-  "version": "0.70.23",
+  "version": "0.70.45",
   "description": "The Stacks ORM integration",
   "author": "Chris Breuer",
   "contributors": [
@@ -25,9 +25,13 @@
   ],
   "exports": {
     ".": {
+      "types": "./dist/src/index.d.ts",
       "bun": "./src/index.ts",
-      "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./traits/*": {
+      "bun": "./src/traits/*.ts",
+      "types": "./dist/src/traits/*.d.ts"
     },
     "./*": {
       "bun": "./src/*",
@@ -35,7 +39,7 @@
     }
   },
   "module": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "types": "dist/src/index.d.ts",
   "files": [
     "README.md",
     "dist"
@@ -47,7 +51,7 @@
   },
   "dependencies": {
     "@stacksjs/ts-validation": "^0.4.9",
-    "bun-query-builder": "^0.1.16"
+    "bun-query-builder": "^0.1.21"
   },
   "devDependencies": {
     "@stacksjs/build": "workspace:*",

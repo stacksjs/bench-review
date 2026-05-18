@@ -57,13 +57,6 @@
       "category": "commerce"
     },
     {
-      "id": "court-house",
-      "name": "CourtHouse",
-      "icon": "tablecells.fill",
-      "hasDedicatedPage": false,
-      "category": "userland"
-    },
-    {
       "id": "customer",
       "name": "Customer",
       "icon": "person.crop.circle.fill",
@@ -113,13 +106,6 @@
       "category": "data"
     },
     {
-      "id": "email-subscription",
-      "name": "EmailSubscription",
-      "icon": "tablecells.fill",
-      "hasDedicatedPage": false,
-      "category": "userland"
-    },
-    {
       "id": "gift-card",
       "name": "GiftCard",
       "icon": "giftcard.fill",
@@ -132,20 +118,6 @@
       "icon": "briefcase.fill",
       "hasDedicatedPage": true,
       "category": "system"
-    },
-    {
-      "id": "judge",
-      "name": "Judge",
-      "icon": "tablecells.fill",
-      "hasDedicatedPage": false,
-      "category": "userland"
-    },
-    {
-      "id": "judge-review",
-      "name": "JudgeReview",
-      "icon": "tablecells.fill",
-      "hasDedicatedPage": false,
-      "category": "userland"
     },
     {
       "id": "license-key",
@@ -188,20 +160,6 @@
       "icon": "bell.fill",
       "hasDedicatedPage": true,
       "category": "system"
-    },
-    {
-      "id": "oauth-access-token",
-      "name": "OauthAccessToken",
-      "icon": "tablecells.fill",
-      "hasDedicatedPage": false,
-      "category": "userland"
-    },
-    {
-      "id": "oauth-client",
-      "name": "OauthClient",
-      "icon": "tablecells.fill",
-      "hasDedicatedPage": false,
-      "category": "userland"
     },
     {
       "id": "order",
@@ -251,13 +209,6 @@
       "icon": "creditcard.fill",
       "hasDedicatedPage": false,
       "category": "commerce"
-    },
-    {
-      "id": "personal-access-token",
-      "name": "PersonalAccessToken",
-      "icon": "tablecells.fill",
-      "hasDedicatedPage": false,
-      "category": "userland"
     },
     {
       "id": "post",

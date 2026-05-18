@@ -1,7 +1,7 @@
 {
   "name": "stacks",
   "type": "module",
-  "version": "0.70.23",
+  "version": "0.70.45",
   "description": "The Stacks framework.",
   "author": "Chris Breuer",
   "contributors": [
@@ -181,7 +181,7 @@
       "import": "./objects/dist/index.js"
     },
     "./orm": {
-      "types": "./orm/dist/index.d.ts",
+      "types": "./orm/dist/src/index.d.ts",
       "import": "./orm/dist/index.js"
     },
     "./path": {
@@ -338,6 +338,6 @@
     "@stacksjs/utils": "workspace:*",
     "@stacksjs/skills": "workspace:*",
     "@stacksjs/validation": "workspace:*",
-    "bun-query-builder": "^0.1.16"
+    "bun-query-builder": "^0.1.21"
   }
 }

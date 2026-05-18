@@ -1,7 +1,7 @@
 {
   "name": "@stacksjs/query-builder",
   "type": "module",
-  "version": "0.70.23",
+  "version": "0.70.45",
   "description": "The Stacks Query Builder integration",
   "author": "Chris Breuer",
   "contributors": [
@@ -25,8 +25,8 @@
   ],
   "exports": {
     ".": {
-      "bun": "./src/index.ts",
       "types": "./dist/index.d.ts",
+      "bun": "./src/index.ts",
       "import": "./dist/index.js"
     },
     "./*": {
@@ -51,6 +51,6 @@
     "@stacksjs/types": "workspace:*"
   },
   "dependencies": {
-    "bun-query-builder": "^0.1.16"
+    "bun-query-builder": "^0.1.21"
   }
 }

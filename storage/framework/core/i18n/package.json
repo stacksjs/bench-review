@@ -1,6 +1,6 @@
 {
   "name": "@stacksjs/i18n",
-  "version": "0.70.23",
+  "version": "0.70.45",
   "description": "Internationalization system for Stacks.js applications",
   "type": "module",
   "license": "MIT",
@@ -15,9 +15,9 @@
   },
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "bun": "./src/index.ts",
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": "./dist/index.js"
     }
   },
   "main": "./dist/index.js",
@@ -35,7 +35,7 @@
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@stacksjs/ts-i18n": "^0.1.8"
+    "@stacksjs/ts-i18n": "^0.1.9"
   },
   "devDependencies": {
     "@stacksjs/development": "workspace:*"
