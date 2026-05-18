@@ -1,17 +1,23 @@
 <script client>
   import type { CourtHouse } from '~/resources/types'
-  import { courtHouses as allCourtHouses } from '~/resources/functions/sample'
 
+  const judgesStore = useStore('judges')
   const searchQuery = state<string>('')
+
+  onMount(() => {
+    if (judgesStore.courtHouses().length === 0)
+      judgesStore.fetchCourtHouses()
+  })
 
   const filteredCourtHouses = derived<CourtHouse[]>(() => {
     const q = searchQuery()
-    if (!q) return allCourtHouses
+    const all = judgesStore.courtHouses()
+    if (!q) return all
     const needle = q.toLowerCase()
-    return allCourtHouses.filter(court =>
+    return all.filter(court =>
       court.name.toLowerCase().includes(needle)
-      || court.city.toLowerCase().includes(needle)
-      || court.state.toLowerCase().includes(needle),
+      || (court.city ?? '').toLowerCase().includes(needle)
+      || (court.state ?? '').toLowerCase().includes(needle),
     )
   })
 </script>

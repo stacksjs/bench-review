@@ -1,64 +1,155 @@
 <script client>
   import type { Judge } from '~/resources/types'
-  import { judges as allJudges } from '~/resources/functions/sample'
 
-  const searchQuery = state<string>('')
+  const judgesStore = useStore('judges')
+  // Local mirror of the input value. `searchJudges` debounces internally
+  // and writes to `judgesStore.searchQuery` — the local state here is
+  // just what x-model binds to so the input is fully controlled.
+  const searchInput = state<string>('')
 
-  const filteredJudges = derived<Judge[]>(() => {
-    const q = searchQuery()
-    if (!q) return []
-    const needle = q.toLowerCase()
-    return allJudges.filter(judge =>
-      judge.name.toLowerCase().includes(needle)
-      || judge.court.name.toLowerCase().includes(needle)
-      || judge.department.toLowerCase().includes(needle),
-    )
+  // Re-run the debounced server search on every keystroke. The store
+  // collapses bursts (250ms debounce) + aborts stale in-flight requests,
+  // so this can fire on every event without flooding the API.
+  function handleInput(value: string): void {
+    searchInput.set(value)
+    judgesStore.searchJudges(value)
+  }
+
+  // ── Cross-store reactivity bridge ──────────────────────────────────
+  //
+  // Two earlier attempts didn't work:
+  //
+  //   1. `derived(() => judgesStore.searchResults())` — the local
+  //      derived registered as a subscriber to the store signal, but
+  //      the notification chain to the `:if` effect never propagated.
+  //   2. Reading `judgesStore.searchResults()` directly in the `:if`
+  //      expression — short-circuit (`searchInput().trim() && …`)
+  //      meant the right-hand side never evaluated on the initial run
+  //      with an empty query, so the effect never subscribed to the
+  //      store signal at all.
+  //
+  // An `effect()` that explicitly touches both signals on every run
+  // subscribes unconditionally and writes the boolean result into a
+  // plain `state`. The `:if="showDropdown"` binding then uses bindIf's
+  // direct-signal fast path — no auto-unwrap proxy, no scope iteration,
+  // no chain to drop the invalidation on the floor.
+  const showDropdown = state<boolean>(false)
+  const showEmpty = state<boolean>(false)
+  const showSpinner = state<boolean>(false)
+
+  effect(() => {
+    const hasInput = searchInput().trim().length > 0
+    const loading = judgesStore.searchLoading()
+    const count = judgesStore.searchResults().length
+    showDropdown.set(hasInput && count > 0)
+    showEmpty.set(hasInput && !loading && count === 0)
+    showSpinner.set(loading)
   })
 
-  function selectJudge(judge: Judge): void {
-    navigate(`/review/${judge.id}`, true)
+  // ReviewJudgeSearch is included from `Bench/ReviewForm.stx`, so the
+  // parent's `judge` state lives in the same merged setup scope.
+  // selectJudge sets it directly to avoid a router-level navigation.
+  function selectJudge(j: Judge): void {
+    judge.set({
+      id: j.id,
+      name: j.name,
+      court: j.court?.name ?? '',
+      department: j.department ?? '',
+      photo: j.photo,
+    })
+    // Reflect the choice in the URL so refresh / back-button still work.
+    if (typeof history !== 'undefined' && typeof window !== 'undefined')
+      history.replaceState({}, '', `/review/${j.id}`)
+    // Clear the search so a future "Change judge" reopens cleanly.
+    searchInput.set('')
+    judgesStore.searchJudges('')
   }
 </script>
 
-<div class="mx-auto max-w-3xl">
+<div class="p-6 sm:p-8 bg-white border border-gray-200 rounded-2xl shadow-sm">
   <div class="text-center">
     <h2 class="font-bold text-2xl text-gray-900 tracking-tight">Write a Review</h2>
-    <p class="mt-2 text-gray-600 text-sm">
-      Search for a judge by name, court, or department to begin your review.
+    <p class="mt-2 text-gray-500 text-sm">
+      Search for a judge by name, court, or location to begin your review.
     </p>
   </div>
 
-  <div class="mt-8">
+  <div class="relative mt-8">
     <div class="relative">
+      <span class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+        <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+        </svg>
+      </span>
       <input
         type="text"
-        x-model="searchQuery"
-        class="block px-4 py-3 w-full text-gray-900 placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-300 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset shadow-sm"
+        :value="searchInput()"
+        @input="handleInput($event.target.value)"
+        class="block pl-10 pr-10 py-3 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
         placeholder="Search for a judge..."
+        autocomplete="off"
       >
-      <div :if="searchQuery() && filteredJudges().length > 0" class="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg">
-        <ul class="overflow-auto py-1 max-h-60 text-base rounded-md">
-          <li
-            :for="judge in filteredJudges"
-            class="relative px-3 py-2 hover:bg-gray-100 cursor-pointer select-none"
-            @click="selectJudge(judge)"
-          >
-              <div class="flex items-center">
-                <img x-src="judge.photo" class="h-10 w-10 rounded-full grayscale filter" x-alt="judge.name">
-                <div class="ml-3">
-                  <p class="font-medium text-gray-900 text-sm" :text="judge.name"></p>
-                  <p class="text-gray-500 text-sm" :text="judge.court.name"></p>
-                  <p class="text-gray-500 text-xs" :text="judge.department"></p>
-                </div>
-              </div>
-          </li>
-        </ul>
-      </div>
-      <div :if="searchQuery() && filteredJudges().length === 0" class="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg">
-        <div class="px-3 py-4 text-center text-gray-500 text-sm">
-          No judges found matching your search.
-        </div>
-      </div>
+      <!-- Spinner appears in the input gutter while the debounced fetch
+           is in flight — keeps the loading state subtle, no layout jump. -->
+      <span :if="showSpinner" class="flex absolute inset-y-0 right-0 items-center pr-3">
+        <svg class="animate-spin h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle>
+          <path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>
+        </svg>
+      </span>
+    </div>
+
+    <!-- Results list. Inline (not absolute) so it can't be clipped by
+         a parent overflow and the page doesn't jump as suggestions
+         appear/disappear. -->
+    <div :if="showDropdown" class="mt-2 bg-white border border-gray-200 rounded-md shadow-sm">
+      <ul class="overflow-auto py-1 max-h-72 divide-y divide-gray-100">
+        <!-- Loop var is "result", NOT "judge" — "judge" already exists
+             in the merged setup scope as the parent ReviewForm's state
+             signal. A :for="judge in …" would shadow it inconsistently
+             across the auto-unwrap proxy, breaking both the iteration
+             reads AND the selectJudge(judge) click handler (which
+             would receive the signal instead of the iteration item).
+             Bind :for to the store signal directly (not wrapped in a
+             local derived) so the list re-renders when results land.
+             (Avoid backticks in HTML comments — stx's script-merge
+             concatenates comment text into the merged setup function
+             and a stray backtick flips the JS parser into template-
+             literal mode, breaking every following script.) -->
+        <!-- Inlined state mutation in @click is intentional, NOT a
+             stylistic regression. The event-handler binder at
+             signals.ts:1669 inspects the expression *text* to decide
+             whether a signal stays raw or gets auto-unwrapped: any
+             signal whose `name.set(` doesn't literally appear in the
+             expression is unwrapped to its current VALUE inside the
+             handler scope. Calling `selectJudge(result)` instead would
+             unwrap `judge` to `null`, and the `judge.set(...)` call
+             inside selectJudge's closure ends up throwing a TypeError
+             that the dispatcher silently swallows — clicks register
+             but nothing visible happens. Writing the .set() calls
+             directly in the expression keeps `judge` / `searchInput`
+             as raw signals so the mutations actually fire. -->
+        <li
+          :for="result in judgesStore.searchResults"
+          class="flex gap-3 items-center px-3 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors"
+          @click="judge.set({ id: result.id, name: result.name, court: (result.court && result.court.name) || '', department: result.department || '', photo: result.photo }); searchInput.set(''); judgesStore.searchJudges(''); window.history && window.history.replaceState({}, '', '/review/' + result.id)"
+        >
+          <img x-src="result.photo" class="object-cover flex-none h-10 w-10 ring-1 ring-gray-100 rounded-full grayscale filter" x-alt="result.name">
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-gray-900 text-sm truncate" :text="result.name"></p>
+            <p class="text-gray-500 text-xs truncate" :text="result.court.name"></p>
+            <p :if="result.location" class="text-gray-400 text-xs truncate" :text="result.location"></p>
+          </div>
+          <svg class="h-4 w-4 text-gray-300 flex-none" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+          </svg>
+        </li>
+      </ul>
+    </div>
+
+    <div :if="showEmpty" class="mt-2 p-4 text-center bg-gray-50 border border-gray-200 border-dashed rounded-md">
+      <p class="text-gray-600 text-sm">No judges match "<span :text="searchInput()"></span>".</p>
+      <p class="mt-1 text-gray-400 text-xs">Try a different name or court.</p>
     </div>
   </div>
 </div>

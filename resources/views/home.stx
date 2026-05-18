@@ -1,15 +1,35 @@
 <script client>
-  import type { Category, Judge, Review } from '~/resources/types'
-  import { categories as allCategories, judges as allJudges, reviews as allReviews } from '~/resources/functions/sample'
+  import type { Category, Judge } from '~/resources/types'
+  import type { JudgeReviewRow } from '~/resources/stores/reviews'
+  // Categories don't have a backing API yet — stay on sample data
+  // until that endpoint exists. Judges + reviews come from the DB.
+  import { categories as allCategories } from '~/resources/functions/sample'
 
   useHead({ title: 'Find and Review Judges - Bench Review' })
 
   const search = useStore('search')
+  const judgesStore = useStore('judges')
+  const reviewsStore = useStore('reviews')
 
-  const featuredJudges = derived<Judge[]>(() => allJudges.slice(0, 6))
-  const latestReviews = derived<Review[]>(() => allReviews.slice(0, 3))
+  onMount(() => {
+    if (judgesStore.judges().length === 0)
+      judgesStore.fetchJudges()
+    if (reviewsStore.latest().length === 0)
+      reviewsStore.fetchLatest(3)
+  })
+
+  const featuredJudges = derived<Judge[]>(() => judgesStore.judges().slice(0, 6))
+  const latestReviews = derived<JudgeReviewRow[]>(() => reviewsStore.latest().slice(0, 3))
+  const reviewsEmpty = derived<boolean>(() => !reviewsStore.loadingLatest() && latestReviews().length === 0)
   const popularCategories = derived<Category[]>(() => allCategories.slice(0, 5))
   const stars: number[] = [1, 2, 3, 4, 5]
+
+  function formatDate(dateStr: string | null | undefined): string {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  }
 
   function submitSearch(): void {
     search.navigateToSearch()
@@ -132,11 +152,8 @@
                 </div>
               </div>
               <div class="flex items-center justify-between mt-4 pt-4 border-gray-100 border-t">
-                <div class="flex items-center">
-                  <Icon :for="star in stars" name="star" size="16" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" />
-                  <span class="ml-2 font-medium text-gray-700 text-sm" :text="judge.rating"></span>
-                </div>
-                <span class="text-gray-500 text-xs" :text="judge.reviewCount + ' reviews'"></span>
+                <span class="text-gray-400 text-xs">No reviews yet</span>
+                <span class="font-medium text-gray-700 text-xs hover:text-gray-900">View profile →</span>
               </div>
           </StxLink>
         </div>
@@ -161,18 +178,28 @@
         </StxLink>
       </div>
 
-      <div class="grid gap-6 grid-cols-1 lg:grid-cols-3 mt-10">
+      <!-- Empty state — no reviews in the DB yet. CTA points at /review
+           so visitors land directly in the submission flow. -->
+      <div :if="reviewsEmpty()" class="mt-10 p-12 text-center bg-white border border-gray-200 border-dashed rounded-2xl">
+        <h3 class="font-semibold text-gray-900 text-lg">No reviews yet</h3>
+        <p class="mt-2 text-gray-500">Be among the first to share your courtroom experience and help the community.</p>
+        <StxLink to="/review" class="inline-block mt-6 px-5 py-2.5 font-semibold text-sm text-white bg-gray-700 hover:bg-gray-800 rounded-lg shadow-sm">
+          Write the first review
+        </StxLink>
+      </div>
+
+      <div :if="!reviewsEmpty()" class="grid gap-6 grid-cols-1 lg:grid-cols-3 mt-10">
         <StxLink
-          :for="review in latestReviews"
+          :for="review in latestReviews()"
           x-to="`/article/${review.id}`"
-          class="block p-6 bg-white border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-md duration-200 transition-all"
+          class="block p-6 bg-white border border-gray-100 rounded-2xl hover:border-gray-300 shadow-sm hover:shadow-md duration-200 transition-all"
         >
             <div class="flex items-center justify-between">
               <div class="flex items-center">
-                <img class="h-9 w-9 rounded-full grayscale filter" x-src="review.author.imageUrl" x-alt="review.author.name">
+                <div class="flex items-center justify-center h-9 w-9 font-semibold text-gray-500 text-sm bg-gray-100 rounded-full" :text="(review.title || 'A').slice(0, 1).toUpperCase()"></div>
                 <div class="ml-3">
-                  <p class="font-medium text-gray-900 text-sm" :text="review.author.name"></p>
-                  <p class="text-gray-500 text-xs" :text="review.date"></p>
+                  <p class="font-medium text-gray-900 text-sm">Reviewer</p>
+                  <p class="text-gray-500 text-xs" :text="formatDate(review.created_at)"></p>
                 </div>
               </div>
               <div class="flex items-center">
@@ -181,7 +208,6 @@
             </div>
             <h3 class="mt-4 font-semibold line-clamp-2 text-gray-900" :text="review.title"></h3>
             <p class="mt-2 line-clamp-3 text-gray-600 text-sm" :text="review.content"></p>
-            <p class="mt-4 font-medium text-gray-700 text-sm" :text="'About ' + review.judge.name"></p>
         </StxLink>
       </div>
     </div>

@@ -1,144 +1,135 @@
 <script client>
-  interface RatingBucket { stars: number, percentage: number }
-  interface JudgeReview {
-    id: number
-    name: string
-    avatar: string
-    rating: number
-    date: string
-    content: string
-    helpfulCount: number
-  }
+  import type { JudgeReviewRow } from '~/resources/stores/reviews'
 
+  const reviewsStore = useStore('reviews')
   const stars: number[] = [1, 2, 3, 4, 5]
-  const ratingBuckets: RatingBucket[] = [
-    { stars: 5, percentage: 100 },
-    { stars: 4, percentage: 80 },
-    { stars: 3, percentage: 60 },
-    { stars: 2, percentage: 40 },
-    { stars: 1, percentage: 20 },
-  ]
 
-  const reviews = derived<JudgeReview[]>(() => [
-    {
-      id: 1,
-      name: 'Michael Chen',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
-      rating: 5,
-      date: '2 weeks ago',
-      content: 'Judge Johnson was extremely thorough and fair in handling my case. She took the time to understand all the details and made sure everyone had a chance to be heard. Her knowledge of the law is impressive, and she maintains a professional yet approachable demeanor in the courtroom.',
-      helpfulCount: 12
-    },
-    {
-      id: 2,
-      name: 'Sarah Williams',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
-      rating: 4,
-      date: '1 month ago',
-      content: 'While I didn\'t get the outcome I was hoping for, I appreciate Judge Johnson\'s clear explanation of her decision and the legal reasoning behind it. She was respectful to all parties involved and maintained excellent control of the courtroom.',
-      helpfulCount: 8
-    },
-    {
-      id: 3,
-      name: 'Robert Davis',
-      avatar: 'https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
-      rating: 5,
-      date: '2 months ago',
-      content: 'One of the most prepared and knowledgeable judges I\'ve appeared before. She asks insightful questions and ensures that all legal procedures are followed correctly. Her courtroom is well-organized and efficient.',
-      helpfulCount: 15
-    }
-  ])
+  // `:id` route param. Cast through Number because params come in as
+  // strings — the byJudge cache is keyed by numeric id.
+  const judgeId = derived<number>(() => Number(params.id))
 
-  const routeId = derived<string>(() => params.id)
+  onMount(() => {
+    const id = judgeId()
+    if (Number.isFinite(id) && id > 0)
+      reviewsStore.fetchByJudge(id)
+  })
+
+  const reviews = derived<JudgeReviewRow[]>(() => reviewsStore.reviewsForJudge(judgeId()))
+  const reviewCount = derived<number>(() => reviews().length)
+  const isLoading = derived<boolean>(() => reviewsStore.isLoadingJudge(judgeId()))
+  const isEmpty = derived<boolean>(() => !isLoading() && reviewCount() === 0)
+
+  // Average rounded to one decimal so the headline number reads like
+  // "4.6" rather than "4.6000000001". Reuse across the summary chip
+  // and the distribution histogram.
+  const averageRating = derived<number>(() => {
+    const list = reviews()
+    if (list.length === 0) return 0
+    const sum = list.reduce((acc, r) => acc + (Number(r.rating) || 0), 0)
+    return Math.round((sum / list.length) * 10) / 10
+  })
+
+  const ratingBuckets = derived<Array<{ stars: number, percentage: number }>>(() => {
+    const list = reviews()
+    if (list.length === 0)
+      return [5, 4, 3, 2, 1].map(s => ({ stars: s, percentage: 0 }))
+    return [5, 4, 3, 2, 1].map((s) => {
+      const count = list.filter(r => Math.round(Number(r.rating)) === s).length
+      return { stars: s, percentage: Math.round((count / list.length) * 100) }
+    })
+  })
+
+  function formatDate(dateStr: string | null | undefined): string {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  }
 </script>
 
 <div class="lg:col-span-2 lg:row-end-2 lg:row-span-2 -mx-4 px-4 py-8 sm:mx-0 sm:pb-14 sm:px-8 xl:pb-20 xl:pt-16 xl:px-16 bg-white ring-1 ring-gray-900/5 sm:rounded-lg shadow-sm">
-  <!-- Overall Rating Summary -->
+
+  <!-- Header: summary if reviews exist, write-CTA always -->
   <div class="flex items-center justify-between">
-    <div>
-      <h2 class="font-semibold text-2xl text-gray-900">4.8</h2>
+    <div :if="reviewCount() > 0">
+      <h2 class="font-semibold text-2xl text-gray-900" :text="averageRating()"></h2>
       <div class="flex items-center">
         <div class="flex items-center">
-          <Icon :for="star in stars" name="star" size="20" x-class="star <= 5 ? 'text-yellow-400' : 'text-gray-300'" />
+          <Icon :for="star in stars" name="star" size="20" x-class="star <= Math.round(averageRating()) ? 'text-yellow-400' : 'text-gray-300'" />
         </div>
-        <p class="ml-2 text-gray-500 text-sm">Based on 128 reviews</p>
+        <p class="ml-2 text-gray-500 text-sm" :text="`Based on ${reviewCount()} review${reviewCount() === 1 ? '' : 's'}`"></p>
       </div>
     </div>
+    <div :if="reviewCount() === 0">
+      <h2 class="font-semibold text-2xl text-gray-900">No reviews yet</h2>
+      <p class="mt-1 text-gray-500 text-sm">Be the first to share your courtroom experience.</p>
+    </div>
     <div class="flex items-center space-x-4">
-      <StxLink x-to="`/review/${routeId}`" class="px-3 py-2 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm">
+      <StxLink x-to="`/review/${judgeId()}`" class="px-3 py-2 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm">
         Write a Review
       </StxLink>
     </div>
   </div>
 
-  <!-- Rating Distribution -->
-  <div class="mt-8">
-    <h3 class="font-semibold text-base text-gray-900">Rating Distribution</h3>
-    <div class="mt-4 space-y-3">
-      <div :for="bucket in ratingBuckets" class="flex items-center">
-          <span class="text-gray-500 text-sm" :text="`${bucket.stars} stars`"></span>
-          <div class="flex-1 ml-4">
-            <div class="h-2 bg-gray-200 rounded-full">
-              <div class="h-2 bg-yellow-400 rounded-full" x-style="`width: ${bucket.percentage}%`"></div>
-            </div>
-          </div>
-          <span class="ml-4 text-gray-500 text-sm" :text="`${bucket.percentage}%`"></span>
-      </div>
-    </div>
+  <!-- Loading state -->
+  <div :if="isLoading()" class="mt-8 text-center text-gray-500 text-sm">
+    Loading reviews…
   </div>
 
-  <!-- Reviews List -->
-  <div class="mt-8">
-    <h3 class="font-semibold text-base text-gray-900">Reviews</h3>
-    <div class="mt-6 space-y-8">
-      <div :for="review in reviews" class="pb-8 border-b border-gray-200">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center">
-              <img x-src="review.avatar" x-alt="review.name" class="h-10 w-10 rounded-full">
-              <div class="ml-4">
-                <h4 class="font-semibold text-gray-900 text-sm" :text="review.name"></h4>
-                <div class="flex items-center">
-                  <div class="flex items-center">
-                    <Icon :for="star in stars" name="star" size="16" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'" />
-                  </div>
-                  <span class="ml-2 text-gray-500 text-sm" :text="review.date"></span>
-                </div>
+  <!-- Empty state -->
+  <div :if="isEmpty()" class="mt-8 p-8 text-center bg-gray-50 border border-gray-200 border-dashed rounded-lg">
+    <p class="text-gray-600 text-sm">This judge has no published reviews yet.</p>
+    <StxLink x-to="`/review/${judgeId()}`" class="inline-block mt-4 font-semibold text-gray-700 text-sm hover:text-gray-900">
+      Write the first review →
+    </StxLink>
+  </div>
+
+  <!-- Rating distribution + list (only when we have data) -->
+  <div :if="reviewCount() > 0">
+    <div class="mt-8">
+      <h3 class="font-semibold text-base text-gray-900">Rating Distribution</h3>
+      <div class="mt-4 space-y-3">
+        <div :for="bucket in ratingBuckets()" class="flex items-center">
+            <span class="text-gray-500 text-sm" :text="`${bucket.stars} stars`"></span>
+            <div class="flex-1 ml-4">
+              <div class="h-2 bg-gray-200 rounded-full">
+                <div class="h-2 bg-yellow-400 rounded-full" x-style="`width: ${bucket.percentage}%`"></div>
               </div>
             </div>
-            <button type="button" class="font-semibold text-gray-600 text-sm hover:text-gray-500">
-              Report
-            </button>
-          </div>
-          <div class="mt-4 text-gray-500 text-sm">
-            <div class="relative">
-              <p class="line-clamp-4" :text="review.content"></p>
-              @include('Bench/BlurReview', { color: 'white' })
+            <span class="ml-4 text-gray-500 text-sm" :text="`${bucket.percentage}%`"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-8">
+      <h3 class="font-semibold text-base text-gray-900">Reviews</h3>
+      <div class="mt-6 space-y-8">
+        <div :for="review in reviews()" class="pb-8 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center">
+                <div class="flex items-center justify-center h-10 w-10 font-semibold text-gray-500 text-sm bg-gray-100 rounded-full" :text="(review.title || 'A').slice(0, 1).toUpperCase()"></div>
+                <div class="ml-4">
+                  <h4 class="font-semibold text-gray-900 text-sm" :text="review.title"></h4>
+                  <div class="flex items-center">
+                    <div class="flex items-center">
+                      <Icon :for="star in stars" name="star" size="16" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'" />
+                    </div>
+                    <span class="ml-2 text-gray-500 text-sm" :text="formatDate(review.created_at)"></span>
+                  </div>
+                </div>
+              </div>
+              <button type="button" class="font-semibold text-gray-600 text-sm hover:text-gray-500">
+                Report
+              </button>
             </div>
-            <div class="mt-2">
-              <StxLink
-                x-to="`/article/${review.id}`"
-                class="inline-block text-gray-600 text-xs hover:text-gray-500 hover:underline"
-              >
-                Read more
-              </StxLink>
+            <div class="mt-4 text-gray-500 text-sm">
+              <p :text="review.content"></p>
             </div>
-          </div>
-          <div class="flex items-center mt-4 space-x-4">
-            <button type="button" class="font-semibold text-gray-500 text-sm hover:text-gray-700" :text="`Helpful (${review.helpfulCount})`"></button>
-          </div>
+            <div class="flex items-center mt-4 space-x-4">
+              <button type="button" class="font-semibold text-gray-500 text-sm hover:text-gray-700" :text="`Helpful (${review.likes ?? 0})`"></button>
+            </div>
+        </div>
       </div>
     </div>
   </div>
 </div>
-
-@push('styles')
-<style>
-.line-clamp-4 {
-  display: -webkit-box;
-  line-clamp: 4;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-</style>
-@endpush

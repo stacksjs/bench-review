@@ -59,3 +59,38 @@ route.post('/api/auth/password/forgot', 'Actions/Password/SendPasswordResetEmail
 route.post('/api/auth/password/reset', 'Actions/Password/PasswordResetAction')
   .name('bench.password.reset')
   .skipCsrf()
+
+// Judge + courthouse read endpoints. Public (no auth gate) because the
+// directory pages are public surface area. Mutating routes will live
+// under `/api/judges` (POST/PATCH/DELETE) when review submission lands
+// — keep those guarded by `auth` middleware then.
+route.get('/api/judges', 'Actions/Judges/JudgeIndexAction')
+  .name('bench.judges.index')
+
+// Server-side typeahead — drives the search input in the review form.
+// MUST come BEFORE the `/api/judges/{id}/reviews` route below: bun-router
+// matches paths in registration order and `/search` would otherwise be
+// captured as `:id = 'search'`.
+route.get('/api/judges/search', 'Actions/Judges/JudgeSearchAction')
+  .name('bench.judges.search')
+
+route.get('/api/court-houses', 'Actions/CourtHouses/CourtHouseIndexAction')
+  .name('bench.courtHouses.index')
+
+// Reviews — split into lazy reads + auth-gated writes.
+// - GET /api/reviews                 : latest across all judges (home feed)
+// - GET /api/judges/:id/reviews      : reviews for a single judge (detail page)
+// - POST /api/reviews                : submit a new review (auth required)
+//
+// The reads stay public; the write is gated by the `auth` middleware
+// auto-discovered from `resources/middleware/auth.ts`.
+route.get('/api/reviews', 'Actions/Reviews/LatestReviewsAction')
+  .name('bench.reviews.latest')
+
+route.get('/api/judges/{id}/reviews', 'Actions/Reviews/ReviewsByJudgeAction')
+  .name('bench.judges.reviews')
+
+route.post('/api/reviews', 'Actions/Reviews/SubmitReviewAction')
+  .name('bench.reviews.submit')
+  .middleware('auth')
+  .skipCsrf()

@@ -24,6 +24,16 @@
 
   const stars: StarRating[] = [1, 2, 3, 4, 5]
 
+  // Store + per-form transient state. The action-bar bindings
+  // (`reviewsStore.submitting()`, `submitError()`) were referenced
+  // before either was declared — every binding threw a silent
+  // ReferenceError, the `x-class` array never resolved, and the
+  // Submit button ended up with `text-white` on a transparent
+  // background → invisible. Declaring them here makes the bindings
+  // evaluate cleanly.
+  const reviewsStore = useStore('reviews')
+  const submitError = state<string | null>(null)
+
   function loadJudge(id: string): void {
     judge.set({
       id,
@@ -64,41 +74,67 @@
   }
 
   onMount(() => {
-    const judgeId = new URLSearchParams(window.location.search).get('judgeId')
-    if (judgeId)
-      loadJudge(judgeId)
+    // Three ways the judge id can land on this page:
+    //   1. /review/:id        (path param, set by the search component
+    //                          via `history.replaceState`)
+    //   2. /review?judgeId=…  (query string, legacy entry points)
+    //   3. /review            (no id — show the search step)
+    //
+    // `params` is only injected by the framework on dynamic routes
+    // (`/review/:id` matches; `/review` doesn't). Read it through
+    // `window.stx._rp` directly so the bare `/review` case doesn't
+    // throw `ReferenceError: params is not defined`.
+    const rp = (typeof window !== 'undefined' && (window as any).stx?._rp) || {}
+    const pathId = rp.id
+    const queryId = typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('judgeId')
+      : null
+    const id = pathId || queryId
+    if (id)
+      loadJudge(String(id))
   })
 </script>
-<div
-  class="pb-32 space-y-12"
->
+<div class="min-h-screen">
+  <div>
+
+  <!-- Step 1: pick a judge (no card around it — the search component
+       brings its own surface). -->
   <div :if="!judge">
     @include('Bench/Judge/ReviewJudgeSearch')
   </div>
 
-  <!-- Review Form - Only shown when judge is selected -->
-  <div :if="judge">
-    <!-- Review Header -->
-    <div class="pb-12">
-      <div>
-        <div class="mb-8 text-center">
-          <img class="inline-block mb-4 h-24 w-24 ring-2 ring-white rounded-full grayscale filter" x-src="judge().photo" x-alt="judge().name" />
-          <h3 class="font-semibold text-gray-800 text-lg" :text="judge().name"></h3>
-          <p class="text-gray-600 text-sm" :text="judge().court"></p>
-          <p class="text-gray-600 text-sm" :text="judge().department"></p>
+  <!-- Step 2: selected-judge banner. Once a judge is chosen, this card
+       sits at the top and confirms the target of the review. Clicking
+       "Change" clears the selection and re-opens the search. -->
+  <div :if="judge" class="overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-sm">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-6 sm:p-8">
+      <div class="flex gap-4 items-center">
+        <img class="object-cover h-16 w-16 ring-2 ring-gray-100 rounded-full grayscale filter" x-src="judge().photo" x-alt="judge().name" />
+        <div class="min-w-0">
+          <h3 class="font-semibold text-gray-900 text-lg" :text="judge().name"></h3>
+          <p class="text-gray-500 text-sm" :text="judge().court"></p>
+          <p :if="judge().department" class="text-gray-400 text-xs" :text="judge().department"></p>
         </div>
       </div>
+      <button
+        type="button"
+        @click="judge.set(null)"
+        class="self-start sm:self-auto inline-flex items-center px-3 py-1.5 font-medium text-gray-600 text-sm border border-gray-200 rounded-md hover:bg-gray-50 hover:border-gray-300 transition-colors"
+      >
+        Change judge
+      </button>
     </div>
   </div>
 
-  <div class="pb-12 border-b border-gray-900/10">
-    <h2 class="font-semibold text-base/7 text-gray-800">Judge's Performance</h2>
-    <p class="mt-1 text-gray-600 text-sm/6">Rate the judge's performance in different aspects.</p>
+  <!-- Step 3: performance ratings — only enabled once a judge is set. -->
+  <div :if="judge" class="p-6 sm:p-8 bg-white border border-gray-200 rounded-2xl shadow-sm mt-2">
+    <h2 class="font-semibold text-base text-gray-900">Judge's Performance</h2>
+    <p class="mt-1 text-gray-500 text-sm">Rate the judge's performance in different aspects.</p>
 
-    <div class="mt-10 space-y-10">
+    <div class="mt-8 space-y-8">
       <!-- Title field -->
-      <div class="col-span-full">
-        <label for="title" class="block font-medium text-gray-700 text-sm/6">Review Title</label>
+      <div>
+        <label for="title" class="block font-medium text-gray-900 text-sm">Review Title</label>
         <div class="mt-2">
           <input
             type="text"
@@ -107,22 +143,24 @@
             x-model="reviewTitle"
             x-disabled="!judge"
             placeholder="Brief summary of your experience"
-            class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-300 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            class="block px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
         </div>
       </div>
 
-      <div class="space-y-6">
+      <!-- Sub-ratings grouped in a soft surface so they read as one
+           "performance scorecard" block rather than three loose rows. -->
+      <div class="p-5 bg-gray-50 border border-gray-200 rounded-xl space-y-5">
         <div class="flex items-center justify-between">
-          <label for="fairness" class="font-medium text-gray-700 text-sm/6">Fairness & Impartiality</label>
+          <label for="fairness" class="font-medium text-gray-900 text-sm">Fairness & Impartiality</label>
           <div class="flex items-center space-x-1 w-64">
             <div class="flex items-center space-x-1">
               <button
                 :for="star in stars"
                 type="button"
                 x-disabled="!judge"
-                class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                x-class="(hoverFairness() || fairness()) >= star ? 'text-yellow-400' : ''"
+                class="hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                x-class="(hoverFairness || fairness) >= star ? 'text-yellow-400' : 'text-gray-300'"
                 @click="fairness.set(star)"
                 @mouseenter="hoverFairness.set(star)"
                 @mouseleave="hoverFairness.set(0)"
@@ -135,15 +173,15 @@
         </div>
 
         <div class="flex items-center justify-between">
-          <label for="knowledge" class="font-medium text-gray-700 text-sm/6">Legal Knowledge</label>
+          <label for="knowledge" class="font-medium text-gray-900 text-sm">Legal Knowledge</label>
           <div class="flex items-center space-x-1 w-64">
             <div class="flex items-center space-x-1">
               <button
                 :for="star in stars"
                 type="button"
                 x-disabled="!judge"
-                class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                x-class="(hoverKnowledge() || knowledge()) >= star ? 'text-yellow-400' : ''"
+                class="hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                x-class="(hoverKnowledge || knowledge) >= star ? 'text-yellow-400' : 'text-gray-300'"
                 @click="knowledge.set(star)"
                 @mouseenter="hoverKnowledge.set(star)"
                 @mouseleave="hoverKnowledge.set(0)"
@@ -156,15 +194,15 @@
         </div>
 
         <div class="flex items-center justify-between">
-          <label for="demeanor" class="font-medium text-gray-700 text-sm/6">Professional Demeanor</label>
+          <label for="demeanor" class="font-medium text-gray-900 text-sm">Professional Demeanor</label>
           <div class="flex items-center space-x-1 w-64">
             <div class="flex items-center space-x-1">
               <button
                 :for="star in stars"
                 type="button"
                 x-disabled="!judge"
-                class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                x-class="(hoverDemeanor() || demeanor()) >= star ? 'text-yellow-400' : ''"
+                class="hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                x-class="(hoverDemeanor || demeanor) >= star ? 'text-yellow-400' : 'text-gray-300'"
                 @click="demeanor.set(star)"
                 @mouseenter="hoverDemeanor.set(star)"
                 @mouseleave="hoverDemeanor.set(0)"
@@ -178,41 +216,51 @@
       </div>
     </div>
 
-    <div class="grid gap-x-6 gap-y-8 grid-cols-1 sm:grid-cols-6 mt-10">
-      <div class="sm:col-span-3">
-        <label for="case-number" class="block font-medium text-gray-700 text-sm/6">Case Number (Optional)</label>
+    </div>
+  </div>
+
+  <!-- Step 4: Case context — optional metadata that helps readers
+       weigh the review. Wrapped in its own card so the form reads as
+       distinct steps rather than one long scroll. -->
+  <div :if="judge" class="p-6 sm:p-8 bg-white border border-gray-200 rounded-2xl shadow-sm mt-2">
+    <h2 class="font-semibold text-base text-gray-900">Case context</h2>
+    <p class="mt-1 text-gray-500 text-sm">Optional — adds credibility to your review.</p>
+
+    <div class="grid gap-x-6 gap-y-6 grid-cols-1 sm:grid-cols-2 mt-6">
+      <div>
+        <label for="case-number" class="block font-medium text-gray-900 text-sm">Case Number (Optional)</label>
         <div class="mt-2">
           <input
             type="text"
             name="case-number"
             id="case-number"
             x-disabled="!judge"
-            class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-300 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            class="block px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
         </div>
       </div>
 
-      <div class="sm:col-span-3">
-        <label for="case-date" class="block font-medium text-gray-700 text-sm/6">Case Date (Optional)</label>
+      <div>
+        <label for="case-date" class="block font-medium text-gray-900 text-sm">Case Date (Optional)</label>
         <div class="mt-2">
           <input
             type="date"
             name="case-date"
             id="case-date"
             x-disabled="!judge"
-            class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-300 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            class="block px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
         </div>
       </div>
 
-      <div class="col-span-full">
-        <label for="role" class="block font-medium text-gray-700 text-sm/6">Your Role in the Case</label>
+      <div class="sm:col-span-2">
+        <label for="role" class="block font-medium text-gray-900 text-sm">Your Role in the Case</label>
         <div class="mt-2">
           <select
             id="role"
             name="role"
             x-disabled="!judge"
-            class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-300 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            class="block px-3 py-2 w-full text-gray-900 text-sm bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
             <option>Attorney</option>
             <option>Party to the Case</option>
@@ -223,29 +271,23 @@
         </div>
       </div>
 
-      <div class="col-span-full">
+      <div class="sm:col-span-2 pt-4 border-t border-gray-100">
         <div class="flex relative items-start">
           <div class="flex items-center h-6">
             <button
               type="button"
               x-disabled="!judge"
               @click="isAnonymous.set(!isAnonymous())"
-              x-class="[
-                isAnonymous ? 'bg-gray-600' : 'bg-gray-200',
-                'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed'
-              ]"
+              class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              x-class="[isAnonymous() ? 'bg-gray-900' : 'bg-gray-200']"
             >
               <span
-                x-class="[
-                  isAnonymous ? 'translate-x-5' : 'translate-x-0',
-                  'pointer-events-none relative inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
-                ]"
+                class="pointer-events-none relative inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transform transition duration-200 ease-in-out"
+                x-class="[isAnonymous() ? 'translate-x-5' : 'translate-x-0']"
               >
                 <span
-                  x-class="[
-                    isAnonymous ? 'opacity-0 duration-100 ease-out' : 'opacity-100 duration-200 ease-in',
-                    'absolute inset-0 flex h-full w-full items-center justify-center transition-opacity'
-                  ]"
+                  class="absolute inset-0 flex h-full w-full items-center justify-center transition-opacity"
+                  x-class="[isAnonymous() ? 'opacity-0 duration-100 ease-out' : 'opacity-100 duration-200 ease-in']"
                   aria-hidden="true"
                 >
                   <svg class="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 12 12">
@@ -253,10 +295,8 @@
                   </svg>
                 </span>
                 <span
-                  x-class="[
-                    isAnonymous ? 'opacity-100 duration-200 ease-in' : 'opacity-0 duration-100 ease-out',
-                    'absolute inset-0 flex h-full w-full items-center justify-center transition-opacity'
-                  ]"
+                  class="absolute inset-0 flex h-full w-full items-center justify-center transition-opacity"
+                  x-class="[isAnonymous() ? 'opacity-100 duration-200 ease-in' : 'opacity-0 duration-100 ease-out']"
                   aria-hidden="true"
                 >
                   <svg class="h-3 w-3 text-gray-600" fill="currentColor" viewBox="0 0 12 12">
@@ -267,59 +307,80 @@
             </button>
           </div>
           <div class="ml-3 leading-6 text-sm">
-            <label for="anonymous" class="font-medium text-gray-700">Post anonymously</label>
-            <p class="text-gray-500">Your name will not be displayed with this review</p>
+            <label for="anonymous" class="font-medium text-gray-900">Post anonymously</label>
+            <p class="text-gray-500">Your name will not be displayed with this review.</p>
           </div>
         </div>
       </div>
     </div>
+  </div>
 
-    <div class="grid gap-x-6 gap-y-8 grid-cols-1 sm:grid-cols-6 mt-10">
-      <div class="col-span-full">
-        <label for="rating" class="block font-medium text-gray-700 text-sm/6">Overall Rating</label>
-        <div class="mt-2">
+  <!-- Step 5: The actual review — rating + freeform text. Last card so
+       it sits closest to the Submit button. -->
+  <div :if="judge" class="p-6 sm:p-8 bg-white border border-gray-200 rounded-2xl shadow-sm mt-2">
+    <h2 class="font-semibold text-base text-gray-900">Your review</h2>
+    <p class="mt-1 text-gray-500 text-sm">Overall rating and your written feedback.</p>
+
+    <div class="mt-6 space-y-8">
+      <div>
+        <label for="rating" class="block font-medium text-gray-900 text-sm">Overall Rating</label>
+        <div class="mt-2 flex items-center space-x-2">
           <div class="flex items-center space-x-1">
             <button
               :for="star in stars"
               type="button"
               x-disabled="!judge"
-              class="text-gray-300 hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-              x-class="(hoverRating() || rating()) >= star ? 'text-yellow-400' : ''"
+              class="hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              x-class="(hoverRating || rating) >= star ? 'text-yellow-400' : 'text-gray-300'"
               @click="rating.set(star)"
               @mouseenter="hoverRating.set(star)"
               @mouseleave="hoverRating.set(0)"
             >
               <Icon name="star" size="32" />
             </button>
-            <span class="ml-2 text-gray-500 text-sm" :text="ratingText()"></span>
           </div>
+          <span class="ml-3 font-medium text-gray-700 text-sm" :text="ratingText()"></span>
         </div>
       </div>
 
-      <div class="col-span-full">
-        <label for="review" class="block font-medium text-gray-700 text-sm/6">Your Review</label>
-        <div class="mt-2" @richtext:change="reviewContent.set($event.detail.html)">
+      <div>
+        <label for="review" class="block font-medium text-gray-900 text-sm">Your Review</label>
+        <div class="mt-2 border border-gray-200 focus-within:border-gray-900 focus-within:ring-2 focus-within:ring-gray-200 shadow-sm transition-colors" @richtext-change="reviewContent.set($event.detail.html)">
           @include('Bench/RichTextEditor')
         </div>
-        <p class="mt-3 text-gray-600 text-sm/6">Please be specific about your experience and maintain a professional tone.</p>
+        <p class="mt-2 text-gray-500 text-xs">Please be specific about your experience and maintain a professional tone.</p>
       </div>
     </div>
   </div>
 
-  <div class="flex gap-x-6 items-center justify-end mt-6">
-    <button type="button" @click="handleCancel" class="font-semibold text-gray-700 text-sm/6">Cancel</button>
-    <button
-      @click="handleSubmit"
-      x-disabled="!judge"
-      class="px-2.5 py-1.5 font-semibold text-sm text-white rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm"
-      x-class="[
-        judge
-          ? 'bg-gray-600 hover:bg-gray-500'
-          : 'bg-gray-300 cursor-not-allowed'
-      ]"
-    >
-      Submit Review
-    </button>
+  <!-- Action bar — sits as its own light surface so the Submit button
+       has visual weight against the page background. Only renders once
+       a judge is picked (matches the rest of the form). -->
+  <div :if="judge" class="p-6 sm:p-8 bg-white border border-gray-200 rounded-2xl shadow-sm mt-2">
+    <p
+      :if="submitError()"
+      role="alert"
+      aria-live="polite"
+      class="mb-4 p-3 text-red-700 text-sm bg-red-50 border border-red-200 rounded-md"
+      :text="submitError()"
+    ></p>
+
+    <div class="flex gap-x-4 items-center justify-end">
+      <button type="button" @click="handleCancel" class="px-4 py-2 font-semibold text-gray-700 text-sm border border-gray-200 rounded-md hover:bg-gray-50 hover:border-gray-300 transition-colors">Cancel</button>
+      <button
+        @click="handleSubmit()"
+        x-disabled="!judge || reviewsStore.submitting()"
+        class="px-5 py-2 font-semibold text-sm text-white rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-900 focus-visible:outline-offset-2 shadow-sm"
+        x-class="[
+          judge && !reviewsStore.submitting()
+            ? 'bg-gray-900 hover:bg-gray-700'
+            : 'bg-gray-300 cursor-not-allowed'
+        ]"
+        :text="reviewsStore.submitting() ? 'Submitting…' : 'Submit Review'"
+      >Submit Review</button>
+    </div>
+  </div>
+
   </div>
 </div>
 

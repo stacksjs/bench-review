@@ -1,5 +1,87 @@
-<div class="space-y-6">
-  <div :for="review in reviews">
+<script client>
+  import type { JudgeReviewRow } from '~/resources/stores/reviews'
+
+  // Self-contained reviews feed. Owns the fetch, the derived view-model,
+  // AND the three render states (loading / empty / list).
+  //
+  // Why everything lives here and not in the parent view:
+  // stx only registers a client-side scope for `<script client>` blocks
+  // inside COMPONENTS — not inside view files. A `<script client>` at the
+  // top of `views/reviews/index.stx` gets silently stripped during
+  // compile, no scope is created, and the fetch never runs. Moving the
+  // logic into a component (which always gets a scope) is the working
+  // pattern — see `Bench/ReviewForm` invoked from `views/review/index.stx`
+  // for the same shape.
+  const reviewsStore = useStore('reviews')
+  const judgesStore = useStore('judges')
+
+  // Top-level fetches — fire on every mount/hydrate of this component.
+  // Cheap because the store dedupes via its internal `loadingLatest`
+  // flag and we only re-fetch judges if the list is empty.
+  reviewsStore.fetchLatest(20)
+  if (judgesStore.judges().length === 0)
+    judgesStore.fetchJudges()
+
+  function formatDate(dateStr: string | null | undefined): string {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  }
+
+  // Seeded reviews have `user_id: null`. Surface a placeholder author
+  // rather than crashing on undefined access inside `Bench/Feed`.
+  const PLACEHOLDER_AUTHOR = {
+    id: 0,
+    name: 'Anonymous',
+    imageUrl: 'https://www.gravatar.com/avatar/?d=mp&s=80',
+  }
+
+  // Single derived owns the view-model: filter out judge-less rows
+  // (legacy factory seeds) and join each row with its judge by id so
+  // `Bench/Feed` gets the nested shape it expects.
+  const reviews = derived(() => {
+    const byId: Record<number, any> = {}
+    for (const j of judgesStore.judges())
+      byId[j.id] = j
+
+    return reviewsStore.latest()
+      .filter((r: JudgeReviewRow) => r.judge_id != null)
+      .map((r: JudgeReviewRow) => {
+        const j = byId[r.judge_id as number]
+        return {
+          id: r.id,
+          title: r.title,
+          content: r.content,
+          rating: r.rating ?? 0,
+          likes: r.likes ?? 0,
+          comments: r.comments ?? 0,
+          type: r.type,
+          status: r.status,
+          date: formatDate(r.created_at),
+          author: PLACEHOLDER_AUTHOR,
+          judge: j
+            ? { id: j.id, name: j.name, imageUrl: (j as any).image_url }
+            : { id: r.judge_id, name: 'Judge', imageUrl: '' },
+        }
+      })
+  })
+</script>
+
+<!-- Three mutually-exclusive states. reviewsStore.loadingLatest() is the
+     canonical loading flag; reviews().length is the canonical empty test
+     after the judge-id filter has run. (No backticks in this comment —
+     stx's script-merge concatenates comment text into the merged setup
+     function and a stray backtick flips the JS parser into template-
+     literal mode, breaking every following script.) -->
+<div :if="reviewsStore.loadingLatest() && reviews().length === 0" class="py-12 text-center text-gray-500 text-sm">
+  Loading reviews…
+</div>
+<div :if="!reviewsStore.loadingLatest() && reviews().length === 0" class="py-12 text-center text-gray-500 text-sm">
+  No reviews yet. Be the first to write one.
+</div>
+<div :if="reviews().length > 0" class="space-y-6">
+  <div :for="review in reviews()">
     @include('Bench/Feed', { review: review })
   </div>
 </div>

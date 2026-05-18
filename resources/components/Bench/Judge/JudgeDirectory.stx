@@ -1,15 +1,25 @@
 <script client>
   import type { Judge } from '~/resources/types'
-  import { judges as allJudges } from '~/resources/functions/sample'
 
+  const judgesStore = useStore('judges')
   const searchQuery = state<string>('')
   const stars: number[] = [1, 2, 3, 4, 5]
 
+  // Fetch on first mount only — the store's internal `judges` state
+  // sticks around across SPA navigations, so revisiting the page
+  // re-uses the cached rows. Add a `force=true` arg to fetchJudges
+  // if/when stale-data UX becomes a problem.
+  onMount(() => {
+    if (judgesStore.judges().length === 0)
+      judgesStore.fetchJudges()
+  })
+
   const filteredJudges = derived<Judge[]>(() => {
     const q = searchQuery()
-    if (!q) return allJudges
+    const all = judgesStore.judges()
+    if (!q) return all
     const needle = q.toLowerCase()
-    return allJudges.filter(j =>
+    return all.filter(j =>
       j.name.toLowerCase().includes(needle)
       || j.court.name.toLowerCase().includes(needle)
       || j.location.toLowerCase().includes(needle),
@@ -107,14 +117,12 @@
             ></h3>
             <p class="mt-1 text-gray-500 text-sm" :text="judge.location"></p>
 
-            <div class="flex items-center justify-center mt-3">
-              <div class="flex items-center">
-                <svg :for="star in stars" class="h-4 w-4 flex-shrink-0" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" clip-rule="evenodd" />
-                </svg>
-              </div>
-              <span class="ml-2 text-gray-400 text-xs" :text="`(${judge.reviewCount} reviews)`"></span>
-            </div>
+            <!-- Review aggregates are lazy-loaded by /api/judges/:id/reviews
+                 when a profile opens — they're NOT included on the
+                 directory payload (avoids the N+1 join). Show a clean
+                 "no reviews yet" hint here; the profile page renders
+                 the full stars + distribution. -->
+            <span class="mt-3 text-gray-400 text-xs">No reviews yet</span>
           </div>
       </StxLink>
     </div>

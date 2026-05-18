@@ -1,13 +1,19 @@
 <script client>
-  import { courtHouses as allCourtHouses, judges as allJudges } from '~/resources/functions/sample'
-
   useHead({ title: 'Search - Bench Review' })
 
   const search = useStore('search')
   const judgesStore = useStore('judges')
 
-  judgesStore.setJudges(allJudges)
-  judgesStore.setCourtHouses(allCourtHouses)
+  // Lazy-fetch both collections. The store's `filteredJudges` /
+  // `filteredCourtHouses` derived signals already drive the page,
+  // so they'll re-derive whenever the fetch lands.
+  onMount(() => {
+    if (judgesStore.judges().length === 0)
+      judgesStore.fetchJudges()
+    if (judgesStore.courtHouses().length === 0)
+      judgesStore.fetchCourtHouses()
+  })
+
   search.initFromUrl()
 
   const filteredJudges = judgesStore.filteredJudges

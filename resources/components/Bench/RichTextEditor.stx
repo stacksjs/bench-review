@@ -1,109 +1,313 @@
 <script client>
+  // Plain-div + script implementation. We can't use a `<rich-text-editor>`
+  // custom element here because stx's component resolver intercepts any
+  // hyphenated tag at parse time and tries to load `rich-text-editor.stx`
+  // from disk — that's an unwinnable name collision between the Web
+  // Components spec ("custom element names MUST contain a hyphen") and
+  // stx's auto-component resolution. So the host is a plain `<div>` with
+  // a `data-richtext-host` marker attribute that stx ignores.
+  //
+  // The two imports below are the only thing stx still does for us:
+  //   - The JS import is resolved + bundled by Bun.build so `MediumEditor`
+  //     lands as inlined code (no `import` in the emitted script body).
+  //   - The CSS import goes through stx's vendor-CSS extractor and emits
+  //     as a sibling `<style data-stx-vendor>` block wrapped in
+  //     `@layer vendor { … }`.
+  //
+  // CSS imports — three files, intentional:
+  //
+  //   1. `medium-editor-compiled.css` — the canonical Placeholder rule
+  //      (`.medium-editor-placeholder:after`) PLUS positioning/visibility
+  //      machinery for the toolbar (`position: absolute; visibility: hidden;
+  //      z-index: 2000`). Without this the placeholder never shows and the
+  //      toolbar has no z-stack. Do NOT swap for `medium-editor.css` — that
+  //      one only ships the `:empty:before` placeholder which never fires
+  //      once MediumEditor inserts its trailing `<br>`.
+  //
+  //   2. Toolbar visual chrome (background, borders, button styles,
+  //      hover states) is supplied entirely by our own CSS in the
+  //      @push('styles') block below — we deliberately do NOT import
+  //      any of the library's `themes/*.css`. The `beagle` theme was
+  //      tried earlier and is what kept stamping `border-radius: 50px`
+  //      and `background: #000` via the vendor layer no matter how
+  //      many times we tried to override them. Dropping the import
+  //      is cleaner than fighting vendor-layer specificity for every
+  //      property.
+  //
+  // Bun.build inlines the JS import; the CSS import runs through stx's
+  // vendor-CSS extractor and emits as a sibling `<style data-stx-vendor>`
+  // block wrapped in `@layer vendor { … }`.
   import { MediumEditor } from 'ts-medium-editor'
+  import 'ts-medium-editor/css/medium-editor-compiled.css'
 
-  const STORAGE_KEY = 'bench-review:compose-draft'
-  const SAVE_DEBOUNCE_MS = 500
-
-  const editorMount = useRef<HTMLElement>('editorMount')
-  const editor = state<InstanceType<typeof MediumEditor> | null>(null)
-
-  let saveTimer: ReturnType<typeof setTimeout> | null = null
-
-  function loadDraft(): string {
-    try {
-      return localStorage.getItem(STORAGE_KEY) || ''
-    } catch {
-      return ''
-    }
+  // SVG icons keyed by `data-action` value. The library's default
+  // button content is plaintext (`B`, `I`, `H2`, `🔗`, `""`, `•`, `1.`)
+  // which looks like a 1990s textarea toolbar. We swap each button's
+  // innerHTML for a Lucide-style 16x16 stroke icon (1.75 stroke width
+  // matches a friendly modern UI density) after MediumEditor finishes
+  // wiring up its action handlers. Action handlers fire on `click`
+  // anywhere inside the button, so the SVG can stay event-passive
+  // (no `pointer-events: none` needed) — the click reaches the
+  // button itself, and the data-action attribute drives the action.
+  const TOOLBAR_ICONS = {
+    bold: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5h6.5a3.5 3.5 0 0 1 0 7H7z"/><path d="M7 12h7.5a3.5 3.5 0 0 1 0 7H7z"/></svg>',
+    italic: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>',
+    underline: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v6a6 6 0 0 0 12 0V4"/><line x1="4" y1="20" x2="20" y2="20"/></svg>',
+    strikethrough: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4H9a3 3 0 0 0-2.83 4"/><path d="M14 12a4 4 0 0 1 0 8H6"/><line x1="4" y1="12" x2="20" y2="12"/></svg>',
+    anchor: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+    h2: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M21 18h-4c0-4 4-3 4-6 0-2-2-2-4-1"/></svg>',
+    h3: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17.5 10.5a2 2 0 1 1 2 3.5 2 2 0 1 1-2 3.5"/></svg>',
+    quote: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1v2c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 .985 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1v2c0 1 0 1 1 1z"/></svg>',
+    unorderedlist: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>',
+    orderedlist: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>',
+    pre: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
   }
 
-  function saveDraft(html: string): void {
-    if (saveTimer)
-      clearTimeout(saveTimer)
-    saveTimer = setTimeout(() => {
+  // Friendly tooltip labels — these become the button's `title`
+  // attribute. The library sets its own titles (e.g. "Bold", "Italic")
+  // but they're terse; we add keyboard shortcuts to make the
+  // discoverability bump worthwhile.
+  const TOOLBAR_TITLES = {
+    bold: 'Bold (⌘B)',
+    italic: 'Italic (⌘I)',
+    underline: 'Underline (⌘U)',
+    strikethrough: 'Strikethrough',
+    anchor: 'Link (⌘K)',
+    h2: 'Heading 2',
+    h3: 'Heading 3',
+    quote: 'Quote',
+    unorderedlist: 'Bullet list',
+    orderedlist: 'Numbered list',
+    pre: 'Code block',
+  }
+
+  function applyToolbarIcons(toolbarEl) {
+    if (!toolbarEl) return
+    toolbarEl.querySelectorAll('button[data-action]').forEach((btn) => {
+      const action = btn.getAttribute('data-action')
+      if (!action) return
+      const icon = TOOLBAR_ICONS[action]
+      if (icon) {
+        btn.innerHTML = icon
+        btn.setAttribute('aria-label', TOOLBAR_TITLES[action] || action)
+        btn.title = TOOLBAR_TITLES[action] || action
+      }
+    })
+  }
+
+  function mountRichTextHost(host) {
+    // Idempotency guard — MutationObserver below can fire multiple times
+    // for the same host (attribute changes, child additions); don't
+    // re-instantiate.
+    if (host.__richtextMounted) return
+    host.__richtextMounted = true
+
+    // Host needs `position: relative` so the toolbar's `position: absolute`
+    // anchors to the host's bounding box (otherwise it'd anchor to the
+    // nearest positioned ancestor — typically body — and float outside
+    // the editor frame). The CSS rule for `[data-richtext-host]` in
+    // `@push('styles')` below already sets this, but assigning inline
+    // makes it survive style-precedence weirdness from main.css resets.
+    host.style.position = 'relative'
+
+    const editable = document.createElement('div')
+    editable.className = 'medium-editor-element'
+    editable.style.cssText = 'min-height: 200px; padding: 0.5rem 0.75rem; outline: none;'
+    host.appendChild(editable)
+
+    const placeholderText = host.getAttribute('data-placeholder') || 'Tell your story…'
+    const storageKey = host.getAttribute('data-storage-key')
+
+    // Restore prior draft BEFORE constructing the editor — once
+    // MediumEditor takes over the element, setting innerHTML through
+    // its own API would fire a spurious `editableInput` event.
+    if (storageKey) {
       try {
-        const trimmed = html?.trim()
-        if (trimmed && trimmed !== '<p><br></p>')
-          localStorage.setItem(STORAGE_KEY, html)
-        else
-          localStorage.removeItem(STORAGE_KEY)
-      }
-      catch {
-        // localStorage unavailable (private mode, quota) — fail silently
-      }
-    }, SAVE_DEBOUNCE_MS)
-  }
+        const draft = localStorage.getItem(storageKey)
+        if (draft) editable.innerHTML = draft
+      } catch {}
+    }
 
-  function emitChange(html: string): void {
-    editorMount.current?.dispatchEvent(new CustomEvent('richtext:change', {
-      bubbles: true,
-      detail: { html },
-    }))
-  }
-
-  onMount(() => {
-    const el = editorMount.current
-    if (!el)
-      return
-
-    const draft = loadDraft()
-    if (draft)
-      el.innerHTML = draft
-
-    const med = new MediumEditor(el, {
+    const editor = new MediumEditor(editable, {
+      // Append the toolbar inside the host (default would be
+      // `document.body`). Keeping it inside the host means it scrolls
+      // with the editor card and stays scoped to the editor's stacking
+      // context — no floating-element-outside-the-card weirdness.
+      elementsContainer: host,
       placeholder: {
-        text: 'Share your experience. Be specific about courtroom conduct, fairness, and clarity of decisions...',
+        text: placeholderText,
         hideOnClick: true,
       },
       toolbar: {
         buttons: ['bold', 'italic', 'anchor', 'h2', 'h3', 'quote', 'unorderedlist', 'orderedlist'],
-        static: false,
+        // `static: true` makes the toolbar always-visible at the top of
+        // the editable area, like a standard WYSIWYG editor. This is
+        // what "show toolbar in the textarea" actually means in
+        // practice — a persistent strip of formatting buttons, not a
+        // floating-on-selection bubble. The library appends the
+        // toolbar AFTER the editable in DOM order; CSS `flex order`
+        // (see `@push('styles')` below) flips them visually so the
+        // toolbar shows above the typing area.
+        static: true,
       },
       anchor: {
         linkValidation: true,
         targetCheckbox: true,
       },
-      autoLink: true,
-      targetBlank: true,
       paste: {
         cleanPastedHTML: true,
         forcePlainText: false,
       },
+      autoLink: true,
+      targetBlank: true,
       spellcheck: true,
+      markdownShortcuts: true,
+      slashCommands: true,
+      taskList: true,
+      tables: true,
     })
 
-    med.subscribe('editableInput', () => {
-      const html = med.getContent() || ''
-      saveDraft(html)
-      emitChange(html)
+    host.__richtextEditor = editor
+    let saveTimer = null
+
+    // Swap each toolbar button's plaintext content for a modern SVG
+    // icon. Done after `new MediumEditor(…)` returns so the toolbar
+    // and its buttons exist in the DOM. We also re-apply on the next
+    // animation frame as a safety net for the (rare) case where
+    // MediumEditor lazily adds buttons after init.
+    applyToolbarIcons(host.querySelector('.medium-editor-toolbar'))
+    requestAnimationFrame(() => applyToolbarIcons(host.querySelector('.medium-editor-toolbar')))
+
+    editor.subscribe('editableInput', () => {
+      const html = editor.getContent() || ''
+
+      // Debounced draft save — collapses keystroke bursts to one
+      // localStorage write per ~500ms. Empty / sentinel content is
+      // cleared rather than stored so a "submit & wipe" flow leaves
+      // no ghost draft behind on next mount.
+      if (storageKey) {
+        if (saveTimer) clearTimeout(saveTimer)
+        saveTimer = setTimeout(() => {
+          try {
+            const trimmed = (html || '').trim()
+            if (trimmed && trimmed !== '<p><br></p>') {
+              localStorage.setItem(storageKey, html)
+            }
+            else {
+              localStorage.removeItem(storageKey)
+            }
+          } catch {}
+        }, 500)
+      }
+
+      // Bubbling CustomEvent — parents can listen with normal DOM
+      // `addEventListener('richtext-change', …)` or in stx templates
+      // with `@richtext-change="x.set($event.detail.html)"`.
+      host.dispatchEvent(new CustomEvent('richtext-change', {
+        bubbles: true,
+        detail: { html },
+      }))
     })
 
-    if (draft)
-      emitChange(draft)
+    // If we restored a draft, fire one onChange so any derived UI
+    // (character count, validation, enable-submit) starts in the
+    // correct state from frame 1.
+    if (storageKey) {
+      try {
+        const draft = localStorage.getItem(storageKey)
+        if (draft) {
+          host.dispatchEvent(new CustomEvent('richtext-change', {
+            bubbles: true,
+            detail: { html: draft },
+          }))
+        }
+      } catch {}
+    }
+  }
 
-    editor.set(med)
+  function mountAll() {
+    document.querySelectorAll('[data-richtext-host]').forEach(mountRichTextHost)
+  }
 
-    return () => {
-      med.destroy()
-      editor.set(null)
-      if (saveTimer) {
-        clearTimeout(saveTimer)
-        saveTimer = null
+  // Initial sweep on script run. The client script is injected at
+  // end-of-body so the host div is guaranteed to be in the DOM by now.
+  mountAll()
+
+  // Re-sweep on DOM mutations so hosts that appear inside a toggled
+  // `:if` block (e.g. only render once the user has picked a judge)
+  // still get an editor. Scoped to body subtree, but the
+  // `__richtextMounted` guard makes redundant calls a no-op.
+  const observer = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      for (const node of m.addedNodes) {
+        if (node.nodeType !== 1) continue
+        if (node.matches && node.matches('[data-richtext-host]')) {
+          mountRichTextHost(node)
+        }
+        else if (node.querySelectorAll) {
+          node.querySelectorAll('[data-richtext-host]').forEach(mountRichTextHost)
+        }
       }
     }
   })
+  observer.observe(document.body, { childList: true, subtree: true })
 </script>
 
-<div class="block w-full text-base text-gray-900 bg-white border-0 ring-1 ring-gray-300 ring-inset rounded-md focus-within:ring-2 focus-within:ring-gray-600 focus-within:ring-inset shadow-sm">
-  <div ref="editorMount" class="medium-editor-element px-3 py-2 min-h-[200px] focus:outline-none"></div>
+<!-- Plain div host (NOT a custom element) — stx's component resolver
+     intercepts hyphenated tags at parse time, so `<rich-text-editor>`
+     would 404 looking for `rich-text-editor.stx`. The `data-richtext-host`
+     attribute is the marker the script uses to find this. -->
+<div
+  data-richtext-host
+  data-placeholder="Share your experience. Type / for blocks, or just start writing…"
+  data-storage-key="bench-review:compose-draft"
+  class="block">
 </div>
 
 @push('styles')
 <style>
-.medium-editor-element {
-  outline: none;
+[data-richtext-host] {
+  /* Flex column so we can use `order` to put the static toolbar
+   * visually above the editable, even though MediumEditor appends
+   * the toolbar AFTER the editable in DOM order (see umd.js:4057). */
+  display: flex;
+  flex-direction: column;
+  position: relative;
 }
 
+/* Static toolbar pinned at top of the host. The `data-static-toolbar="true"`
+ * attribute is set by MediumEditor when `static: true` is passed; selecting
+ * via that attribute (rather than just `.medium-editor-toolbar`) keeps
+ * non-static toolbars unaffected if we ever bring back the floating mode. */
+[data-richtext-host] > .medium-editor-toolbar[data-static-toolbar="true"] {
+  order: 0;
+  margin: 0;
+}
+
+[data-richtext-host] > .medium-editor-element {
+  order: 1;
+}
+
+/* Surgical override of medium-editor.css chrome that conflicts with
+ * the outer wrapper's `ring-1 focus-within:ring-2` styling. Leaves
+ * padding/min-height/font/color alone — those are owned by inline
+ * style on the editable div (or inherit from the wrapper). */
+.medium-editor-element {
+  outline: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.medium-editor-element:focus {
+  border: 0;
+  box-shadow: none;
+}
+
+/* Prose styles for the content inside the editor — these are
+ * project-specific (matches bench-review's neutral, muted palette)
+ * and intentionally NOT in the library wrapper. Tune per consumer. */
 .medium-editor-element p:first-child {
   margin-top: 0;
 }
@@ -146,6 +350,328 @@
 .medium-editor-element a {
   color: #4b5563;
   text-decoration: underline;
+}
+
+.medium-editor-element pre {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  font-family: 'SF Mono', Monaco, Menlo, Consolas, monospace;
+  font-size: 0.85em;
+  line-height: 1.55;
+  overflow-x: auto;
+}
+
+.medium-editor-element pre > code {
+  display: block;
+  white-space: pre;
+  background: transparent;
+  padding: 0;
+}
+
+.medium-editor-element table.medium-editor-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  font-size: 0.95em;
+}
+
+.medium-editor-element table.medium-editor-table td {
+  border: 1px solid #e5e7eb;
+  padding: 0.45rem 0.6rem;
+  min-width: 60px;
+  vertical-align: top;
+}
+
+.medium-editor-element ul.medium-editor-task-list {
+  list-style: none;
+  padding-left: 0.25rem;
+  margin: 0.5rem 0;
+}
+
+.medium-editor-element li.medium-editor-task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.15rem 0;
+}
+
+.medium-editor-element li.medium-editor-task-item > input[type="checkbox"] {
+  margin-top: 0.4rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.medium-editor-element li.medium-editor-task-item[data-checked="true"] > .task-text {
+  color: #9ca3af;
+  text-decoration: line-through;
+}
+
+.medium-editor-slash-menu {
+  font-family: inherit;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Toolbar chrome — INLINED ON PURPOSE.
+ *
+ * The library ships its toolbar visuals in `themes/*.css` files which
+ * we'd normally pull in via vendor-CSS extraction. But that path has
+ * one too many moving pieces (Bun.resolveSync wildcard exports +
+ * stx's vendor extractor + CSS-layer ordering + Tailwind preflight)
+ * and a single failure in any of them yields exactly the symptom we
+ * had: toolbar mounts as raw inline buttons, no positioning, no
+ * chrome. Inlining the minimum positioning + chrome rules below
+ * removes those dependencies so the toolbar is guaranteed to render
+ * correctly regardless of framework state.
+ *
+ * Visual choice: black-pill (beagle-style) — matches the Medium
+ * editor aesthetic against the page's light, neutral palette.
+ * ───────────────────────────────────────────────────────────────── */
+
+/* Floating-mode toolbar (kept for completeness — only kicks in if
+ * `static: false` is set on a future consumer). Hidden by default,
+ * visible when `medium-editor-toolbar-active` class is added by the
+ * library on selection. */
+.medium-editor-toolbar:not([data-static-toolbar="true"]) {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  z-index: 2000;
+  background-color: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 9999px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18), 0 2px 4px rgba(0, 0, 0, 0.12);
+  padding: 2px;
+  font-family: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.medium-editor-toolbar:not([data-static-toolbar="true"]).medium-editor-toolbar-active {
+  visibility: visible;
+}
+
+/* Static-mode toolbar — full-width strip at the top of the editor.
+ * Flex layout for the button row, subtle bottom border to separate
+ * it from the typing area. `!important` on `position`/`display`/
+ * `visibility` overrides the inline styles MediumEditor sets in JS
+ * (umd.js:4046-4048) — those say `position: static; display: block;
+ * visibility: visible` which is mostly what we want, but `display:
+ * block` would prevent flex layout of the buttons. Override with
+ * `flex` and keep the visibility/position assertions for safety.
+ *
+ * Border-radius matches the wrapper's `rounded-lg` (0.5rem = 8px)
+ * MINUS the wrapper's 1px border, so the toolbar's painted corners
+ * sit *inside* the wrapper's border instead of being clipped under
+ * it by `overflow-hidden`. Explicit radius is a belt-and-suspenders
+ * against rendering edge cases where rounded clipping leaves a
+ * 1-2px anti-aliased halo at the corners (a real Safari/Chrome bug
+ * with `border-radius` + `overflow: hidden` + child backgrounds). */
+.medium-editor-toolbar[data-static-toolbar="true"] {
+  position: static !important;
+  display: flex !important;
+  visibility: visible !important;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  background-color: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 6px 8px;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+/* `ts-medium-editor` appends buttons directly under the toolbar div —
+ * NO `<ul><li>` wrapping like the original `medium-editor` does (see
+ * umd.js:4078 `this.toolbar.appendChild(button)`). The selectors here
+ * target buttons as direct toolbar children, not nested in lists.
+ * Hidden any defensive ul/li reset in case a custom-button consumer
+ * ever uses one.
+ *
+ * Button chrome — neutral light buttons that match the surrounding
+ * form. Hover/active states are darker but still light-palette to
+ * avoid the visual jolt of black-on-white toolbar inside a white
+ * card. Glyph styles (.medium-editor-action-bold/italic/underline)
+ * are inherited from the shared rules below. */
+.medium-editor-toolbar ul,
+.medium-editor-toolbar li {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.medium-editor-toolbar > button,
+.medium-editor-toolbar .medium-editor-action {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  box-sizing: border-box;
+  color: #6b7280;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  height: 32px;
+  width: 32px;
+  line-height: 1;
+  margin: 0;
+  padding: 0;
+  text-decoration: none;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.medium-editor-toolbar > button svg,
+.medium-editor-toolbar .medium-editor-action svg {
+  display: block;
+  /* Decouple icon stroke colour from button text colour — `currentColor`
+   * on the SVG inherits the button's `color`, which we change on hover
+   * and `.medium-editor-button-active`. That's why the colour change
+   * happens here rather than per-icon. */
+  color: inherit;
+}
+
+.medium-editor-toolbar > button:hover,
+.medium-editor-toolbar .medium-editor-action:hover {
+  background-color: #ffffff;
+  border-color: #e5e7eb;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  color: #111827;
+}
+
+.medium-editor-toolbar > button:focus-visible,
+.medium-editor-toolbar .medium-editor-action:focus-visible {
+  outline: 2px solid #111827;
+  outline-offset: 1px;
+}
+
+.medium-editor-toolbar > button:focus,
+.medium-editor-toolbar .medium-editor-action:focus {
+  outline: none;
+}
+
+.medium-editor-toolbar > button.medium-editor-button-active,
+.medium-editor-toolbar .medium-editor-action.medium-editor-button-active {
+  background-color: #111827;
+  border-color: #111827;
+  color: #ffffff;
+}
+
+/* Re-inline the action glyph styles so `B`/`I`/etc. render with the
+ * correct weight/slant even without the compiled.css extractor. */
+.medium-editor-action-bold { font-weight: 800; }
+.medium-editor-action-italic { font-style: italic; }
+.medium-editor-action-underline { text-decoration: underline; }
+.medium-editor-action-pre {
+  font-family: 'SF Mono', Monaco, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+/* Toolbar form (used by the anchor-link prompt). Inline with the
+ * other toolbar buttons, light palette to match. */
+.medium-editor-toolbar-form {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+  background: transparent;
+  color: #111827;
+}
+
+.medium-editor-toolbar-form-active {
+  display: inline-flex;
+}
+
+.medium-editor-toolbar-form input,
+.medium-editor-toolbar-form .medium-editor-toolbar-input {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  box-sizing: border-box;
+  color: #111827;
+  font-family: inherit;
+  font-size: 13px;
+  height: 28px;
+  margin: 0;
+  padding: 0 8px;
+  width: 200px;
+  outline: none;
+}
+
+.medium-editor-toolbar-form input:focus,
+.medium-editor-toolbar-form .medium-editor-toolbar-input:focus {
+  border-color: #111827;
+}
+
+.medium-editor-toolbar-form input::placeholder {
+  color: #9ca3af;
+}
+
+.medium-editor-toolbar-form a {
+  color: #374151;
+  display: inline-flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  height: 28px;
+  padding: 0 6px;
+  text-decoration: none;
+}
+
+.medium-editor-toolbar-form a:hover {
+  color: #111827;
+}
+
+/* Placeholder — same inlining argument as above. The compiled.css
+ * Placeholder rule depends on the extension toggling
+ * `.medium-editor-placeholder` on the editable element; the basic
+ * `medium-editor.css` uses `:empty:before` which never fires once
+ * MediumEditor appends its trailing `<br>`. */
+.medium-editor-placeholder {
+  position: relative;
+}
+
+.medium-editor-placeholder::after {
+  content: attr(data-placeholder) !important;
+  color: #9ca3af;
+  font-style: italic;
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: inherit;
+  margin: inherit;
+  pointer-events: none;
+  white-space: pre;
+}
+
+/* Anchor preview (link tooltip) — appears when hovering over a link
+ * in the editor body. */
+.medium-editor-anchor-preview {
+  background: #111827;
+  border-radius: 9999px;
+  color: #f3f4f6;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  max-width: 280px;
+  padding: 6px 12px;
+  position: absolute;
+  text-align: center;
+  visibility: hidden;
+  word-break: break-all;
+  z-index: 2000;
+}
+
+.medium-editor-anchor-preview a {
+  color: #f3f4f6;
+  display: inline-block;
+  text-decoration: underline;
+}
+
+.medium-editor-anchor-preview-active {
+  visibility: visible;
 }
 </style>
 @endpush

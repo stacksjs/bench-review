@@ -1,3 +1,11 @@
+/* Establishes the cascade order for layered CSS so vendor stylesheets
+ * injected by stx's `<script client>` CSS-import support (each wrapped in
+ * `@layer vendor { … }` at emit time) can never out-specificity utility
+ * classes from crosswind. Components → custom prose styles sit between.
+ * Any rules not in a named layer rank above all layered rules — keep that
+ * in mind if a future stylesheet relies on un-layered specificity. */
+@layer vendor, components, utilities;
+
 @import './markdown.css';
 
 html,

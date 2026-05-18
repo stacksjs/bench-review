@@ -1,54 +1,76 @@
 <script client>
-  import type { Review } from '~/resources/types'
-  import { reviews as allReviews } from '~/resources/functions/sample'
+  import type { JudgeReviewRow } from '~/resources/stores/reviews'
 
-  const courtReviews = derived<Review[]>(() => allReviews.slice(0, 5))
+  const reviewsStore = useStore('reviews')
   const stars: number[] = [1, 2, 3, 4, 5]
+
+  // Latest-reviews strip. Until `/api/court-houses/:id/reviews` exists,
+  // this surfaces the cross-judge feed unfiltered — the courthouse
+  // detail page treats it as "recent activity from any judge", which
+  // is still useful while the section is empty.
+  onMount(() => {
+    if (reviewsStore.latest().length === 0)
+      reviewsStore.fetchLatest(5)
+  })
+
+  const courtReviews = derived<JudgeReviewRow[]>(() => reviewsStore.latest().slice(0, 5))
+  const isLoading = derived<boolean>(() => reviewsStore.loadingLatest())
+  const isEmpty = derived<boolean>(() => !isLoading() && courtReviews().length === 0)
+
+  function formatDate(dateStr: string | null | undefined): string {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  }
 </script>
 
 <div class="lg:col-span-2 lg:row-end-2 lg:row-span-2 -mx-4 px-4 py-8 sm:mx-0 sm:pb-14 sm:px-8 xl:pb-20 xl:pt-16 xl:px-16 bg-white ring-1 ring-gray-900/5 sm:rounded-lg shadow-sm">
   <div class="flex items-center justify-between">
-    <div>
-      <h2 class="font-semibold text-2xl text-gray-900">4.4</h2>
-      <div class="flex items-center">
-        <div class="flex items-center">
-          <Icon :for="star in stars" name="star" size="20" x-class="star <= 4 ? 'text-yellow-400' : 'text-gray-300'" />
-        </div>
-        <p class="ml-2 text-gray-500 text-sm">Based on 1,287 reviews</p>
-      </div>
+    <div :if="!isEmpty()">
+      <h2 class="font-semibold text-2xl text-gray-900">Recent reviews</h2>
+      <p class="mt-1 text-gray-500 text-sm">Latest community reviews of judges at this court.</p>
+    </div>
+    <div :if="isEmpty()">
+      <h2 class="font-semibold text-2xl text-gray-900">No reviews yet</h2>
+      <p class="mt-1 text-gray-500 text-sm">Be the first to share your experience at this courthouse.</p>
     </div>
     <StxLink to="/review" class="px-3 py-2 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm">
       Write a Review
     </StxLink>
   </div>
 
-  <div class="mt-8">
-    <h3 class="font-semibold text-base text-gray-900">Reviews of judges at this court</h3>
-    <div class="mt-6 space-y-8">
-      <div :for="review in courtReviews" class="pb-8 border-b border-gray-200">
+  <div :if="isLoading()" class="mt-8 text-center text-gray-500 text-sm">Loading reviews…</div>
+
+  <div :if="isEmpty()" class="mt-8 p-8 text-center bg-gray-50 border border-gray-200 border-dashed rounded-lg">
+    <p class="text-gray-600 text-sm">No published reviews for this courthouse yet.</p>
+    <StxLink to="/review" class="inline-block mt-4 font-semibold text-gray-700 text-sm hover:text-gray-900">
+      Be the first to write one →
+    </StxLink>
+  </div>
+
+  <div :if="!isLoading() && !isEmpty()" class="mt-8">
+    <div class="space-y-8">
+      <div :for="review in courtReviews()" class="pb-8 border-b border-gray-200">
           <div class="flex items-center justify-between">
             <div class="flex items-center">
-              <img x-src="review.author.imageUrl" x-alt="review.author.name" class="h-10 w-10 rounded-full">
+              <div class="flex items-center justify-center h-10 w-10 font-semibold text-gray-500 text-sm bg-gray-100 rounded-full" :text="(review.title || 'A').slice(0, 1).toUpperCase()"></div>
               <div class="ml-4">
-                <h4 class="font-semibold text-gray-900 text-sm" :text="review.author.name"></h4>
+                <h4 class="font-semibold text-gray-900 text-sm" :text="review.title"></h4>
                 <div class="flex items-center">
                   <div class="flex items-center">
                     <Icon :for="star in stars" name="star" size="16" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'" />
                   </div>
-                  <span class="ml-2 text-gray-500 text-sm" :text="review.date"></span>
+                  <span class="ml-2 text-gray-500 text-sm" :text="formatDate(review.created_at)"></span>
                 </div>
               </div>
             </div>
-            <span class="inline-flex items-center px-2 py-1 font-medium text-deepBrown text-xs bg-offBrown ring-1 ring-deepBrown/20 ring-inset rounded-full" :text="review.type"></span>
+            <span :if="review.type" class="inline-flex items-center px-2 py-1 font-medium text-xs text-gray-700 bg-gray-100 ring-1 ring-gray-200 ring-inset rounded-full" :text="review.type"></span>
           </div>
-          <h4 class="mt-4 font-semibold text-base text-gray-900" :text="review.title"></h4>
-          <p class="mt-2 leading-relaxed line-clamp-3 text-gray-700 text-sm" :text="review.content"></p>
+          <p class="mt-3 leading-relaxed line-clamp-3 text-gray-700 text-sm" :text="review.content"></p>
           <div class="flex items-center justify-between mt-4">
-            <p class="text-gray-600 text-sm">
-              About <StxLink x-to="`/judges/${review.judge.id}/profile`" class="font-medium hover:underline" :text="review.judge.name"></StxLink>
-            </p>
-            <StxLink x-to="`/article/${review.id}`" class="text-gray-600 text-sm hover:text-gray-500 hover:underline">
-              Read more →
+            <StxLink x-to="`/judges/${review.judge_id}/profile`" class="text-gray-600 text-sm hover:underline">
+              View judge →
             </StxLink>
           </div>
       </div>
