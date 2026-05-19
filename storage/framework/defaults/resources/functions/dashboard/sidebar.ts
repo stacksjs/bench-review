@@ -22,12 +22,29 @@ import { resolve } from 'node:path'
 
 type ModelCategory = 'userland' | 'data' | 'commerce' | 'content' | 'marketing' | 'system'
 
+/**
+ * Per-model dashboard configuration shape (stacksjs/stacks#1843).
+ * Mirror of `DashboardModelOptions` in `@stacksjs/types` — duplicated here
+ * because this file is consumed from STX server-script context where the
+ * full type imports aren't available. Keep in sync with the source.
+ */
+interface DashboardModelOptionsLite {
+  enabled?: boolean
+  label?: string
+  icon?: string
+  section?: string
+  roles?: string[]
+  description?: string
+}
+
 interface DiscoveredModel {
   id: string
   name: string
   icon?: string
   hasDedicatedPage?: boolean
   category?: ModelCategory
+  /** Per-model dashboard config from `defineModel({ dashboard: … })`. */
+  dashboard?: DashboardModelOptionsLite
 }
 
 interface DataRowToggles {
@@ -47,6 +64,8 @@ interface DashboardSectionToggles {
   analytics: boolean
   management: boolean
   utilities: boolean
+  /** CI tracking surface (stacksjs/stacks#1844). Lives under management. */
+  ci?: boolean
   data: DataRowToggles
 }
 
@@ -115,6 +134,7 @@ const ICON_PATHS: Record<string, string> = {
   'truck': '<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>',
   'percent': '<line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
   'activity': '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+  'check-circle': '<circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/>',
   'users': '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>',
   'group': '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>',
   'mail': '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/>',
@@ -142,13 +162,47 @@ function svg(key: string): string {
   return SVG_OPEN + path + SVG_CLOSE
 }
 
-interface NavItem { to: string, icon: string, text: string, mpa?: boolean }
+interface NavItem {
+  to: string
+  icon: string
+  text: string
+  mpa?: boolean
+  /**
+   * Role-gate metadata for sidebar items (stacksjs/stacks#1843).
+   * When set, the rendered `<a>` carries `data-required-roles="…"` and
+   * the client-side `useRole()` filter hides the row from viewers who
+   * don't hold a matching role. Unauthenticated viewers (dev dashboard)
+   * see all rows per the permissive default in `useRole`.
+   */
+  roles?: string[]
+}
 
 const SECTION_TOGGLE_ONCLICK = "(function(btn){var sec=btn.closest('.sidebar-section');var key=sec.getAttribute('data-section');sec.classList.toggle('collapsed');try{var c={};var s=localStorage.getItem('sidebar-collapsed');if(s)c=JSON.parse(s);c[key]=sec.classList.contains('collapsed');localStorage.setItem('sidebar-collapsed',JSON.stringify(c));}catch(e){}})(this)"
 
+/**
+ * HTML-encode a string for safe insertion into element attributes (`role`
+ * names, labels) or text content. Models can ship arbitrary `dashboard`
+ * config, so we don't trust the values to be HTML-safe by construction.
+ */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 function renderItem(item: NavItem): string {
   const mpaAttr = item.mpa ? ' data-mpa="true"' : ''
-  return `<li><a href="${item.to}" class="sidebar-link"${mpaAttr}><span class="sidebar-icon">${svg(item.icon)}</span><span>${item.text}</span></a></li>`
+  // Roles encoded as a comma-separated list on `data-required-roles`. The
+  // client-side filter in `useRole()` parses this and removes the row if
+  // the viewer doesn't hold any of the listed roles. Static rows omit the
+  // attribute entirely, so they're always visible.
+  const rolesAttr = item.roles && item.roles.length > 0
+    ? ` data-required-roles="${escapeHtml(item.roles.join(','))}"`
+    : ''
+  return `<li${rolesAttr ? ` data-required-roles-li="${escapeHtml((item.roles ?? []).join(','))}"` : ''}><a href="${escapeHtml(item.to)}" class="sidebar-link"${mpaAttr}${rolesAttr}><span class="sidebar-icon">${svg(item.icon)}</span><span>${escapeHtml(item.text)}</span></a></li>`
 }
 
 function renderSection(key: string, label: string, items: NavItem[]): string {
@@ -206,15 +260,37 @@ export function loadDiscoveredModels(): DiscoveredModel[] {
  * `/commerce/customers` already exists, so the Customer model row would
  * just duplicate it).
  */
+/**
+ * The section a model surfaces under, after honouring the model's
+ * `dashboard.section` override. When no override is set, falls back to
+ * the path-derived category. Returns `undefined` when the model is
+ * explicitly disabled so callers can skip the row.
+ */
+function effectiveCategory(m: DiscoveredModel): string | undefined {
+  if (m.dashboard?.enabled === false)
+    return undefined
+  if (m.dashboard?.section)
+    return m.dashboard.section
+  return m.category ?? 'data'
+}
+
 function categoryNavItems(
   models: DiscoveredModel[],
   category: ModelCategory,
   dedicated: Set<string>,
 ): NavItem[] {
   return models
-    .filter(m => (m.category ?? 'data') === category)
+    .filter(m => effectiveCategory(m) === category)
     .filter(m => !m.hasDedicatedPage && !dedicated.has(m.id))
-    .map((m): NavItem => ({ to: `/models/${m.id}`, icon: 'table', text: m.name, mpa: true }))
+    .map((m): NavItem => ({
+      to: `/models/${m.id}`,
+      icon: m.dashboard?.icon ?? m.icon ?? 'table',
+      text: m.dashboard?.label ?? m.name,
+      mpa: true,
+      ...(m.dashboard?.roles && m.dashboard.roles.length > 0
+        ? { roles: m.dashboard.roles }
+        : {}),
+    }))
 }
 
 /**
@@ -303,9 +379,22 @@ export function buildSidebarNavHtml(
   if (dataRows.subscribers) dataNav.push({ to: '/data/subscribers', icon: 'mail', text: 'Subscribers' })
   if (dataRows.allModels) dataNav.push({ to: '/models', icon: 'table', text: 'All Models' })
   for (const m of discoveredModels) {
-    if (m.category !== 'userland' && m.category !== 'data' && m.category !== undefined) continue
+    // Skip when:
+    //   - explicit `dashboard.enabled === false` (effectiveCategory returns undefined)
+    //   - pinned to a different section via `dashboard.section`
+    //   - already has a dedicated dashboard page
+    const eff = effectiveCategory(m)
+    if (eff !== 'userland' && eff !== 'data') continue
     if (m.hasDedicatedPage) continue
-    dataNav.push({ to: `/models/${m.id}`, icon: 'table', text: m.name, mpa: true })
+    dataNav.push({
+      to: `/models/${m.id}`,
+      icon: m.dashboard?.icon ?? m.icon ?? 'table',
+      text: m.dashboard?.label ?? m.name,
+      mpa: true,
+      ...(m.dashboard?.roles && m.dashboard.roles.length > 0
+        ? { roles: m.dashboard.roles }
+        : {}),
+    })
   }
   sections.push(['data', 'data', dataNav])
 
@@ -389,7 +478,7 @@ export function buildSidebarNavHtml(
   // `permissions` lives under a `/management/` subdir. The bare
   // `/management/<x>` URLs from before never resolved.
   if (toggles.management) {
-    sections.push(['management', 'management', [
+    const managementItems: NavItem[] = [
       { to: '/cloud', icon: 'cloud', text: 'Cloud' },
       { to: '/servers', icon: 'server', text: 'Servers' },
       { to: '/serverless', icon: 'zap', text: 'Serverless' },
@@ -399,7 +488,18 @@ export function buildSidebarNavHtml(
       { to: '/logs', icon: 'log', text: 'Logs' },
       { to: '/health', icon: 'activity', text: 'Health' },
       { to: '/insights', icon: 'star', text: 'Insights' },
-    ]])
+      // Kanban surface (stacksjs/stacks#1846). Role-gated to admin+dev
+      // via data-required-roles; the client filter in useRole() hides
+      // the row for client-role viewers. Permissive default applies on
+      // the localhost dev dashboard.
+      { to: '/kanban', icon: 'table', text: 'Kanban', mpa: true, roles: ['admin', 'dev'] },
+    ]
+    // CI tracking (stacksjs/stacks#1844) — opt-in via `ci.enabled` in
+    // config/dashboard.ts. The page additionally checks `useRole().isDev()`
+    // (stub for #1843) before rendering.
+    if (toggles.ci)
+      managementItems.push({ to: '/ci', icon: 'check-circle', text: 'CI' })
+    sections.push(['management', 'management', managementItems])
   }
 
   // Utilities section: real paths are flat (`/buddy`, `/environment`,

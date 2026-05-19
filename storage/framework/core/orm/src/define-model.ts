@@ -1,16 +1,5 @@
-import { createModel, type ModelDefinition as BQBModelDefinition } from 'bun-query-builder'
+import { createModel, type ModelDefinition as BQBModelDefinition, registerModel } from 'bun-query-builder'
 import type { InferRelationNames } from 'bun-query-builder'
-// Namespace import so an out-of-sync `bun-query-builder` build (e.g. pantry
-// shipping a version that only has `registerModel` as a class method, not a
-// top-level export) doesn't throw at module-eval. The named-import form
-// triggers Bun's strict-ESM "Export named X not found" → which used to
-// segfault Bun 1.3.13 when raced through `injectGlobalAutoImports`'s
-// `Promise.race([import(pkg), setTimeout])` wrapper, taking the API dev
-// server (4008) silently offline. Resolve at runtime instead so a missing
-// helper degrades to a no-op rather than a boot crash.
-import * as bqb from 'bun-query-builder'
-const registerModel: ((name: string, model: unknown) => void) | undefined
-  = (bqb as { registerModel?: (name: string, model: unknown) => void }).registerModel
 import { log } from '@stacksjs/logging'
 import { snakeCase } from '@stacksjs/strings'
 import { AsyncLocalStorage } from 'node:async_hooks'
@@ -1254,7 +1243,7 @@ export function defineModel<const TDef extends ModelDefinition>(definition: TDef
   // call. We bypass `bun-query-builder.defineModel` (which would also
   // register) because stacks needs to install its own wrappers around
   // the result of `createModel`.
-  registerModel?.(definition.name, finalModel)
+  registerModel(definition.name, finalModel)
 
   return finalModel
 }
