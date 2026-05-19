@@ -50,13 +50,13 @@
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@stacksjs/ts-validation": "^0.4.9",
+    "@stacksjs/ts-validation": "^0.4.10",
     "bun-query-builder": "^0.1.21"
   },
   "devDependencies": {
     "@stacksjs/build": "workspace:*",
     "@stacksjs/config": "workspace:*",
-    "better-dx": "^0.2.12",
+    "better-dx": "^0.2.15",
     "@stacksjs/query-builder": "workspace:*",
     "@stacksjs/types": "workspace:*"
   }
