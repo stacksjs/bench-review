@@ -19,7 +19,14 @@ export default new Action({
     },
 
     level: {
-      rule: schema.string().in(['info', 'warn', 'error']),
+      // Was `schema.string().in([...])` — that's the pattern the
+      // framework default for LogAction ships with, but
+      // `StringValidator` has no `.in()` method (the validator's
+      // string-only enum support was renamed/moved). The runtime
+      // throws "schema.string().in is not a function" the first time
+      // this action's module evaluates. The working enum primitive is
+      // `schema.enum([...])`.
+      rule: schema.enum(['info', 'warn', 'error']),
       message: 'The log level must be one of "info", "warn", or "error".',
     },
   },

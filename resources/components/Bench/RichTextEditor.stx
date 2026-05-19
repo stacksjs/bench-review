@@ -40,6 +40,14 @@
   import { MediumEditor } from 'ts-medium-editor'
   import 'ts-medium-editor/css/medium-editor-compiled.css'
 
+  // Compose-draft signal. Backed by `localStorage` via stx's
+  // `useLocalStorage` composable: initial value seeds from storage,
+  // every `.set()` writes through, cleanup on scope destroy is
+  // automatic. Single key for the whole RichTextEditor scope — the
+  // form has one host. (Multi-host pages would need per-host state;
+  // we don't have any.)
+  const composeDraft = useLocalStorage<string>('bench-review:compose-draft', '')
+
   // SVG icons keyed by `data-action` value. The library's default
   // button content is plaintext (`B`, `I`, `H2`, `🔗`, `""`, `•`, `1.`)
   // which looks like a 1990s textarea toolbar. We swap each button's
@@ -206,17 +214,11 @@
     host.appendChild(editable)
 
     const placeholderText = host.getAttribute('data-placeholder') || 'Tell your story…'
-    const storageKey = host.getAttribute('data-storage-key')
 
     // Restore prior draft BEFORE constructing the editor — once
     // MediumEditor takes over the element, setting innerHTML through
     // its own API would fire a spurious `editableInput` event.
-    if (storageKey) {
-      try {
-        const draft = localStorage.getItem(storageKey)
-        if (draft) editable.innerHTML = draft
-      } catch {}
-    }
+    if (composeDraft()) editable.innerHTML = composeDraft()
 
     const editor = new MediumEditor(editable, {
       // Append the toolbar inside the host (default would be
@@ -258,7 +260,7 @@
     })
 
     host.__richtextEditor = editor
-    let saveTimer = null
+    let saveTimer: ReturnType<typeof setTimeout> | null = null
 
     // Swap each toolbar button's plaintext content for a modern SVG
     // icon. Done after `new MediumEditor(…)` returns so the toolbar
@@ -313,50 +315,54 @@
       })
     })
 
-    editor.subscribe('editableInput', () => {
-      const html = editor.getContent() || ''
+    function emitChange() {
+      // Read `editable.innerHTML` directly. `ts-medium-editor`'s
+      // `editor.getContent()` and its `editableInput` subscription
+      // both silently no-op on this build, so the DOM is ground truth.
+      const html = editable.innerHTML || ''
 
-      // Debounced draft save — collapses keystroke bursts to one
-      // localStorage write per ~500ms. Empty / sentinel content is
-      // cleared rather than stored so a "submit & wipe" flow leaves
-      // no ghost draft behind on next mount.
-      if (storageKey) {
-        if (saveTimer) clearTimeout(saveTimer)
-        saveTimer = setTimeout(() => {
-          try {
-            const trimmed = (html || '').trim()
-            if (trimmed && trimmed !== '<p><br></p>') {
-              localStorage.setItem(storageKey, html)
-            }
-            else {
-              localStorage.removeItem(storageKey)
-            }
-          } catch {}
-        }, 500)
-      }
+      // Debounced draft autosave via the useLocalStorage signal —
+      // setting it writes through to localStorage on a single effect.
+      // Trimmed empty-state sentinel is stored as '' so the next mount
+      // doesn't try to "restore" a meaningless <p><br></p>.
+      if (saveTimer) clearTimeout(saveTimer)
+      saveTimer = setTimeout(() => {
+        const trimmed = (html || '').trim()
+        composeDraft.set(trimmed && trimmed !== '<p><br></p>' ? html : '')
+      }, 500)
 
-      // Bubbling CustomEvent — parents can listen with normal DOM
-      // `addEventListener('richtext-change', …)` or in stx templates
-      // with `@richtext-change="x.set($event.detail.html)"`.
+      // Bubbling CustomEvent — parents listen via @richtext-change.
       host.dispatchEvent(new CustomEvent('richtext-change', {
         bubbles: true,
         detail: { html },
       }))
-    })
+    }
+
+    // Native `input` event on a contenteditable fires for every
+    // keystroke / paste / drop / IME composition end. It's the
+    // reliable bottom-floor event — bind directly here instead of
+    // (only) going through MediumEditor's `editableInput` pubsub.
+    editable.addEventListener('input', emitChange)
+    // `blur` covers the case where the user pastes/drops and clicks
+    // away without an intermediate keystroke (rare but real).
+    editable.addEventListener('blur', emitChange)
+
+    // Keep the MediumEditor subscription as a belt-and-suspenders
+    // path — if it ever DOES fire, the duplicate dispatch is
+    // idempotent (reviewContent.set with the same value is a no-op).
+    try {
+      editor.subscribe('editableInput', emitChange)
+    }
+    catch {}
 
     // If we restored a draft, fire one onChange so any derived UI
     // (character count, validation, enable-submit) starts in the
     // correct state from frame 1.
-    if (storageKey) {
-      try {
-        const draft = localStorage.getItem(storageKey)
-        if (draft) {
-          host.dispatchEvent(new CustomEvent('richtext-change', {
-            bubbles: true,
-            detail: { html: draft },
-          }))
-        }
-      } catch {}
+    if (composeDraft()) {
+      host.dispatchEvent(new CustomEvent('richtext-change', {
+        bubbles: true,
+        detail: { html: composeDraft() },
+      }))
     }
   }
 
@@ -395,7 +401,6 @@
 <div
   data-richtext-host
   data-placeholder="Share your experience. Type / for blocks, or just start writing…"
-  data-storage-key="bench-review:compose-draft"
   class="block">
 </div>
 

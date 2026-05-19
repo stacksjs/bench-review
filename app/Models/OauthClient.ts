@@ -11,9 +11,24 @@ export default defineModel({
   hasMany: ['OauthAccessToken'],
   traits: {
     useTimestamps: true,
-    useSeeder: {
-      count: 10,
-    },
+    // `useSeeder` is deliberately disabled. The framework default trait
+    // would auto-seed 10 fake OAuth client rows on every `./buddy seed`,
+    // and (more importantly) interact with the personal-access-client
+    // setup in a way that can invalidate live user sessions. We
+    // recovered from one such incident: a `./buddy seed` mid-session
+    // caused every `Authorization: Bearer <token>` request to fail
+    // validation because the secret used to encrypt the token's ID
+    // half had been rotated under the token. Users see
+    // "Unauthorized. Invalid token." with no obvious cause.
+    //
+    // The personal-access-client (id=1) is created exactly once by
+    // `./buddy auth:setup`, and the dev-grade fake rows the factory
+    // generates here aren't used for anything. Skipping the trait
+    // entirely is the safe choice. If you need test clients, write a
+    // class seeder in `database/seeders/` and gate it on `id=1 NOT
+    // EXISTS` or similar.
+    //
+    // useSeeder: { count: 10 },
   },
 
   attributes: {

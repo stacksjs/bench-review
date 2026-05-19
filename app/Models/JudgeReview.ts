@@ -24,9 +24,18 @@ export default defineModel({
       filterable: ['rating', 'status', 'type'],
     },
 
-    useSeeder: {
-      count: 10,
-    },
+    // `useSeeder` deliberately disabled. The ORM's factory-driven path
+    // for `create()` has a snake_case → camelCase mapping gap that
+    // silently drops fields like `judge_id` and `user_id`, so every
+    // factory row lands with NULL foreign keys. The result: 10 lorem-
+    // ipsum rows that don't tie to any judge — they fail the
+    // `r.judge_id != null` filter in ReviewsFeed and the API's
+    // `JudgeReview.where('judge_id', X)` lookups, so /reviews and
+    // /judges/:id/reviews both render empty even when the table is
+    // full. Use `database/seeders/ReviewSeeder.ts` for fixed data
+    // (it uses raw `db.insertInto` and sets judge_id correctly).
+    //
+    // useSeeder: { count: 10 },
 
     useApi: {
       uri: 'judge-reviews',

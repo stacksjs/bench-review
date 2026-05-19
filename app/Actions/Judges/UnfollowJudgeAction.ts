@@ -1,6 +1,7 @@
 import { Action } from '@stacksjs/actions'
 import { db } from '@stacksjs/database'
-import { response } from '@stacksjs/router'
+import { request, response } from '@stacksjs/router'
+import { schema } from '@stacksjs/validation'
 
 /**
  * DELETE /api/judges/{id}/follow — current user stops following the
@@ -10,15 +11,19 @@ export default new Action({
   name: 'Unfollow Judge',
   description: 'Remove the current user from the given judge\'s followers',
   method: 'DELETE',
-  async handle({ id }: { id: string | number }) {
+  validations: {
+    id: {
+      rule: schema.number().positive(),
+      message: 'Invalid judge id.',
+    },
+  },
+  async handle() {
     const authUser = await Auth.user()
     const userId = (authUser as any)?.id
     if (!userId)
       return response.json({ error: 'Not authenticated' }, { status: 401 })
 
-    const judgeId = Number(id)
-    if (!Number.isFinite(judgeId) || judgeId <= 0)
-      return response.json({ error: 'Invalid judge id' }, { status: 400 })
+    const judgeId = Number((request as any).params?.id)
 
     await db.deleteFrom('judge_follows' as any)
       .where('user_id' as any, '=', userId)

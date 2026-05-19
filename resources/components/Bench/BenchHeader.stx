@@ -20,6 +20,33 @@
   function submitHeaderSearch(): void {
     search.navigateToSearch()
   }
+
+  // Global broken-image fallback. Avatar URLs (judge.photo, author.imageUrl)
+  // can 404 — third-party CDNs expire links, seeded data points at images
+  // that disappeared, etc. Without intervention the browser renders the
+  // alt text inside the rounded-full frame, which looks like garbage.
+  //
+  // One delegated `error` listener in capture phase (img-error events
+  // don't bubble) catches every failed image load and swaps src to a
+  // generic placeholder avatar. The `__bench_fallback_applied` flag
+  // prevents an infinite loop if the placeholder itself ever 404s.
+  //
+  // Registered once globally via the window flag — BenchHeader's IIFE
+  // re-runs on every SPA nav, but we only want one listener attached.
+  if (typeof window !== 'undefined' && !(window as any).__benchBrokenImageHandler) {
+    ;(window as any).__benchBrokenImageHandler = true
+    document.addEventListener('error', (e) => {
+      const t = e.target as HTMLElement
+      if (!t || t.tagName !== 'IMG') return
+      const img = t as HTMLImageElement & { __bench_fallback_applied?: boolean }
+      if (img.__bench_fallback_applied) return
+      img.__bench_fallback_applied = true
+      img.src = '/images/avatars/default-user.svg'
+      // Drop the grayscale filter so the neutral fallback shows in full
+      // tone — otherwise the gray SVG turns into a near-white blob.
+      img.classList.remove('grayscale', 'filter')
+    }, true)
+  }
 </script>
 <header class="z-10">
   <nav class="flex items-center justify-between mx-auto p-6 lg:px-8 bg-off-white border-b" aria-label="Global">

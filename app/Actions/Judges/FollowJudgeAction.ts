@@ -1,6 +1,7 @@
 import { Action } from '@stacksjs/actions'
 import { db } from '@stacksjs/database'
-import { response } from '@stacksjs/router'
+import { request, response } from '@stacksjs/router'
+import { schema } from '@stacksjs/validation'
 
 /**
  * POST /api/judges/{id}/follow — current user follows the given judge.
@@ -10,20 +11,32 @@ import { response } from '@stacksjs/router'
  * at the storage layer; we catch the resulting constraint error and
  * return success so the client UI doesn't need to special-case "already
  * following".
+ *
+ * Declarative `validations` covers the path-param `id` (merged into
+ * the framework's `input` along with query + body) — the handler only
+ * checks auth and judge existence.
  */
 export default new Action({
   name: 'Follow Judge',
   description: 'Add the current user to the given judge\'s followers',
   method: 'POST',
-  async handle({ id }: { id: string | number }) {
+  validations: {
+    id: {
+      rule: schema.number().positive(),
+      message: 'Invalid judge id.',
+    },
+  },
+  async handle() {
     const authUser = await Auth.user()
     const userId = (authUser as any)?.id
     if (!userId)
       return response.json({ error: 'Not authenticated' }, { status: 401 })
 
-    const judgeId = Number(id)
-    if (!Number.isFinite(judgeId) || judgeId <= 0)
-      return response.json({ error: 'Invalid judge id' }, { status: 400 })
+    // Route params come through `(request as any).params` in this
+    // framework — mirrors ShowReviewAction / ReviewsByJudgeAction. The
+    // declarative `validations` above already proved the value is a
+    // positive number; this just casts it.
+    const judgeId = Number((request as any).params?.id)
 
     const judge = await Judge.find(judgeId)
     if (!judge)
