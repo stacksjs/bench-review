@@ -1,0 +1,193 @@
+<script client>
+  import type { ProfileReviewRow } from '~/resources/stores/profile'
+
+  // Self-contained profile view. Owns:
+  //   - reading the current user from auth store (cached in cookie)
+  //   - fetching the user's reviews from /api/me/reviews
+  //   - deriving stats (totalReviews, judgesReviewed, avgRating,
+  //     totalLikes) from that list
+  //   - suggesting 3 judges the user hasn't yet reviewed
+  //
+  // Lives in a component (not the view) because view-level
+  // <script client> blocks are silently dropped — see
+  // feedback_stx_view_vs_component_scripts.
+
+  const authStore = useStore('auth')
+  const judgesStore = useStore('judges')
+  const profileStore = useStore('profile')
+
+  // Fetch in BOTH top-level (hydration) and onMount (SPA nav) — see
+  // feedback_stx_toplevel_skipped_on_spa_nav. The flag is scoped per
+  // mount so re-entering the page re-fetches.
+  let hasFetched = false
+  function fetchOnce(): void {
+    if (hasFetched) return
+    hasFetched = true
+    profileStore.fetchMyReviews()
+    if (judgesStore.judges().length === 0)
+      judgesStore.fetchJudges()
+  }
+  fetchOnce()
+  onMount(() => fetchOnce())
+
+  function formatDate(dateStr: string | null | undefined): string {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  }
+
+  function relativeTime(dateStr: string | null | undefined): string {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (Number.isNaN(d.getTime())) return ''
+    const diffMs = Date.now() - d.getTime()
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    if (days <= 0) return 'today'
+    if (days === 1) return '1 day ago'
+    if (days < 7) return `${days} days ago`
+    if (days < 30) return `${Math.floor(days / 7)} week${Math.floor(days / 7) === 1 ? '' : 's'} ago`
+    if (days < 365) return `${Math.floor(days / 30)} month${Math.floor(days / 30) === 1 ? '' : 's'} ago`
+    return formatDate(dateStr)
+  }
+
+  function snippet(html: string | null | undefined, max = 140): string {
+    if (!html) return ''
+    const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+    return text.length > max ? `${text.slice(0, max - 1)}…` : text
+  }
+
+  const displayName = derived<string>(() => authStore.user()?.name || 'Guest')
+  const userEmail = derived<string>(() => authStore.user()?.email || '')
+
+  const memberSince = derived<string>(() => {
+    const u = authStore.user()
+    if (!u) return 'Sign in to see your profile'
+    const created = (u as any).created_at || (u as any).createdAt
+    if (!created) return 'Member'
+    const d = new Date(created)
+    if (Number.isNaN(d.getTime())) return 'Member'
+    return `Member since ${d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}`
+  })
+
+  const avatarUrl = derived<string>(() => {
+    return authStore.user()?.avatar
+      || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+  })
+
+  // Recent reviews — already sorted by created_at desc from the API.
+  const recentReviews = derived<ProfileReviewRow[]>(() => profileStore.myReviews().slice(0, 5))
+
+  // Suggested judges — pick 3 the user hasn't yet reviewed. Falls back
+  // to "any 3 judges" if no judges loaded yet.
+  const suggestedJudges = derived(() => {
+    const reviewed = new Set<number>()
+    for (const r of profileStore.myReviews()) {
+      if (r.judge_id != null)
+        reviewed.add(r.judge_id)
+    }
+    const candidates = judgesStore.judges()
+      .filter((j: any) => !reviewed.has(j.id))
+    return candidates.slice(0, 3)
+  })
+</script>
+
+<div class="min-h-screen bg-gray-50">
+  <div class="mx-auto px-4 py-8 max-w-7xl">
+    <div class="overflow-hidden bg-gray-900 rounded-2xl">
+      <div class="p-10">
+        <div class="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex gap-4 items-center">
+            <img class="object-cover h-24 w-24 ring-2 ring-white/20 rounded-full" x-src="avatarUrl" x-alt="displayName" />
+            <div>
+              <h1 class="font-bold text-2xl text-white" :text="displayName"></h1>
+              <p class="text-gray-400 text-sm" :text="userEmail"></p>
+              <p class="mt-1 text-gray-400 text-xs" :text="memberSince"></p>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <StxLink to="/settings" class="inline-flex items-center px-4 py-2 font-medium text-gray-900 text-sm bg-white rounded-lg hover:bg-gray-100 transition-colors">Edit profile</StxLink>
+            <StxLink to="/review" class="inline-flex items-center px-4 py-2 font-medium text-white text-sm bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">Write a review</StxLink>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid gap-4 grid-cols-2 mt-8 lg:grid-cols-4">
+      <div class="p-6 bg-white border border-gray-200 rounded-xl">
+        <p class="text-gray-500 text-sm">Total Reviews</p>
+        <p class="mt-1 font-semibold text-3xl text-gray-900" :text="profileStore.totalReviews"></p>
+      </div>
+      <div class="p-6 bg-white border border-gray-200 rounded-xl">
+        <p class="text-gray-500 text-sm">Judges Reviewed</p>
+        <p class="mt-1 font-semibold text-3xl text-gray-900" :text="profileStore.judgesReviewed"></p>
+      </div>
+      <div class="p-6 bg-white border border-gray-200 rounded-xl">
+        <p class="text-gray-500 text-sm">Average Rating</p>
+        <p class="mt-1 font-semibold text-3xl text-gray-900" :text="profileStore.averageRating || '—'"></p>
+      </div>
+      <div class="p-6 bg-white border border-gray-200 rounded-xl">
+        <p class="text-gray-500 text-sm">Total Likes</p>
+        <p class="mt-1 font-semibold text-3xl text-gray-900" :text="profileStore.totalLikes"></p>
+      </div>
+    </div>
+
+    <div class="grid gap-6 grid-cols-1 mt-10 lg:grid-cols-3">
+      <div class="p-6 bg-white border border-gray-200 rounded-2xl lg:col-span-2">
+        <div class="flex items-center justify-between">
+          <h2 class="font-semibold text-base text-gray-900">Recent reviews</h2>
+          <StxLink to="/reviews" class="font-medium text-gray-600 text-sm hover:text-gray-900">All reviews</StxLink>
+        </div>
+
+        <div :if="profileStore.loading && profileStore.totalReviews === 0" class="py-12 text-center text-gray-500 text-sm">
+          Loading your reviews…
+        </div>
+        <div :if="!profileStore.loading && profileStore.totalReviews === 0" class="py-12 text-center">
+          <p class="text-gray-500 text-sm">You haven't written any reviews yet.</p>
+          <StxLink to="/review" class="inline-block mt-3 px-4 py-2 font-medium text-white text-sm bg-gray-900 hover:bg-gray-700 rounded-lg transition-colors">Write your first review</StxLink>
+        </div>
+
+        <ul :if="recentReviews.length > 0" class="mt-6 space-y-6">
+          <li :for="review in recentReviews" class="flex gap-4">
+            <div class="flex-none h-2 w-2 mt-2 bg-gray-900 rounded-full"></div>
+            <div class="flex-1 min-w-0">
+              <div class="flex flex-wrap items-baseline gap-x-2">
+                <StxLink x-to="`/article/${review.id}`" class="font-medium text-gray-900 text-sm hover:underline" :text="review.title"></StxLink>
+                <span :if="review.judge" class="text-gray-500 text-xs">
+                  on
+                  <StxLink x-to="`/judges/${review.judge.id}/profile`" class="hover:underline" :text="review.judge.name"></StxLink>
+                </span>
+              </div>
+              <p class="mt-0.5 text-gray-500 text-sm" :text="snippet(review.content)"></p>
+              <div class="flex items-center gap-3 mt-1">
+                <span class="text-gray-400 text-xs" :text="relativeTime(review.created_at)"></span>
+                <span :if="review.status === 'pending'" class="px-1.5 py-0.5 font-medium text-yellow-700 text-xs bg-yellow-50 ring-1 ring-yellow-200 rounded">Pending review</span>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <div class="p-6 bg-white border border-gray-200 rounded-2xl">
+        <h2 class="font-semibold text-base text-gray-900">Review next</h2>
+        <p class="mt-1 text-gray-500 text-sm">Judges you haven't reviewed yet.</p>
+        <ul :if="suggestedJudges.length > 0" class="mt-5 space-y-4">
+          <li :for="j in suggestedJudges" class="flex gap-3 items-center">
+            <img class="object-cover flex-none h-10 w-10 rounded-full grayscale filter" x-src="j.image_url || j.photo" x-alt="j.name" />
+            <div class="flex-1 min-w-0">
+              <p class="font-medium text-gray-900 text-sm truncate" :text="j.name"></p>
+              <p class="text-gray-500 text-xs truncate" :text="(j.court && j.court.name) || j.court || ''"></p>
+            </div>
+            <StxLink x-to="`/review/${j.id}`" class="flex-none px-2.5 py-1 font-medium text-gray-900 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">Review</StxLink>
+          </li>
+        </ul>
+        <div :if="suggestedJudges.length === 0" class="mt-5 py-6 text-center">
+          <p class="text-gray-500 text-sm">All caught up.</p>
+        </div>
+        <StxLink to="/judges" class="block mt-5 px-3 py-2 font-medium text-gray-700 text-sm text-center bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+          Find more judges
+        </StxLink>
+      </div>
+    </div>
+  </div>
+</div>

@@ -24,7 +24,8 @@ defineStore('search', () => {
     const params = new URLSearchParams()
     if (query()) params.set('q', query())
     if (location()) params.set('location', location())
-    navigate('/search?', true) + params.toString()
+    const qs = params.toString()
+    navigate(qs ? `/search?${qs}` : '/search', true)
   }
 
   function initFromUrl(): void {

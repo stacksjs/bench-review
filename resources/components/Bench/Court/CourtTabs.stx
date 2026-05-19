@@ -1,0 +1,57 @@
+<script client>
+  // Court-house detail tab bar. Reads the court id from URL pathname
+  // so each leaf view (/court-houses/:id/{profile,reviews,bench}) can
+  // drop in this include without duplicating logic.
+
+  function resolveCourtId(): number {
+    if (typeof window === 'undefined') return 0
+    const fromRouter = Number((window as any).stx?._rp?.id)
+    if (Number.isFinite(fromRouter) && fromRouter > 0) return fromRouter
+    const m = window.location.pathname.match(/^\/court-houses\/(\d+)/)
+    return m ? Number(m[1]) : 0
+  }
+
+  function resolveActiveTab(): 'profile' | 'reviews' | 'bench' {
+    if (typeof window === 'undefined') return 'profile'
+    const p = window.location.pathname
+    if (p.includes('/reviews')) return 'reviews'
+    if (p.includes('/bench')) return 'bench'
+    return 'profile'
+  }
+
+  const courtTabsId = state<number>(resolveCourtId())
+  const courtActiveTab = state<'profile' | 'reviews' | 'bench'>(resolveActiveTab())
+
+  onMount(() => {
+    courtTabsId.set(resolveCourtId())
+    courtActiveTab.set(resolveActiveTab())
+  })
+</script>
+
+<div class="mx-auto px-4 pt-8 sm:px-6 lg:px-8 max-w-7xl">
+  <div class="hidden sm:block">
+    <nav class="flex -mb-px space-x-8 border-b border-gray-200" aria-label="Tabs">
+      <StxLink
+        x-to="`/court-houses/${courtTabsId}/profile`"
+        class="px-1 py-4 font-medium text-sm whitespace-nowrap border-b-2 transition-colors"
+        x-class="courtActiveTab === 'profile' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
+      >
+        Profile
+      </StxLink>
+      <StxLink
+        x-to="`/court-houses/${courtTabsId}/bench`"
+        class="px-1 py-4 font-medium text-sm whitespace-nowrap border-b-2 transition-colors"
+        x-class="courtActiveTab === 'bench' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
+      >
+        Judges on the Bench
+      </StxLink>
+      <StxLink
+        x-to="`/court-houses/${courtTabsId}/reviews`"
+        class="px-1 py-4 font-medium text-sm whitespace-nowrap border-b-2 transition-colors"
+        x-class="courtActiveTab === 'reviews' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
+      >
+        Reviews
+      </StxLink>
+    </nav>
+  </div>
+</div>

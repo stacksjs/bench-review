@@ -1,0 +1,146 @@
+<script client>
+  // View-level <script client> blocks are silently dropped — only
+  // components get scopes (see feedback_stx_view_vs_component_scripts).
+  // All search-page logic lives here so the bindings actually wire up.
+  const search = useStore('search')
+  const judgesStore = useStore('judges')
+
+  // Initialize from URL on both hydration (top-level) and SPA nav
+  // (onMount). See feedback_stx_toplevel_skipped_on_spa_nav — top-level
+  // body doesn't re-execute on SPA nav into the route, so without an
+  // onMount call the navbar search would land on /search?q=foo with
+  // search.query still empty from the previous page's state.
+  let didInit = false
+  function initOnce(): void {
+    if (didInit) return
+    didInit = true
+    search.initFromUrl()
+    if (judgesStore.judges().length === 0)
+      judgesStore.fetchJudges()
+    if (judgesStore.courtHouses().length === 0)
+      judgesStore.fetchCourtHouses()
+  }
+  initOnce()
+  onMount(() => initOnce())
+
+  const filteredJudges = judgesStore.filteredJudges
+  const filteredCourts = judgesStore.filteredCourtHouses
+  const totalResults = judgesStore.totalResults
+  const stars: number[] = [1, 2, 3, 4, 5]
+
+  function submitSearch(): void {
+    search.updateUrlQuery()
+  }
+</script>
+
+<div class="min-h-screen">
+  <div class="mx-auto px-4 py-12 sm:px-6 lg:px-8 max-w-7xl">
+    <div>
+      <form @submit.prevent="submitSearch()" class="relative">
+        <div class="flex absolute inset-y-0 left-0 items-center pl-4 pointer-events-none">
+          <Icon name="search" size="20" class="text-gray-400" />
+        </div>
+        <input
+          type="text"
+          x-model="search.query"
+          placeholder="Search judges, courts, or locations..."
+          class="block pl-12 pr-32 py-4 w-full text-gray-900 sm:text-base placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-200 ring-inset rounded-xl focus:ring-2 focus:ring-gray-600 focus:ring-inset shadow-sm"
+        >
+        <div class="flex absolute inset-y-0 right-0 items-center pr-2">
+          <button
+            type="submit"
+            class="px-4 py-2 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-lg shadow-sm"
+          >
+            Search
+          </button>
+        </div>
+      </form>
+
+      <div class="flex items-center justify-between mt-6">
+        <div>
+          <h1 class="font-semibold text-2xl text-gray-900">
+            <span :if="search.query" :text="`Results for &quot;${search.query}&quot;`"></span>
+            <span :if="!search.query">All results</span>
+          </h1>
+          <p class="mt-1 text-gray-600 text-sm" :text="totalResults + ' results found'"></p>
+        </div>
+      </div>
+
+      <div class="mt-6 border-b border-gray-200">
+        <nav class="flex -mb-px space-x-8" aria-label="Tabs">
+          <button
+            type="button"
+            @click="search.setTab('all')"
+            class="px-1 py-3 font-medium text-sm whitespace-nowrap border-b-2"
+            x-class="search.tab === 'all' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
+          >
+            All <span class="ml-1 text-gray-400" :text="`(${totalResults})`"></span>
+          </button>
+          <button
+            type="button"
+            @click="search.setTab('judges')"
+            class="px-1 py-3 font-medium text-sm whitespace-nowrap border-b-2"
+            x-class="search.tab === 'judges' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
+          >
+            Judges <span class="ml-1 text-gray-400" :text="`(${filteredJudges.length})`"></span>
+          </button>
+          <button
+            type="button"
+            @click="search.setTab('courts')"
+            class="px-1 py-3 font-medium text-sm whitespace-nowrap border-b-2"
+            x-class="search.tab === 'courts' ? 'border-gray-600 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
+          >
+            Courts <span class="ml-1 text-gray-400" :text="`(${filteredCourts.length})`"></span>
+          </button>
+        </nav>
+      </div>
+    </div>
+
+    <div class="mt-8">
+      <div :if="search.tab === 'all' || search.tab === 'judges'">
+        <h2 :if="search.tab === 'all'" class="font-semibold text-gray-900 text-lg">Judges</h2>
+        <div :if="filteredJudges.length === 0" class="py-12 text-center">
+          <p class="text-gray-500 text-sm">No judges match your search.</p>
+        </div>
+        <ul role="list" :if="filteredJudges.length > 0" class="mt-4 divide-gray-100 divide-y">
+          <li :for="judge in filteredJudges" class="flex items-center justify-between py-5">
+            <StxLink x-to="`/judges/${judge.id}/profile`" class="flex flex-1 gap-x-4 items-center min-w-0">
+              <img class="object-cover flex-none h-12 w-12 rounded-full grayscale filter" x-src="judge.photo" x-alt="judge.name">
+              <div class="flex-auto min-w-0">
+                <p class="font-semibold text-gray-900 text-sm hover:underline" :text="judge.name"></p>
+                <p class="mt-0.5 text-gray-500 text-xs" :text="`${judge.court.name} · ${judge.location}`"></p>
+              </div>
+            </StxLink>
+            <div class="flex gap-x-2 items-center">
+              <Icon :for="star in stars" name="star" size="16" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" />
+              <span class="ml-1 text-gray-500 text-xs" :text="`(${judge.reviewCount})`"></span>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <div :if="search.tab === 'all' || search.tab === 'courts'" x-class="search.tab === 'all' ? 'mt-12' : ''">
+        <h2 :if="search.tab === 'all'" class="font-semibold text-gray-900 text-lg">Court Houses</h2>
+        <div :if="filteredCourts.length === 0" class="py-12 text-center">
+          <p class="text-gray-500 text-sm">No courts match your search.</p>
+        </div>
+        <div :if="filteredCourts.length > 0" class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-4">
+          <StxLink
+            :for="court in filteredCourts"
+            x-to="`/court-houses/${court.id}/profile`"
+            class="overflow-hidden bg-white border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-md duration-200 transition-all group"
+          >
+            <div class="relative h-32 w-full">
+              <img x-src="court.image" x-alt="court.name" class="object-cover h-full w-full">
+              <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+            </div>
+            <div class="p-4">
+              <h3 class="font-semibold text-gray-900 text-sm group-hover:text-deep-brown" :text="court.name"></h3>
+              <p class="mt-1 text-gray-500 text-xs" :text="`${court.city}, ${court.state}`"></p>
+            </div>
+          </StxLink>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

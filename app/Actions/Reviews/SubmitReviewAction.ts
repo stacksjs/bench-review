@@ -57,6 +57,12 @@ export default new Action({
     if (!judge)
       return response.json({ error: 'Judge not found' }, { status: 404 })
 
+    // `auth` middleware sets the authenticated user on the global Auth
+    // helper before the action runs (see middleware.ts:35). We pull the
+    // id here so /api/me/reviews can filter by author later.
+    const authUser = await Auth.user()
+    const userId = (authUser as any)?.id ?? null
+
     const review = await JudgeReview.create({
       title,
       content,
@@ -66,11 +72,7 @@ export default new Action({
       likes: 0,
       comments: 0,
       judge_id: judgeId,
-      // user_id comes from the auth context once that wiring lands.
-      // The route's `auth` middleware proves a session cookie exists;
-      // mapping it to a row id needs the server-side token validation
-      // hook described in resources/middleware/auth.ts.
-      user_id: null,
+      user_id: userId,
     })
 
     return response.json({ ok: true, review }, { status: 201 })

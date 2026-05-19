@@ -1,0 +1,74 @@
+<script client>
+  // Court-house detail header. Resolves the court id from URL pathname
+  // (same fallback pattern as ArticleView — _rp is undefined during
+  // hard-reload hydration) and looks it up against judgesStore's
+  // courtHouses cache.
+
+  function resolveCourtId(): number {
+    if (typeof window === 'undefined') return 0
+    const fromRouter = Number((window as any).stx?._rp?.id)
+    if (Number.isFinite(fromRouter) && fromRouter > 0) return fromRouter
+    const m = window.location.pathname.match(/^\/court-houses\/(\d+)/)
+    return m ? Number(m[1]) : 0
+  }
+
+  const courtHeaderId = state<number>(resolveCourtId())
+  const courtsStore = useStore('judges')
+
+  // Fetch in BOTH top-level (hydration) and onMount (SPA nav). See
+  // feedback_stx_toplevel_skipped_on_spa_nav.
+  let courtHasFetched = false
+  function fetchCourtsOnce(): void {
+    if (courtHasFetched) return
+    courtHasFetched = true
+    if (courtsStore.courtHouses().length === 0)
+      courtsStore.fetchCourtHouses()
+    if (courtsStore.judges().length === 0)
+      courtsStore.fetchJudges()
+  }
+  fetchCourtsOnce()
+  onMount(() => {
+    courtHeaderId.set(resolveCourtId())
+    fetchCourtsOnce()
+  })
+
+  const currentCourt = derived(() => {
+    const id = courtHeaderId()
+    if (!id) return null
+    return courtsStore.courtHouses().find((c: any) => Number(c.id) === id) || null
+  })
+
+  const courtName = derived<string>(() => (currentCourt() as any)?.name || 'Loading…')
+  const courtCity = derived<string>(() => (currentCourt() as any)?.city || '')
+  const courtState = derived<string>(() => (currentCourt() as any)?.state || '')
+  const courtImage = derived<string>(() => {
+    const c: any = currentCourt()
+    return (c && (c.image || c.image_url))
+      || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+  })
+
+  // Judges on this bench — handy for the header's secondary stat and
+  // the bench tab. Filter against the judges cache by court id.
+  const benchJudges = derived(() => {
+    const id = courtHeaderId()
+    if (!id) return []
+    return courtsStore.judges().filter((j: any) => Number(j.court?.id ?? j.court_id) === id)
+  })
+</script>
+
+<header class="relative pt-16 isolate">
+  <div class="absolute inset-0 overflow-hidden -z-10" aria-hidden="true">
+    <div class="absolute bottom-0 inset-x-0 h-px bg-gray-900/5"></div>
+  </div>
+
+  <div class="mx-auto px-4 py-10 sm:px-6 lg:px-8 max-w-7xl">
+    <div class="flex gap-x-6 items-center">
+      <img x-src="courtImage" x-alt="courtName" class="object-cover flex-none h-16 w-16 ring-1 ring-gray-900/10 rounded-lg">
+      <div>
+        <div class="text-gray-500 text-sm/6">Courthouse <span class="text-gray-700" :text="`#${courtHeaderId}`"></span></div>
+        <h1 class="mt-1 font-semibold text-base text-gray-900" :text="courtName"></h1>
+        <p class="mt-0.5 text-gray-500 text-sm" :text="`${courtCity}${courtCity && courtState ? ', ' : ''}${courtState}`"></p>
+      </div>
+    </div>
+  </div>
+</header>

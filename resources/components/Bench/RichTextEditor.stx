@@ -95,6 +95,96 @@
     })
   }
 
+  // Caret-stickiness fix for inline formats (bold/italic/underline/
+  // strikethrough). Without this, the Google-Docs-style behaviour is
+  // wrong: with the caret inside a <b> and no selection, pressing the
+  // Bold button (or ⌘B) turns the button OFF visually, but the caret
+  // is still inside the <b> — so the next typed character inherits
+  // bold and MediumEditor re-flips the button to ACTIVE. The format
+  // "won't turn off".
+  //
+  // Fix: after the button's own click handler runs (microtask later),
+  // if the toolbar shows the format is now INACTIVE and the selection
+  // is collapsed inside a matching ancestor element, move the caret
+  // OUT of that ancestor — so the next typed character lands in the
+  // ancestor's parent (no formatting inheritance, toolbar stays off).
+  // When the user has actually selected text, browser's execCommand
+  // already wraps/unwraps correctly, so we no-op on non-collapsed
+  // selections.
+  const FORMAT_TAGS = {
+    bold: ['B', 'STRONG'],
+    italic: ['I', 'EM'],
+    underline: ['U'],
+    strikethrough: ['S', 'STRIKE', 'DEL'],
+  }
+
+  // Map data-action → execCommand name for queryCommandState lookups.
+  // Most actions match 1:1; the ones that don't are listed here.
+  const ACTION_TO_COMMAND = {
+    bold: 'bold',
+    italic: 'italic',
+    underline: 'underline',
+    strikethrough: 'strikethrough',
+  }
+
+  function attachCaretFixHandlers(toolbarEl, editable) {
+    if (!toolbarEl) return
+    toolbarEl.querySelectorAll('button[data-action]').forEach((btn) => {
+      const action = btn.getAttribute('data-action')
+      const tags = FORMAT_TAGS[action]
+      if (!tags) return
+      btn.addEventListener('click', () => {
+        // Microtask-defer so MediumEditor's own click handler runs
+        // first (it updates `.medium-editor-button-active` after
+        // execCommand). Then we inspect the post-toggle state.
+        Promise.resolve().then(() => {
+          const sel = window.getSelection()
+          if (!sel || sel.rangeCount === 0) return
+          const range = sel.getRangeAt(0)
+          if (!range.collapsed) return
+
+          // For a collapsed selection (no text highlighted) the user
+          // is toggling PENDING format — what the next typed character
+          // will inherit. MediumEditor's checkActiveButtons reads
+          // queryCommandState which in many browsers does NOT report
+          // pending-format state, so the button visually stays off
+          // even though typing produces bold/italic text. Force the
+          // class to match queryCommandState directly — Chrome and
+          // Firefox both expose the pending bit here.
+          const cmd = ACTION_TO_COMMAND[action]
+          let isOn = false
+          if (cmd) {
+            try { isOn = document.queryCommandState(cmd) }
+            catch { isOn = false }
+            if (isOn) btn.classList.add('medium-editor-button-active')
+            else btn.classList.remove('medium-editor-button-active')
+          }
+
+          // Format just turned OFF — caret-stickiness fix: move the
+          // caret outside the matching ancestor so the next typed
+          // character lands UNFORMATTED. Without this the caret stays
+          // inside <b> and the next char gets bolded, re-flipping the
+          // button to active.
+          if (!isOn) {
+            let node = range.startContainer
+            let parent = node.nodeType === 3 ? node.parentElement : node
+            while (parent && parent !== editable) {
+              if (tags.includes(parent.tagName)) {
+                const newRange = document.createRange()
+                newRange.setStartAfter(parent)
+                newRange.collapse(true)
+                sel.removeAllRanges()
+                sel.addRange(newRange)
+                return
+              }
+              parent = parent.parentElement
+            }
+          }
+        })
+      })
+    })
+  }
+
   function mountRichTextHost(host) {
     // Idempotency guard — MutationObserver below can fire multiple times
     // for the same host (attribute changes, child additions); don't
@@ -176,7 +266,52 @@
     // animation frame as a safety net for the (rare) case where
     // MediumEditor lazily adds buttons after init.
     applyToolbarIcons(host.querySelector('.medium-editor-toolbar'))
-    requestAnimationFrame(() => applyToolbarIcons(host.querySelector('.medium-editor-toolbar')))
+    attachCaretFixHandlers(host.querySelector('.medium-editor-toolbar'), editable)
+    requestAnimationFrame(() => {
+      applyToolbarIcons(host.querySelector('.medium-editor-toolbar'))
+      attachCaretFixHandlers(host.querySelector('.medium-editor-toolbar'), editable)
+    })
+
+    // Keyboard shortcuts (⌘B / ⌘I / ⌘U) bypass the toolbar buttons
+    // entirely, so the active-state + caret-fix need a separate hook
+    // for them. Run after the browser's execCommand has processed
+    // the shortcut.
+    editable.addEventListener('keydown', (e) => {
+      if (!(e.metaKey || e.ctrlKey)) return
+      const k = e.key.toLowerCase()
+      const action = k === 'b' ? 'bold' : k === 'i' ? 'italic' : k === 'u' ? 'underline' : null
+      if (!action) return
+      const tags = FORMAT_TAGS[action]
+      const cmd = ACTION_TO_COMMAND[action]
+      Promise.resolve().then(() => {
+        const sel = window.getSelection()
+        if (!sel || sel.rangeCount === 0) return
+        const range = sel.getRangeAt(0)
+        if (!range.collapsed) return
+        const btn = host.querySelector(`.medium-editor-toolbar button[data-action="${action}"]`)
+        let isOn = false
+        try { isOn = document.queryCommandState(cmd) }
+        catch { isOn = false }
+        if (btn) {
+          if (isOn) btn.classList.add('medium-editor-button-active')
+          else btn.classList.remove('medium-editor-button-active')
+        }
+        if (isOn) return // Pending-ON: leave caret where it is.
+        let node = range.startContainer
+        let parent = node.nodeType === 3 ? node.parentElement : node
+        while (parent && parent !== editable) {
+          if (tags.includes(parent.tagName)) {
+            const newRange = document.createRange()
+            newRange.setStartAfter(parent)
+            newRange.collapse(true)
+            sel.removeAllRanges()
+            sel.addRange(newRange)
+            return
+          }
+          parent = parent.parentElement
+        }
+      })
+    })
 
     editor.subscribe('editableInput', () => {
       const html = editor.getContent() || ''

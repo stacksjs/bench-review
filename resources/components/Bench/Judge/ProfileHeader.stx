@@ -2,9 +2,72 @@
   const showCopiedFeedback = state<boolean>(false)
   const menuOpen = state<boolean>(false)
 
+  // Resolve judge id from the URL — same pathname-fallback pattern as
+  // ArticleView (window.stx._rp is undefined during hydration on hard
+  // reload — see feedback_stx_rp_unset_on_hard_reload).
+  function resolveJudgeId(): number {
+    if (typeof window === 'undefined') return 0
+    const fromRouter = Number((window as any).stx?._rp?.id)
+    if (Number.isFinite(fromRouter) && fromRouter > 0) return fromRouter
+    const m = window.location.pathname.match(/^\/judges\/(\d+)/)
+    return m ? Number(m[1]) : 0
+  }
+
+  const judgeId = state<number>(resolveJudgeId())
+
+  const authStore = useStore('auth')
+  const followsStore = useStore('follows')
+  const judgesStore = useStore('judges')
+
+  // Pull the followed-ids and the judges directory once per mount. Both
+  // are noop-cheap when already loaded (the stores dedupe internally).
+  // Top-level + onMount, see feedback_stx_toplevel_skipped_on_spa_nav.
+  let hasFetched = false
+  function fetchOnce(): void {
+    if (hasFetched) return
+    hasFetched = true
+    if (authStore.isAuthenticated)
+      followsStore.fetchFollows()
+    if (judgesStore.judges().length === 0)
+      judgesStore.fetchJudges()
+  }
+  fetchOnce()
+  onMount(() => {
+    judgeId.set(resolveJudgeId())
+    fetchOnce()
+  })
+
+  // View-model: the current judge row (resolved against the store by
+  // id). Falls back to placeholder text while loading so the header
+  // doesn't show literal "undefined".
+  const currentJudge = derived(() => {
+    const id = judgeId()
+    if (!id) return null
+    return judgesStore.judges().find((j: any) => Number(j.id) === id) || null
+  })
+
+  const judgeName = derived<string>(() => currentJudge()?.name || 'Loading…')
+  const judgeImage = derived<string>(() => {
+    const j: any = currentJudge()
+    return (j && (j.image_url || j.photo)) || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+  })
+
+  const isFollowing = derived<boolean>(() => followsStore.isFollowing(judgeId()))
+  const followPending = derived<boolean>(() => followsStore.isPending(judgeId()))
+
+  async function toggleFollow(): Promise<void> {
+    const id = judgeId()
+    if (!id) return
+    if (!authStore.isAuthenticated) {
+      navigate(`/login?next=${encodeURIComponent(window.location.pathname)}`, true)
+      return
+    }
+    await followsStore.toggle(id)
+  }
+
   async function shareProfile(): Promise<void> {
     const url = window.location.href
-    const title = 'Judge Profile'
+    const title = currentJudge()?.name ? `${currentJudge().name} — Bench Review` : 'Judge Profile'
     if (navigator.share) {
       try {
         await navigator.share({ title, url })
@@ -29,10 +92,10 @@
   <div class="mx-auto px-4 py-10 sm:px-6 lg:px-8 max-w-7xl">
     <div class="flex gap-x-8 items-center justify-between mx-auto lg:mx-0 max-w-2xl lg:max-w-none">
       <div class="flex gap-x-6 items-center">
-        <img src="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="" class="flex-none size-16 ring-1 ring-gray-900/10 rounded-full grayscale filter">
+        <img x-src="judgeImage" x-alt="judgeName" class="object-cover flex-none size-16 ring-1 ring-gray-900/10 rounded-full grayscale filter">
         <h1>
-          <div class="text-gray-500 text-sm/6">Judge <span class="text-gray-700">#12345</span></div>
-          <div class="mt-1 font-semibold text-base text-gray-900">Hon. Sarah Johnson</div>
+          <div class="text-gray-500 text-sm/6">Judge <span class="text-gray-700" :text="`#${judgeId}`"></span></div>
+          <div class="mt-1 font-semibold text-base text-gray-900" :text="judgeName"></div>
         </h1>
       </div>
       <div class="flex gap-x-4 items-center sm:gap-x-6">
@@ -41,11 +104,22 @@
           class="hidden sm:block font-semibold text-gray-900 text-sm/6"
           @click="shareProfile()"
         >
-          <span :if="!showCopiedFeedback()">Share Profile</span>
-          <span :if="showCopiedFeedback()">Copied!</span>
+          <span :if="!showCopiedFeedback">Share Profile</span>
+          <span :if="showCopiedFeedback">Copied!</span>
         </button>
-        <StxLink x-to="`/review/judge/${judge.id}`" class="hidden sm:block font-semibold text-gray-900 text-sm/6">Write Review</StxLink>
-        <a href="#" class="px-3 py-2 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm">Follow</a>
+        <StxLink x-to="`/review/${judgeId}`" class="hidden sm:block font-semibold text-gray-900 text-sm/6">Write Review</StxLink>
+        <button
+          type="button"
+          @click="toggleFollow()"
+          x-disabled="followPending"
+          class="px-3 py-2 font-semibold text-sm rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 shadow-sm transition-colors"
+          x-class="[
+            isFollowing
+              ? 'bg-white text-gray-900 ring-1 ring-gray-300 hover:bg-gray-50 focus-visible:outline-gray-300'
+              : 'bg-gray-900 text-white hover:bg-gray-700 focus-visible:outline-gray-900'
+          ]"
+          :text="followPending ? '…' : (isFollowing ? 'Following' : 'Follow')"
+        >Follow</button>
 
         <div class="sm:hidden relative">
           <button type="button" class="block -m-3 p-3" @click="menuOpen.set(!menuOpen())" id="more-menu-button" aria-expanded="false" aria-haspopup="true">
@@ -53,8 +127,8 @@
             <Icon name="more-vertical" size="20" class="text-gray-500" />
           </button>
 
-          <div :if="menuOpen()" @click.away="menuOpen.set(false)" class="absolute right-0 z-10 mt-0.5 py-2 w-32 bg-white ring-1 ring-gray-900/5 rounded-md focus:outline-none shadow-lg origin-top-right" role="menu" aria-orientation="vertical" aria-labelledby="more-menu-button" tabindex="-1">
-            <button type="button" class="block px-3 py-1 w-full text-gray-900 text-left text-sm/6" role="menuitem" tabindex="-1" id="more-menu-item-0" @click="shareProfile">Share Profile</button>
+          <div :if="menuOpen" @click.away="menuOpen.set(false)" class="absolute right-0 z-10 mt-0.5 py-2 w-32 bg-white ring-1 ring-gray-900/5 rounded-md focus:outline-none shadow-lg origin-top-right" role="menu" aria-orientation="vertical" aria-labelledby="more-menu-button" tabindex="-1">
+            <button type="button" class="block px-3 py-1 w-full text-gray-900 text-left text-sm/6" role="menuitem" tabindex="-1" id="more-menu-item-0" @click="shareProfile()">Share Profile</button>
             <StxLink to="/review" class="block px-3 py-1 text-gray-900 text-sm/6" role="menuitem" tabindex="-1" id="more-menu-item-1">Write Review</StxLink>
           </div>
         </div>

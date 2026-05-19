@@ -1,0 +1,326 @@
+<script client>
+  import type { JudgeReviewRow } from '~/resources/stores/reviews'
+
+  // Self-contained article view. Owns:
+  //   - reading the URL :id param (pathname-based; see
+  //     feedback_stx_rp_unset_on_hard_reload for why we don't read
+  //     window.stx._rp)
+  //   - calling reviewsStore.fetchById(id) on mount/hydrate
+  //   - three render states (loading / not-found / loaded)
+  //   - the article markup itself, inlined here so loop/binding scope
+  //     reaches every :text / x-class / x-src reference. Splitting
+  //     header + body + comments into separate components would
+  //     re-introduce the @include + scope-boundary problem that bit
+  //     Bench/ReviewsFeed on /reviews.
+
+  const reviewsStore = useStore('reviews')
+  const stars: number[] = [1, 2, 3, 4, 5]
+  const readingProgress = state<number>(0)
+  const liked = state<boolean>(false)
+
+  // Resolve id from the URL. See feedback_stx_rp_unset_on_hard_reload —
+  // window.stx._rp is unset during hydration on hard reload, so we
+  // parse location.pathname instead. Router param wins when present
+  // (faster on SPA nav), pathname is the canonical fallback.
+  function resolveReviewId(): number {
+    if (typeof window === 'undefined') return 0
+    const fromRouter = Number((window as any).stx?._rp?.id)
+    if (Number.isFinite(fromRouter) && fromRouter > 0) return fromRouter
+    const m = window.location.pathname.match(/^\/article\/(\d+)/)
+    return m ? Number(m[1]) : 0
+  }
+
+  const reviewId = resolveReviewId()
+  if (reviewId > 0)
+    reviewsStore.fetchById(reviewId)
+
+  function formatDate(dateStr: string | null | undefined): string {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
+  }
+
+  // Rough read-time estimate from the HTML body. Counts whitespace
+  // runs as a word-count proxy (good enough for "X min read" on
+  // ~100-500-word reviews) and divides by 220 wpm. We deliberately
+  // AVOID a tag-strip regex like /<[^>]+>/g — the literal `<` in the
+  // regex can confuse stx's script-merge pass, which scans script
+  // bodies for HTML-ish syntax. Counting all whitespace runs (text +
+  // tag boundaries) is slightly high, but harmless: a short review
+  // reads as 1 min either way.
+  function estimateReadTime(html: string | null | undefined): number {
+    if (!html) return 1
+    let runs = 0
+    let prevWasSpace = true
+    for (let i = 0; i < html.length; i++) {
+      const c = html.charCodeAt(i)
+      const isSpace = c === 32 || c === 9 || c === 10 || c === 13
+      if (!isSpace && prevWasSpace) runs++
+      prevWasSpace = isSpace
+    }
+    return Math.max(1, Math.round(runs / 220))
+  }
+
+  // Reading-progress effect — kept in this component because the bar
+  // is part of the article chrome. Uses requestAnimationFrame to keep
+  // the scroll handler cheap. Cleanup via onDestroy so SPA nav away
+  // from the article tears down the listener.
+  onMount(() => {
+    if (typeof window === 'undefined') return
+    let ticking = false
+    const update = (): void => {
+      const doc = document.documentElement
+      const max = doc.scrollHeight - window.innerHeight
+      const ratio = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0
+      readingProgress.set(Math.round(ratio * 100))
+      ticking = false
+    }
+    const onScroll = (): void => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(update)
+    }
+    update()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onDestroy(() => window.removeEventListener('scroll', onScroll))
+  })
+
+  function toggleLike(): void {
+    liked.set(!liked())
+  }
+
+  // View-model wrappers. Bare-property auto-unwrap reads these without
+  // call-syntax, so :text="title" stays clean and reactive.
+  const title = derived<string>(() => reviewsStore.current()?.title ?? '')
+  const content = derived<string>(() => reviewsStore.current()?.content ?? '')
+  const rating = derived<number>(() => Number(reviewsStore.current()?.rating ?? 0))
+  const status = derived<string>(() => reviewsStore.current()?.status ?? '')
+  const reviewType = derived<string>(() => reviewsStore.current()?.type ?? '')
+  const likes = derived<number>(() => Number(reviewsStore.current()?.likes ?? 0))
+  const date = derived<string>(() => formatDate(reviewsStore.current()?.created_at))
+  const readMinutes = derived<number>(() => estimateReadTime(reviewsStore.current()?.content))
+  const judgeName = derived<string>(() => (reviewsStore.current() as any)?.judge?.name ?? 'Judge')
+  const judgeId = derived<number | null>(() => (reviewsStore.current() as any)?.judge?.id ?? null)
+  const judgeCourt = derived<string>(() => (reviewsStore.current() as any)?.judge?.court ?? '')
+  const judgeImage = derived<string>(() => (reviewsStore.current() as any)?.judge?.image_url ?? '')
+
+  // Tiny avatar fallback: build two initials from the judge name so
+  // a missing image_url renders a tasteful monogram instead of a
+  // broken-image icon. Strips honorifics so "Hon. Elena Kagan" → "EK".
+  const judgeInitials = derived<string>(() => {
+    const raw = judgeName().replace(/^(hon\.|judge|justice|chief)\s+/i, '').trim()
+    const parts = raw.split(/\s+/).filter(Boolean)
+    if (parts.length === 0) return '?'
+    if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase()
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  })
+
+  // Capitalize the review type label for the topic chip. "positive"
+  // → "Positive", and a null/missing type falls back to "Review".
+  const reviewTypeLabel = derived<string>(() => {
+    const t = reviewType()
+    if (!t) return 'Review'
+    return t.charAt(0).toUpperCase() + t.slice(1)
+  })
+</script>
+
+<div class="min-h-screen bg-white">
+  <!-- Reading progress bar. Sits above all article chrome so it stays
+       visible during sticky-header interactions. Width is the live
+       percentage from the scroll handler. -->
+  <div class="fixed inset-x-0 top-0 z-50 h-1 bg-transparent" style="pointer-events: none">
+    <div class="h-full bg-amber-500 transition-all duration-100 ease-out" x-style="`width: ${readingProgress}%`"></div>
+  </div>
+
+  <!-- Loading state -->
+  <div :if="reviewsStore.loadingCurrent && !reviewsStore.current" class="mx-auto pb-32 pt-32 px-4 sm:px-6 lg:px-8 max-w-2xl text-center text-gray-400 text-sm tracking-wide">
+    Loading review…
+  </div>
+
+  <!-- 404 state -->
+  <div :if="reviewsStore.currentNotFound" class="mx-auto pb-32 pt-32 px-4 sm:px-6 lg:px-8 max-w-2xl text-center">
+    <p class="font-medium text-amber-600 text-xs tracking-widest uppercase">404 — not found</p>
+    <h1 class="mt-4 font-serif font-bold text-4xl text-gray-900 tracking-tight">Review not found</h1>
+    <p class="mt-4 text-base text-gray-500">The review you're looking for either doesn't exist or hasn't been published yet.</p>
+    <StxLink x-to="`/reviews`" class="inline-block mt-8 font-semibold text-gray-900 text-sm hover:underline underline-offset-4">
+      ← Back to all reviews
+    </StxLink>
+  </div>
+
+  <!-- Loaded state -->
+  <article :if="reviewsStore.current" class="mx-auto pb-32 pt-12 sm:pt-16 px-4 sm:px-6 max-w-3xl">
+    <!-- Topic chip -->
+    <p class="font-medium text-amber-600 text-center text-xs tracking-widest uppercase" :text="reviewTypeLabel"></p>
+
+    <!-- Hero title — large serif, tight tracking, generous bottom margin -->
+    <h1 class="mt-4 font-serif font-bold leading-[1.1] text-4xl sm:text-5xl lg:text-6xl text-center text-gray-900 tracking-tight" :text="title"></h1>
+
+    <!-- Star rating + date + read time row. Centered, subtle. -->
+    <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-8 text-gray-500 text-sm">
+      <div class="flex items-center gap-1 article-stars">
+        <span
+          :for="star in stars"
+          class="inline-block transition-colors"
+          x-class="star <= rating ? 'text-amber-500' : 'text-gray-200'"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+            <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.12 2.12 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.12 2.12 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.12 2.12 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.12 2.12 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.12 2.12 0 0 0 1.597-1.16z" />
+          </svg>
+        </span>
+        <span class="ml-2 font-medium text-gray-700 tabular-nums" :text="`${rating}/5`"></span>
+      </div>
+      <span class="hidden sm:inline text-gray-300">·</span>
+      <span :text="date"></span>
+      <span class="hidden sm:inline text-gray-300">·</span>
+      <span :text="`${readMinutes} min read`"></span>
+    </div>
+
+    <!-- Judge byline. Medium-style author row: round avatar + name + court.
+         Avatar falls back to an initials monogram when image_url is
+         missing — a broken-image icon is a tell that an MVP shipped
+         too eagerly. -->
+    <div class="flex items-center gap-4 mt-12 pb-6 border-b border-gray-200">
+      <img
+        :if="judgeImage"
+        class="object-cover h-12 w-12 ring-1 ring-gray-200 rounded-full grayscale filter"
+        x-src="judgeImage"
+        x-alt="judgeName"
+      />
+      <div
+        :if="!judgeImage"
+        class="flex items-center justify-center h-12 w-12 font-semibold text-amber-700 text-sm bg-amber-50 ring-1 ring-amber-200/60 rounded-full"
+        :text="judgeInitials"
+      ></div>
+      <div class="min-w-0 flex-1">
+        <p class="font-semibold text-gray-900 text-sm">
+          <span class="text-gray-400 font-normal">Review of</span>
+          <StxLink :if="judgeId" x-to="`/judges/${judgeId}/profile`" class="ml-1 text-gray-900 hover:underline underline-offset-2" :text="judgeName"></StxLink>
+          <span :if="!judgeId" :text="judgeName"></span>
+        </p>
+        <p :if="judgeCourt" class="text-gray-500 text-xs mt-0.5" :text="judgeCourt"></p>
+      </div>
+      <StxLink
+        :if="judgeId"
+        x-to="`/judges/${judgeId}/profile`"
+        class="hidden sm:inline-flex flex-shrink-0 items-center px-3 py-1.5 font-medium text-gray-700 text-xs border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-colors"
+      >
+        View judge →
+      </StxLink>
+    </div>
+
+    <!-- Body. Serif typography, generous leading, drop cap on the
+         first paragraph. Typography styles live in the styles block
+         at the bottom of this file. (No directive names inside HTML
+         comments — stx's template scanner processes them anyway and
+         splices the matched block right at the comment location,
+         which busts the page.) -->
+    <div class="article-body mt-10 text-gray-800" x-html="content"></div>
+
+    <!-- Footer row: clap-style like + status pill + back link -->
+    <div class="flex items-center justify-between mt-14 pt-8 border-t border-gray-200">
+      <button
+        type="button"
+        @click="toggleLike()"
+        class="inline-flex items-center gap-2 px-4 py-2 font-medium text-sm rounded-full border transition-all"
+        x-class="liked ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'"
+      >
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+        </svg>
+        <span class="tabular-nums" :text="`${likes + (liked ? 1 : 0)}`"></span>
+      </button>
+
+      <div class="flex items-center gap-4 text-gray-500 text-sm">
+        <span :if="status" class="hidden sm:inline-flex items-center px-2.5 py-1 font-medium text-emerald-700 text-xs bg-emerald-50 ring-1 ring-emerald-200/60 rounded-full capitalize" :text="status"></span>
+        <StxLink x-to="`/reviews`" class="text-gray-600 hover:text-gray-900 hover:underline underline-offset-2">
+          ← All reviews
+        </StxLink>
+      </div>
+    </div>
+  </article>
+</div>
+
+@push('styles')
+<style>
+  /* Medium-style serif. System serif stack avoids a webfont dependency
+     and matches the editorial register we want. */
+  .article-body {
+    font-family: 'Charter', 'Iowan Old Style', 'Source Serif Pro', Georgia, Cambria, 'Times New Roman', serif;
+    font-size: 1.25rem;
+    line-height: 1.7;
+    color: #292929;
+  }
+
+  .article-body > * + * { margin-top: 1.4em; }
+
+  .article-body p { margin: 0; }
+
+  /* Drop cap on the very first paragraph. Subtle scale + tighter
+     leading so the cap doesn't push the column over. */
+  .article-body > p:first-child::first-letter {
+    float: left;
+    font-size: 4.6rem;
+    line-height: 1;
+    padding-right: 0.6rem;
+    padding-top: 0.35rem;
+    font-weight: 700;
+    color: #111;
+  }
+
+  .article-body h2 {
+    font-family: inherit;
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: #1a1a1a;
+    margin-top: 2.5em;
+    margin-bottom: 0.6em;
+    letter-spacing: -0.01em;
+  }
+
+  .article-body h3 {
+    font-family: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.35;
+    color: #1a1a1a;
+    margin-top: 2em;
+    margin-bottom: 0.5em;
+  }
+
+  .article-body strong { color: #111; font-weight: 700; }
+  .article-body em { font-style: italic; }
+
+  .article-body blockquote {
+    border-left: 3px solid #111;
+    padding-left: 1.25rem;
+    margin-left: 0;
+    font-style: italic;
+    color: #444;
+    font-size: 1.35rem;
+    line-height: 1.55;
+  }
+
+  .article-body ul, .article-body ol {
+    padding-left: 1.5rem;
+    margin: 1.4em 0;
+  }
+  .article-body ul { list-style: disc; }
+  .article-body ol { list-style: decimal; }
+  .article-body li { margin: 0.4em 0; }
+
+  .article-body a {
+    color: #b45309;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+  }
+  .article-body a:hover { color: #92400e; }
+
+  /* The star icons inherit color via currentColor, but the inline-svg
+     stars in the header use fill=currentColor so x-class colors fill
+     directly without a stroke fight. */
+  .article-stars svg { display: block; }
+</style>
+@endpush

@@ -1,3 +1,11 @@
+@extends('layouts/default')
+
 @section('title', 'Court House Judges - Bench Review')
 
-@include('Bench/Court/CourtJudges')
+@section('content')
+  @include('Bench/Court/CourtHeader')
+  @include('Bench/Court/CourtTabs')
+  <div class="mx-auto px-4 py-8 sm:px-6 lg:px-8 max-w-7xl">
+    @include('Bench/Court/CourtJudges')
+  </div>
+@endsection

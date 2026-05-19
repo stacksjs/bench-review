@@ -87,10 +87,35 @@ route.get('/api/court-houses', 'Actions/CourtHouses/CourtHouseIndexAction')
 route.get('/api/reviews', 'Actions/Reviews/LatestReviewsAction')
   .name('bench.reviews.latest')
 
+route.get('/api/reviews/{id}', 'Actions/Reviews/ShowReviewAction')
+  .name('bench.reviews.show')
+
 route.get('/api/judges/{id}/reviews', 'Actions/Reviews/ReviewsByJudgeAction')
   .name('bench.judges.reviews')
 
 route.post('/api/reviews', 'Actions/Reviews/SubmitReviewAction')
   .name('bench.reviews.submit')
+  .middleware('auth')
+  .skipCsrf()
+
+// Self-routes — return data scoped to the authenticated user. Auth-
+// gated; profile + follow pages depend on these.
+route.get('/api/me/reviews', 'Actions/Me/MyReviewsAction')
+  .name('bench.me.reviews')
+  .middleware('auth')
+
+route.get('/api/me/follows', 'Actions/Me/MyFollowsAction')
+  .name('bench.me.follows')
+  .middleware('auth')
+
+// Follow / unfollow a judge. POST is idempotent on (user_id, judge_id);
+// DELETE on a row that doesn't exist is a no-op. Both auth-gated.
+route.post('/api/judges/{id}/follow', 'Actions/Judges/FollowJudgeAction')
+  .name('bench.judges.follow')
+  .middleware('auth')
+  .skipCsrf()
+
+route.delete('/api/judges/{id}/follow', 'Actions/Judges/UnfollowJudgeAction')
+  .name('bench.judges.unfollow')
   .middleware('auth')
   .skipCsrf()

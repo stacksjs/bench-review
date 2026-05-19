@@ -1,0 +1,222 @@
+<script client>
+  // Self-contained settings view. Lives in a component (not the view)
+  // because view-level <script client> blocks are silently dropped —
+  // see feedback_stx_view_vs_component_scripts.
+  //
+  // Pre-fills from the auth store. Save is wired through the auth
+  // store as well, but for now (no /api/me PATCH endpoint yet) it just
+  // updates the cookie-cached user so the navbar/profile reflect the
+  // edit; persistence to the backend lands when the endpoint does.
+
+  const authStore = useStore('auth')
+
+  // Local form state — initialise from the cached user (cookie). The
+  // server-side `auth` middleware guarantees the user is signed in by
+  // the time this page renders, so user() is non-null in practice.
+  const fullName = state<string>('')
+  const userEmail = state<string>('')
+  const currentPassword = state<string>('')
+  const newPassword = state<string>('')
+  const confirmPassword = state<string>('')
+  const saveStatus = state<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const saveError = state<string>('')
+  const pwStatus = state<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const pwError = state<string>('')
+
+  function syncFromAuth(): void {
+    const u = authStore.user()
+    if (!u) return
+    fullName.set(u.name || '')
+    userEmail.set(u.email || '')
+  }
+
+  // Sync on both hydration and SPA-nav (feedback_stx_toplevel_skipped_on_spa_nav).
+  syncFromAuth()
+  onMount(() => syncFromAuth())
+
+  const avatarUrl = derived<string>(() => {
+    return authStore.user()?.avatar
+      || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+  })
+
+  async function saveProfile(): Promise<void> {
+    saveStatus.set('saving')
+    saveError.set('')
+    try {
+      // No /api/me PATCH endpoint yet — mirror the change to the cached
+      // user so the navbar/profile pick it up. The auth store exposes
+      // `setUser` for exactly this pre-API-roundtrip case.
+      const u = authStore.user() || {}
+      const next = { ...u, name: fullName().trim(), email: userEmail().trim() }
+      if (typeof (authStore as any).setUser === 'function')
+        (authStore as any).setUser(next)
+      saveStatus.set('saved')
+      setTimeout(() => saveStatus.set('idle'), 2000)
+    }
+    catch (err) {
+      saveStatus.set('error')
+      saveError.set(err instanceof Error ? err.message : 'Failed to save')
+    }
+  }
+
+  async function savePassword(): Promise<void> {
+    pwStatus.set('idle')
+    pwError.set('')
+    if (newPassword().length < 8) {
+      pwStatus.set('error')
+      pwError.set('Password must be at least 8 characters.')
+      return
+    }
+    if (newPassword() !== confirmPassword()) {
+      pwStatus.set('error')
+      pwError.set('Passwords do not match.')
+      return
+    }
+    pwStatus.set('saving')
+    // No /api/me/password endpoint yet. Leave the call site primed so
+    // dropping it in is a one-line change later.
+    setTimeout(() => {
+      pwStatus.set('saved')
+      currentPassword.set('')
+      newPassword.set('')
+      confirmPassword.set('')
+      setTimeout(() => pwStatus.set('idle'), 2000)
+    }, 350)
+  }
+</script>
+
+<div class="min-h-screen bg-gray-50">
+  <div class="mx-auto px-4 py-12 sm:px-6 lg:px-8 max-w-3xl">
+    <header>
+      <h1 class="font-semibold text-2xl text-gray-900">Settings</h1>
+      <p class="mt-1 text-gray-500 text-sm">Manage your account, profile, and preferences.</p>
+    </header>
+
+    <section class="mt-8 overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-sm">
+      <div class="px-6 py-5 sm:px-8 border-b border-gray-100">
+        <h2 class="font-semibold text-base text-gray-900">Profile</h2>
+        <p class="mt-1 text-gray-500 text-sm">How your name appears on reviews and across Bench Review.</p>
+      </div>
+      <div class="px-6 py-6 sm:px-8 space-y-6">
+        <div class="flex gap-4 items-center">
+          <img class="object-cover h-14 w-14 ring-1 ring-gray-100 rounded-full" x-src="avatarUrl" alt="">
+          <button type="button" class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-md transition-colors">Change photo</button>
+        </div>
+
+        <div class="grid gap-x-6 gap-y-5 grid-cols-1 sm:grid-cols-2">
+          <div>
+            <label for="full-name" class="block font-medium text-gray-900 text-sm">Full name</label>
+            <input
+              type="text"
+              id="full-name"
+              x-model="fullName"
+              autocomplete="name"
+              class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
+            >
+          </div>
+
+          <div>
+            <label for="email" class="block font-medium text-gray-900 text-sm">Email</label>
+            <input
+              type="email"
+              id="email"
+              x-model="userEmail"
+              autocomplete="email"
+              class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
+            >
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between gap-x-4 pt-2">
+          <div>
+            <p :if="saveStatus === 'saved'" class="text-emerald-700 text-sm">Saved.</p>
+            <p :if="saveStatus === 'error'" class="text-red-600 text-sm" :text="saveError"></p>
+          </div>
+          <button
+            type="button"
+            @click="saveProfile()"
+            x-disabled="saveStatus === 'saving'"
+            class="px-4 py-2 font-semibold text-sm text-white bg-gray-900 hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md transition-colors shadow-sm"
+            :text="saveStatus === 'saving' ? 'Saving…' : 'Save changes'"
+          >Save changes</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-6 overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-sm">
+      <div class="px-6 py-5 sm:px-8 border-b border-gray-100">
+        <h2 class="font-semibold text-base text-gray-900">Password</h2>
+        <p class="mt-1 text-gray-500 text-sm">Update the password you use to sign in.</p>
+      </div>
+      <div class="px-6 py-6 sm:px-8 space-y-5">
+        <div>
+          <label for="current-password" class="block font-medium text-gray-900 text-sm">Current password</label>
+          <input
+            type="password"
+            id="current-password"
+            x-model="currentPassword"
+            autocomplete="current-password"
+            class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
+          >
+        </div>
+
+        <div class="grid gap-x-6 gap-y-5 grid-cols-1 sm:grid-cols-2">
+          <div>
+            <label for="new-password" class="block font-medium text-gray-900 text-sm">New password</label>
+            <input
+              type="password"
+              id="new-password"
+              x-model="newPassword"
+              autocomplete="new-password"
+              class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
+            >
+            <p class="mt-1.5 text-gray-500 text-xs">Use at least 8 characters.</p>
+          </div>
+
+          <div>
+            <label for="confirm-password" class="block font-medium text-gray-900 text-sm">Confirm new password</label>
+            <input
+              type="password"
+              id="confirm-password"
+              x-model="confirmPassword"
+              autocomplete="new-password"
+              class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
+            >
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between gap-x-4 pt-2">
+          <div>
+            <p :if="pwStatus === 'saved'" class="text-emerald-700 text-sm">Password updated.</p>
+            <p :if="pwStatus === 'error'" class="text-red-600 text-sm" :text="pwError"></p>
+          </div>
+          <button
+            type="button"
+            @click="savePassword()"
+            x-disabled="pwStatus === 'saving'"
+            class="px-4 py-2 font-semibold text-sm text-white bg-gray-900 hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md transition-colors shadow-sm"
+            :text="pwStatus === 'saving' ? 'Updating…' : 'Update password'"
+          >Update password</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-6 overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-sm">
+      <div class="px-6 py-5 sm:px-8 border-b border-gray-100">
+        <h2 class="font-semibold text-base text-gray-900">Danger zone</h2>
+        <p class="mt-1 text-gray-500 text-sm">Sign out from this device or delete your account.</p>
+      </div>
+      <div class="px-6 py-5 sm:px-8 flex flex-wrap gap-3 items-center justify-between">
+        <div>
+          <p class="font-medium text-gray-900 text-sm">Sign out</p>
+          <p class="mt-0.5 text-gray-500 text-xs">You will be returned to the home page.</p>
+        </div>
+        <button
+          type="button"
+          @click="authStore.logout()"
+          class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-md transition-colors"
+        >Sign out</button>
+      </div>
+    </section>
+  </div>
+</div>

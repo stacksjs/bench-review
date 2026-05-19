@@ -65,53 +65,80 @@
     return 'neutral'
   }
 
+  // Single-flight guard. With both @click="handleSubmit()" AND the
+  // onMount fallback addEventListener wired up, a single click would
+  // otherwise fire the handler twice. The flag prevents the duplicate.
+  let submitInFlight = false
+
   async function handleSubmit(): Promise<void> {
+    // Loud, easy-to-grep log so users debugging "submit does nothing"
+    // can confirm the click reached the handler in DevTools console.
+    // If you don't see this when clicking, the click handler never
+    // bound — likely a stx scope-registration issue, not a logic bug.
+    console.log('[bench:submit] handleSubmit fired', {
+      judge: judge() ? judge()!.id : null,
+      titleLen: reviewTitle().length,
+      contentLen: reviewContent().length,
+      rating: rating(),
+    })
+    if (submitInFlight) {
+      console.log('[bench:submit] already in flight — skipping')
+      return
+    }
+    submitInFlight = true
     submitError.set(null)
 
-    const j = judge()
-    if (!j) {
-      submitError.set('Pick a judge first.')
-      return
-    }
-
-    const title = reviewTitle().trim()
-    if (!title) {
-      submitError.set('Add a review title.')
-      return
-    }
-
-    const content = reviewContent().trim()
-    if (!content) {
-      submitError.set('Write a review before submitting.')
-      return
-    }
-
-    const overall = rating()
-    if (!overall || overall < 1) {
-      submitError.set('Give the judge an overall rating.')
-      return
-    }
-
-    const result = await reviewsStore.submit({
-      judge_id: Number(j.id),
-      title,
-      content,
-      rating: overall,
-      type: ratingType(overall),
-    })
-
-    if (!result.ok) {
-      submitError.set(result.error || 'Failed to submit review.')
-      return
-    }
-
     try {
-      localStorage.removeItem('bench-review:compose-draft')
+      const j = judge()
+      if (!j) {
+        submitError.set('Pick a judge first.')
+        return
+      }
+
+      const title = reviewTitle().trim()
+      if (!title) {
+        submitError.set('Add a review title.')
+        return
+      }
+
+      const content = reviewContent().trim()
+      if (!content) {
+        submitError.set('Write a review before submitting.')
+        return
+      }
+
+      const overall = rating()
+      if (!overall || overall < 1) {
+        submitError.set('Give the judge an overall rating.')
+        return
+      }
+
+      console.log('[bench:submit] calling reviewsStore.submit')
+      const result = await reviewsStore.submit({
+        judge_id: Number(j.id),
+        title,
+        content,
+        rating: overall,
+        type: ratingType(overall),
+      })
+      console.log('[bench:submit] reviewsStore.submit returned', result)
+
+      if (!result.ok) {
+        submitError.set(result.error || 'Failed to submit review.')
+        return
+      }
+
+      try {
+        localStorage.removeItem('bench-review:compose-draft')
+      }
+      catch {
+        // localStorage unavailable — fail silently
+      }
+      navigate(`/judges/${j.id}/reviews`, true)
     }
-    catch {
-      // localStorage unavailable — fail silently
+    finally {
+      submitInFlight = false
     }
-    navigate(`/judges/${j.id}/reviews`, true)
   }
 
   function handleCancel(): void {
@@ -137,6 +164,33 @@
     const id = pathId || queryId
     if (id)
       loadJudge(String(id))
+
+    // Fallback submit-button wiring. The @click="handleSubmit()" on
+    // the button is the primary path, but if stx's scope binding
+    // fails for any reason (loaded over SPA nav, scope didn't
+    // register, bindIf raced the children-process pass) the user
+    // ends up with an inert button. Bind directly here so an actual
+    // <button data-submit-review> click ALWAYS reaches handleSubmit.
+    // submitInFlight inside handleSubmit prevents double-fire when
+    // both paths reach it on the same click.
+    //
+    // The button is rendered inside :if="judge", so it isn't in the
+    // DOM at first paint. A MutationObserver picks it up as soon as
+    // bindIf inserts it.
+    function wireSubmit(): void {
+      const btn = document.querySelector('[data-submit-review]') as HTMLButtonElement | null
+      if (!btn || (btn as any).__bench_submit_wired) return
+      ;(btn as any).__bench_submit_wired = true
+      console.log('[bench:submit] wired fallback click listener on submit button')
+      btn.addEventListener('click', (e) => {
+        e.preventDefault()
+        handleSubmit()
+      })
+    }
+    wireSubmit()
+    const mo = new MutationObserver(() => wireSubmit())
+    mo.observe(document.body, { childList: true, subtree: true })
+    onDestroy(() => mo.disconnect())
   })
 </script>
 <div class="min-h-screen">
@@ -411,17 +465,19 @@
     ></p>
 
     <div class="flex gap-x-4 items-center justify-end">
-      <button type="button" @click="handleCancel" class="px-4 py-2 font-semibold text-gray-700 text-sm border border-gray-200 rounded-md hover:bg-gray-50 hover:border-gray-300 transition-colors">Cancel</button>
+      <button type="button" @click="handleCancel()" class="px-4 py-2 font-semibold text-gray-700 text-sm border border-gray-200 rounded-md hover:bg-gray-50 hover:border-gray-300 transition-colors">Cancel</button>
       <button
+        type="button"
+        data-submit-review
         @click="handleSubmit()"
-        x-disabled="!judge || reviewsStore.submitting()"
+        x-disabled="!judge || reviewsStore.submitting"
         class="px-5 py-2 font-semibold text-sm text-white rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-900 focus-visible:outline-offset-2 shadow-sm"
         x-class="[
-          judge && !reviewsStore.submitting()
+          judge && !reviewsStore.submitting
             ? 'bg-gray-900 hover:bg-gray-700'
             : 'bg-gray-300 cursor-not-allowed'
         ]"
-        :text="reviewsStore.submitting() ? 'Submitting…' : 'Submit Review'"
+        :text="reviewsStore.submitting ? 'Submitting…' : 'Submit Review'"
       >Submit Review</button>
     </div>
   </div>

@@ -32,12 +32,26 @@
     isLiked.set(!isLiked())
   }
 
-  // Top-level fetches — fire on every mount/hydrate of this component.
-  // Cheap because the store dedupes via its internal `loadingLatest`
-  // flag and we only re-fetch judges if the list is empty.
-  reviewsStore.fetchLatest(20)
-  if (judgesStore.judges().length === 0)
-    judgesStore.fetchJudges()
+  // Fire fetches in BOTH top-level AND onMount. Top-level runs on
+  // hard-reload hydration (onMount doesn't — see
+  // feedback_onmount_not_on_hydration). onMount runs on SPA nav (the
+  // top-level body of a re-mounted scope does NOT re-execute — bit us
+  // when navigating /article/X → /reviews left the feed empty with no
+  // API request). The local `hasFetched` flag is scoped to this scope
+  // instance, so it resets per mount — meaning SPA nav re-fetches
+  // (good: the user expects fresh data after they posted a review),
+  // and the guard only prevents double-fire when BOTH paths fire on
+  // the same initial mount.
+  let hasFetched = false
+  function fetchOnce(): void {
+    if (hasFetched) return
+    hasFetched = true
+    reviewsStore.fetchLatest(20)
+    if (judgesStore.judges().length === 0)
+      judgesStore.fetchJudges()
+  }
+  fetchOnce()
+  onMount(() => fetchOnce())
 
   function formatDate(dateStr: string | null | undefined): string {
     if (!dateStr) return ''
@@ -149,7 +163,7 @@
         <div class="flex items-center space-x-4">
           <button
             type="button"
-            @click="toggleLike"
+            @click="toggleLike()"
             class="inline-flex items-center text-sm duration-150 ease-in-out transition"
             x-class="isLiked ? 'text-blue-600' : 'text-gray-500 hover:text-gray-600'"
           >

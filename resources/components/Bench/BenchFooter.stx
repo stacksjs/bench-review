@@ -17,7 +17,6 @@
           <li><StxLink to="/judges" class="text-gray-600 hover:text-gray-900">Find Judges</StxLink></li>
           <li><StxLink to="/court-houses" class="text-gray-600 hover:text-gray-900">Court Houses</StxLink></li>
           <li><StxLink to="/reviews" class="text-gray-600 hover:text-gray-900">Latest Reviews</StxLink></li>
-          <li><StxLink to="/blog" class="text-gray-600 hover:text-gray-900">Blog</StxLink></li>
         </ul>
       </div>
 

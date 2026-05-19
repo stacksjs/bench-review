@@ -33,11 +33,10 @@
         <StxLink to="/court-houses" class="font-semibold text-gray-900 text-sm/6 border-b-2 border-transparent hover:border-gray-500 duration-200 transition-colors">Find CourtHouses</StxLink>
         <StxLink to="/review" class="font-semibold text-gray-900 text-sm/6 border-b-2 border-transparent hover:border-gray-500 duration-200 transition-colors">Write Review</StxLink>
         <StxLink to="/reviews" class="font-semibold text-gray-900 text-sm/6 border-b-2 border-transparent hover:border-gray-500 duration-200 transition-colors">Reviews</StxLink>
-        <StxLink to="/blog" class="font-semibold text-gray-900 text-sm/6 border-b-2 border-transparent hover:border-gray-500 duration-200 transition-colors">Blog</StxLink>
       </div>
     </div>
     <div class="hidden lg:flex flex-1 justify-center mx-8 max-w-md">
-      <form class="w-full" @submit.prevent="submitHeaderSearch">
+      <form class="w-full" @submit.prevent="submitHeaderSearch()">
         <label for="header-search" class="sr-only">Search</label>
         <input id="header-search" type="text" x-model="search.query" placeholder="Search judges or courts..." class="block px-3 py-2 w-full text-gray-900 sm:text-sm placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-200 ring-inset rounded-lg focus:ring-2 focus:ring-gray-600 focus:ring-inset">
       </form>

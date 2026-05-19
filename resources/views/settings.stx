@@ -2,90 +2,10 @@
 
 @section('title', 'Settings - Bench Review')
 
-@section('content')
 <script server>
   definePageMeta({ middleware: ['auth'] })
 </script>
-<script client>
-  const firstName = state<string>('John')
-  const lastName = state<string>('Doe')
-  const currentPassword = state<string>('')
-  const newPassword = state<string>('')
-  const confirmPassword = state<string>('')
-</script>
-<div class="min-h-screen">
-  <div class="mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
-    <div class="space-y-10 divide-gray-900/10 divide-y">
-      <div class="grid gap-x-8 gap-y-8 grid-cols-1 md:grid-cols-3">
-        <div class="px-4 sm:px-0">
-          <h2 class="font-semibold leading-7 text-base text-gray-800">Settings</h2>
-          <p class="mt-1 leading-6 text-gray-600 text-sm">Update your account settings and profile information.</p>
-        </div>
 
-        <form class="md:col-span-2 bg-white ring-1 ring-gray-900/5 sm:rounded-xl shadow-sm">
-          <div class="px-4 py-6 sm:p-8">
-            <div class="grid gap-x-6 gap-y-8 grid-cols-1 sm:grid-cols-6 max-w-2xl">
-              <div class="col-span-full">
-                <h3 class="font-semibold leading-7 text-base text-gray-800">Personal Information</h3>
-                <div class="grid gap-x-6 gap-y-4 grid-cols-1 sm:grid-cols-6 mt-4">
-                  <div class="sm:col-span-3">
-                    <label for="first-name" class="block font-medium leading-6 text-gray-700 text-sm">First name</label>
-                    <div class="mt-2">
-                      <input type="text" name="first-name" id="first-name" x-model="firstName" class="block py-1.5 w-full text-gray-900 sm:leading-6 sm:text-sm placeholder:text-gray-400 border-0 ring-1 ring-gray-300 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset shadow-sm" />
-                    </div>
-                  </div>
-
-                  <div class="sm:col-span-3">
-                    <label for="last-name" class="block font-medium leading-6 text-gray-700 text-sm">Last name</label>
-                    <div class="mt-2">
-                      <input type="text" name="last-name" id="last-name" x-model="lastName" class="block py-1.5 w-full text-gray-900 sm:leading-6 sm:text-sm placeholder:text-gray-400 border-0 ring-1 ring-gray-300 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset shadow-sm" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="col-span-full">
-                <label for="photo" class="block font-medium leading-6 text-gray-700 text-sm">Photo</label>
-                <div class="flex gap-x-3 items-center mt-2">
-                  <img class="h-12 w-12 rounded-full" src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="" />
-                  <button type="button" class="px-2.5 py-1.5 font-semibold text-gray-700 text-sm bg-white hover:bg-gray-50 ring-1 ring-gray-300 ring-inset rounded-md shadow-sm">Change</button>
-                </div>
-              </div>
-
-              <div class="col-span-full">
-                <h3 class="font-semibold leading-7 text-base text-gray-800">Update Password</h3>
-                <div class="mt-4 space-y-4">
-                  <div>
-                    <label for="current-password" class="block font-medium leading-6 text-gray-700 text-sm">Current Password</label>
-                    <div class="mt-2">
-                      <input type="password" name="current-password" id="current-password" x-model="currentPassword" class="block py-1.5 w-full text-gray-900 sm:leading-6 sm:text-sm placeholder:text-gray-400 border-0 ring-1 ring-gray-300 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset shadow-sm" />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label for="new-password" class="block font-medium leading-6 text-gray-700 text-sm">New Password</label>
-                    <div class="mt-2">
-                      <input type="password" name="new-password" id="new-password" x-model="newPassword" class="block py-1.5 w-full text-gray-900 sm:leading-6 sm:text-sm placeholder:text-gray-400 border-0 ring-1 ring-gray-300 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset shadow-sm" />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label for="confirm-password" class="block font-medium leading-6 text-gray-700 text-sm">Confirm New Password</label>
-                    <div class="mt-2">
-                      <input type="password" name="confirm-password" id="confirm-password" x-model="confirmPassword" class="block py-1.5 w-full text-gray-900 sm:leading-6 sm:text-sm placeholder:text-gray-400 border-0 ring-1 ring-gray-300 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset shadow-sm" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="flex gap-x-6 items-center justify-end px-4 py-4 sm:px-8 border-gray-900/10 border-t">
-            <button type="button" class="font-semibold leading-6 text-gray-700 text-sm">Cancel</button>
-            <button type="submit" class="px-3 py-2 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm">Save</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-</div>
+@section('content')
+  @include('Bench/Settings/SettingsView')
 @endsection

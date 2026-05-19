@@ -54,6 +54,14 @@ defineStore('reviews', () => {
   const loadingByJudge = state<Record<number, boolean>>({})
   const submitting = state<boolean>(false)
 
+  // Single-review slice. The article page fetches one row at a time
+  // through `fetchById`, and the page reads `current()` to render.
+  // `currentNotFound` is sticky across the request lifecycle so the
+  // page can show a 404 state without racing the loading flag.
+  const current = state<(JudgeReviewRow & { judge?: { id: number, name: string, court?: string | null, image_url?: string | null } | null }) | null>(null)
+  const loadingCurrent = state<boolean>(false)
+  const currentNotFound = state<boolean>(false)
+
   async function fetchLatest(limit = 6): Promise<void> {
     loadingLatest.set(true)
     try {
@@ -67,6 +75,30 @@ defineStore('reviews', () => {
     }
     finally {
       loadingLatest.set(false)
+    }
+  }
+
+  async function fetchById(id: number): Promise<void> {
+    // Reset before fetching so a stale `current` from a previous
+    // article doesn't flash while the new one loads.
+    current.set(null)
+    currentNotFound.set(false)
+    loadingCurrent.set(true)
+    try {
+      const res = await fetch(`/api/reviews/${id}`)
+      if (res.status === 404) {
+        currentNotFound.set(true)
+        return
+      }
+      if (!res.ok) return
+      const data = await res.json() as JudgeReviewRow & { judge?: any }
+      current.set(data)
+    }
+    catch (err) {
+      console.error('[reviews] fetchById failed:', err)
+    }
+    finally {
+      loadingCurrent.set(false)
     }
   }
 
@@ -158,9 +190,13 @@ defineStore('reviews', () => {
     loadingLatest,
     loadingByJudge,
     submitting,
+    current,
+    loadingCurrent,
+    currentNotFound,
     hasAnyLatest,
     fetchLatest,
     fetchByJudge,
+    fetchById,
     submit,
     reviewsForJudge,
     isLoadingJudge,

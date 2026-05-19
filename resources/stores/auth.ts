@@ -220,6 +220,12 @@ defineStore('auth', () => {
     notifications.set(notifications().filter(n => n.id !== id))
   }
 
+  function setUser(next: UserProfile | null): void {
+    user.set(next)
+    if (next)
+      setUserCookie(next)
+  }
+
   return {
     user,
     token,
@@ -230,6 +236,7 @@ defineStore('auth', () => {
     signUp,
     logout,
     getUser,
+    setUser,
     authFetch,
     setNotifications,
     markAllRead,

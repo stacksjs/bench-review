@@ -47,7 +47,7 @@
       <div class="flex items-center space-x-4">
         <button
           type="button"
-          @click="toggleLike"
+          @click="toggleLike()"
           class="inline-flex items-center text-sm duration-150 ease-in-out transition"
           x-class="isLiked() ? 'text-blue-600' : 'text-gray-500 hover:text-gray-600'"
         >

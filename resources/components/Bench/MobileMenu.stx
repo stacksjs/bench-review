@@ -24,7 +24,7 @@
       <div class="-my-6 divide-gray-500/10 divide-y">
         <div class="py-6 space-y-2">
           <form
-            @submit.prevent="submitMobileSearch"
+            @submit.prevent="submitMobileSearch()"
             class="-mx-3 mb-4 px-3"
           >
             <div class="relative">
@@ -44,7 +44,6 @@
           <StxLink to="/court-houses" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Court Houses</StxLink>
           <StxLink to="/review" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Write a Review</StxLink>
           <StxLink to="/reviews" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Reviews</StxLink>
-          <StxLink to="/blog" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Blog</StxLink>
           <div :if="isAuthenticated">
             <StxLink to="/notifications" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Notifications</StxLink>
             <StxLink to="/profile" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Profile</StxLink>
