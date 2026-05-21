@@ -57,7 +57,81 @@ function clearAuthCookies(): void {
 function readCookie(name: string): string {
   if (typeof document === 'undefined') return ''
   const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`))
-  return match ? decodeURIComponent(match[1]) : ''
+  return match && match[1] !== undefined ? decodeURIComponent(match[1]) : ''
+}
+
+// Endpoints where a 401 means "wrong credentials," not "session
+// expired" — we must NOT bounce the user, otherwise the inline form-
+// error UX gets short-circuited by a redirect to /login itself.
+const AUTH_EXEMPT_PATHS = [
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/forgot-password',
+  '/api/auth/reset-password',
+]
+
+// One-shot guard so a burst of parallel 401s after a long idle
+// (home page kicks off four fetches at once) only triggers ONE
+// cleanup + navigation, not four.
+let signingOut = false
+
+function signOutAndRedirect(): void {
+  if (signingOut) return
+  signingOut = true
+  clearAuthCookies()
+  if (typeof document !== 'undefined')
+    document.dispatchEvent(new CustomEvent('auth:expired', { bubbles: true }))
+  if (typeof window !== 'undefined') {
+    const target = '/login?expired=1'
+    if (typeof (globalThis as any).navigate === 'function')
+      (globalThis as any).navigate(target, true)
+    else
+      window.location.assign(target)
+  }
+}
+
+function isAuthExempt(url: string): boolean {
+  return AUTH_EXEMPT_PATHS.some(p => url.endsWith(p) || url.includes(`${p}?`))
+}
+
+/**
+ * Centralised fetch for authenticated /api/* calls.
+ *
+ * Reads the auth-token cookie, attaches the Bearer header, and on a
+ * 401 from a request that carried a token (the server rejected the
+ * session) clears local auth state and bounces to /login. Lives in
+ * the auth store module so it ships in the same bundle as the store
+ * — the stx store compiler doesn't follow cross-directory value
+ * imports cleanly, and the previous attempt at extracting this into
+ * `resources/lib/` blew up with `apiFetch is not defined` at scope-
+ * setup time.
+ *
+ * Stores reach this lazily via `useStore('auth').authFetch(...)` so
+ * the cross-store dependency is resolved at call time, never at
+ * module-load.
+ */
+async function _apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = readCookie(AUTH_COOKIE)
+  const carriedToken = !!token
+
+  if (token) {
+    const headers = new Headers(options.headers)
+    if (!headers.has('Authorization'))
+      headers.set('Authorization', `Bearer ${token}`)
+    if (!headers.has('Accept'))
+      headers.set('Accept', 'application/json')
+    options.headers = headers
+  }
+
+  const res = await fetch(url, options)
+
+  // Only treat 401 as "session expired" when we actually sent a
+  // token. A 401 on an anonymous request is just "you need to log
+  // in" — that's not a logout trigger.
+  if (res.status === 401 && carriedToken && !isAuthExempt(url))
+    signOutAndRedirect()
+
+  return res
 }
 
 defineStore('auth', () => {
@@ -89,6 +163,17 @@ defineStore('auth', () => {
     catch {
       // Private-mode browsers or corrupted JSON — drop silently.
     }
+
+    // Drop in-memory state the moment apiFetch detects an expired or
+    // invalidated token. apiFetch already clears the cookies + bounces
+    // to /login; this listener keeps the signals in lock-step so any
+    // component still bound to `user`/`token` doesn't render a stale
+    // session while the navigation is in flight.
+    document.addEventListener('auth:expired', () => {
+      user.set(null)
+      token.set('')
+      notifications.set([])
+    })
   }
 
   // Internal: stash credentials in state + cookies. Both signIn/signUp
@@ -187,26 +272,10 @@ defineStore('auth', () => {
     catch { return null }
   }
 
-  // Attach the bearer token to fetches that hit our API. 401s clear the
-  // session and bounce the user back to /login automatically so a
-  // long-idle tab doesn't sit on a stale page rendering "Welcome back".
-  async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
-    const t = token() || readCookie(AUTH_COOKIE)
-    if (t) {
-      const headers = new Headers(options.headers)
-      if (!headers.has('Authorization'))
-        headers.set('Authorization', `Bearer ${t}`)
-      options.headers = headers
-    }
-    const res = await fetch(url, options)
-    if (res.status === 401 && !url.endsWith('/api/auth/login')) {
-      user.set(null)
-      token.set('')
-      clearAuthCookies()
-      navigate('/login', true)
-    }
-    return res
-  }
+  // Public handle for other stores. They reach this via
+  // `useStore('auth').authFetch(...)` inside their async methods so
+  // the cross-store reference resolves lazily, not at module load.
+  const authFetch = _apiFetch
 
   function setNotifications(notifs: NotificationItem[]): void {
     notifications.set(notifs)

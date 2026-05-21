@@ -18,6 +18,16 @@
   const rememberMe = state<boolean>(false)
   const loading = state<boolean>(false)
   const submitError = state<string>('')
+  // Set when apiFetch bounces here after a 401 (token expired or
+  // invalidated). Read once from the URL so a refresh doesn't keep
+  // the banner glued in place. NOTE: must use `window.location` not
+  // bare `location` — stx scopes can auto-merge a `location` signal
+  // from the search store, which would mask the browser global and
+  // throw on `.search`, taking the rest of the <script client> body
+  // (including `submitError`) down with it.
+  const sessionExpired = state<boolean>(
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('expired'),
+  )
 
   async function submitLogin(): Promise<void> {
     loading.set(true)
@@ -36,6 +46,15 @@
   <div class="mt-10 sm:mx-auto sm:max-w-[480px] sm:w-full">
     <div class="px-6 py-12 sm:px-12 bg-white sm:rounded-lg shadow">
       <h1 class="mb-6 font-bold text-2xl text-gray-900 text-center">Welcome back</h1>
+
+      <div
+        role="status"
+        aria-live="polite"
+        class="mb-6 px-4 py-3 text-amber-800 text-sm bg-amber-50 border border-amber-200 rounded-md"
+        x-class="sessionExpired() ? '' : 'hidden'"
+      >
+        Your session expired. Please sign in again.
+      </div>
 
       <form @submit.prevent="submitLogin()" class="space-y-6">
         <div>
@@ -85,13 +104,13 @@
           </div>
         </div>
 
-        <p
-          :if="submitError()"
+        <div
           role="alert"
           aria-live="polite"
-          class="text-red-600 text-sm"
+          class="px-4 py-3 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
+          x-class="submitError() ? '' : 'hidden'"
           :text="submitError()"
-        ></p>
+        ></div>
 
         <button
           type="submit"

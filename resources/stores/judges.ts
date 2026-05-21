@@ -60,7 +60,7 @@ defineStore('judges', () => {
   async function fetchJudges(): Promise<void> {
     loading.set(true)
     try {
-      const res = await fetch('/api/judges')
+      const res = await useStore('auth').authFetch('/api/judges')
       if (res.ok) {
         const data = await res.json() as Judge[]
         judges.set(data)
@@ -77,7 +77,7 @@ defineStore('judges', () => {
   async function fetchCourtHouses(): Promise<void> {
     loading.set(true)
     try {
-      const res = await fetch('/api/court-houses')
+      const res = await useStore('auth').authFetch('/api/court-houses')
       if (res.ok) {
         const data = await res.json() as CourtHouse[]
         courtHouses.set(data)
@@ -130,7 +130,7 @@ defineStore('judges', () => {
 
       searchLoading.set(true)
       try {
-        const res = await fetch(`/api/judges/search?q=${encodeURIComponent(trimmed)}`, {
+        const res = await useStore('auth').authFetch(`/api/judges/search?q=${encodeURIComponent(trimmed)}`, {
           signal: controller.signal,
         })
         if (!res.ok) return

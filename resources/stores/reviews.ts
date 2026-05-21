@@ -1,4 +1,4 @@
-import { defineStore, derived, state } from '@stacksjs/stx'
+import { defineStore, derived, state, useStore } from '@stacksjs/stx'
 
 export interface JudgeReviewRow {
   id: number
@@ -65,7 +65,7 @@ defineStore('reviews', () => {
   async function fetchLatest(limit = 6): Promise<void> {
     loadingLatest.set(true)
     try {
-      const res = await fetch(`/api/reviews?limit=${limit}`)
+      const res = await useStore('auth').authFetch(`/api/reviews?limit=${limit}`)
       if (!res.ok) return
       const data = await res.json() as JudgeReviewRow[]
       latest.set(Array.isArray(data) ? data : [])
@@ -85,7 +85,7 @@ defineStore('reviews', () => {
     currentNotFound.set(false)
     loadingCurrent.set(true)
     try {
-      const res = await fetch(`/api/reviews/${id}`)
+      const res = await useStore('auth').authFetch(`/api/reviews/${id}`)
       if (res.status === 404) {
         currentNotFound.set(true)
         return
@@ -108,7 +108,7 @@ defineStore('reviews', () => {
     // parallel without flickering each other's spinners.
     loadingByJudge.set({ ...loadingByJudge(), [judgeId]: true })
     try {
-      const res = await fetch(`/api/judges/${judgeId}/reviews`)
+      const res = await useStore('auth').authFetch(`/api/judges/${judgeId}/reviews`)
       if (!res.ok) return
       const data = await res.json() as JudgeReviewRow[]
       byJudge.set({ ...byJudge(), [judgeId]: Array.isArray(data) ? data : [] })
@@ -126,26 +126,9 @@ defineStore('reviews', () => {
   async function submit(payload: SubmitReviewPayload): Promise<SubmitResult> {
     submitting.set(true)
     try {
-      // The API server validates `Authorization: Bearer …` not the
-      // cookie — they're two separate auth surfaces. The cookie keeps
-      // the stx-serve front-end auth gate happy; the header proves the
-      // session to bun-router. Read straight from `document.cookie`
-      // rather than the auth store to avoid the cross-store import.
-      const cookieMatch = typeof document !== 'undefined'
-        ? document.cookie.match(/(?:^|; )auth-token=([^;]*)/)
-        : null
-      const token = cookieMatch ? decodeURIComponent(cookieMatch[1]) : ''
-
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      }
-      if (token)
-        headers.Authorization = `Bearer ${token}`
-
-      const res = await fetch('/api/reviews', {
+      const res = await useStore('auth').authFetch('/api/reviews', {
         method: 'POST',
-        headers,
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
       const data = await res.json().catch(() => ({})) as { ok?: boolean, error?: string, errors?: Record<string, string>, review?: JudgeReviewRow }

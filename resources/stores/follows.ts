@@ -1,4 +1,4 @@
-import { defineStore, derived, state } from '@stacksjs/stx'
+import { defineStore, derived, state, useStore } from '@stacksjs/stx'
 
 /**
  * Follows store — tracks which judges the current user follows.
@@ -16,24 +16,10 @@ defineStore('follows', () => {
   // and avoid double-fire while a request is pending.
   const pending = state<Record<number, boolean>>({})
 
-  function authHeaders(): Record<string, string> {
-    const cookieMatch = typeof document !== 'undefined'
-      ? document.cookie.match(/(?:^|; )auth-token=([^;]*)/)
-      : null
-    const token = cookieMatch ? decodeURIComponent(cookieMatch[1]) : ''
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    }
-    if (token)
-      headers.Authorization = `Bearer ${token}`
-    return headers
-  }
-
   async function fetchFollows(): Promise<void> {
     loading.set(true)
     try {
-      const res = await fetch('/api/me/follows', { headers: authHeaders() })
+      const res = await useStore('auth').authFetch('/api/me/follows')
       if (!res.ok) {
         followedIds.set([])
         return
@@ -75,9 +61,9 @@ defineStore('follows', () => {
     // Optimistic — flip the UI immediately, roll back on failure.
     followedIds.set([...followedIds(), id])
     try {
-      const res = await fetch(`/api/judges/${id}/follow`, {
+      const res = await useStore('auth').authFetch(`/api/judges/${id}/follow`, {
         method: 'POST',
-        headers: authHeaders(),
+        headers: { 'Content-Type': 'application/json' },
       })
       if (!res.ok) {
         followedIds.set(followedIds().filter(x => x !== id))
@@ -103,9 +89,9 @@ defineStore('follows', () => {
     const before = followedIds()
     followedIds.set(before.filter(x => x !== id))
     try {
-      const res = await fetch(`/api/judges/${id}/follow`, {
+      const res = await useStore('auth').authFetch(`/api/judges/${id}/follow`, {
         method: 'DELETE',
-        headers: authHeaders(),
+        headers: { 'Content-Type': 'application/json' },
       })
       if (!res.ok) {
         followedIds.set(before)

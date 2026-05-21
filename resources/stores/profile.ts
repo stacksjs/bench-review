@@ -1,4 +1,4 @@
-import { defineStore, derived, state } from '@stacksjs/stx'
+import { defineStore, derived, state, useStore } from '@stacksjs/stx'
 
 export interface ProfileReviewRow {
   id: number
@@ -35,19 +35,7 @@ defineStore('profile', () => {
   async function fetchMyReviews(): Promise<void> {
     loading.set(true)
     try {
-      // Same auth-token plumbing as reviews.submit — the API expects a
-      // Bearer header, not just the cookie. Read from document.cookie
-      // directly so this store doesn't have to import the auth store
-      // (avoids a circular reference at scope-setup time).
-      const cookieMatch = typeof document !== 'undefined'
-        ? document.cookie.match(/(?:^|; )auth-token=([^;]*)/)
-        : null
-      const token = cookieMatch ? decodeURIComponent(cookieMatch[1]) : ''
-      const headers: Record<string, string> = { Accept: 'application/json' }
-      if (token)
-        headers.Authorization = `Bearer ${token}`
-
-      const res = await fetch('/api/me/reviews', { headers })
+      const res = await useStore('auth').authFetch('/api/me/reviews')
       if (!res.ok) {
         myReviews.set([])
         return
