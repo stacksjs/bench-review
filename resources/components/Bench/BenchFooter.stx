@@ -4,7 +4,7 @@
     <div class="grid gap-10 grid-cols-2 md:grid-cols-5">
       <div class="col-span-2">
         <StxLink to="/" class="flex gap-2 items-center">
-          <img src="/images/bench/logo.png" alt="Bench Review" class="h-12">
+          <StxImage src="/images/bench/logo.png" alt="Bench Review" class="h-12" />
         </StxLink>
         <p class="mt-4 max-w-xs leading-6 text-gray-600 text-sm">
           Like Glassdoor for the judiciary. Reviews from clerks, attorneys, and court staff to bring transparency to the bench.
@@ -44,7 +44,7 @@
     <!-- Bottom bar -->
     <div class="flex flex-col gap-6 items-center justify-between md:flex-row mt-12 pt-8 border-gray-200 border-t">
       <div class="flex gap-4 items-center">
-        <img src="/images/bench/uscourts.webp" alt="US Courts Logo" class="h-10 opacity-50" />
+        <StxImage src="/images/bench/uscourts.webp" alt="US Courts Logo" class="h-10 opacity-50" />
         <p class="text-gray-600 text-sm/6">&copy; 2026 Bench Review. All rights reserved. Built with <a href="https://github.com/stacksjs/stacks" class="hover:text-gray-800">Stacks</a>.</p>
       </div>
 

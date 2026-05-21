@@ -6,9 +6,9 @@
         Get unlimited access to detailed judge reviews, ratings, and insights from legal professionals—plus powerful search and filtering to find exactly what you are looking for.
       </p>
       <div class="flex gap-x-6 items-center justify-center mt-10">
-        <a href="/register" class="px-3.5 py-2.5 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm">
+        <StxLink to="/register" class="px-3.5 py-2.5 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm">
           Subscribe
-        </a>
+        </StxLink>
       </div>
     </div>
   </div>

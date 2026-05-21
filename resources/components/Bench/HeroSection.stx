@@ -30,8 +30,8 @@
           <div class="flex justify-center mt-14 sm:-mt-44 lg:mt-0">
             <div class="max-w-2xl w-full">
               <div class="relative">
-                <img src="/images/bench/hero-image.webp" alt="Bench Hero"
-                  class="object-cover w-full rounded-lg">
+                <StxImage src="/images/bench/hero-image.webp" alt="Bench Hero" sizes="sm:100vw md:100vw lg:50vw"
+                  class="object-cover w-full rounded-lg" />
               </div>
             </div>
           </div>
