@@ -13,8 +13,9 @@ import { schema } from '@stacksjs/validation'
  * following".
  *
  * Declarative `validations` covers the path-param `id` (merged into
- * the framework's `input` along with query + body) — the handler only
- * checks auth and judge existence.
+ * the framework's `input` along with query + body) — path-param
+ * strings are now auto-coerced to numbers when the rule expects one,
+ * see stacks-router.ts:getRequestInput + stacksjs/stacks#1865.
  */
 export default new Action({
   name: 'Follow Judge',

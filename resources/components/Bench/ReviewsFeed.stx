@@ -69,15 +69,26 @@
   }
 
   // Single derived owns the view-model: filter out judge-less rows
-  // (legacy factory seeds) and join each row with its judge by id so
-  // `Bench/Feed` gets the nested shape it expects.
+  // (legacy factory seeds), filter by the active practice-area
+  // category (from the judges store, set by CategoriesList in the
+  // left sidebar), and join each row with its judge by id so the
+  // card markup gets the nested shape it expects.
   const reviews = derived(() => {
     const byId: Record<number, any> = {}
     for (const j of judgesStore.judges())
       byId[j.id] = j
 
+    const category = judgesStore.activeCategory()
+
     return reviewsStore.latest()
       .filter((r: JudgeReviewRow) => r.judge_id != null)
+      .filter((r: JudgeReviewRow) => {
+        // No filter applied → keep everything. Otherwise only keep
+        // reviews whose judge belongs to the selected practice area.
+        if (!category) return true
+        const j = byId[r.judge_id as number]
+        return j && (j as any).practice_area === category
+      })
       .map((r: JudgeReviewRow) => {
         const j = byId[r.judge_id as number]
         return {
@@ -117,7 +128,13 @@
   <div :if="reviewsStore.loadingLatest && reviews.length === 0" class="py-12 text-center text-gray-500 text-sm">
     Loading reviews…
   </div>
-  <div :if="!reviewsStore.loadingLatest && reviews.length === 0" class="py-12 text-center text-gray-500 text-sm">
+  <!-- Two empty states: filter-narrowed vs genuinely empty. The
+       judgesStore.activeCategory signal drives the distinction so the
+       message matches what the user just clicked. -->
+  <div :if="!reviewsStore.loadingLatest && reviews.length === 0 && judgesStore.activeCategory()" class="py-12 text-center text-gray-500 text-sm">
+    No reviews in this category yet.
+  </div>
+  <div :if="!reviewsStore.loadingLatest && reviews.length === 0 && !judgesStore.activeCategory()" class="py-12 text-center text-gray-500 text-sm">
     No reviews yet. Be the first to write one.
   </div>
   <div :if="reviews.length > 0" class="space-y-6">

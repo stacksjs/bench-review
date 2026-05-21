@@ -43,13 +43,18 @@
     return ORDER.map(({ key, label }) => ({ key, label, count: counts[key] || 0 }))
   })
 
-  const activeCategory = state<string>('')
-
+  // Active category + toggle action live on the judges store so a
+  // sibling component (ReviewsFeed) can subscribe via signal rather
+  // than chase a DOM event across scopes. We mirror it to a local
+  // derived so the existing `x-class="activeCategory === category.key"`
+  // (bare, no parens) markup pattern keeps working — see
+  // feedback_stx_xclass_no_signal_calls_with_for_var: call-syntax on a
+  // signal inside a :for x-class falls into a stx fallback path that
+  // leaves the loop var as a signal function and always evaluates the
+  // same branch. The store handles the "click-active-to-clear" toggle.
+  const activeCategory = derived<string>(() => judgesStore.activeCategory())
   function setActiveCategory(categoryKey: string): void {
-    // Toggle off if clicking the active category — lets users clear
-    // the filter without an explicit "All" button.
-    activeCategory.set(activeCategory() === categoryKey ? '' : categoryKey)
-    document.dispatchEvent(new CustomEvent('category-changed', { detail: activeCategory(), bubbles: true }))
+    judgesStore.setActiveCategory(categoryKey)
   }
 </script>
 

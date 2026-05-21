@@ -6,6 +6,9 @@ import { schema } from '@stacksjs/validation'
 /**
  * DELETE /api/judges/{id}/follow — current user stops following the
  * given judge. Idempotent: deleting a row that doesn't exist is a no-op.
+ *
+ * Declarative `validations` covers the path-param `id` (auto-coerced
+ * from string by the framework, see stacksjs/stacks#1865).
  */
 export default new Action({
   name: 'Unfollow Judge',

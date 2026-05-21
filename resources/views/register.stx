@@ -13,7 +13,7 @@
   const name = state<string>('')
   const email = state<string>('')
   const password = state<string>('')
-  const passwordConfirmation = state<string>('')
+  const confirmPwd = state<string>('')
   const loading = state<boolean>(false)
   const submitError = state<string>('')
 
@@ -24,7 +24,7 @@
     // Quick client-side check before round-tripping. The server enforces
     // the full rule (min length, uppercase, lowercase, numbers) — these
     // two checks just save users a network trip on obvious typos.
-    if (password() !== passwordConfirmation()) {
+    if (password() !== confirmPwd()) {
       submitError.set('Passwords do not match.')
       loading.set(false)
       return
@@ -39,7 +39,7 @@
       name: name(),
       email: email(),
       password: password(),
-      password_confirmation: passwordConfirmation(),
+      password_confirmation: confirmPwd(),
     })
     loading.set(false)
     if (!result.ok) {
@@ -109,13 +109,14 @@
           <label for="password_confirmation" class="block font-medium text-gray-900 text-sm/6">Confirm password</label>
           <div class="mt-2">
             <input
-              x-model="passwordConfirmation"
               type="password"
+              x-model="confirmPwd"
               name="password_confirmation"
               id="password_confirmation"
-              autocomplete="new-password"
+              autocomplete="off"
               required
               x-disabled="loading"
+              style="-webkit-text-security: disc; text-security: disc;"
               class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border border-gray-400 rounded-md focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-600 disabled:opacity-50 shadow-sm"
             >
           </div>

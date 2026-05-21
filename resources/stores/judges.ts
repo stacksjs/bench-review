@@ -14,6 +14,18 @@ defineStore('judges', () => {
   const searchLoading = state<boolean>(false)
   const searchQuery = state<string>('')
 
+  // Active practice-area category filter ('' = show all). Lifted from
+  // CategoriesList's local state so ReviewsFeed (a sibling component
+  // mounted in the same view) can react to changes via signal subscription
+  // rather than the cross-scope DOM event bus.
+  const activeCategory = state<string>('')
+
+  function setActiveCategory(categoryKey: string): void {
+    // Toggle off when the user clicks the active category — lets them
+    // clear the filter without an explicit "All" button.
+    activeCategory.set(activeCategory() === categoryKey ? '' : categoryKey)
+  }
+
   // Mutable scratch so the debounce + abort-on-stale logic can survive
   // re-renders without leaking React-style refs everywhere.
   let searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -161,6 +173,8 @@ defineStore('judges', () => {
     searchResults,
     searchLoading,
     searchQuery,
+    activeCategory,
+    setActiveCategory,
     setJudges,
     setCourtHouses,
     filteredJudges,
