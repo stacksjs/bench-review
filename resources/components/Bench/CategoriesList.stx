@@ -1,33 +1,69 @@
 <script client>
-  import type { Category } from '~/resources/types'
-  import { categories as allCategories } from '~/resources/functions/sample'
+  import type { Judge, PracticeArea } from '~/resources/types'
 
-  const categories = derived<Category[]>(() => allCategories)
-  const activeCategory = state<string>(allCategories.find(cat => cat.current)?.name || '')
+  // Practice-area presentation order. We always render this list in
+  // this order regardless of count so the sidebar reads consistently
+  // across visits — sorting by count would move Criminal/Civil/etc.
+  // around as data churns and make the panel feel unstable.
+  const ORDER: { key: PracticeArea, label: string }[] = [
+    { key: 'criminal', label: 'Criminal' },
+    { key: 'civil', label: 'Civil' },
+    { key: 'family', label: 'Family' },
+    { key: 'probate', label: 'Probate' },
+    { key: 'appellate', label: 'Appellate' },
+    { key: 'bankruptcy', label: 'Bankruptcy' },
+    { key: 'other', label: 'Other' },
+  ]
 
-  function setActiveCategory(categoryName: string): void {
-    activeCategory.set(categoryName)
-    document.dispatchEvent(new CustomEvent('category-changed', { detail: categoryName, bubbles: true }))
+  const judgesStore = useStore('judges')
+
+  // Fetch on hydration if the store is empty. judgesStore.fetchJudges
+  // is a no-op if a request is already in flight.
+  let hasFetched = false
+  function fetchOnce(): void {
+    if (hasFetched) return
+    hasFetched = true
+    if (judgesStore.judges().length === 0)
+      judgesStore.fetchJudges()
+  }
+  fetchOnce()
+  onMount(() => fetchOnce())
+
+  // Counts per practice area, derived from the live judges list.
+  // Tiles with count=0 are kept (rather than filtered out) so the
+  // sidebar reads as a complete set of categories — "0 Bankruptcy"
+  // is more useful than the category quietly disappearing.
+  const categories = derived(() => {
+    const counts: Record<string, number> = Object.create(null)
+    for (const j of judgesStore.judges()) {
+      const area = (j as Judge).practice_area
+      if (!area) continue
+      counts[area] = (counts[area] || 0) + 1
+    }
+    return ORDER.map(({ key, label }) => ({ key, label, count: counts[key] || 0 }))
+  })
+
+  const activeCategory = state<string>('')
+
+  function setActiveCategory(categoryKey: string): void {
+    // Toggle off if clicking the active category — lets users clear
+    // the filter without an explicit "All" button.
+    activeCategory.set(activeCategory() === categoryKey ? '' : categoryKey)
+    document.dispatchEvent(new CustomEvent('category-changed', { detail: activeCategory(), bubbles: true }))
   }
 </script>
-<div
-  class="top-4 p-4 bg-off-gray border rounded-md"
->
+
+<div class="top-4 p-4 bg-off-gray border rounded-md">
   <h2 class="font-semibold text-base text-gray-900">Explore Categories</h2>
   <nav class="mt-4 space-y-1">
     <a
       :for="category in categories"
-      @click.prevent="setActiveCategory(category.name)"
+      @click.prevent="setActiveCategory(category.key)"
       href="#"
       class="flex items-center px-3 py-2 font-medium text-sm rounded-md group"
-      x-class="activeCategory() === category.name ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
+      x-class="activeCategory === category.key ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
     >
-      <span
-        class="flex-shrink-0 mr-3 h-5 w-5"
-        x-class="activeCategory() === category.name ? 'text-gray-500' : 'text-gray-400 group-hover:text-gray-500'"
-        aria-hidden="true"
-      ></span>
-      <span :text="category.name"></span>
+      <span :text="category.label"></span>
       <span class="inline-block ml-auto px-2 py-0.5 font-medium text-gray-600 text-xs bg-gray-100 rounded-full" :text="category.count"></span>
     </a>
   </nav>

@@ -19,7 +19,7 @@ export default new Action({
     const authUser = await Auth.user()
     const userId = (authUser as any)?.id
     if (!userId)
-      return response.json({ error: 'Not authenticated' }, { status: 401 })
+      return response.json({ error: 'Not authenticated' }, 401)
 
     const rows = await db.selectFrom('judge_follows' as any)
       .select(['judge_id'] as any)

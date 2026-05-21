@@ -30,7 +30,7 @@ export default new Action({
     const authUser = await Auth.user()
     const userId = (authUser as any)?.id
     if (!userId)
-      return response.json({ error: 'Not authenticated' }, { status: 401 })
+      return response.json({ error: 'Not authenticated' }, 401)
 
     // Route params come through `(request as any).params` in this
     // framework — mirrors ShowReviewAction / ReviewsByJudgeAction. The
@@ -40,7 +40,7 @@ export default new Action({
 
     const judge = await Judge.find(judgeId)
     if (!judge)
-      return response.json({ error: 'Judge not found' }, { status: 404 })
+      return response.json({ error: 'Judge not found' }, 404)
 
     try {
       await db.insertInto('judge_follows' as any).values({

@@ -21,7 +21,7 @@ export default new Action({
     const authUser = await Auth.user()
     const userId = (authUser as any)?.id
     if (!userId)
-      return response.json({ error: 'Not authenticated' }, { status: 401 })
+      return response.json({ error: 'Not authenticated' }, 401)
 
     const judgeId = Number((request as any).params?.id)
 

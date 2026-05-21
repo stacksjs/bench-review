@@ -23,7 +23,7 @@ export default new Action({
     const raw = String((request as any).params?.id || '')
     const judgeId = Number(raw)
     if (!Number.isFinite(judgeId) || judgeId <= 0)
-      return response.json({ error: 'Invalid judge id' }, { status: 400 })
+      return response.json({ error: 'Invalid judge id' }, 400)
 
     const rows = await JudgeReview.where('judge_id', judgeId)
       .where('status', 'published')

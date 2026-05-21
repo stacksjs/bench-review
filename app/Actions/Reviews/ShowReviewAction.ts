@@ -21,13 +21,13 @@ export default new Action({
     const raw = String((request as any).params?.id || '')
     const id = Number(raw)
     if (!Number.isFinite(id) || id <= 0)
-      return response.json({ error: 'Invalid review id' }, { status: 400 })
+      return response.json({ error: 'Invalid review id' }, 400)
 
     const review = await JudgeReview.where('id', id)
       .where('status', 'published')
       .first()
     if (!review)
-      return response.json({ error: 'Not Found' }, { status: 404 })
+      return response.json({ error: 'Not Found' }, 404)
 
     const row = (review as any).toJSON ? (review as any).toJSON() : review
 

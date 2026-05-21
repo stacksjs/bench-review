@@ -338,22 +338,13 @@
       }))
     }
 
-    // Native `input` event on a contenteditable fires for every
-    // keystroke / paste / drop / IME composition end. It's the
-    // reliable bottom-floor event — bind directly here instead of
-    // (only) going through MediumEditor's `editableInput` pubsub.
+    // Native `input` on a contenteditable fires for every keystroke /
+    // paste / drop / IME composition end. `blur` catches paste-and-
+    // click-away. Together they cover every input path without going
+    // through MediumEditor's `editor.subscribe('editableInput', ...)`
+    // pubsub — which was tried and silently no-op'd on this build.
     editable.addEventListener('input', emitChange)
-    // `blur` covers the case where the user pastes/drops and clicks
-    // away without an intermediate keystroke (rare but real).
     editable.addEventListener('blur', emitChange)
-
-    // Keep the MediumEditor subscription as a belt-and-suspenders
-    // path — if it ever DOES fire, the duplicate dispatch is
-    // idempotent (reviewContent.set with the same value is a no-op).
-    try {
-      editor.subscribe('editableInput', emitChange)
-    }
-    catch {}
 
     // If we restored a draft, fire one onChange so any derived UI
     // (character count, validation, enable-submit) starts in the

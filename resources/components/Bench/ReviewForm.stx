@@ -19,7 +19,6 @@
   const hoverKnowledge = state<StarRating>(0)
   const demeanor = state<StarRating>(0)
   const hoverDemeanor = state<StarRating>(0)
-  const isAnonymous = state<boolean>(false)
   const judge = state<SelectedJudge | null>(null)
 
   const stars: StarRating[] = [1, 2, 3, 4, 5]
@@ -301,104 +300,15 @@
     </div>
   </div>
 
-  <!-- Step 4: Case context — optional metadata that helps readers
-       weigh the review. Wrapped in its own card so the form reads as
-       distinct steps rather than one long scroll. -->
-  <div :if="judge && !submitted" class="p-6 sm:p-8 bg-white border border-gray-200 rounded-2xl shadow-sm mt-2">
-    <h2 class="font-semibold text-base text-gray-900">Case context</h2>
-    <p class="mt-1 text-gray-500 text-sm">Optional — adds credibility to your review.</p>
-
-    <div class="grid gap-x-6 gap-y-6 grid-cols-1 sm:grid-cols-2 mt-6">
-      <div>
-        <label for="case-number" class="block font-medium text-gray-900 text-sm">Case Number (Optional)</label>
-        <div class="mt-2">
-          <input
-            type="text"
-            name="case-number"
-            id="case-number"
-            x-disabled="!judge"
-            class="block px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-          >
-        </div>
-      </div>
-
-      <div>
-        <label for="case-date" class="block font-medium text-gray-900 text-sm">Case Date (Optional)</label>
-        <div class="mt-2">
-          <input
-            type="date"
-            name="case-date"
-            id="case-date"
-            x-disabled="!judge"
-            class="block px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-          >
-        </div>
-      </div>
-
-      <div class="sm:col-span-2">
-        <label for="role" class="block font-medium text-gray-900 text-sm">Your Role in the Case</label>
-        <div class="mt-2">
-          <select
-            id="role"
-            name="role"
-            x-disabled="!judge"
-            class="block px-3 py-2 w-full text-gray-900 text-sm bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-          >
-            <option>Attorney</option>
-            <option>Party to the Case</option>
-            <option>Court Staff</option>
-            <option>Observer</option>
-            <option>Other</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="sm:col-span-2 pt-4 border-t border-gray-100">
-        <div class="flex relative items-start">
-          <div class="flex items-center h-6">
-            <button
-              type="button"
-              x-disabled="!judge"
-              @click="isAnonymous.set(!isAnonymous())"
-              class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              x-class="[isAnonymous() ? 'bg-gray-900' : 'bg-gray-200']"
-            >
-              <span
-                class="pointer-events-none relative inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transform transition duration-200 ease-in-out"
-                x-class="[isAnonymous() ? 'translate-x-5' : 'translate-x-0']"
-              >
-                <span
-                  class="absolute inset-0 flex h-full w-full items-center justify-center transition-opacity"
-                  x-class="[isAnonymous() ? 'opacity-0 duration-100 ease-out' : 'opacity-100 duration-200 ease-in']"
-                  aria-hidden="true"
-                >
-                  <svg class="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 12 12">
-                    <path d="M4 8l2-2m0 0l2-2M6 6L4 4m2 2l2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                  </svg>
-                </span>
-                <span
-                  class="absolute inset-0 flex h-full w-full items-center justify-center transition-opacity"
-                  x-class="[isAnonymous() ? 'opacity-100 duration-200 ease-in' : 'opacity-0 duration-100 ease-out']"
-                  aria-hidden="true"
-                >
-                  <svg class="h-3 w-3 text-gray-600" fill="currentColor" viewBox="0 0 12 12">
-                    <path d="M3.707 5.293a1 1 0 00-1.414 1.414l1.414-1.414zM5 8l-.707.707a1 1 0 001.414 0L5 8zm4.707-3.293a1 1 0 00-1.414-1.414l1.414 1.414zm-7.414 2l2 2 1.414-1.414-2-2-1.414 1.414zm3.414 2l4-4-1.414-1.414-4 4 1.414 1.414z" />
-                  </svg>
-                </span>
-              </span>
-            </button>
-          </div>
-          <div class="ml-3 leading-6 text-sm">
-            <label for="anonymous" class="font-medium text-gray-900">Post anonymously</label>
-            <p class="text-gray-500">Your name will not be displayed with this review.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Step 5: The actual review — rating + freeform text. Last card so
-       it sits closest to the Submit button. -->
+  <!-- Step 4: The actual review — rating + freeform text. Last card
+       before the action bar.
+       The "Case context" card (case number / case date / your role /
+       post-anonymously toggle) used to live here. It was unwired:
+       SubmitReviewAction only sends judge_id/title/content/rating/type,
+       and the API/DB have no columns for case metadata or anonymity.
+       Dropped rather than mocked so users don't fill in fields that
+       silently disappear. Restore (with API + schema support) if/when
+       we actually do something with case context. -->
   <div :if="judge && !submitted" class="p-6 sm:p-8 bg-white border border-gray-200 rounded-2xl shadow-sm mt-2">
     <h2 class="font-semibold text-base text-gray-900">Your review</h2>
     <p class="mt-1 text-gray-500 text-sm">Overall rating and your written feedback.</p>

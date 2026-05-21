@@ -65,6 +65,23 @@ export default defineModel({
       },
       factory: faker => faker.image.url(),
     },
+
+    // Practice-area category for the /reviews "Explore Categories"
+    // sidebar. Lowercase tokens; UI capitalises for display. NULL is
+    // allowed (unclassified) so this column is non-breaking for any
+    // row inserted before the backfill.
+    practiceArea: {
+      required: false,
+      order: 3,
+      fillable: true,
+      validation: {
+        rule: schema.enum(['criminal', 'civil', 'family', 'probate', 'appellate', 'bankruptcy', 'other']),
+        message: {
+          enum: 'Practice area must be one of criminal, civil, family, probate, appellate, bankruptcy, other.',
+        },
+      },
+      factory: faker => faker.helpers.arrayElement(['criminal', 'civil', 'family', 'probate', 'appellate', 'bankruptcy', 'other']),
+    },
   },
 
   dashboard: {

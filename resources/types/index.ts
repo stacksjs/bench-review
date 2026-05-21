@@ -28,6 +28,8 @@ export interface Court {
   zipCode?: string
 }
 
+export type PracticeArea = 'criminal' | 'civil' | 'family' | 'probate' | 'appellate' | 'bankruptcy' | 'other'
+
 export interface Judge {
   id: number | string
   name: string
@@ -38,6 +40,11 @@ export interface Judge {
   reviewCount: number
   department: string
   photo: string
+  // Practice-area category. `null` for unclassified rows (legacy
+  // factory-seeded judges from before the backfill landed). The
+  // /reviews "Explore Categories" sidebar derives counts off this
+  // and only shows tiles for non-null values.
+  practice_area?: PracticeArea | null
 }
 
 export interface TrendingJudge {

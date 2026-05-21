@@ -79,7 +79,7 @@ export default new Action({
     // avoids writing a review against a stale/deleted judge.
     const judge = await Judge.find(judgeId)
     if (!judge)
-      return response.json({ error: 'Judge not found' }, { status: 404 })
+      return response.json({ error: 'Judge not found' }, 404)
 
     // `auth` middleware sets the authenticated user on the global Auth
     // helper before the action runs (see middleware.ts:35). We pull the
@@ -115,6 +115,6 @@ export default new Action({
       .where('uuid' as any, '=', uuid)
       .executeTakeFirst()
 
-    return response.json({ ok: true, review: inserted }, { status: 201 })
+    return response.json({ ok: true, review: inserted }, 201)
   },
 })

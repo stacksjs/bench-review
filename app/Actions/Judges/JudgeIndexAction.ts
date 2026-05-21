@@ -40,6 +40,10 @@ export default new Action({
         // static `sample.ts` import and consume this without other changes.
         photo: j.image_url,
         location: court ? `${court.city || ''}${court.state ? `, ${court.state}` : ''}`.trim() : '',
+        // Practice-area category for the /reviews "Explore Categories"
+        // sidebar. Null means unclassified; the sidebar shows counts
+        // only for non-null values.
+        practice_area: j.practice_area ?? null,
         // Review aggregates (rating + count) are lazy-loaded by the
         // reviews store — directory cards render an empty state until
         // the user opens a judge profile that calls the byJudge endpoint.
