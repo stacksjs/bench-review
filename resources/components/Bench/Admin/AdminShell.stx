@@ -1,0 +1,95 @@
+<script client>
+  // Admin chrome — header bar, sidebar nav, sign out, and the
+  // unauthenticated/unprivileged redirect guard. Mounted by
+  // `layouts/admin.stx` so every admin page (index/users/reviews) gets
+  // the same shell without each view re-importing it.
+  //
+  // The guard logic here is a UX nicety — the real protection is the
+  // `admin` middleware on every `/api/admin/*` endpoint. If somebody
+  // bypasses the redirect (disables JS, navigates raw HTML), the API
+  // calls still 401/403 and the page renders empty.
+  const adminStore = useStore('admin')
+  const authStore = useStore('auth')
+
+  const adminName = derived<string>(() => adminStore.currentUser()?.name || authStore.user()?.name || 'Admin')
+
+  // Drives the active link styling. Bare `window.location` (not
+  // `location`) per the bare-globals shadowing memory.
+  const currentPath = state<string>(
+    typeof window !== 'undefined' ? window.location.pathname : '/admin',
+  )
+
+  function isActive(path: string): boolean {
+    const cur = currentPath()
+    if (path === '/admin') return cur === '/admin' || cur === '/admin/'
+    return cur.startsWith(path)
+  }
+
+  async function handleSignOut(): Promise<void> {
+    await adminStore.signOut()
+  }
+
+  // Hydration check: if we have a token (auth.token) but no admin
+  // profile in memory yet, refresh it. If the user is not actually an
+  // admin, bounce to /admin/login. Runs on top-level mount AND
+  // onMount so both hard-reload and SPA nav are covered (see memory
+  // feedback_onmount_fires_on_both — the redundant call is the
+  // documented belt-and-suspenders pattern).
+  let bootstrapped = false
+  async function bootstrap(): Promise<void> {
+    if (bootstrapped) return
+    bootstrapped = true
+
+    // Not authenticated at all → straight to login.
+    if (!authStore.token()) {
+      if (typeof window !== 'undefined' && window.location.pathname !== '/admin/login')
+        navigate('/admin/login', true)
+      return
+    }
+
+    const ok = await adminStore.fetchMe()
+    if (!ok && typeof window !== 'undefined' && window.location.pathname !== '/admin/login')
+      navigate('/admin/login', true)
+  }
+  bootstrap()
+  onMount(() => { bootstrap() })
+</script>
+
+<header class="bg-white border-b border-gray-200">
+  <div class="mx-auto px-4 max-w-6xl sm:px-6 lg:px-8">
+    <div class="flex justify-between h-16">
+      <div class="flex items-center">
+        <StxLink to="/admin" class="flex gap-x-2 items-center">
+          <span class="font-bold text-gray-900 text-lg">Bench Review</span>
+          <span class="px-2 py-0.5 font-semibold text-gray-700 text-xs tracking-wide uppercase bg-gray-100 rounded">Admin</span>
+        </StxLink>
+        <nav class="hidden sm:flex sm:gap-x-2 ml-10">
+          <StxLink
+            to="/admin"
+            class="inline-flex items-center px-3 py-2 font-medium text-sm rounded-md"
+            x-class="isActive('/admin') && !isActive('/admin/users') && !isActive('/admin/reviews') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'"
+          >Dashboard</StxLink>
+          <StxLink
+            to="/admin/users"
+            class="inline-flex items-center px-3 py-2 font-medium text-sm rounded-md"
+            x-class="isActive('/admin/users') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'"
+          >Users</StxLink>
+          <StxLink
+            to="/admin/reviews"
+            class="inline-flex items-center px-3 py-2 font-medium text-sm rounded-md"
+            x-class="isActive('/admin/reviews') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'"
+          >Reviews</StxLink>
+        </nav>
+      </div>
+      <div class="flex gap-x-4 items-center">
+        <span class="hidden sm:inline text-gray-600 text-sm" :text="adminName"></span>
+        <StxLink to="/" class="text-gray-500 text-sm hover:text-gray-900">View site</StxLink>
+        <button
+          type="button"
+          @click="handleSignOut()"
+          class="font-semibold text-gray-500 text-sm hover:text-red-600 transition-colors"
+        >Sign out</button>
+      </div>
+    </div>
+  </div>
+</header>

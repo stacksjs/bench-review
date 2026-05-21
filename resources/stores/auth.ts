@@ -68,6 +68,11 @@ const AUTH_EXEMPT_PATHS = [
   '/api/auth/register',
   '/api/auth/forgot-password',
   '/api/auth/reset-password',
+  // Admin login is its own credential-verification surface — a 401
+  // here means "wrong creds for an admin account," not "session
+  // expired." Treat it like the normal /auth/login above so the
+  // inline form-error UX isn't short-circuited by a redirect.
+  '/api/admin/auth/login',
 ]
 
 // One-shot guard so a burst of parallel 401s after a long idle
@@ -82,7 +87,14 @@ function signOutAndRedirect(): void {
   if (typeof document !== 'undefined')
     document.dispatchEvent(new CustomEvent('auth:expired', { bubbles: true }))
   if (typeof window !== 'undefined') {
-    const target = '/login?expired=1'
+    // Bounce back to whichever login surface the user came from.
+    // An admin whose session expires mid-action lands at /admin/login;
+    // a regular user lands at /login. Without this branch, an admin
+    // gets dumped on the public login page, signs in there, and is
+    // then redirected to the homepage instead of resuming admin work.
+    const onAdmin = typeof window.location !== 'undefined'
+      && window.location.pathname.startsWith('/admin')
+    const target = onAdmin ? '/admin/login?expired=1' : '/login?expired=1'
     if (typeof (globalThis as any).navigate === 'function')
       (globalThis as any).navigate(target, true)
     else
@@ -307,6 +319,11 @@ defineStore('auth', () => {
     getUser,
     setUser,
     authFetch,
+    // Exposed for the admin store — admin login POSTs to its own
+    // endpoint, then needs to persist the returned token + user via
+    // the same cookie plumbing the public signIn uses. Without this
+    // the admin store would have to duplicate `setAuthCookie` etc.
+    persistAuth,
     setNotifications,
     markAllRead,
     dismissNotification,

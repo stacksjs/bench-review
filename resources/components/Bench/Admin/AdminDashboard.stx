@@ -1,0 +1,58 @@
+<script client>
+  // Admin landing — pulls a small slice of users + reviews to surface
+  // the moderation queue depth and the total counts. The stores are
+  // shared with the Users / Reviews pages so visiting them after the
+  // dashboard reuses the already-fetched data (and vice versa).
+  const adminUsers = useStore('adminUsers')
+  const adminReviews = useStore('adminReviews')
+
+  // Snapshot signal — refresh once per mount via the same dual-call
+  // pattern used elsewhere (hard reload + SPA nav, see
+  // feedback_onmount_fires_on_both).
+  let bootstrapped = false
+  async function fetchSummary(): Promise<void> {
+    if (bootstrapped) return
+    bootstrapped = true
+    // perPage=1 keeps the response cheap — we only need `total` here.
+    adminUsers.perPage.set(1)
+    adminReviews.perPage.set(1)
+    adminReviews.statusFilter.set('pending')
+    await Promise.all([
+      adminUsers.fetchUsers(),
+      adminReviews.fetchReviews(),
+    ])
+  }
+  fetchSummary()
+  onMount(() => { fetchSummary() })
+
+  const pendingCount = derived<number>(() => adminReviews.total())
+  const userCount = derived<number>(() => adminUsers.total())
+</script>
+
+<div class="space-y-6">
+  <div>
+    <h1 class="font-bold text-2xl text-gray-900">Dashboard</h1>
+    <p class="mt-1 text-gray-600 text-sm">Manage users and moderate review submissions.</p>
+  </div>
+
+  <div class="gap-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+    <StxLink to="/admin/reviews" class="block p-6 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
+      <p class="font-medium text-gray-500 text-sm">Pending reviews</p>
+      <p class="mt-2 font-bold text-3xl text-gray-900" :text="pendingCount()"></p>
+      <p class="mt-2 font-semibold text-gray-600 text-sm">Open moderation queue &rarr;</p>
+    </StxLink>
+    <StxLink to="/admin/users" class="block p-6 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
+      <p class="font-medium text-gray-500 text-sm">Total users</p>
+      <p class="mt-2 font-bold text-3xl text-gray-900" :text="userCount()"></p>
+      <p class="mt-2 font-semibold text-gray-600 text-sm">Manage users &rarr;</p>
+    </StxLink>
+    <div class="block p-6 bg-white border border-gray-200 rounded-lg">
+      <p class="font-medium text-gray-500 text-sm">Quick actions</p>
+      <div class="flex flex-col gap-y-1 mt-2">
+        <StxLink to="/admin/reviews?status=pending" class="font-semibold text-gray-900 text-sm hover:underline">Review pending submissions</StxLink>
+        <StxLink to="/admin/users" class="font-semibold text-gray-900 text-sm hover:underline">Promote a user to admin</StxLink>
+        <StxLink to="/" class="font-semibold text-gray-600 text-sm hover:underline">View public site</StxLink>
+      </div>
+    </div>
+  </div>
+</div>

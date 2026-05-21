@@ -2,6 +2,9 @@
 // Source: resources/views/
 
 export const routes = [
+  { pattern: '/admin/login', filePath: 'resources/views/admin/login.stx', isDynamic: false, params: [] },
+  { pattern: '/admin/reviews', filePath: 'resources/views/admin/reviews.stx', isDynamic: false, params: [] },
+  { pattern: '/admin/users', filePath: 'resources/views/admin/users.stx', isDynamic: false, params: [] },
   { pattern: '/blog/categories', filePath: 'storage/framework/defaults/resources/views/blog/categories.stx', isDynamic: false, params: [] },
   { pattern: '/blog/category', filePath: 'storage/framework/defaults/resources/views/blog/category.stx', isDynamic: false, params: [] },
   { pattern: '/blog/post', filePath: 'storage/framework/defaults/resources/views/blog/post.stx', isDynamic: false, params: [] },
@@ -14,6 +17,7 @@ export const routes = [
   { pattern: '/judges/submit', filePath: 'resources/views/judges/submit.stx', isDynamic: false, params: [] },
   { pattern: '/', filePath: 'resources/views/index.stx', isDynamic: false, params: [] },
   { pattern: '/about', filePath: 'resources/views/about.stx', isDynamic: false, params: [] },
+  { pattern: '/admin', filePath: 'resources/views/admin/index.stx', isDynamic: false, params: [] },
   { pattern: '/blog', filePath: 'resources/views/blog/index.stx', isDynamic: false, params: [] },
   { pattern: '/cart', filePath: 'storage/framework/defaults/resources/views/cart.stx', isDynamic: false, params: [] },
   { pattern: '/coming-soon', filePath: 'resources/views/coming-soon.stx', isDynamic: false, params: [] },

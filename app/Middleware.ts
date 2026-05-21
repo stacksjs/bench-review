@@ -27,6 +27,7 @@ export default {
   'env:prod': 'EnvProduction',
   'role': 'Role',
   'permission': 'Permission',
+  'admin': 'Admin',
   'verified': 'EnsureEmailIsVerified',
   'csrf': 'Csrf',
   'compress': 'Compress',

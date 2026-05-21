@@ -1,0 +1,108 @@
+@extends('layouts/default')
+
+@section('title', 'Admin Login - Bench Review')
+
+@section('content')
+<script client>
+  useHead({ title: 'Admin Login - Bench Review' })
+
+  const adminStore = useStore('admin')
+  const email = state<string>('')
+  const password = state<string>('')
+  const loading = state<boolean>(false)
+  const submitError = state<string>('')
+  // Show the "session expired" banner when apiFetch bounced us here.
+  // Bare `location` would resolve to the search store signal in stx
+  // scope and throw on `.search` — use `window.location` defensively
+  // (memory: feedback_stx_bare_globals_shadowed_by_store_signals).
+  const sessionExpired = state<boolean>(
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('expired'),
+  )
+
+  async function submitAdminLogin(): Promise<void> {
+    loading.set(true)
+    submitError.set('')
+    const ok = await adminStore.adminLogin(email(), password())
+    loading.set(false)
+    if (!ok) {
+      submitError.set(adminStore.loginError() || 'Login failed. Please try again.')
+      return
+    }
+    navigate('/admin', true)
+  }
+</script>
+
+<div class="min-h-screen">
+  <div class="mt-10 sm:mx-auto sm:max-w-[480px] sm:w-full">
+    <div class="px-6 py-12 sm:px-12 bg-white sm:rounded-lg shadow">
+      <div class="mb-2 text-center">
+        <span class="inline-block px-2 py-0.5 font-semibold text-gray-700 text-xs tracking-wide uppercase bg-gray-100 rounded">Admin</span>
+      </div>
+      <h1 class="mb-6 font-bold text-2xl text-gray-900 text-center">Sign in to admin</h1>
+
+      <div
+        role="status"
+        aria-live="polite"
+        class="mb-6 px-4 py-3 text-amber-800 text-sm bg-amber-50 border border-amber-200 rounded-md"
+        x-class="sessionExpired() ? '' : 'hidden'"
+      >
+        Your admin session expired. Please sign in again.
+      </div>
+
+      <form @submit.prevent="submitAdminLogin()" class="space-y-6">
+        <div>
+          <label for="admin-email" class="block font-medium text-gray-900 text-sm/6">Email address</label>
+          <div class="mt-2">
+            <input
+              x-model="email"
+              type="email"
+              name="email"
+              id="admin-email"
+              autocomplete="email"
+              required
+              x-disabled="loading"
+              class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border border-gray-400 rounded-md focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-600 disabled:opacity-50 shadow-sm"
+            >
+          </div>
+        </div>
+
+        <div>
+          <label for="admin-password" class="block font-medium text-gray-900 text-sm/6">Password</label>
+          <div class="mt-2">
+            <input
+              x-model="password"
+              type="password"
+              name="password"
+              id="admin-password"
+              autocomplete="current-password"
+              required
+              x-disabled="loading"
+              class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border border-gray-400 rounded-md focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-600 disabled:opacity-50 shadow-sm"
+            >
+          </div>
+        </div>
+
+        <div
+          role="alert"
+          aria-live="polite"
+          class="px-4 py-3 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
+          x-class="submitError() ? '' : 'hidden'"
+          :text="submitError()"
+        ></div>
+
+        <button
+          type="submit"
+          x-disabled="loading"
+          class="flex justify-center px-3 py-1.5 w-full font-semibold text-sm/6 text-white bg-gray-900 hover:bg-gray-800 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-900 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+          :text="loading() ? 'Signing in...' : 'Sign in to admin'"
+        >Sign in to admin</button>
+      </form>
+    </div>
+
+    <p class="mt-10 text-center text-gray-500 text-sm/6">
+      Not an admin?
+      <StxLink to="/login" class="font-semibold text-gray-600 hover:text-gray-500">Public login</StxLink>
+    </p>
+  </div>
+</div>
+@endsection

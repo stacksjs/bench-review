@@ -1,0 +1,7 @@
+@extends('layouts/admin')
+
+@section('title', 'Admin - Bench Review')
+
+@section('content')
+@include('Bench/Admin/AdminDashboard')
+@endsection

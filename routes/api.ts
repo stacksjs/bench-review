@@ -124,3 +124,56 @@ route.delete('/judges/{id}/follow', 'Actions/Judges/UnfollowJudgeAction')
   .name('bench.judges.unfollow')
   .middleware('auth')
   .skipCsrf()
+
+// Admin — separate login endpoint. Verifies the user has the `admin`
+// role AFTER credentials are validated; non-admins get a 403 and the
+// freshly issued token is revoked before the response goes out so a
+// bounced login never leaves a usable credential behind.
+route.post('/admin/auth/login', 'Actions/Admin/Auth/AdminLoginAction')
+  .name('bench.admin.auth.login')
+  .skipCsrf()
+
+// Admin user management — all auth + admin gated. `admin` middleware
+// resolves the current user via Auth.user() and checks the role itself,
+// so chaining `.middleware('auth').middleware('admin')` covers both
+// the "is signed in" and "is admin" gates.
+route.get('/admin/users', 'Actions/Admin/Users/UserIndexAction')
+  .name('bench.admin.users.index')
+  .middleware('auth')
+  .middleware('admin')
+
+route.patch('/admin/users/{id}', 'Actions/Admin/Users/UpdateUserAction')
+  .name('bench.admin.users.update')
+  .middleware('auth')
+  .middleware('admin')
+  .skipCsrf()
+
+route.post('/admin/users/{id}/role', 'Actions/Admin/Users/ToggleRoleAction')
+  .name('bench.admin.users.role')
+  .middleware('auth')
+  .middleware('admin')
+  .skipCsrf()
+
+route.delete('/admin/users/{id}', 'Actions/Admin/Users/DeleteUserAction')
+  .name('bench.admin.users.destroy')
+  .middleware('auth')
+  .middleware('admin')
+  .skipCsrf()
+
+// Admin review moderation.
+route.get('/admin/reviews', 'Actions/Admin/Reviews/ReviewIndexAction')
+  .name('bench.admin.reviews.index')
+  .middleware('auth')
+  .middleware('admin')
+
+route.patch('/admin/reviews/{id}/status', 'Actions/Admin/Reviews/UpdateReviewStatusAction')
+  .name('bench.admin.reviews.status')
+  .middleware('auth')
+  .middleware('admin')
+  .skipCsrf()
+
+route.delete('/admin/reviews/{id}', 'Actions/Admin/Reviews/DeleteReviewAction')
+  .name('bench.admin.reviews.destroy')
+  .middleware('auth')
+  .middleware('admin')
+  .skipCsrf()

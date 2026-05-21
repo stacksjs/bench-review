@@ -1,0 +1,203 @@
+<script client>
+  import type { AdminReviewRow, ReviewStatusFilter } from '~/resources/stores/adminReviews'
+
+  const store = useStore('adminReviews')
+
+  let hasFetched = false
+  function bootstrap(): void {
+    if (hasFetched) return
+    hasFetched = true
+    store.perPage.set(25)
+    store.page.set(1)
+    // Default the moderator view to pending — that's the queue depth
+    // they care about. The status query-param (set by the dashboard
+    // CTA "Open moderation queue") overrides if present.
+    if (typeof window !== 'undefined') {
+      const fromUrl = new URLSearchParams(window.location.search).get('status')
+      if (fromUrl === 'all' || fromUrl === 'pending' || fromUrl === 'published' || fromUrl === 'rejected')
+        store.statusFilter.set(fromUrl as ReviewStatusFilter)
+    }
+    store.fetchReviews()
+  }
+  bootstrap()
+  onMount(() => { bootstrap() })
+
+  // Expanded row state — single open at a time keeps the layout calm.
+  const expandedId = state<number>(0)
+  function toggleExpand(review: AdminReviewRow): void {
+    expandedId.set(expandedId() === review.id ? 0 : review.id)
+  }
+
+  function setFilter(next: ReviewStatusFilter): void {
+    expandedId.set(0)
+    store.setStatusFilter(next)
+  }
+
+  async function approve(review: AdminReviewRow): Promise<void> {
+    await store.setReviewStatus(review.id, 'published')
+  }
+  async function reject(review: AdminReviewRow): Promise<void> {
+    await store.setReviewStatus(review.id, 'rejected')
+  }
+  async function confirmDelete(review: AdminReviewRow): Promise<void> {
+    if (typeof window === 'undefined') return
+    const ok = window.confirm(`Delete review "${review.title}"? This cannot be undone.`)
+    if (!ok) return
+    await store.deleteReview(review.id)
+  }
+
+  function onSearchInput(e: Event): void {
+    const value = (e.target as HTMLInputElement).value
+    store.setSearch(value)
+  }
+
+  function nextPage(): void {
+    if (store.page() < store.totalPages())
+      store.setPage(store.page() + 1)
+  }
+  function prevPage(): void {
+    if (store.page() > 1)
+      store.setPage(store.page() - 1)
+  }
+
+  function formatDate(s: string | null | undefined): string {
+    if (!s) return ''
+    const d = new Date(s)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  }
+
+  // Filter tabs definition. Static — order is the order of importance
+  // to a moderator (pending first because that's the queue depth).
+  const TABS: Array<{ key: ReviewStatusFilter, label: string }> = [
+    { key: 'pending', label: 'Pending' },
+    { key: 'published', label: 'Published' },
+    { key: 'rejected', label: 'Rejected' },
+    { key: 'all', label: 'All' },
+  ]
+</script>
+
+<div class="space-y-4">
+  <div class="flex justify-between items-end">
+    <div>
+      <h1 class="font-bold text-2xl text-gray-900">Reviews</h1>
+      <p class="mt-1 text-gray-600 text-sm">
+        <span :text="store.total()"></span> <span :text="store.statusFilter()"></span>
+      </p>
+    </div>
+    <div>
+      <label for="reviews-search" class="sr-only">Search reviews</label>
+      <input
+        id="reviews-search"
+        type="text"
+        placeholder="Search title or content…"
+        @input="onSearchInput($event)"
+        class="block px-3 py-2 sm:w-72 text-gray-900 sm:text-sm placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-200 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset"
+      >
+    </div>
+  </div>
+
+  <div class="flex gap-x-1 border-b border-gray-200">
+    <button
+      :for="tab in TABS"
+      type="button"
+      @click="setFilter(tab.key)"
+      class="px-4 py-2 font-medium text-sm border-b-2 transition-colors"
+      x-class="store.statusFilter() === tab.key ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300'"
+      :text="tab.label"
+    ></button>
+  </div>
+
+  <div
+    role="alert"
+    class="px-4 py-3 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
+    x-class="store.actionError() ? '' : 'hidden'"
+    :text="store.actionError()"
+  ></div>
+
+  <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div :if="store.loading() && store.reviews().length === 0" class="px-4 py-12 text-center text-gray-500 text-sm">
+      Loading reviews…
+    </div>
+    <div :if="!store.loading() && store.reviews().length === 0" class="px-4 py-12 text-center text-gray-500 text-sm">
+      Nothing here.
+    </div>
+    <ul :if="store.reviews().length > 0" class="divide-gray-100 divide-y">
+      <li :for="review in store.reviews()" class="px-4 py-4">
+        <div class="flex justify-between gap-x-4">
+          <div class="flex-1 min-w-0">
+            <div class="flex gap-x-2 items-center">
+              <span
+                class="inline-block px-2 py-0.5 font-medium text-xs rounded-full"
+                x-class="review.status === 'published' ? 'bg-emerald-100 text-emerald-800' : review.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'"
+                :text="review.status"
+              ></span>
+              <span class="text-gray-500 text-xs" :text="formatDate(review.created_at)"></span>
+            </div>
+            <h3 class="mt-1 font-semibold text-gray-900 text-base" :text="review.title"></h3>
+            <p class="mt-1 text-gray-600 text-sm">
+              <span :text="review.judge.name"></span>
+              <span class="text-gray-400"> · </span>
+              <span :if="review.user" :text="review.user ? review.user.email : ''"></span>
+              <span :if="!review.user" class="text-gray-400">(anonymous)</span>
+              <span class="text-gray-400"> · </span>
+              <span :text="'★ ' + review.rating"></span>
+            </p>
+          </div>
+          <div class="flex flex-shrink-0 flex-col gap-y-1 items-end">
+            <div class="flex gap-x-2">
+              <button
+                type="button"
+                @click="approve(review)"
+                x-disabled="review.status === 'published'"
+                class="px-2.5 py-1 font-medium text-emerald-800 text-xs bg-emerald-50 border border-emerald-200 rounded hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              >Approve</button>
+              <button
+                type="button"
+                @click="reject(review)"
+                x-disabled="review.status === 'rejected'"
+                class="px-2.5 py-1 font-medium text-amber-800 text-xs bg-amber-50 border border-amber-200 rounded hover:bg-amber-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              >Reject</button>
+              <button
+                type="button"
+                @click="confirmDelete(review)"
+                class="px-2.5 py-1 font-medium text-red-800 text-xs bg-red-50 border border-red-200 rounded hover:bg-red-100"
+              >Delete</button>
+            </div>
+            <button
+              type="button"
+              @click="toggleExpand(review)"
+              class="text-gray-500 text-xs hover:text-gray-900"
+              :text="expandedId() === review.id ? 'Hide content' : 'Show content'"
+            ></button>
+          </div>
+        </div>
+        <div
+          class="mt-3 px-4 py-3 bg-gray-50 rounded prose prose-sm max-w-none"
+          x-class="expandedId() === review.id ? '' : 'hidden'"
+          x-html="review.content"
+        ></div>
+      </li>
+    </ul>
+  </div>
+
+  <div class="flex justify-between items-center">
+    <p class="text-gray-500 text-sm">
+      Page <span :text="store.page()"></span> of <span :text="store.totalPages()"></span>
+    </p>
+    <div class="flex gap-x-2">
+      <button
+        type="button"
+        @click="prevPage()"
+        x-disabled="store.page() <= 1"
+        class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+      >Previous</button>
+      <button
+        type="button"
+        @click="nextPage()"
+        x-disabled="store.page() >= store.totalPages()"
+        class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+      >Next</button>
+    </div>
+  </div>
+</div>
