@@ -21,9 +21,11 @@ import { resolve } from 'node:path'
 import process from 'node:process'
 import { filesystems, app as appConfig } from '@stacksjs/config'
 import { S3Client } from '@stacksjs/ts-cloud'
-import type { SignedUrlOptions, StorageAdapter } from './types'
+import type { PresignedUploadUrl, PresignedUploadUrlOptions, SignedUrlOptions, StorageAdapter } from './types'
 import { createLocalStorage } from './adapters/local'
 import { S3StorageAdapter } from './adapters/s3'
+import { putUploadedFile } from './put-file'
+import type { PutFileOptions, UploadedFileLike } from './put-file'
 import type {
   DiskConfig,
   FilesystemConfig,
@@ -184,8 +186,36 @@ class StorageManager {
   // Convenience Methods
   // ===========================================================================
 
-  async put(path: string, contents: string | Uint8Array | Buffer): Promise<void> {
-    return this.disk().write(path, contents)
+  /**
+   * Write contents to the default disk at the given path. The original
+   * low-level overload — `Storage.put('logs/today.txt', text)` — stays
+   * as-is for code that already has a path + bytes.
+   */
+  async put(path: string, contents: string | Uint8Array | Buffer): Promise<void>
+  /**
+   * Write an `UploadedFile` (typically `req.file('avatar')` or one entry
+   * from `req.files`) to a disk and return both the storage path and the
+   * resulting public URL. Derives a safe filename so callers don't have
+   * to write the same uuid + extension boilerplate in every upload
+   * action. See stacksjs/stacks#1856.
+   *
+   * @example
+   * ```ts
+   * const file = req.file('avatar')!
+   * const { path, url } = await Storage.put(file, { disk: 'public', dir: 'avatars' })
+   * await db.updateTable('users').set({ avatar: url }).where('id', '=', userId).execute()
+   * ```
+   */
+  async put(file: UploadedFileLike, opts?: PutFileOptions): Promise<{ path: string, url: string }>
+  async put(
+    pathOrFile: string | UploadedFileLike,
+    contentsOrOpts?: string | Uint8Array | Buffer | PutFileOptions,
+  ): Promise<void | { path: string, url: string }> {
+    if (typeof pathOrFile === 'string') {
+      return this.disk().write(pathOrFile, contentsOrOpts as string | Uint8Array | Buffer)
+    }
+    const opts = (contentsOrOpts as PutFileOptions | undefined) ?? {}
+    return putUploadedFile(this, pathOrFile, opts)
   }
 
   async get(path: string): Promise<string> {
@@ -244,6 +274,34 @@ class StorageManager {
       throw new Error(`[storage] disk '${this.config.default}' does not support signedUrl`)
     }
     return adapter.signedUrl(path, options)
+  }
+
+  /**
+   * Mint a presigned URL the browser can PUT to directly, bypassing
+   * the app server (stacksjs/stacks#1856 Stage 6). Use with the
+   * `useDirectUpload({ presignEndpoint })` frontend composable.
+   *
+   * Only adapters that can serve URLs (S3, etc.) implement this — the
+   * local-disk and in-memory adapters throw a clear "not supported"
+   * error rather than returning a useless localhost URL.
+   *
+   * @example
+   * ```ts
+   * // In a `/api/me/avatar/presign` action:
+   * const { url, path } = await Storage.disk('s3').presignedUploadUrl({
+   *   contentType: req.body.contentType,
+   *   expiresIn: 60,
+   *   dir: 'avatars',
+   * })
+   * return { url, path }
+   * ```
+   */
+  async presignedUploadUrl(options: PresignedUploadUrlOptions): Promise<PresignedUploadUrl> {
+    const adapter = this.disk()
+    if (typeof adapter.presignedUploadUrl !== 'function') {
+      throw new Error(`[storage] disk '${this.config.default}' does not support presignedUploadUrl — only S3-style adapters do. Use \`Storage.put(file, opts)\` for local/proxied uploads.`)
+    }
+    return adapter.presignedUploadUrl(options)
   }
 
   async size(path: string): Promise<number> {

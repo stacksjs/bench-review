@@ -1,7 +1,9 @@
 import type { CLI } from '@stacksjs/types'
 import process from 'node:process'
 import { bold, dim, green, intro, log, onUnknownSubcommand, red, yellow } from "@stacksjs/cli"
+import { feature } from '@stacksjs/config'
 import { storage } from '@stacksjs/storage'
+import { FEATURE_NAMES, featurePathsPresent } from './features'
 
 interface HealthCheck {
   name: string
@@ -214,6 +216,92 @@ export function doctor(buddy: CLI): void {
         if (errors.length > 0) throw new Error(errors.join('; '))
         return 'All encrypted values decrypt cleanly'
       })
+
+      // Storage credentials — if the default disk is `s3`, the AWS env vars
+      // need to be present, otherwise every upload action throws on first
+      // use. Warn loudly so the developer notices before the first upload
+      // attempt rather than in a stacktrace. See stacksjs/stacks#1856.
+      try {
+        const { filesystems } = await import('@stacksjs/config')
+        const driver = (filesystems as { driver?: string }).driver ?? 'local'
+        if (driver === 's3') {
+          const bucket = process.env.S3_BUCKET ?? (filesystems as { s3?: { bucket?: string } }).s3?.bucket
+          const accessKeyId = process.env.AWS_ACCESS_KEY_ID
+          const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY
+          const missing: string[] = []
+          if (!bucket) missing.push('S3_BUCKET')
+          if (!accessKeyId) missing.push('AWS_ACCESS_KEY_ID')
+          if (!secretAccessKey) missing.push('AWS_SECRET_ACCESS_KEY')
+          if (missing.length > 0) {
+            checks.push({
+              name: 'Storage credentials',
+              status: 'warn',
+              message: `Default disk is 's3' but missing: ${missing.join(', ')}. Uploads will throw on first use.`,
+            })
+          }
+          else {
+            checks.push({
+              name: 'Storage credentials',
+              status: 'pass',
+              message: 's3 default disk has bucket + AWS credentials',
+            })
+          }
+        }
+        else {
+          checks.push({
+            name: 'Storage credentials',
+            status: 'pass',
+            message: `Default disk is '${driver}' (no remote credentials required)`,
+          })
+        }
+      }
+      catch (err) {
+        checks.push({
+          name: 'Storage credentials',
+          status: 'warn',
+          message: `Could not audit storage config: ${err instanceof Error ? err.message : String(err)}`,
+        })
+      }
+
+      // Feature scaffolding orphans — files belonging to a disabled feature
+      // are still on disk. Spec: `./buddy doctor` should warn so the user
+      // can decide whether to `<feature>:uninstall` (delete them) or
+      // `<feature>:install` (re-enable). See stacksjs/stacks#1854.
+      try {
+        const orphans: Array<{ feature: string, count: number }> = []
+        for (const name of FEATURE_NAMES) {
+          if (feature(name)) continue
+          const present = featurePathsPresent(name)
+          if (present.length > 0) orphans.push({ feature: name, count: present.length })
+        }
+        if (orphans.length > 0) {
+          const summary = orphans
+            .map(o => `${o.feature} (${o.count} path${o.count === 1 ? '' : 's'})`)
+            .join(', ')
+          checks.push({
+            name: 'Feature scaffolding',
+            status: 'warn',
+            message: `Stamped files remain for disabled features: ${summary}. Run \`./buddy <feature>:uninstall\` to remove or \`<feature>:install\` to re-enable.`,
+          })
+        }
+        else {
+          checks.push({
+            name: 'Feature scaffolding',
+            status: 'pass',
+            message: 'No orphan files for disabled features',
+          })
+        }
+      }
+      catch (err) {
+        // Reading config can throw if the project's config tree is incomplete
+        // (e.g., during scaffolding). Surface as a warn so doctor still
+        // finishes the remaining probes.
+        checks.push({
+          name: 'Feature scaffolding',
+          status: 'warn',
+          message: `Could not audit feature scaffolding: ${err instanceof Error ? err.message : String(err)}`,
+        })
+      }
 
       // Display results
       log.info('')

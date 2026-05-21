@@ -2,19 +2,36 @@
  * Route Loader
  *
  * Loads routes from the route registry with automatic prefixing.
- * The key name becomes the URL prefix (except 'api' and 'web' which have no prefix).
+ * The key name becomes the URL prefix; `'web'` is the only key that
+ * loads at root (`/`) without a prefix.
  *
- * User routes are loaded FIRST so they always take priority over framework defaults.
- * When bun-router encounters a duplicate route (same method + path), the first
- * registration wins — so user-defined routes naturally override framework routes.
+ * The `'api'` key auto-prefixes with `/api` so user routes in
+ * `routes/api.ts` line up with the rpx proxy forward path
+ * (`/api/*` → API server with `stripPrefix: false`). Previously this
+ * key was also in `NO_PREFIX_KEYS`, which produced silent 404s when
+ * `routes/api.ts` registered `route.get('/cart/add', ...)` but the
+ * proxied request arrived as `/api/cart/add` — see
+ * stacksjs/stacks#1835 root cause 4.
+ *
+ * User routes are loaded FIRST so they always take priority over
+ * framework defaults. When bun-router encounters a duplicate route
+ * (same method + path), the first registration wins — so user-defined
+ * routes naturally override framework routes.
  */
 
-import type { RouteDefinition, RouteRegistry } from '../../../../../app/Routes'
+import type { RouteDefinition, RouteRegistry } from './route-types'
 import { log } from '@stacksjs/logging'
 import { route } from './stacks-router'
 
-/** Keys that should not have a prefix (loaded at root /) */
-const NO_PREFIX_KEYS = ['api', 'web']
+/**
+ * Keys that load at root `/` with no prefix. Currently just `'web'`
+ * for HTML/SSR routes that mount at the document root.
+ *
+ * `'api'` is deliberately NOT in this list (see top-of-file note).
+ * It picks up the conventional `/api` prefix via the default
+ * key-to-prefix mapping below.
+ */
+const NO_PREFIX_KEYS = ['web']
 
 /**
  * Load all routes from the registry
@@ -105,16 +122,56 @@ async function loadFrameworkRoutes(): Promise<void> {
 }
 
 /**
+ * Validate that a route-file name can't escape the `routes/` root.
+ *
+ * The registry today is author-trusted, but treating it as untrusted
+ * at the loader boundary costs nothing and prevents a future "let
+ * users register routes" feature from turning into a path-traversal
+ * vector. Mirrors `assertSafeHandlerPath` in `stacks-router.ts` so a
+ * reviewer can compare the two side-by-side.
+ *
+ * Checks in order:
+ *   1. Null bytes anywhere.
+ *   2. URL-encoded characters (`%2e%2e` → `..`) — decoded BEFORE the
+ *      traversal check, otherwise an attacker could hide `..` from the
+ *      string-contains check by encoding it.
+ *   3. Absolute paths (POSIX `/...` and Windows `C:\...`).
+ *   4. `..` segments after splitting on either separator (catches
+ *      `..\..\..\etc` on Windows registries).
+ *
+ * stacksjs/stacks#1863 (T-9).
+ */
+function assertSafeRouteName(routeName: string): string {
+  if (typeof routeName !== 'string' || routeName.length === 0)
+    throw new Error(`[route-loader] Invalid route path: empty or non-string`)
+  if (routeName.includes('\0'))
+    throw new Error(`[route-loader] Invalid route path: null byte`)
+
+  let decoded: string
+  try {
+    decoded = decodeURIComponent(routeName)
+  }
+  catch {
+    throw new Error(`[route-loader] Invalid route path: malformed URL encoding`)
+  }
+
+  const cleanPath = decoded.replace(/\.ts$/, '')
+
+  if (cleanPath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(cleanPath))
+    throw new Error(`[route-loader] Invalid route path: absolute paths not allowed (${cleanPath})`)
+
+  const segments = cleanPath.split(/[/\\]/)
+  if (segments.some(s => s === '..'))
+    throw new Error(`[route-loader] Invalid route path: '..' segment not allowed (${cleanPath})`)
+
+  return cleanPath
+}
+
+/**
  * Import a route file from the routes directory
  */
 async function importRouteFile(routeName: string): Promise<void> {
-  // Remove .ts extension if present
-  const cleanPath = routeName.replace(/\.ts$/, '')
-
-  // Prevent path traversal
-  if (cleanPath.includes('..') || cleanPath.startsWith('/')) {
-    throw new Error(`Invalid route path: ${cleanPath}`)
-  }
+  const cleanPath = assertSafeRouteName(routeName)
 
   // Resolve `routes/<name>` against the project root via @stacksjs/path so
   // the import works whether this package is loaded from the workspace
