@@ -59,6 +59,19 @@ export default defineModel({
   // with "str.replace is not a function" because the model-name
   // resolver was being passed an object instead of a string.
   hasMany: ['PersonalAccessToken', 'OauthAccessToken'],
+  // RBAC pivots. `roles` and `permissions` both live in many-to-many
+  // tables (user_roles, user_permissions) whose shape is fixed by
+  // `@stacksjs/auth`'s rbac-store-bqb adapter. Declaring them here
+  // gives the ORM enough metadata to eager-load via
+  // `User.with(['roles'])` and gives downstream code typed access to
+  // the pivot instead of `getUserRoles(u.id)` per row. The runtime
+  // `assignRole` / `removeRole` / `hasAnyRole` chain from
+  // @stacksjs/auth keeps going through raw db (it's the source of
+  // truth for writes); these declarations are read-side ergonomics.
+  belongsToMany: [
+    { model: 'Role', pivotTable: 'user_roles', firstForeignKey: 'user_id', secondForeignKey: 'role_id' },
+    { model: 'Permission', pivotTable: 'user_permissions', firstForeignKey: 'user_id', secondForeignKey: 'permission_id' },
+  ],
 
   attributes: {
     name: {

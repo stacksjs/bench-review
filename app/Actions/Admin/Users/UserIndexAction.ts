@@ -1,8 +1,6 @@
 import { Action } from '@stacksjs/actions'
-import { getUserRoles } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
-import { bootRbac } from '../../../Helpers/rbac'
 
 /**
  * GET /api/admin/users — paginated user list for the admin UI.
@@ -13,22 +11,18 @@ import { bootRbac } from '../../../Helpers/rbac'
  *   - page     : 1-indexed, default 1
  *   - perPage  : default 25, clamped to [1, 100]
  *
- * Each user is hydrated with its role names via `getUserRoles(id)` so
- * the table can show "admin"/"client" badges and the promote/demote
- * action knows the current state without a follow-up roundtrip.
- *
- * The roles fan-out is N+1 in the worst case (one query per row, plus
- * the page query). At the project's expected scale (tens to low
- * thousands of users) that's fine. Swap to a single JOIN on
- * `user_roles` + `roles` when it becomes hot.
+ * Roles are eager-loaded with a single JOIN against the
+ * `user_roles` / `roles` pair (the same many-to-many shape declared
+ * via `belongsToMany` on the User and Role models) and grouped by
+ * `user_id` in memory. Cheaper than the previous per-row
+ * `getUserRoles` fan-out by `O(N)` round-trips at the cost of one
+ * SQL join over the visible page.
  */
 export default new Action({
   name: 'Admin User Index',
   description: 'Paginated user list with role hydration for admin UI',
   method: 'GET',
   async handle() {
-    bootRbac()
-
     const q = String((request as any).get?.('q') ?? '').trim()
     const pageRaw = Number((request as any).get?.('page') ?? 1)
     const perPageRaw = Number((request as any).get?.('perPage') ?? 25)
@@ -62,16 +56,38 @@ export default new Action({
       countQuery.executeTakeFirst(),
     ])
 
-    const users = await Promise.all((rows as Array<any>).map(async (u) => {
-      const roles = await getUserRoles(u.id)
-      return {
-        id: u.id,
-        email: u.email,
-        name: u.name,
-        created_at: u.created_at,
-        updated_at: u.updated_at,
-        roles: roles.map(r => ({ id: r.id, name: r.name, guard_name: r.guard_name })),
+    const userRows = rows as Array<any>
+    const userIds = userRows.map(u => u.id) as number[]
+
+    // Bulk role-hydration. One JOIN over the visible page rather than
+    // N selects from `getUserRoles(u.id)`. If the page is empty, skip
+    // the query entirely — `where('user_id', 'in', [])` produces a
+    // dialect-specific syntax error in some Bun drivers.
+    const rolesByUser = new Map<number, Array<{ id: number, name: string, guard_name: string }>>()
+    if (userIds.length > 0) {
+      const roleRows = await (db.selectFrom('user_roles' as any) as any)
+        .innerJoin('roles', 'roles.id', 'user_roles.role_id')
+        .select('user_roles.user_id as user_id')
+        .select('roles.id as id')
+        .select('roles.name as name')
+        .select('roles.guard_name as guard_name')
+        .where('user_roles.user_id' as any, 'in', userIds as any)
+        .execute() as Array<{ user_id: number, id: number, name: string, guard_name: string }>
+
+      for (const r of roleRows) {
+        const list = rolesByUser.get(r.user_id) ?? []
+        list.push({ id: r.id, name: r.name, guard_name: r.guard_name })
+        rolesByUser.set(r.user_id, list)
       }
+    }
+
+    const users = userRows.map(u => ({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      created_at: u.created_at,
+      updated_at: u.updated_at,
+      roles: rolesByUser.get(u.id) ?? [],
     }))
 
     const total = Number((totalRow as any)?.total ?? 0)
