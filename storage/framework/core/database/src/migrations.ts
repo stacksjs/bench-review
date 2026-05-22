@@ -73,6 +73,9 @@ function configureQueryBuilder(): void {
 
   setConfig({
     dialect,
+    // Suppress bun-query-builder's `-- …` chatter on no-op runs.
+    // Stacks' buddy CLI already surfaces progress via intro/outro.
+    verbose: false,
     database: {
       database: connectionConfig?.name || connectionConfig?.database || 'stacks',
       host: connectionConfig?.host || 'localhost',
@@ -450,7 +453,7 @@ export async function runDatabaseMigration(): Promise<Result<string, Error>> {
   const startedAt = Date.now()
   const hidden = await hideDisabledFeatureMigrations()
   try {
-    log.info('Migrating database...')
+    log.debug('Migrating database...')
 
     // Ensure the database exists before running migrations (PostgreSQL/MySQL)
     await ensureDatabaseExists()
@@ -469,7 +472,7 @@ export async function runDatabaseMigration(): Promise<Result<string, Error>> {
     log.debug(`[migration] Running migrations from: ${modelsDir}`)
     await qbExecuteMigration(modelsDir)
 
-    log.success(`Database migration completed in ${Date.now() - startedAt}ms.`)
+    log.debug(`Database migration completed in ${Date.now() - startedAt}ms.`)
     return ok('Database migration completed.')
   }
   catch (error) {
@@ -615,7 +618,7 @@ async function dropFrameworkTables(dialect: 'sqlite' | 'mysql' | 'postgres'): Pr
  */
 export async function generateMigrations(): Promise<Result<string, Error>> {
   try {
-    log.info('Generating migrations...')
+    log.debug('Generating migrations...')
 
     // Configure bun-query-builder with stacks database settings
     configureQueryBuilder()
@@ -623,7 +626,7 @@ export async function generateMigrations(): Promise<Result<string, Error>> {
     const dialect = getDialect()
     const { modelsDir, skip } = prepareMigrationModelsDir()
     if (skip) {
-      log.info('No app/Models directory found; using committed framework migrations')
+      log.debug('No app/Models directory found; using committed framework migrations')
       return ok('Migrations generated')
     }
 
@@ -633,12 +636,12 @@ export async function generateMigrations(): Promise<Result<string, Error>> {
     if (result.hasChanges) {
       const written = persistGeneratedMigrations(result.sqlStatements ?? [])
       if (written > 0)
-        log.success(`Migrations generated (${written} file${written === 1 ? '' : 's'})`)
+        log.success(`Generated ${written} migration file${written === 1 ? '' : 's'}`)
       else
-        log.success('Migrations generated')
+        log.debug('Migration generation produced no new files (already up to date)')
     }
     else {
-      log.info('No changes detected')
+      log.debug('No changes detected')
     }
 
     return ok('Migrations generated')
