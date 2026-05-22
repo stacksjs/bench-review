@@ -14,6 +14,18 @@ export interface JudgeReviewRow {
   user_id?: number | null
   created_at?: string | null
   updated_at?: string | null
+  // Server-hydrated when the request carried an auth token. Drives
+  // the "people find this helpful" button's filled/empty state on
+  // hard reload of an article page. Anonymous reads come back false
+  // and the UI prompts to sign in on first click.
+  liked_by_me?: boolean
+}
+
+export interface LikeResult {
+  ok: boolean
+  liked?: boolean
+  likes?: number
+  error?: string
 }
 
 export interface SubmitReviewPayload {
@@ -163,6 +175,74 @@ defineStore('reviews', () => {
     return !!loadingByJudge()[judgeId]
   }
 
+  /**
+   * Toggle "people find this helpful" for a review.
+   *
+   * The endpoint is auth-gated. If the caller is anonymous, the auth
+   * store's `authFetch` will deliver a 401 — we surface that as
+   * `{ ok: false, error: 'auth' }` so the calling component can prompt
+   * the user to sign in instead of silently failing.
+   *
+   * On success, fans the new `{ liked, likes }` pair out to every
+   * cache slice that might be showing this review (`current`,
+   * `latest`, `byJudge[*]`). Doing the fan-out here rather than at the
+   * call site keeps the UI reactive across navigations — clicking
+   * like on the detail page and then hitting "← All reviews" shows
+   * the updated count in the feed without a refetch.
+   */
+  async function toggleLike(reviewId: number): Promise<LikeResult> {
+    try {
+      const res = await useStore('auth').authFetch(`/api/reviews/${reviewId}/like`, {
+        method: 'POST',
+      })
+      if (res.status === 401)
+        return { ok: false, error: 'auth' }
+      const data = await res.json().catch(() => ({})) as { liked?: boolean, likes?: number, error?: string }
+      if (!res.ok)
+        return { ok: false, error: data.error || 'Failed to update like' }
+
+      const liked = !!data.liked
+      const likes = Number(data.likes ?? 0)
+
+      // Fan-out: patch `current`, `latest`, and every judge slice that
+      // includes this review. Each `.set(...)` triggers a single
+      // re-render; we only call it for slices that actually changed
+      // so unrelated views don't churn.
+      const cur = current()
+      if (cur && cur.id === reviewId)
+        current.set({ ...cur, likes, liked_by_me: liked })
+
+      const prevLatest = latest()
+      if (prevLatest.some(r => r.id === reviewId)) {
+        latest.set(prevLatest.map(r =>
+          r.id === reviewId ? { ...r, likes, liked_by_me: liked } : r,
+        ))
+      }
+
+      const byJudgeMap = byJudge()
+      let touched = false
+      const nextByJudge: typeof byJudgeMap = {}
+      for (const [k, rows] of Object.entries(byJudgeMap)) {
+        if (rows.some(r => r.id === reviewId)) {
+          nextByJudge[Number(k)] = rows.map(r =>
+            r.id === reviewId ? { ...r, likes, liked_by_me: liked } : r,
+          )
+          touched = true
+        }
+        else {
+          nextByJudge[Number(k)] = rows
+        }
+      }
+      if (touched)
+        byJudge.set(nextByJudge)
+
+      return { ok: true, liked, likes }
+    }
+    catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'Network error' }
+    }
+  }
+
   // Convenience derived so card UIs can show "Be the first" without
   // peeking into both slices themselves.
   const hasAnyLatest = derived<boolean>(() => latest().length > 0)
@@ -181,6 +261,7 @@ defineStore('reviews', () => {
     fetchByJudge,
     fetchById,
     submit,
+    toggleLike,
     reviewsForJudge,
     isLoadingJudge,
   }

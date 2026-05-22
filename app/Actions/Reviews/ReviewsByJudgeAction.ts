@@ -1,5 +1,6 @@
 import { Action } from '@stacksjs/actions'
 import { request, response } from '@stacksjs/router'
+import { hydrateLikedByMe } from '../../Helpers/reviewLikes'
 
 /**
  * GET /api/judges/:id/reviews — list published reviews for one judge.
@@ -10,7 +11,8 @@ import { request, response } from '@stacksjs/router'
  * payload small and avoids a JOIN that would scale poorly.
  *
  * Returns published reviews only — pending/rejected stay invisible
- * to the public.
+ * to the public. `liked_by_me` is hydrated per row when the request
+ * carries an auth token.
  */
 export default new Action({
   name: 'Reviews By Judge',
@@ -30,6 +32,7 @@ export default new Action({
       .orderBy('created_at', 'desc')
       .get()
 
-    return response.json(rows ?? [])
+    const hydrated = await hydrateLikedByMe(rows ?? [])
+    return response.json(hydrated)
   },
 })

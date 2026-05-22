@@ -14,22 +14,59 @@
   // for the same shape.
   const reviewsStore = useStore('reviews')
   const judgesStore = useStore('judges')
+  const authStore = useStore('auth')
 
-  // Shared per-feed UI state. Inlining the review card markup (rather than
-  // @include'ing Bench/Feed) means each rendered card uses the SAME isLiked
-  // / showPricingModal here, so toggling like affects every card in the
-  // list. That's a known compromise — the alternative is @include'ing
-  // Bench/Feed, which doesn't work for this flow: stx treats Bench/Feed as
-  // a scope component (it has its own <script client>), and when :for
-  // clones the template, processElement stops at the data-stx-scope
-  // boundary (signals.js:1660-1661). The Feed scope is then processed
+  // Per-card like state lives on each row (see the `liked` field in
+  // the `reviews` derived map below). Hoisting it OUT of a single
+  // shared `state<boolean>` was the fix for "click like on card A,
+  // every card highlights" — the previous version had one signal
+  // serving N cards.
+  //
+  // Why the markup still lives in this component (and not in a
+  // @include'd Bench/Feed): stx treats Bench/Feed as a scope component
+  // (it has its own <script client>), and when :for clones the
+  // template, processElement stops at the data-stx-scope boundary
+  // (signals.js:1660-1661). The Feed scope is then processed
   // independently with its own locals, and the loop variable `review`
   // never reaches the bindings inside. Until @include can forward props
   // across scope boundaries, the cards live here.
   const stars: number[] = [1, 2, 3, 4, 5]
-  const isLiked = state<boolean>(false)
-  function toggleLike(): void {
-    isLiked.set(!isLiked())
+
+  // Surfaces a soft sign-in nudge under the feed when an anonymous
+  // user clicks a like button. We don't redirect — same rationale as
+  // the article page: keep their scroll position; let them sign in
+  // and pick up where they were.
+  const likeAuthPrompt = state<boolean>(false)
+  const likeError = state<string>('')
+
+  // Track in-flight toggles per-review so a fast double-tap on the
+  // same card can't fire two POSTs in parallel (which would race the
+  // optimistic counter — though the server is idempotent on the pair,
+  // the second response can arrive first and flip the visible state).
+  const inFlight = state<Record<number, boolean>>({})
+  function isPending(reviewId: number): boolean {
+    return !!inFlight()[reviewId]
+  }
+
+  async function toggleLike(reviewId: number): Promise<void> {
+    if (isPending(reviewId)) return
+    if (!authStore.isAuthenticated()) {
+      likeAuthPrompt.set(true)
+      return
+    }
+    inFlight.set({ ...inFlight(), [reviewId]: true })
+    likeError.set('')
+    const result = await reviewsStore.toggleLike(reviewId)
+    const next = { ...inFlight() }
+    delete next[reviewId]
+    inFlight.set(next)
+    if (!result.ok) {
+      if (result.error === 'auth') {
+        likeAuthPrompt.set(true)
+        return
+      }
+      likeError.set(result.error || 'Could not update — try again.')
+    }
   }
 
   // Fire fetches in BOTH top-level AND onMount. Top-level runs on
@@ -79,6 +116,12 @@
       byId[j.id] = j
 
     const category = judgesStore.activeCategory()
+    // Resolve current user id once per derived re-run rather than
+    // per-row. authStore.user() is reactive — sign-in mid-page
+    // re-runs the derived and the isOwn flag flips for the user's
+    // own cards. Anonymous reads: meId stays null, isOwn always
+    // false, every card shows the helpful button.
+    const meId = authStore.user()?.id ?? null
 
     return reviewsStore.latest()
       .filter((r: JudgeReviewRow) => r.judge_id != null)
@@ -91,12 +134,23 @@
       })
       .map((r: JudgeReviewRow) => {
         const j = byId[r.judge_id as number]
+        const authorId = (r as any).user_id ?? null
         return {
           id: r.id,
           title: r.title,
           content: r.content,
           rating: r.rating ?? 0,
           likes: r.likes ?? 0,
+          // Per-row liked state. Hydrated server-side via
+          // LatestReviewsAction → hydrateLikedByMe when the request
+          // carries auth, kept in lock-step on toggle by the reviews
+          // store's fan-out (resources/stores/reviews.ts:toggleLike).
+          liked: !!(r as any).liked_by_me,
+          // Hide the helpful button on the user's own cards. Server
+          // also rejects own-likes (LikeReviewAction 422), this is
+          // the UX side of that gate. Seeded reviews have user_id=null
+          // → authorId is null → isOwn always false → button visible.
+          isOwn: meId != null && authorId != null && Number(meId) === Number(authorId),
           comments: r.comments ?? 0,
           type: r.type,
           status: r.status,
@@ -125,6 +179,26 @@
      flips the JS parser into template-literal mode, breaking every
      following script.) -->
 <div>
+  <!-- Soft sign-in nudge when anonymous user clicks "helpful." Same
+       pattern as ArticleView's footer prompt; we don't redirect to
+       keep their scroll position. CSS-toggled (x-class hidden) rather
+       than :if so the element stays in DOM and the message text
+       binding stays subscribed — the bindIf remove-then-readd cycle
+       drops bindings on re-add. -->
+  <div
+    role="status"
+    class="mb-4 px-3 py-2 text-amber-800 text-sm bg-amber-50 border border-amber-200 rounded-md"
+    x-class="likeAuthPrompt() ? '' : 'hidden'"
+  >
+    <StxLink to="/login" class="font-semibold underline underline-offset-2">Sign in</StxLink>
+    to mark reviews as helpful.
+  </div>
+  <div
+    role="alert"
+    class="mb-4 px-3 py-2 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
+    x-class="likeError() ? '' : 'hidden'"
+    :text="likeError()"
+  ></div>
   <div :if="reviewsStore.loadingLatest && reviews.length === 0" class="py-12 text-center text-gray-500 text-sm">
     Loading reviews…
   </div>
@@ -178,15 +252,37 @@
           </div>
         </div>
         <div class="flex items-center space-x-4">
+          <!-- Reader: clickable heart + count. -->
           <button
+            :if="!review.isOwn"
             type="button"
-            @click="toggleLike()"
+            @click="toggleLike(review.id)"
             class="inline-flex items-center text-sm duration-150 ease-in-out transition"
-            x-class="isLiked ? 'text-blue-600' : 'text-gray-500 hover:text-gray-600'"
+            x-class="review.liked ? 'text-amber-600' : 'text-gray-500 hover:text-gray-600'"
+            aria-label="Mark helpful"
           >
-            <Icon name="bookmark" size="20" class="mr-1.5 transition-colors" x-class="isLiked ? 'text-blue-600' : 'text-gray-500'" />
-            <span :text="review.likes"></span>
+            <!-- Heart matches the article-page button so the helpful
+                 metaphor is consistent across the feed → detail flow.
+                 Bookmark was the old shared-state placeholder. -->
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5 transition-colors">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+            </svg>
+            <span class="tabular-nums" :text="review.likes"></span>
           </button>
+          <!-- Author: read-only count. Still shows the reaction
+               total — it's useful feedback for the writer — but no
+               click target. Same span shape so the layout doesn't
+               jump between own/other cards. -->
+          <span
+            :if="review.isOwn"
+            class="inline-flex items-center text-gray-400 text-sm"
+            aria-label="Reader reactions to your review"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+            </svg>
+            <span class="tabular-nums" :text="review.likes"></span>
+          </span>
           <StxLink x-to="`/article/${review.id}`" class="text-gray-600 text-sm hover:text-gray-500 hover:underline">
             Read more
           </StxLink>

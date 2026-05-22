@@ -103,6 +103,15 @@ route.post('/reviews', 'Actions/Reviews/SubmitReviewAction')
   .middleware('auth')
   .skipCsrf()
 
+// Toggle "people find this helpful" on a review. POST is idempotent on
+// (user_id, judge_review_id): an existing like is removed, a missing
+// one is created. The action keeps the denormalised `likes` counter
+// on the review row in sync so public feed reads stay COUNT-free.
+route.post('/reviews/{id}/like', 'Actions/Reviews/LikeReviewAction')
+  .name('bench.reviews.like')
+  .middleware('auth')
+  .skipCsrf()
+
 // Self-routes — return data scoped to the authenticated user. Auth-
 // gated; profile + follow pages depend on these.
 route.get('/me/reviews', 'Actions/Me/MyReviewsAction')

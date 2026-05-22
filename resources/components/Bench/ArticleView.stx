@@ -14,9 +14,37 @@
   //     Bench/ReviewsFeed on /reviews.
 
   const reviewsStore = useStore('reviews')
+  const authStore = useStore('auth')
   const stars: number[] = [1, 2, 3, 4, 5]
   const readingProgress = state<number>(0)
-  const liked = state<boolean>(false)
+  // `liked` is derived from the store rather than held locally so a
+  // toggle elsewhere in the SPA (feed card, nav-and-back, parallel
+  // tab via SSE) stays in lock-step. ShowReviewAction hydrates
+  // `liked_by_me` server-side when the request carries auth, so a
+  // hard reload of an already-liked article paints filled on first
+  // paint without an extra round-trip.
+  const liked = derived<boolean>(() => !!reviewsStore.current()?.liked_by_me)
+  // Author check — hide the "helpful" button on the author's own
+  // review so they can't self-react. Server also enforces this
+  // (LikeReviewAction returns 422); the client gate is purely UX.
+  // Seeded/anonymous reviews have user_id=null and the author check
+  // resolves false → button stays visible for everyone else.
+  const isOwnReview = derived<boolean>(() => {
+    const me = authStore.user()
+    const row = reviewsStore.current()
+    return !!me && !!row && Number(me.id) === Number((row as any).user_id)
+  })
+  // Surfaces the auth-required prompt under the helpful button when
+  // an anonymous user clicks. We don't redirect — a redirect would
+  // discard the article position; a soft inline prompt nudges them
+  // to sign in without losing context.
+  const likeAuthPrompt = state<boolean>(false)
+  const likeError = state<string>('')
+  // Belt-and-suspenders against accidental double-fire (touch +
+  // synthetic click on iOS, or a fast double-tap). The endpoint is
+  // already idempotent on the pair, but blocking the second submit
+  // also stops the optimistic UI from flickering.
+  const likePending = state<boolean>(false)
 
   // Resolve id from the URL. See feedback_stx_rp_unset_on_hard_reload —
   // window.stx._rp is unset during hydration on hard reload, so we
@@ -86,8 +114,27 @@
     onDestroy(() => window.removeEventListener('scroll', onScroll))
   })
 
-  function toggleLike(): void {
-    liked.set(!liked())
+  async function toggleLike(): Promise<void> {
+    if (likePending()) return
+    // Anonymous click — surface the sign-in prompt instead of POSTing
+    // and getting bounced to /login (which would discard the article
+    // position). The user can sign in via the inline link and pick
+    // back up where they were.
+    if (!authStore.isAuthenticated()) {
+      likeAuthPrompt.set(true)
+      return
+    }
+    likePending.set(true)
+    likeError.set('')
+    const result = await reviewsStore.toggleLike(reviewId)
+    likePending.set(false)
+    if (!result.ok) {
+      if (result.error === 'auth') {
+        likeAuthPrompt.set(true)
+        return
+      }
+      likeError.set(result.error || 'Could not update — try again.')
+    }
   }
 
   // View-model wrappers. Bare-property auto-unwrap reads these without
@@ -217,19 +264,67 @@
          which busts the page.) -->
     <div class="article-body mt-10 text-gray-800" x-html="content"></div>
 
-    <!-- Footer row: clap-style like + status pill + back link -->
-    <div class="flex items-center justify-between mt-14 pt-8 border-t border-gray-200">
-      <button
-        type="button"
-        @click="toggleLike()"
-        class="inline-flex items-center gap-2 px-4 py-2 font-medium text-sm rounded-full border transition-all"
-        x-class="liked ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'"
-      >
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-        </svg>
-        <span class="tabular-nums" :text="`${likes + (liked ? 1 : 0)}`"></span>
-      </button>
+    <!-- Footer row: "people find this helpful" + status pill + back link -->
+    <div class="flex flex-col gap-3 mt-14 pt-8 sm:flex-row sm:items-center sm:justify-between border-t border-gray-200">
+      <div class="flex flex-col gap-2 items-start">
+        <div class="flex gap-3 items-center">
+          <!-- Reader view: clickable button. Hidden for the author of
+               the row (own reviews can't be self-liked). -->
+          <button
+            :if="!isOwnReview"
+            type="button"
+            @click="toggleLike()"
+            x-disabled="likePending"
+            class="inline-flex items-center gap-2 px-4 py-2 font-medium text-sm rounded-full border transition-all disabled:opacity-60 disabled:cursor-wait"
+            x-class="liked ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'"
+            aria-pressed="false"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+            </svg>
+            <span class="tabular-nums" :text="likes"></span>
+            <!-- Caption shifts based on count + own-like state so the
+                 button reads naturally at 0, 1, and N — and credits the
+                 reader directly when they're the one who reacted. -->
+            <span class="text-xs text-current/80" :text="liked ? (likes === 1 ? 'You find this helpful' : `You and ${likes - 1} ${likes === 2 ? 'other' : 'others'} find this helpful`) : (likes === 0 ? 'Be the first to find this helpful' : likes === 1 ? '1 person finds this helpful' : `${likes} people find this helpful`)"></span>
+          </button>
+          <!-- Author view: read-only badge showing how readers reacted.
+               Same icon + count + caption shape, no click handler, no
+               hover affordance — visually distinct from the reader
+               button so the author can tell at a glance that this is
+               their own row. -->
+          <div
+            :if="isOwnReview"
+            class="inline-flex items-center gap-2 px-4 py-2 font-medium text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-full"
+            aria-label="Reader reactions to your review"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+            </svg>
+            <span class="tabular-nums" :text="likes"></span>
+            <span class="text-xs text-gray-500" :text="likes === 0 ? 'No reactions yet' : likes === 1 ? '1 reader found this helpful' : `${likes} readers found this helpful`"></span>
+          </div>
+        </div>
+        <!-- Inline sign-in nudge (anonymous click). Soft prompt, no
+             redirect — the user keeps their scroll position and can
+             come back after auth. The `next` param survives the auth
+             flow because the auth store's signIn navigates manually
+             after success. -->
+        <div
+          :if="likeAuthPrompt"
+          role="status"
+          class="px-3 py-1.5 text-amber-800 text-xs bg-amber-50 border border-amber-200 rounded-md"
+        >
+          <StxLink to="/login" class="font-semibold underline underline-offset-2">Sign in</StxLink>
+          to mark this review as helpful.
+        </div>
+        <div
+          :if="likeError"
+          role="alert"
+          class="px-3 py-1.5 text-red-800 text-xs bg-red-50 border border-red-200 rounded-md"
+          :text="likeError"
+        ></div>
+      </div>
 
       <div class="flex items-center gap-4 text-gray-500 text-sm">
         <span :if="status" class="hidden sm:inline-flex items-center px-2.5 py-1 font-medium text-emerald-700 text-xs bg-emerald-50 ring-1 ring-emerald-200/60 rounded-full capitalize" :text="status"></span>

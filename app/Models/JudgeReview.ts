@@ -42,6 +42,14 @@ export default defineModel({
       routes: ['index', 'store', 'show'],
     },
 
+    // Wires `JudgeReview._likeable.{like,unlike,isLiked,likeCount,likedBy}`
+    // off the `judge_reviews_likes` pivot table (default naming:
+    // `<table>_likes`, FK `judge_review_id`). Pivot rows are the source
+    // of truth for who liked what; the `likes` integer column on the
+    // review row is a denormalised counter the action keeps in sync so
+    // list-feed reads don't have to fan out a per-row COUNT(*).
+    likeable: true,
+
     observe: true,
   },
 
