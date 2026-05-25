@@ -1,7 +1,9 @@
 import { Action } from '@stacksjs/actions'
+import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { notify } from '../../../Helpers/notifications'
 
 /**
  * PATCH /api/admin/reviews/{id}/status — approve or reject a review.
@@ -35,9 +37,9 @@ export default new Action({
       return response.json({ error: 'Status must be "published" or "rejected".' }, 422)
 
     const existing = await db.selectFrom('judge_reviews' as any)
-      .select(['id'] as any)
+      .select(['id', 'user_id', 'status'] as any)
       .where('id' as any, '=', reviewId)
-      .executeTakeFirst()
+      .executeTakeFirst() as { id: number, user_id: number | null, status: string } | undefined
     if (!existing)
       return response.json({ error: 'Review not found.' }, 404)
 
@@ -45,6 +47,22 @@ export default new Action({
       .set({ status, updated_at: new Date().toISOString() } as any)
       .where('id' as any, '=', reviewId)
       .execute()
+
+    // Notify the review's author IFF status actually changed AND the
+    // review has a real author (seeded reviews have user_id=null).
+    // Approve and reject each generate a fresh notification — no
+    // dedup, since toggling status back and forth is a deliberate
+    // moderation signal the user should see each time.
+    if (existing.user_id != null && existing.status !== status) {
+      const me = await Auth.user().catch(() => null)
+      const actorId = (me as any)?.id ?? null
+      await notify({
+        userId: Number(existing.user_id),
+        actorUserId: actorId,
+        type: status === 'published' ? 'approved' : 'rejected',
+        reviewId,
+      })
+    }
 
     return response.json({ ok: true, id: reviewId, status })
   },

@@ -122,6 +122,21 @@ route.get('/me/reviews', 'Actions/Me/MyReviewsAction')
   .name('bench.me.reviews')
   .middleware('auth')
 
+// In-app notification feed for the bell icon + /notifications page.
+route.get('/me/notifications', 'Actions/Me/NotificationsIndexAction')
+  .name('bench.me.notifications.index')
+  .middleware('auth')
+
+route.post('/me/notifications/{id}/read', 'Actions/Me/NotificationReadAction')
+  .name('bench.me.notifications.read')
+  .middleware('auth')
+  .skipCsrf()
+
+route.post('/me/notifications/read-all', 'Actions/Me/NotificationsReadAllAction')
+  .name('bench.me.notifications.read-all')
+  .middleware('auth')
+  .skipCsrf()
+
 route.get('/me/follows', 'Actions/Me/MyFollowsAction')
   .name('bench.me.follows')
   .middleware('auth')

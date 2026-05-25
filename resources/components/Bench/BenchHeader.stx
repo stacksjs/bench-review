@@ -4,6 +4,76 @@
   const auth = useStore('auth')
   const search = useStore('search')
   const judgesStore = useStore('judges')
+  const notifications = useStore('notifications')
+
+  // Bell dropdown open/closed. Local toggle — doesn't need to live in
+  // the store since multiple BenchHeader instances don't share one
+  // page. Click-outside is handled by the @blur on the wrapper.
+  const bellOpen = state<boolean>(false)
+
+  function toggleBell(): void {
+    const next = !bellOpen()
+    bellOpen.set(next)
+    // Lazy-fetch on first open so anonymous-then-login flows don't
+    // hit the API with a stale token. Subsequent opens reuse the
+    // poll-fed cache.
+    if (next) void notifications.fetchNotifications()
+  }
+
+  function closeBell(): void {
+    // setTimeout matches the typeahead-dropdown blur pattern — gives
+    // an in-dropdown @mousedown a chance to fire its handler before
+    // the dropdown vanishes.
+    setTimeout(() => bellOpen.set(false), 150)
+  }
+
+  async function handleBellRowClick(notifId: number, link: string | null): Promise<void> {
+    bellOpen.set(false)
+    await notifications.markRead(notifId)
+    if (link && typeof window !== 'undefined') navigate(link, true)
+  }
+
+  async function handleMarkAllRead(): Promise<void> {
+    await notifications.markAllRead()
+  }
+
+  // Notification phrasing — short, scannable, derived per row.
+  function notificationLabel(n: { type: string, actor: { name: string } | null, review: { title: string } | null }): string {
+    const reviewTitle = n.review?.title ?? 'your review'
+    const truncated = reviewTitle.length > 40 ? reviewTitle.slice(0, 38) + '…' : reviewTitle
+    if (n.type === 'like') {
+      const who = n.actor?.name ?? 'Someone'
+      return `${who} found "${truncated}" helpful`
+    }
+    if (n.type === 'approved') return `Your review "${truncated}" was approved`
+    if (n.type === 'rejected') return `Your review "${truncated}" was declined`
+    return 'New notification'
+  }
+
+  function notificationLink(n: { type: string, review: { id: number } | null }): string | null {
+    return n.review ? `/article/${n.review.id}` : null
+  }
+
+  // Relative time formatter — "2m", "3h", "5d" — keeps the dropdown
+  // tight. Falls back to absolute date past a week.
+  function relativeTime(iso: string): string {
+    if (!iso) return ''
+    const t = new Date(iso).getTime()
+    if (!Number.isFinite(t)) return ''
+    const diffS = Math.max(0, Math.floor((Date.now() - t) / 1000))
+    if (diffS < 60) return 'just now'
+    if (diffS < 3600) return `${Math.floor(diffS / 60)}m`
+    if (diffS < 86400) return `${Math.floor(diffS / 3600)}h`
+    if (diffS < 604800) return `${Math.floor(diffS / 86400)}d`
+    return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  }
+
+  // Start polling when authenticated. The store guards re-starts so
+  // the effect can fire on every nav without spinning up duplicates.
+  effect(() => {
+    if (auth.isAuthenticated()) notifications.startPolling()
+    else notifications.stopPolling()
+  })
 
   // `auth.isAuthenticated` is a derived signal that reads `token()` —
   // capturing it here keeps the :if bindings reactive without us having
@@ -291,6 +361,80 @@
           to="/admin"
           class="inline-flex items-center px-2.5 py-0.5 font-semibold text-gray-700 text-xs tracking-wide uppercase bg-gray-100 border border-gray-200 rounded hover:bg-gray-200"
         >Admin</StxLink>
+
+        <!-- Notification bell. Toggles a dropdown with the 30 most-
+             recent items + a "Mark all read" affordance. Server-side
+             unread count drives the badge; the store polls every 30s
+             so the badge stays fresh without a refresh. -->
+        <div class="relative" @blur="closeBell()">
+          <button
+            type="button"
+            @click="toggleBell()"
+            class="relative inline-flex items-center justify-center h-9 w-9 rounded-full text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400"
+            aria-label="Notifications"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            <!-- Unread badge. CSS-toggled via x-class hidden so the
+                 :text binding to unreadCount() stays subscribed when
+                 the badge re-appears after a markAllRead. -->
+            <span
+              class="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 font-semibold text-[10px] text-white bg-red-500 rounded-full ring-2 ring-white"
+              x-class="notifications.hasUnread ? '' : 'hidden'"
+              :text="notifications.unreadCount() > 99 ? '99+' : notifications.unreadCount()"
+            ></span>
+          </button>
+
+          <!-- Dropdown panel. Same x-class-hidden treatment as the
+               typeahead — keeps inner :for / :text bindings subscribed
+               across show/hide cycles. -->
+          <div
+            class="absolute right-0 mt-2 w-80 sm:w-96 z-30 overflow-hidden bg-white border border-gray-200 rounded-lg shadow-lg"
+            x-class="bellOpen() ? '' : 'hidden'"
+          >
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <p class="font-semibold text-gray-900 text-sm">Notifications</p>
+              <button
+                type="button"
+                @mousedown.prevent="handleMarkAllRead()"
+                class="font-medium text-gray-500 text-xs hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed"
+                x-disabled="!notifications.hasUnread"
+              >Mark all read</button>
+            </div>
+            <div class="max-h-96 overflow-y-auto">
+              <!-- Empty state. Two-line treatment matches the admin tables. -->
+              <div
+                class="px-4 py-10 text-center"
+                x-class="notifications.items().length === 0 ? '' : 'hidden'"
+              >
+                <p class="font-medium text-gray-500 text-sm">No notifications yet</p>
+                <p class="mt-1 text-gray-400 text-xs">You're all caught up.</p>
+              </div>
+              <ul x-class="notifications.items().length > 0 ? 'divide-gray-100 divide-y' : 'hidden'">
+                <li :for="n in notifications.items" class="hover:bg-gray-50">
+                  <button
+                    type="button"
+                    @mousedown.prevent="handleBellRowClick(n.id, notificationLink(n))"
+                    class="flex w-full gap-x-3 px-4 py-3 text-left"
+                  >
+                    <!-- Unread dot. Visible only when the row is
+                         unread; keeps the row scannable. -->
+                    <span class="mt-1 inline-flex h-2 w-2 flex-shrink-0 rounded-full" x-class="n.unread ? 'bg-blue-500' : 'bg-transparent'"></span>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-gray-900 text-sm" :text="notificationLabel(n)"></p>
+                      <p class="mt-0.5 text-gray-400 text-xs" :text="relativeTime(n.created_at)"></p>
+                    </div>
+                  </button>
+                </li>
+              </ul>
+            </div>
+            <div class="px-4 py-2 border-t border-gray-100 text-center">
+              <StxLink to="/notifications" class="font-medium text-gray-600 text-xs hover:text-gray-900">View all</StxLink>
+            </div>
+          </div>
+        </div>
+
         <StxLink to="/profile" class="font-semibold text-gray-900 text-sm/6 hover:text-gray-600" :text="userName"></StxLink>
         <button
           type="button"

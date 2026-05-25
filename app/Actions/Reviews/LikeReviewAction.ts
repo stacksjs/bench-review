@@ -2,6 +2,7 @@ import { Action } from '@stacksjs/actions'
 import { Auth } from '@stacksjs/auth'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { notify } from '../../Helpers/notifications'
 
 /**
  * POST /api/reviews/{id}/like — toggle the current user's "people find
@@ -78,6 +79,18 @@ export default new Action({
     else {
       await likeable.like(reviewId, userId)
       liked = true
+      // Notify the review's author. The helper dedups on
+      // (recipient, actor, 'like', review) so unlike-then-re-like
+      // produces ONE notification, not N. Anonymous reviews have
+      // authorId === null → the helper short-circuits.
+      if (authorId != null) {
+        await notify({
+          userId: Number(authorId),
+          actorUserId: Number(userId),
+          type: 'like',
+          reviewId,
+        })
+      }
     }
 
     // Fresh count straight from the pivot. The composite UNIQUE on

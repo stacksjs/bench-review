@@ -1,0 +1,149 @@
+<script client>
+  import type { NotificationRow } from '~/resources/stores/notifications'
+
+  // Standalone notifications page. The header bell shows recent 30
+  // in a popover; this page shows the same feed with filter tabs and
+  // a "Mark all read" affordance. Same store backs both surfaces, so
+  // marking-read here propagates the badge count instantly.
+  const store = useStore('notifications')
+
+  let hasFetched = false
+  function bootstrap(): void {
+    if (hasFetched) return
+    hasFetched = true
+    // Read filter from URL so back/forward and bookmarks restore the
+    // user's last selection. `?filter=unread` is the only non-default.
+    if (typeof window !== 'undefined') {
+      const fromUrl = new URLSearchParams(window.location.search).get('filter')
+      if (fromUrl === 'unread') store.filter.set('unread')
+      else store.filter.set('all')
+    }
+    void store.fetchNotifications()
+  }
+  bootstrap()
+  onMount(() => { bootstrap() })
+
+  function setFilter(next: 'all' | 'unread'): void {
+    store.setFilter(next)
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      if (next === 'all') url.searchParams.delete('filter')
+      else url.searchParams.set('filter', next)
+      window.history.replaceState({}, '', url.toString())
+    }
+  }
+
+  async function handleRowClick(n: NotificationRow): Promise<void> {
+    await store.markRead(n.id)
+    const link = n.review ? `/article/${n.review.id}` : ''
+    if (link) navigate(link, true)
+  }
+
+  function labelFor(n: NotificationRow): string {
+    const title = n.review?.title ?? 'your review'
+    if (n.type === 'like') {
+      const who = n.actor?.name ?? 'Someone'
+      return `${who} found "${title}" helpful`
+    }
+    if (n.type === 'approved') return `Your review "${title}" was approved`
+    if (n.type === 'rejected') return `Your review "${title}" was declined`
+    return 'New notification'
+  }
+
+  function detailFor(n: NotificationRow): string {
+    if (n.type === 'approved') return 'It\'s now visible on the public feed.'
+    if (n.type === 'rejected') return 'A moderator declined it. You can edit and resubmit if you have new context.'
+    if (n.type === 'like') return 'Click to view the review.'
+    return ''
+  }
+
+  function relativeTime(iso: string): string {
+    if (!iso) return ''
+    const t = new Date(iso).getTime()
+    if (!Number.isFinite(t)) return ''
+    const diffS = Math.max(0, Math.floor((Date.now() - t) / 1000))
+    if (diffS < 60) return 'just now'
+    if (diffS < 3600) return `${Math.floor(diffS / 60)} min ago`
+    if (diffS < 86400) return `${Math.floor(diffS / 3600)} hr ago`
+    if (diffS < 604800) return `${Math.floor(diffS / 86400)} d ago`
+    return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  }
+
+  // Empty state copy — filter-aware (memory feedback_stx_view_vs_component_scripts:
+  // logic lives in components, not views).
+  const emptyTitle = derived<string>(() => store.filter() === 'unread' ? 'No unread notifications' : 'No notifications yet')
+  const emptyHint = derived<string>(() => store.filter() === 'unread'
+    ? 'Once new activity arrives it will land here.'
+    : 'Reviews, likes, and moderation updates will appear here as they happen.')
+</script>
+
+<div class="min-h-screen">
+  <div class="mx-auto px-4 py-10 sm:px-6 lg:px-8 max-w-3xl">
+    <div class="flex justify-between items-end">
+      <div>
+        <h1 class="font-bold text-2xl text-gray-900">Notifications</h1>
+        <p class="mt-1 text-gray-500 text-sm">
+          <span :text="store.unreadCount()"></span> unread
+        </p>
+      </div>
+      <button
+        type="button"
+        @click="store.markAllRead()"
+        class="font-medium text-gray-600 text-sm hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed"
+        x-disabled="!store.hasUnread"
+      >Mark all read</button>
+    </div>
+
+    <div class="flex gap-x-1 mt-6 border-b border-gray-200">
+      <button
+        type="button"
+        @click="setFilter('all')"
+        class="px-4 py-2 font-medium text-sm border-b-2 transition-colors"
+        x-class="store.filter() === 'all' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300'"
+      >All</button>
+      <button
+        type="button"
+        @click="setFilter('unread')"
+        class="px-4 py-2 font-medium text-sm border-b-2 transition-colors"
+        x-class="store.filter() === 'unread' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300'"
+      >Unread</button>
+    </div>
+
+    <div class="mt-6 bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div :if="store.loading() && store.items().length === 0" class="px-6 py-12 text-center text-gray-500 text-sm">
+        Loading notifications…
+      </div>
+      <!-- Empty state. x-class hidden so the inner :text bindings
+           stay subscribed across filter changes — bindIf would drop
+           them on re-add. -->
+      <div
+        class="px-6 py-16 text-center"
+        x-class="!store.loading() && store.items().length === 0 ? '' : 'hidden'"
+      >
+        <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-50">
+          <svg class="h-6 w-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+        </div>
+        <p class="font-semibold text-gray-900 text-sm" :text="emptyTitle()"></p>
+        <p class="mt-1 max-w-md mx-auto text-gray-500 text-xs leading-relaxed" :text="emptyHint()"></p>
+      </div>
+      <ul x-class="store.items().length > 0 ? 'divide-gray-100 divide-y' : 'hidden'">
+        <li :for="n in store.items" class="hover:bg-gray-50">
+          <button
+            type="button"
+            @click="handleRowClick(n)"
+            class="flex w-full gap-x-4 px-6 py-4 text-left"
+          >
+            <span class="mt-1 inline-flex h-2.5 w-2.5 flex-shrink-0 rounded-full" x-class="n.unread ? 'bg-blue-500' : 'bg-transparent'"></span>
+            <div class="flex-1 min-w-0">
+              <p class="font-medium text-gray-900 text-sm" :text="labelFor(n)"></p>
+              <p class="mt-1 text-gray-500 text-xs" :text="detailFor(n)"></p>
+              <p class="mt-1 text-gray-400 text-xs" :text="relativeTime(n.created_at)"></p>
+            </div>
+          </button>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
