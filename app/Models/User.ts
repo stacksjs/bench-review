@@ -38,10 +38,15 @@ export default defineModel({
       // options: {}, // you may pass options to the search engine
     },
 
-    useSeeder: {
-      // defaults to a count of 10, `seedable` used as an alias
-      count: 10,
-    },
+    // `useSeeder` deliberately disabled. Auto-firing the factory on
+    // every `./buddy migrate` minted 10 fresh faker users per run —
+    // the table accumulated noise with unguessable bcrypt passwords
+    // that no one can use. `database/seeders/UserSeeder.ts` owns the
+    // explicit list of real test accounts (the project owner as
+    // admin + a handful of regulars with a documented test password),
+    // idempotent on email so re-runs are no-ops.
+    //
+    // useSeeder: { count: 10 },
 
     useApi: {
       uri: 'users', // your-url.com/api/users

@@ -3,7 +3,6 @@ CREATE TABLE IF NOT EXISTS "judge_reviews" (
   "title" TEXT,
   "content" TEXT,
   "rating" INTEGER,
-  "likes" INTEGER,
   "comments" INTEGER,
   "type" TEXT,
   "status" TEXT,

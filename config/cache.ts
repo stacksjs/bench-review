@@ -9,7 +9,15 @@ import { env } from '@stacksjs/env'
  * you have any questions, feel free to reach out via Discord or GitHub Discussions.
  */
 export default {
-  driver: 'dynamodb',
+  // The cache module (storage/framework/core/cache/src/drivers/
+  // index.ts) only implements `memory` and `redis` today — the
+  // dynamodb / memcached blocks below are aspirational templates
+  // for drivers a project could wire up itself, not active impls.
+  // The shipped project default of `dynamodb` is therefore a stub
+  // that the new config validator (upstream b8a718f7 era) correctly
+  // flags. `memory` is the right zero-config dev choice; flip to
+  // `redis` for production with a real Redis instance behind it.
+  driver: 'memory',
   prefix: 'stacks',
   ttl: 3600,
 
