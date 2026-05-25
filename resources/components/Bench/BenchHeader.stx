@@ -269,6 +269,17 @@
         <StxLink to="/register" class="font-semibold text-gray-900 text-sm/6">Sign up</StxLink>
       </div>
       <div :if="isAuthenticated" class="flex gap-x-4 items-center">
+        <!-- Admin shortcut. Visible only to users whose `roles` array
+             (hydrated by the auth store's fetchMe from /api/me)
+             contains 'admin'. The server still enforces access via
+             the `admin` middleware on every /api/admin/* route — this
+             link is purely UX so admins can jump straight to the
+             moderation surface from any public page. -->
+        <StxLink
+          :if="auth.isAdmin"
+          to="/admin"
+          class="inline-flex items-center px-2.5 py-0.5 font-semibold text-gray-700 text-xs tracking-wide uppercase bg-gray-100 border border-gray-200 rounded hover:bg-gray-200"
+        >Admin</StxLink>
         <StxLink to="/profile" class="font-semibold text-gray-900 text-sm/6 hover:text-gray-600" :text="userName"></StxLink>
         <button
           type="button"

@@ -116,6 +116,10 @@ export interface UserProfile {
   avatar?: string
   created_at?: string
   createdAt?: string
+  // Role names from RBAC. Populated by the auth store's `fetchMe()`
+  // call against `/api/me` on hydration / after login. Drives
+  // conditional UI like the "Admin" link in BenchHeader.
+  roles?: string[]
 }
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning'

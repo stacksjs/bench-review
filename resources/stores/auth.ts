@@ -217,6 +217,10 @@ defineStore('auth', () => {
         return { ok: false, error: msg }
       }
       persistAuth(data.token ?? '', data.user)
+      // Best-effort role hydration so isAdmin flips immediately after
+      // a regular login. fetchMe is idempotent + cheap; on failure the
+      // header just won't show the admin link until next mount.
+      await fetchMe().catch(() => {})
       return { ok: true, user: data.user, token: data.token }
     }
     catch (err) {
@@ -289,6 +293,41 @@ defineStore('auth', () => {
   // the cross-store reference resolves lazily, not at module load.
   const authFetch = _apiFetch
 
+  /**
+   * Hydrate role names onto the cached user via `/api/me`. Used by
+   * BenchHeader to conditionally render the "Admin" link. Idempotent:
+   * cheap to call on every mount; skipped silently when no token is
+   * present.
+   *
+   * Updates both the `user` signal AND the auth-user cookie so a
+   * subsequent hard reload sees the roles without re-fetching.
+   */
+  async function fetchMe(): Promise<void> {
+    if (!token()) return
+    try {
+      const res = await _apiFetch('/api/me')
+      if (!res.ok) return
+      const data = await res.json() as UserProfile & { roles?: string[] }
+      const merged: UserProfile = { ...(user() ?? {}), ...data }
+      user.set(merged)
+      setUserCookie(merged)
+    }
+    catch {
+      // Network blip — skip silently; isAdmin will stay false until
+      // the next opportunity to refresh.
+    }
+  }
+
+  // Derived role check. False when no user, no roles, or no admin
+  // role in the array. Reactive — flips the moment fetchMe lands.
+  const isAdmin = derived<boolean>(() => !!user()?.roles?.includes('admin'))
+
+  // Auto-hydrate roles on first mount when a token is already in the
+  // cookie (e.g. after a hard reload). Fires once per page load.
+  if (typeof window !== 'undefined' && token()) {
+    fetchMe().catch(() => {})
+  }
+
   function setNotifications(notifs: NotificationItem[]): void {
     notifications.set(notifs)
   }
@@ -311,6 +350,7 @@ defineStore('auth', () => {
     user,
     token,
     isAuthenticated,
+    isAdmin,
     notifications,
     unreadCount,
     signIn,
@@ -318,6 +358,7 @@ defineStore('auth', () => {
     logout,
     getUser,
     setUser,
+    fetchMe,
     authFetch,
     // Exposed for the admin store — admin login POSTs to its own
     // endpoint, then needs to persist the returned token + user via

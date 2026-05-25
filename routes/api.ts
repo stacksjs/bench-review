@@ -114,6 +114,10 @@ route.post('/reviews/{id}/like', 'Actions/Reviews/LikeReviewAction')
 
 // Self-routes — return data scoped to the authenticated user. Auth-
 // gated; profile + follow pages depend on these.
+route.get('/me', 'Actions/Me/MeAction')
+  .name('bench.me')
+  .middleware('auth')
+
 route.get('/me/reviews', 'Actions/Me/MyReviewsAction')
   .name('bench.me.reviews')
   .middleware('auth')
