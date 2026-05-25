@@ -92,6 +92,19 @@
     return names.length === 0 ? '—' : names.join(', ')
   }
 
+  // Empty-state copy — search-aware so the message reads naturally
+  // for whatever filter is active. Two-line composition matches the
+  // reviews-table treatment.
+  const emptyTitle = derived<string>(() => {
+    const q = store.query().trim()
+    return q ? `No users match "${q}"` : 'No users yet'
+  })
+  const emptyHint = derived<string>(() => {
+    return store.query().trim()
+      ? 'Try a different search term or clear the search.'
+      : 'New registrations show up here. The seeded test accounts are a good start (alice@example.com, bob@example.com, carol@example.com).'
+  })
+
   // Pretty-print created_at without leaking timezone surprises.
   function formatDate(s: string | null | undefined): string {
     if (!s) return ''
@@ -143,10 +156,22 @@
         <tr :if="store.loading() && store.users().length === 0">
           <td colspan="5" class="px-4 py-12 text-center text-gray-500 text-sm">Loading users…</td>
         </tr>
-        <tr :if="!store.loading() && store.users().length === 0">
-          <td colspan="5" class="px-4 py-12 text-center text-gray-500 text-sm">No users found.</td>
+        <!-- Empty state. x-class hidden (not :if) so the inner :text
+             bindings keep subscribing to the search query signal as
+             it changes — bindIf's remove/re-add cycle drops bindings
+             on re-add. -->
+        <tr x-class="!store.loading() && store.users().length === 0 ? '' : 'hidden'">
+          <td colspan="5" class="px-6 py-16 text-center">
+            <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-50">
+              <svg class="h-6 w-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6 5.87a4 4 0 100-8 4 4 0 000 8zm0 0a4 4 0 014 4M5 8a3 3 0 116 0 3 3 0 01-6 0zm10 0a3 3 0 116 0 3 3 0 01-6 0z" />
+              </svg>
+            </div>
+            <p class="font-semibold text-gray-900 text-sm" :text="emptyTitle()"></p>
+            <p class="mt-1 max-w-md mx-auto text-gray-500 text-xs leading-relaxed" :text="emptyHint()"></p>
+          </td>
         </tr>
-        <tr :for="user in store.users()" class="hover:bg-gray-50">
+        <tr :for="user in store.users" class="hover:bg-gray-50">
           <td class="px-4 py-3 text-gray-900 text-sm">
             <div class="flex flex-col">
               <span class="font-medium" :text="user.name || '(no name)'"></span>

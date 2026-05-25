@@ -67,6 +67,28 @@
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
   }
 
+  // Empty-state copy — derived so the message reads naturally for
+  // the current filter and search. Composed of two lines: a short
+  // headline + a quieter hint underneath. Branches on search query
+  // first (search dominates filter), then on status.
+  const emptyTitle = derived<string>(() => {
+    const q = store.query().trim()
+    if (q) return `No reviews match "${q}"`
+    const status = store.statusFilter()
+    if (status === 'pending') return 'No pending reviews'
+    if (status === 'published') return 'No published reviews yet'
+    if (status === 'rejected') return 'No rejected reviews'
+    return 'No reviews yet'
+  })
+  const emptyHint = derived<string>(() => {
+    if (store.query().trim()) return 'Try a different search term or clear the search.'
+    const status = store.statusFilter()
+    if (status === 'pending') return 'New submissions land here for moderation. You\'re all caught up.'
+    if (status === 'published') return 'Approve a pending review to populate this list.'
+    if (status === 'rejected') return 'Reviews you\'ve declined show up here.'
+    return 'Submissions appear here once users start writing.'
+  })
+
   // Filter tabs definition. Static — order is the order of importance
   // to a moderator (pending first because that's the queue depth).
   const TABS: Array<{ key: ReviewStatusFilter, label: string }> = [
@@ -119,11 +141,28 @@
     <div :if="store.loading() && store.reviews().length === 0" class="px-4 py-12 text-center text-gray-500 text-sm">
       Loading reviews…
     </div>
-    <div :if="!store.loading() && store.reviews().length === 0" class="px-4 py-12 text-center text-gray-500 text-sm">
-      Nothing here.
+    <!-- Empty state. x-class hidden (not :if) so the inner :text
+         bindings stay subscribed across status / query changes —
+         bindIf's remove/re-add cycle drops bindings on the re-add
+         (same footgun the login form hit; see login.stx). -->
+    <div
+      class="px-6 py-16 text-center"
+      x-class="!store.loading() && store.reviews().length === 0 ? '' : 'hidden'"
+    >
+      <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-50">
+        <svg class="h-6 w-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z" />
+        </svg>
+      </div>
+      <p class="font-semibold text-gray-900 text-sm" :text="emptyTitle()"></p>
+      <p class="mt-1 max-w-md mx-auto text-gray-500 text-xs leading-relaxed" :text="emptyHint()"></p>
     </div>
-    <ul :if="store.reviews().length > 0" class="divide-gray-100 divide-y">
-      <li :for="review in store.reviews()" class="px-4 py-4">
+    <!-- x-class hidden (not :if) so the inner :for keeps its
+         subscription across the loading -> loaded transition. The
+         :if remove/re-add cycle drops the :for binding on re-add and
+         the rows never render even after reviews() populates. -->
+    <ul x-class="store.reviews().length > 0 ? 'divide-gray-100 divide-y' : 'hidden'">
+      <li :for="review in store.reviews" class="px-4 py-4">
         <div class="flex justify-between gap-x-4">
           <div class="flex-1 min-w-0">
             <div class="flex gap-x-2 items-center">

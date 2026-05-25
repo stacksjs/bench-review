@@ -19,6 +19,21 @@
     typeof window !== 'undefined' ? window.location.pathname : '/admin',
   )
 
+  // Keep currentPath in lock-step with the URL across SPA navigation.
+  // AdminShell sits inside `layouts/admin` and STAYS MOUNTED as the
+  // user moves between /admin / /admin/users / /admin/reviews — the
+  // top-level script body only runs once, so without these listeners
+  // the initial pathname stuck and the nav highlight never moved.
+  //
+  // `stx:navigate` is dispatched by the router when `navigate(...)` is
+  // called (StxLink clicks, post-login redirects). `popstate` covers
+  // browser back/forward. Both fire AFTER the URL has updated.
+  if (typeof window !== 'undefined') {
+    const syncPath = (): void => currentPath.set(window.location.pathname)
+    window.addEventListener('stx:navigate', syncPath)
+    window.addEventListener('popstate', syncPath)
+  }
+
   function isActive(path: string): boolean {
     const cur = currentPath()
     if (path === '/admin') return cur === '/admin' || cur === '/admin/'
