@@ -122,6 +122,16 @@ route.get('/me/reviews', 'Actions/Me/MyReviewsAction')
   .name('bench.me.reviews')
   .middleware('auth')
 
+route.patch('/me/reviews/{id}', 'Actions/Me/UpdateMyReviewAction')
+  .name('bench.me.reviews.update')
+  .middleware('auth')
+  .skipCsrf()
+
+route.delete('/me/reviews/{id}', 'Actions/Me/DeleteMyReviewAction')
+  .name('bench.me.reviews.destroy')
+  .middleware('auth')
+  .skipCsrf()
+
 // In-app notification feed for the bell icon + /notifications page.
 route.get('/me/notifications', 'Actions/Me/NotificationsIndexAction')
   .name('bench.me.notifications.index')

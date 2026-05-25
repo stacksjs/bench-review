@@ -143,6 +143,162 @@
   const content = derived<string>(() => reviewsStore.current()?.content ?? '')
   const rating = derived<number>(() => Number(reviewsStore.current()?.rating ?? 0))
   const status = derived<string>(() => reviewsStore.current()?.status ?? '')
+  // True for the author-only states (pending / rejected). The server
+  // only serves these to the row's author (ShowReviewAction enforces),
+  // so when this is true, the current viewer IS the author. Drives
+  // the prominent status banner at the top of the article and gates
+  // the like button (no readers can react to non-published content).
+  const isUnpublished = derived<boolean>(() => {
+    const s = status()
+    return s === 'pending' || s === 'rejected'
+  })
+  // Status-pill copy + colors. Computed once, reused by both the
+  // top banner and the footer chip so the two surfaces stay aligned.
+  const statusLabel = derived<string>(() => {
+    const s = status()
+    if (s === 'pending') return 'Pending review'
+    if (s === 'rejected') return 'Declined'
+    if (s === 'published') return 'Published'
+    return ''
+  })
+  const statusBlurb = derived<string>(() => {
+    const s = status()
+    if (s === 'pending') return 'A moderator hasn\'t reviewed this yet. It isn\'t visible to other readers until it\'s approved.'
+    if (s === 'rejected') return 'A moderator declined this review. Only you can see it. Edit and resubmit if you have new context, or write a fresh review.'
+    return ''
+  })
+  // Tailwind classes for the badge — keyed off status. Static array
+  // mapping keeps the markup terse.
+  const statusBadgeClasses = derived<string>(() => {
+    const s = status()
+    if (s === 'pending') return 'bg-amber-50 text-amber-800 ring-amber-200/60'
+    if (s === 'rejected') return 'bg-red-50 text-red-800 ring-red-200/60'
+    if (s === 'published') return 'bg-emerald-50 text-emerald-800 ring-emerald-200/60'
+    return 'bg-gray-50 text-gray-700 ring-gray-200/60'
+  })
+
+  // ── Author edit mode ─────────────────────────────────────────────
+  //
+  // Edit/delete buttons live on the status banner (only shown for
+  // unpublished reviews, which the server only serves to the author).
+  // Inline editing keeps the user in the same page — no separate
+  // /edit route, no judge-picker step (the judge is fixed on the
+  // existing row).
+  //
+  // Content is edited as a plain textarea here, not the MediumEditor
+  // used on submission. The author can still keep / paste HTML if
+  // they want; the textarea is intentionally lower-friction for a
+  // light correction pass. Switching to the rich editor for edits
+  // would require re-mounting it with the existing HTML, which the
+  // MediumEditor binding doesn't currently support cleanly.
+  const editing = state<boolean>(false)
+  const editTitle = state<string>('')
+  const editContent = state<string>('')
+  const editRating = state<number>(0)
+  const editError = state<string>('')
+  const editSaving = state<boolean>(false)
+
+  function startEdit(): void {
+    const r = reviewsStore.current()
+    if (!r) return
+    editTitle.set(String(r.title ?? ''))
+    const initialHtml = String((r as any).content ?? '')
+    editContent.set(initialHtml)
+    editRating.set(Number(r.rating ?? 0))
+    editError.set('')
+    editing.set(true)
+    // Seed the rich editor with the existing article HTML. The
+    // editor's host lives inside `[data-edit-richtext-host]` (the
+    // outer x-class-toggled wrapper) and was mounted at script-load
+    // by RichTextEditor's MutationObserver. We push content into
+    // its editable element imperatively here — `data-no-draft` on
+    // the wrapper skipped the localStorage restore, so without this
+    // call the editor would be empty when edit mode opens.
+    //
+    // Microtask-deferred so the `editing.set(true)` above unhides
+    // the host before we touch the editable (some MediumEditor
+    // internals measure on setContent and need layout to be live).
+    if (typeof window !== 'undefined') {
+      Promise.resolve().then(() => {
+        const wrapper = document.querySelector('[data-edit-richtext-host]') as HTMLElement | null
+        const host = wrapper?.querySelector('[data-richtext-host]') as HTMLElement | null
+        const editor = host && (host as any).__richtextEditor
+        const editable = host?.querySelector('.medium-editor-element') as HTMLElement | null
+        if (editor && typeof editor.setContent === 'function') {
+          editor.setContent(initialHtml)
+        }
+        else if (editable) {
+          editable.innerHTML = initialHtml
+        }
+        // Sync our local state so the Save handler sends the right
+        // payload even if the user clicks Save without typing
+        // (i.e. only changing the rating, not the content).
+        editContent.set(initialHtml)
+      })
+    }
+  }
+
+  function cancelEdit(): void {
+    editing.set(false)
+    editError.set('')
+  }
+
+  async function saveEdit(): Promise<void> {
+    if (editSaving()) return
+    const id = reviewId
+    if (!id) return
+
+    const title = editTitle().trim()
+    if (title.length < 3) {
+      editError.set('Title must be at least 3 characters.')
+      return
+    }
+    const content = editContent().trim()
+    if (content.length < 10) {
+      editError.set('Review content must be at least 10 characters.')
+      return
+    }
+    const rating = Number(editRating())
+    if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+      editError.set('Pick a star rating from 1 to 5.')
+      return
+    }
+
+    editSaving.set(true)
+    editError.set('')
+    const result = await reviewsStore.updateOwn(id, {
+      title,
+      content,
+      rating,
+      // Mirror the rating-to-type mapping used by SubmitReviewAction
+      // (4-5 = positive, 1-2 = negative, 3 = neutral) so a re-edit
+      // with a different rating updates the chip color correctly.
+      type: rating >= 4 ? 'positive' : rating <= 2 ? 'negative' : 'neutral',
+    })
+    editSaving.set(false)
+
+    if (!result.ok) {
+      editError.set(result.error || 'Could not save changes.')
+      return
+    }
+    editing.set(false)
+  }
+
+  async function handleDelete(): Promise<void> {
+    if (typeof window === 'undefined') return
+    const ok = window.confirm('Delete this review? This cannot be undone.')
+    if (!ok) return
+    const id = reviewId
+    if (!id) return
+    const result = await reviewsStore.deleteOwn(id)
+    if (!result.ok) {
+      editError.set(result.error || 'Could not delete review.')
+      return
+    }
+    // Bounce out — the row is gone; staying on the page would render
+    // the not-found state, but a fresh page elsewhere is friendlier.
+    navigate('/reviews', true)
+  }
   const reviewType = derived<string>(() => reviewsStore.current()?.type ?? '')
   const likes = derived<number>(() => Number(reviewsStore.current()?.likes ?? 0))
   const date = derived<string>(() => formatDate(reviewsStore.current()?.created_at))
@@ -197,6 +353,136 @@
 
   <!-- Loaded state -->
   <article :if="reviewsStore.current" class="mx-auto pb-32 pt-12 sm:pt-16 px-4 sm:px-6 max-w-3xl">
+    <!-- Author-only status banner for non-published reviews. The
+         server (ShowReviewAction) only serves pending/rejected rows
+         to their author, so when this shows, the viewer IS the
+         author. Pinned at the top so it's the first thing they see
+         (the notification deep-link lands them here). Edit + Delete
+         buttons let the author act on the moderation feedback in
+         place — Edit toggles the inline form below, Delete cascades
+         server-side and bounces back to /reviews. -->
+    <div
+      class="mb-8 px-4 py-3 ring-1 rounded-md"
+      x-class="isUnpublished ? statusBadgeClasses : 'hidden'"
+    >
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold text-sm" :text="statusLabel"></p>
+          <p class="mt-1 text-xs leading-relaxed" :text="statusBlurb"></p>
+        </div>
+        <div class="flex flex-shrink-0 gap-x-2">
+          <button
+            :if="!editing"
+            type="button"
+            @click="startEdit()"
+            class="px-3 py-1.5 font-semibold text-gray-800 text-xs bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          >Edit</button>
+          <button
+            :if="!editing"
+            type="button"
+            @click="handleDelete()"
+            class="px-3 py-1.5 font-semibold text-red-700 text-xs bg-white border border-red-200 rounded-md hover:bg-red-50"
+          >Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inline edit form. Replaces the read-view content below when
+         active; the article body below has its own x-class hidden
+         binding keyed on the editing signal. The rating bar matches
+         the star control on the submit form. Save flips the server's
+         status back to pending and exits edit mode. -->
+    <div
+      class="mb-8 p-6 bg-white border border-gray-200 rounded-lg shadow-sm"
+      x-class="editing ? '' : 'hidden'"
+    >
+      <h2 class="font-bold text-gray-900 text-lg">Edit your review</h2>
+      <p class="mt-1 text-gray-500 text-xs">Saving resubmits the review for moderation. It returns to the pending queue regardless of its current status.</p>
+
+      <div class="space-y-4 mt-5">
+        <div>
+          <label for="edit-title" class="block font-medium text-gray-900 text-sm">Title</label>
+          <input
+            id="edit-title"
+            type="text"
+            x-model="editTitle"
+            x-disabled="editSaving"
+            class="block mt-1 px-3 py-2 w-full text-sm bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:opacity-50"
+          >
+        </div>
+
+        <div>
+          <label class="block font-medium text-gray-900 text-sm">Content</label>
+          <!-- Rich-text editor. The Bench/RichTextEditor include
+               renders its own host and mounts the MediumEditor
+               script. The data-no-draft attribute on the wrapper
+               propagates to the editor host via a closest() check
+               in the editor's mount logic — that opts the article-
+               edit flow out of the localStorage compose-draft
+               persistence so article edits never clobber an in-
+               progress new-review draft (and vice versa). The
+               data-edit-richtext-host marker is the imperative
+               selector startEdit() uses to seed content. (No
+               backticks in this comment — stx's script-merge
+               concatenates comment text and a stray backtick flips
+               the JS parser into template-literal mode, which leaks
+               the comment to DOM and duplicates the editor on the
+               page; see the standing memory note.) -->
+          <div
+            data-no-draft
+            data-edit-richtext-host
+            class="mt-1 border border-gray-300 focus-within:border-gray-900 focus-within:ring-2 focus-within:ring-gray-200 rounded-md shadow-sm transition-colors overflow-hidden"
+            @richtext-change="editContent.set($event.detail.html)"
+          >
+            @include('Bench/RichTextEditor')
+          </div>
+          <p class="mt-2 text-gray-500 text-xs">Edits go back into the moderation queue. Formatting carries through.</p>
+        </div>
+
+        <div>
+          <label class="block font-medium text-gray-900 text-sm">Overall rating</label>
+          <div class="flex gap-x-1 mt-1">
+            <button
+              :for="star in stars"
+              type="button"
+              x-disabled="editSaving"
+              @click="editRating.set(star)"
+              class="text-2xl leading-none transition-colors disabled:opacity-50"
+              x-class="editRating >= star ? 'text-yellow-400' : 'text-gray-300 hover:text-gray-400'"
+            >★</button>
+          </div>
+        </div>
+
+        <div
+          role="alert"
+          class="px-3 py-2 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
+          x-class="editError() ? '' : 'hidden'"
+          :text="editError()"
+        ></div>
+
+        <div class="flex justify-end gap-x-2 pt-2">
+          <button
+            type="button"
+            @click="cancelEdit()"
+            x-disabled="editSaving"
+            class="px-4 py-2 font-semibold text-gray-700 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+          >Cancel</button>
+          <button
+            type="button"
+            @click="saveEdit()"
+            x-disabled="editSaving"
+            class="px-4 py-2 font-semibold text-white text-sm bg-gray-900 hover:bg-gray-800 rounded-md disabled:opacity-50"
+            :text="editSaving() ? 'Saving…' : 'Save & resubmit'"
+          >Save &amp; resubmit</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Read-view wrapper. Hidden while the inline edit form is
+         open so the author doesn't see the live article + the
+         editor side-by-side. The edit form lives above this wrapper
+         and grows the page; the read view collapses while editing. -->
+    <div x-class="editing ? 'hidden' : ''">
     <!-- Topic chip -->
     <p class="font-medium text-amber-600 text-center text-xs tracking-widest uppercase" :text="reviewTypeLabel"></p>
 
@@ -264,9 +550,17 @@
          which busts the page.) -->
     <div class="article-body mt-10 text-gray-800" x-html="content"></div>
 
-    <!-- Footer row: "people find this helpful" + status pill + back link -->
+    <!-- Footer row: "people find this helpful" + status pill + back link.
+         Helpful-button area hidden entirely for unpublished reviews —
+         no readers can see them yet, so the count and the CTA don't
+         apply. The status pill on the right still renders so the
+         author has a footer-level reminder of where their submission
+         sits. -->
     <div class="flex flex-col gap-3 mt-14 pt-8 sm:flex-row sm:items-center sm:justify-between border-t border-gray-200">
-      <div class="flex flex-col gap-2 items-start">
+      <div
+        class="flex flex-col gap-2 items-start"
+        x-class="isUnpublished ? 'hidden' : ''"
+      >
         <div class="flex gap-3 items-center">
           <!-- Reader view: clickable button. Hidden for the author of
                the row (own reviews can't be self-liked). -->
@@ -307,9 +601,9 @@
         </div>
         <!-- Inline sign-in nudge (anonymous click). Soft prompt, no
              redirect — the user keeps their scroll position and can
-             come back after auth. The `next` param survives the auth
-             flow because the auth store's signIn navigates manually
-             after success. -->
+             come back after auth. The "next" query param survives the
+             auth flow because the auth store's signIn navigates
+             manually after success. -->
         <div
           :if="likeAuthPrompt"
           role="status"
@@ -327,12 +621,21 @@
       </div>
 
       <div class="flex items-center gap-4 text-gray-500 text-sm">
-        <span :if="status" class="hidden sm:inline-flex items-center px-2.5 py-1 font-medium text-emerald-700 text-xs bg-emerald-50 ring-1 ring-emerald-200/60 rounded-full capitalize" :text="status"></span>
+        <!-- Status pill — color-coded per status. Bare status ident
+             (auto-unwrapped) drives the :if; the badge-classes derived
+             hands us tailwind tokens. -->
+        <span
+          :if="status"
+          class="hidden sm:inline-flex items-center px-2.5 py-1 font-medium text-xs ring-1 rounded-full capitalize"
+          x-class="statusBadgeClasses"
+          :text="statusLabel"
+        ></span>
         <StxLink x-to="`/reviews`" class="text-gray-600 hover:text-gray-900 hover:underline underline-offset-2">
           ← All reviews
         </StxLink>
       </div>
     </div>
+    </div><!-- /read-view wrapper -->
   </article>
 </div>
 

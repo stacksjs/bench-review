@@ -200,6 +200,18 @@
     if (host.__richtextMounted) return
     host.__richtextMounted = true
 
+    // `data-no-draft` opts out of the localStorage compose-draft
+    // persistence. Used by the article-edit flow where the editor
+    // shouldn't restore from / save to the same key the new-review
+    // submission form uses — otherwise editing an existing article
+    // would clobber an in-progress new-review draft. The attribute
+    // can sit on the host itself OR any ancestor: callers that
+    // `@include('Bench/RichTextEditor')` can't override the host's
+    // attributes (the markup is fixed inside this component), but
+    // they CAN wrap the include in a `<div data-no-draft>` and the
+    // closest() check picks it up.
+    const noDraft = !!host.closest('[data-no-draft]')
+
     // Host needs `position: relative` so the toolbar's `position: absolute`
     // anchors to the host's bounding box (otherwise it'd anchor to the
     // nearest positioned ancestor — typically body — and float outside
@@ -218,7 +230,10 @@
     // Restore prior draft BEFORE constructing the editor — once
     // MediumEditor takes over the element, setting innerHTML through
     // its own API would fire a spurious `editableInput` event.
-    if (composeDraft()) editable.innerHTML = composeDraft()
+    // Skipped when the host opts out via `data-no-draft` (article-
+    // edit flow seeds content imperatively after mount via
+    // `host.__richtextEditor.setContent(html)`).
+    if (!noDraft && composeDraft()) editable.innerHTML = composeDraft()
 
     const editor = new MediumEditor(editable, {
       // Append the toolbar inside the host (default would be
@@ -325,11 +340,14 @@
       // setting it writes through to localStorage on a single effect.
       // Trimmed empty-state sentinel is stored as '' so the next mount
       // doesn't try to "restore" a meaningless <p><br></p>.
-      if (saveTimer) clearTimeout(saveTimer)
-      saveTimer = setTimeout(() => {
-        const trimmed = (html || '').trim()
-        composeDraft.set(trimmed && trimmed !== '<p><br></p>' ? html : '')
-      }, 500)
+      // Skipped when the host opted out via `data-no-draft`.
+      if (!noDraft) {
+        if (saveTimer) clearTimeout(saveTimer)
+        saveTimer = setTimeout(() => {
+          const trimmed = (html || '').trim()
+          composeDraft.set(trimmed && trimmed !== '<p><br></p>' ? html : '')
+        }, 500)
+      }
 
       // Bubbling CustomEvent — parents listen via @richtext-change.
       host.dispatchEvent(new CustomEvent('richtext-change', {
@@ -348,8 +366,10 @@
 
     // If we restored a draft, fire one onChange so any derived UI
     // (character count, validation, enable-submit) starts in the
-    // correct state from frame 1.
-    if (composeDraft()) {
+    // correct state from frame 1. Suppressed when noDraft — the
+    // article-edit flow seeds content imperatively (via setContent)
+    // and dispatches its own change event after that.
+    if (!noDraft && composeDraft()) {
       host.dispatchEvent(new CustomEvent('richtext-change', {
         bubbles: true,
         detail: { html: composeDraft() },

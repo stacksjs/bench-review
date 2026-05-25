@@ -176,6 +176,62 @@ defineStore('reviews', () => {
   }
 
   /**
+   * Author edit. Sends a partial patch (only changed fields), then
+   * refreshes the local `current` slice with the server's response.
+   * The server resets `status` to `pending` on every edit, so the
+   * UI's status banner flips automatically.
+   */
+  async function updateOwn(reviewId: number, patch: { title?: string, content?: string, rating?: number, type?: string }): Promise<{ ok: boolean, error?: string }> {
+    try {
+      const res = await useStore('auth').authFetch(`/api/me/reviews/${reviewId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean, review?: any, error?: string }
+      if (!res.ok || !data.ok)
+        return { ok: false, error: data.error || 'Could not save changes' }
+
+      const cur = current()
+      if (cur && data.review && Number(cur.id) === Number(reviewId)) {
+        current.set({ ...cur, ...data.review })
+      }
+      return { ok: true }
+    }
+    catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'Network error' }
+    }
+  }
+
+  /**
+   * Author delete. Drops the row + cascaded pivots server-side, then
+   * clears local caches so the UI doesn't keep a dangling reference.
+   */
+  async function deleteOwn(reviewId: number): Promise<{ ok: boolean, error?: string }> {
+    try {
+      const res = await useStore('auth').authFetch(`/api/me/reviews/${reviewId}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean, error?: string }
+      if (!res.ok || !data.ok)
+        return { ok: false, error: data.error || 'Could not delete review' }
+
+      // Local-cache cleanup. If the deleted review was `current`,
+      // null it out so the next render doesn't show a phantom row.
+      // Also strip it from `latest` and any `byJudge` slice.
+      if (current()?.id === reviewId) current.set(null)
+      latest.set(latest().filter(r => r.id !== reviewId))
+      const next = { ...byJudge() }
+      for (const [k, rows] of Object.entries(next))
+        next[Number(k)] = rows.filter(r => r.id !== reviewId)
+      byJudge.set(next)
+
+      return { ok: true }
+    }
+    catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'Network error' }
+    }
+  }
+
+  /**
    * Toggle "people find this helpful" for a review.
    *
    * The endpoint is auth-gated. If the caller is anonymous, the auth
@@ -261,6 +317,8 @@ defineStore('reviews', () => {
     fetchByJudge,
     fetchById,
     submit,
+    updateOwn,
+    deleteOwn,
     toggleLike,
     reviewsForJudge,
     isLoadingJudge,
