@@ -36,12 +36,17 @@ export default new Action({
     const perPage = Math.min(100, Math.max(1, Number.isFinite(perPageRaw) ? Math.floor(perPageRaw) : 25))
     const offset = (page - 1) * perPage
 
+    // Apply WHERE clauses BEFORE orderBy — bqb's SELECT builder emits
+    // chained methods in call order, so orderBy-then-where produces
+    // `... ORDER BY ... WHERE ...` which SQLite rejects. See
+    // UserIndexAction for the same fix.
     let listQuery: any = db.selectFrom('judge_reviews' as any)
       .selectAll()
-      .orderBy('created_at' as any, 'desc')
 
     let countQuery: any = db.selectFrom('judge_reviews' as any)
-      .select(db.fn.count('id' as any).as('total') as any)
+      // Plain-string COUNT — `db.fn.count` is undefined in this bqb
+      // version. See UserIndexAction for the same pattern.
+      .select(['COUNT(*) as total'] as any)
 
     if (status !== 'all') {
       listQuery = listQuery.where('status' as any, '=', status)
@@ -49,16 +54,14 @@ export default new Action({
     }
 
     if (q.length > 0) {
+      // bqb has no Kysely-style callback `where(eb => eb.or([…]))` —
+      // the form is silently no-op'd. Use `where().orWhere()` instead.
       const like = `%${q}%`
-      listQuery = listQuery.where((eb: any) => eb.or([
-        eb('title', 'like', like),
-        eb('content', 'like', like),
-      ]))
-      countQuery = countQuery.where((eb: any) => eb.or([
-        eb('title', 'like', like),
-        eb('content', 'like', like),
-      ]))
+      listQuery = listQuery.where('title', 'like', like).orWhere('content', 'like', like)
+      countQuery = countQuery.where('title', 'like', like).orWhere('content', 'like', like)
     }
+
+    listQuery = listQuery.orderBy('created_at' as any, 'desc')
 
     const [rows, totalRow] = await Promise.all([
       listQuery.limit(perPage).offset(offset).execute(),

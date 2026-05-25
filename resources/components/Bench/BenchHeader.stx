@@ -79,6 +79,7 @@
     showEmpty.set(q.length > 0 && !loading && judgeCount === 0 && courtCount === 0)
   })
 
+
   function closeDropdown(): void {
     showDropdown.set(false)
     showEmpty.set(false)
@@ -220,25 +221,35 @@
         class="absolute top-full left-0 right-0 mt-1 z-20 overflow-hidden bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto"
         x-class="showDropdown() ? '' : 'hidden'"
       >
+        <!-- `:for="judge in judgesStore.searchResults"` — NO PARENS on
+             the signal reference. Matches the working pattern in
+             Bench/Judge/ReviewJudgeSearch. The call form
+             (`searchResults()`) evaluates once at bindFor time and
+             returns a snapshot array; the effect inside bindFor then
+             tracks no signal at all, so the list never re-renders
+             when results land. Bare-ref form hands stx the signal
+             function itself, and the effect's lazy-eval (`with()`
+             scope at signals.ts:2092-2105) sees the read-through on
+             every re-evaluation. -->
         <div class="py-1" x-class="judgesStore.searchResults().length > 0 ? '' : 'hidden'">
           <div class="px-3 py-1.5 font-semibold text-gray-500 text-xs tracking-wider uppercase">Judges</div>
           <button
-            :for="result in judgesStore.searchResults()"
+            :for="judge in judgesStore.searchResults"
             type="button"
-            @mousedown.prevent="pickJudge(result)"
+            @mousedown.prevent="pickJudge(judge)"
             class="flex w-full items-center gap-x-3 px-3 py-2 text-left hover:bg-gray-50"
           >
-            <img class="h-8 w-8 rounded-full object-cover" x-src="result.photo" x-alt="result.name">
+            <img class="h-8 w-8 rounded-full object-cover" x-src="judge.photo" x-alt="judge.name">
             <div class="flex-1 min-w-0">
-              <p class="font-medium text-gray-900 text-sm truncate" :text="result.name"></p>
-              <p class="text-gray-500 text-xs truncate" :text="(result.court && result.court.name) ? result.court.name : (result.location || '')"></p>
+              <p class="font-medium text-gray-900 text-sm truncate" :text="judge.name"></p>
+              <p class="text-gray-500 text-xs truncate" :text="(judge.court && judge.court.name) ? judge.court.name : (judge.location || '')"></p>
             </div>
           </button>
         </div>
         <div class="py-1 border-t border-gray-100" x-class="filteredCourtResults().length > 0 ? '' : 'hidden'">
           <div class="px-3 py-1.5 font-semibold text-gray-500 text-xs tracking-wider uppercase">Courthouses</div>
           <button
-            :for="court in filteredCourtResults()"
+            :for="court in filteredCourtResults"
             type="button"
             @mousedown.prevent="pickCourt(court)"
             class="flex w-full items-center gap-x-3 px-3 py-2 text-left hover:bg-gray-50"
