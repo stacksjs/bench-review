@@ -1,6 +1,6 @@
 import { Action } from '@stacksjs/actions'
 import { request, response } from '@stacksjs/router'
-import { hydrateLikedByMe } from '../../Helpers/reviewLikes'
+import { hydrateLikeData } from '../../Helpers/reviewLikes'
 
 /**
  * GET /api/reviews?limit=N — latest published reviews across all judges.
@@ -32,7 +32,7 @@ export default new Action({
       .limit(limit)
       .get()
 
-    const hydrated = await hydrateLikedByMe(rows ?? [])
+    const hydrated = await hydrateLikeData(rows ?? [])
     return response.json(hydrated)
   },
 })

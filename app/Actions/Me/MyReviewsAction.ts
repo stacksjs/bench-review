@@ -1,5 +1,6 @@
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
+import { hydrateLikeData } from '../../Helpers/reviewLikes'
 
 /**
  * GET /api/me/reviews — reviews authored by the current user.
@@ -39,7 +40,14 @@ export default new Action({
     for (const j of judges)
       judgesById[j.id as number] = j
 
-    const enriched = rows.map(r => ({
+    // Hydrate `likes` so the profile's "total reactions received"
+    // tally has real data to sum (resources/stores/profile.ts:78
+    // accumulates `r.likes || 0` across this response). `liked_by_me`
+    // is also returned by the helper — harmlessly true on the user's
+    // own rows when they've reacted to their own review pre-author-
+    // gate, false otherwise.
+    const hydrated = await hydrateLikeData(rows)
+    const enriched = hydrated.map(r => ({
       ...r,
       judge: r.judge_id != null ? (judgesById[r.judge_id as number] ?? null) : null,
     }))

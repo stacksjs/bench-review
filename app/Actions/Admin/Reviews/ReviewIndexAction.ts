@@ -83,6 +83,24 @@ export default new Action({
     const userById = new Map<number, any>()
     for (const u of users as any[]) userById.set(u.id, u)
 
+    // Bulk like-count over the visible page. Reuses the same pivot
+    // the public-feed helper reads from, but skips the liked-by-me
+    // half — admins moderating don't need their own reaction state
+    // surfaced in the queue.
+    const reviewIdsForCount = reviewRows.map(r => Number(r.id)).filter(Number.isFinite)
+    const likesByReview = new Map<number, number>()
+    if (reviewIdsForCount.length > 0) {
+      // See app/Helpers/reviewLikes.ts:hydrateLikeData for why
+      // COUNT(*) is a plain string here, not a `sql` tagged template.
+      const countRows = await (db.selectFrom('judge_reviews_likes' as any) as any)
+        .select(['judge_review_id', 'COUNT(*) as c'])
+        .where('judge_review_id' as any, 'in', reviewIdsForCount as any)
+        .groupBy('judge_review_id' as any)
+        .execute() as Array<{ judge_review_id: number, c: number | string }>
+      for (const row of countRows)
+        likesByReview.set(Number(row.judge_review_id), Number(row.c))
+    }
+
     const hydrated = reviewRows.map((r) => {
       const j = r.judge_id != null ? judgeById.get(r.judge_id) : null
       const u = r.user_id != null ? userById.get(r.user_id) : null
@@ -93,7 +111,7 @@ export default new Action({
         rating: r.rating,
         status: r.status,
         type: r.type,
-        likes: r.likes,
+        likes: likesByReview.get(Number(r.id)) ?? 0,
         comments: r.comments,
         created_at: r.created_at,
         updated_at: r.updated_at,

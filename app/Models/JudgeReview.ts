@@ -44,10 +44,12 @@ export default defineModel({
 
     // Wires `JudgeReview._likeable.{like,unlike,isLiked,likeCount,likedBy}`
     // off the `judge_reviews_likes` pivot table (default naming:
-    // `<table>_likes`, FK `judge_review_id`). Pivot rows are the source
-    // of truth for who liked what; the `likes` integer column on the
-    // review row is a denormalised counter the action keeps in sync so
-    // list-feed reads don't have to fan out a per-row COUNT(*).
+    // `<table>_likes`, FK `judge_review_id`). The pivot is the SINGLE
+    // source of truth — there's no denormalised counter on this row.
+    // Feed actions fan a single GROUP BY query over the visible page
+    // via `app/Helpers/reviewLikes.ts:hydrateLikeData()` to surface
+    // counts cheaply without the drift risk of keeping two stores in
+    // lock-step.
     likeable: true,
 
     observe: true,
@@ -96,19 +98,6 @@ export default defineModel({
         },
       },
       factory: faker => faker.number.int({ min: 1, max: 5 }),
-    },
-
-    likes: {
-      required: true,
-      order: 4,
-      fillable: true,
-      validation: {
-        rule: schema.number().min(0),
-        message: {
-          min: 'Likes cannot be negative',
-        },
-      },
-      factory: faker => faker.number.int({ min: 0, max: 100 }),
     },
 
     comments: {

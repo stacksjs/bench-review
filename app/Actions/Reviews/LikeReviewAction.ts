@@ -1,6 +1,5 @@
 import { Action } from '@stacksjs/actions'
 import { Auth } from '@stacksjs/auth'
-import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
 
@@ -19,11 +18,11 @@ import { schema } from '@stacksjs/validation'
  *   2. The counter UI ("123 people find this helpful") only carries
  *      weight if those are real accounts.
  *
- * The likes pivot table is the source of truth. We also keep the
- * denormalised `judge_reviews.likes` integer column in lock-step so
- * the public feed (`LatestReviewsAction`, `ReviewsByJudgeAction`) can
- * render the count without a per-row COUNT(*) join. Two writes per
- * toggle is cheap and the read fan-out savings dominate.
+ * The pivot table `judge_reviews_likes` is the single source of truth.
+ * There is no denormalised counter — `likeCount()` reads the pivot
+ * directly on every toggle to return the fresh count to the client.
+ * Feed reads share the same pivot via `app/Helpers/reviewLikes.ts`'s
+ * bulk GROUP BY.
  */
 export default new Action({
   name: 'Like Review',
@@ -81,16 +80,10 @@ export default new Action({
       liked = true
     }
 
-    // Resync the denormalised counter from the source of truth. A
-    // COUNT(*) over `(judge_review_id = N)` is index-friendly and
-    // keeps us safe from drift if a race causes a like/unlike
-    // mid-toggle on another tab.
+    // Fresh count straight from the pivot. The composite UNIQUE on
+    // `(judge_review_id, user_id)` means the COUNT(*) here is exact
+    // even under concurrent toggles from other tabs.
     const fresh = await likeable.likeCount(reviewId)
-    await db.updateTable('judge_reviews' as any)
-      .set({ likes: fresh, updated_at: new Date().toISOString() } as any)
-      .where('id' as any, '=', reviewId)
-      .execute()
-
     return response.json({ liked, likes: fresh })
   },
 })

@@ -1,6 +1,6 @@
 import { Action } from '@stacksjs/actions'
-import { Auth } from '@stacksjs/auth'
 import { request, response } from '@stacksjs/router'
+import { hydrateLikeData } from '../../Helpers/reviewLikes'
 
 /**
  * GET /api/reviews/:id — one published review, joined with its judge.
@@ -11,10 +11,11 @@ import { request, response } from '@stacksjs/router'
  * surface is rough and the cost of two indexed lookups is negligible
  * for a single-row read.
  *
- * If the request carries an auth token, hydrates `liked_by_me` so the
- * article view can paint the "people find this helpful" button in its
- * correct state on hard reload. Anonymous reads leave `liked_by_me`
- * false — the UI then prompts the user to sign in on first click.
+ * `likes` and `liked_by_me` are hydrated via the same helper used by
+ * the list endpoints. Single-row case is a degenerate page-of-one;
+ * reusing the helper keeps the count source consistent across every
+ * read path (no chance of the article view showing one number while
+ * the feed shows another).
  *
  * Returns 404 for missing or non-published rows so unmoderated content
  * doesn't accidentally surface via a guessed id.
@@ -35,37 +36,17 @@ export default new Action({
     if (!review)
       return response.json({ error: 'Not Found' }, 404)
 
-    const row = (review as any).toJSON ? (review as any).toJSON() : review
+    const [hydrated] = await hydrateLikeData([review as any])
 
     let judge: any = null
-    if (row.judge_id) {
-      const j = await Judge.where('id', row.judge_id).first()
+    if (hydrated.judge_id) {
+      const j = await Judge.where('id', hydrated.judge_id).first()
       if (j) {
         const jr = (j as any).toJSON ? (j as any).toJSON() : j
         judge = { id: jr.id, name: jr.name, court: jr.court ?? null, image_url: jr.image_url ?? null }
       }
     }
 
-    // Resolve `liked_by_me` only when the caller is authenticated.
-    // Anonymous reads don't trigger the lookup — saves a query on the
-    // public-feed click-through path. `Auth.user()` reads bearer-token
-    // only (see authentication.ts:291), which matches how every other
-    // user-scoped lookup in this app resolves the current user.
-    let likedByMe = false
-    try {
-      const authUser = await Auth.user()
-      const userId = (authUser as any)?.id
-      if (userId) {
-        const likeable = (JudgeReview as any)._likeable
-        if (likeable)
-          likedByMe = await likeable.isLiked(id, userId)
-      }
-    }
-    catch {
-      // Auth resolution failed — fall through with likedByMe=false. A
-      // broken token shouldn't 500 a public page read.
-    }
-
-    return response.json({ ...row, judge, liked_by_me: likedByMe })
+    return response.json({ ...hydrated, judge })
   },
 })

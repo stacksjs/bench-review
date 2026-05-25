@@ -1,6 +1,6 @@
 import { Action } from '@stacksjs/actions'
 import { request, response } from '@stacksjs/router'
-import { hydrateLikedByMe } from '../../Helpers/reviewLikes'
+import { hydrateLikeData } from '../../Helpers/reviewLikes'
 
 /**
  * GET /api/judges/:id/reviews — list published reviews for one judge.
@@ -32,7 +32,7 @@ export default new Action({
       .orderBy('created_at', 'desc')
       .get()
 
-    const hydrated = await hydrateLikedByMe(rows ?? [])
+    const hydrated = await hydrateLikeData(rows ?? [])
     return response.json(hydrated)
   },
 })

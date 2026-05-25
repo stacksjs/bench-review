@@ -101,7 +101,6 @@ export default new Action({
       rating,
       type,
       status: 'pending',
-      likes: 0,
       comments: 0,
       judge_id: judgeId,
       user_id: userId,

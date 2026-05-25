@@ -234,7 +234,6 @@ export default class ReviewSeeder extends Seeder {
             content: r.content,
             rating: r.rating,
             type: r.type,
-            likes: r.likes,
             comments: r.comments,
           } as any)
           .where('id' as any, '=', existing.id)
@@ -242,13 +241,19 @@ export default class ReviewSeeder extends Seeder {
         continue
       }
 
+      // `likes` is intentionally not seeded — there is no denormalised
+      // counter anymore (see app/Helpers/reviewLikes.ts). Real
+      // reactions land as rows in `judge_reviews_likes` from the
+      // toggle endpoint; seeded reviews start with zero reactions.
+      // The `r.likes` field on the data array is dead weight — keeping
+      // it so the array shape stays human-readable for future tweaks
+      // (e.g. if we ever pre-seed reactions for staging demos).
       await db.insertInto('judge_reviews' as any).values({
         title: r.title,
         content: r.content,
         rating: r.rating,
         type: r.type,
         status: 'published',
-        likes: r.likes,
         comments: r.comments,
         judge_id: judgeId,
         user_id: null,
