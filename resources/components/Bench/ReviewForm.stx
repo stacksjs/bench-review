@@ -31,6 +31,61 @@
   // background → invisible. Declaring them here makes the bindings
   // evaluate cleanly.
   const reviewsStore = useStore('reviews')
+  const judgesStore = useStore('judges')
+
+  // ── URL-driven judge preload ──────────────────────────────────────
+  //
+  // Landing on `/review/:id` (e.g. via the "Review this judge" CTA on
+  // a judge profile) should skip the judge-picker step entirely — the
+  // judge is already chosen, the user just wants to rate.
+  //
+  // We parse the pathname rather than reading `window.stx._rp.id`
+  // because the router-param object is unset during hydration on hard
+  // reload (memory: feedback_stx_rp_unset_on_hard_reload). Pathname is
+  // the canonical fallback that works on both SPA nav and hard reload.
+  //
+  // Looks up the judge by id from the directory (`judgesStore.judges`).
+  // If the directory hasn't loaded yet, fires `fetchJudges()` first;
+  // the effect re-runs once the list arrives and the lookup succeeds
+  // on the next tick. If the id doesn't match any judge (deleted /
+  // bad URL), `judge` stays null and the picker is shown — same UX
+  // as `/review` without an id.
+  function resolveReviewPathJudgeId(): number {
+    if (typeof window === 'undefined') return 0
+    const m = window.location.pathname.match(/^\/review\/(\d+)\b/)
+    return m ? Number(m[1]) : 0
+  }
+
+  const preloadJudgeId = resolveReviewPathJudgeId()
+
+  function applyPreloadedJudge(): void {
+    if (!preloadJudgeId) return
+    if (judge()) return // already set
+    const list = judgesStore.judges()
+    const found = list.find((j: any) => Number(j.id) === preloadJudgeId)
+    if (!found) return
+    judge.set({
+      id: String((found as any).id),
+      name: (found as any).name,
+      court: (found as any).court?.name ?? '',
+      department: (found as any).department ?? '',
+      photo: (found as any).photo ?? '',
+    })
+  }
+
+  // Kick the directory fetch if we have a target id and the list is
+  // empty. The effect below reacts when the list lands.
+  if (preloadJudgeId && judgesStore.judges().length === 0)
+    judgesStore.fetchJudges()
+
+  // Reactive resolve — fires now (synchronously, with whatever's
+  // cached) and again whenever `judges()` flips from [] to populated.
+  effect(() => {
+    // Touch `judges()` so this effect subscribes to it.
+    void judgesStore.judges().length
+    applyPreloadedJudge()
+  })
+
   const submitError = state<string | null>(null)
   // Sticky success state. Reviews land as `status=pending` and won't
   // show up on the judge's reviews page until a moderator publishes,
@@ -82,6 +137,19 @@
   let submitInFlight = false
 
   async function handleSubmit(): Promise<void> {
+    // Diagnostic — left in deliberately. The submit chain had a few
+    // silent-failure modes during stabilization; this one log line
+    // lets the user verify in DevTools whether the click is firing
+    // at all vs. the handler running and hitting a guard.
+    console.log('[ReviewForm] Submit clicked', {
+      judge: judge(),
+      title: reviewTitle(),
+      contentLen: reviewContent().length,
+      rating: rating(),
+      submitInFlight,
+      submitting: reviewsStore.submitting(),
+    })
+
     if (submitInFlight) return
     submitInFlight = true
     submitError.set(null)
@@ -353,28 +421,42 @@
        has visual weight against the page background. Only renders once
        a judge is picked (matches the rest of the form). -->
   <div :if="judge && !submitted" class="p-6 sm:p-8 bg-white border border-gray-200 rounded-2xl shadow-sm mt-2">
-    <p
-      :if="submitError()"
+    <!-- Alert-banner pattern (x-class hidden) rather than :if because
+         the bindIf re-subscription footgun bit the login form earlier:
+         when an alert flips from set → null → set again, :if's
+         remove/re-add cycle drops the :text subscription on the
+         re-add. CSS-toggle keeps the element in DOM, :text stays
+         subscribed, the message flips reliably on every validation
+         failure. -->
+    <div
       role="alert"
       aria-live="polite"
       class="mb-4 p-3 text-red-700 text-sm bg-red-50 border border-red-200 rounded-md"
+      x-class="submitError() ? '' : 'hidden'"
       :text="submitError()"
-    ></p>
+    ></div>
 
     <div class="flex gap-x-4 items-center justify-end">
       <button type="button" @click="handleCancel()" class="px-4 py-2 font-semibold text-gray-700 text-sm border border-gray-200 rounded-md hover:bg-gray-50 hover:border-gray-300 transition-colors">Cancel</button>
+      <!-- Call-syntax `judge()` / `reviewsStore.submitting()` on
+           purpose. Bare `reviewsStore.submitting` returned the
+           function reference in this scope (not the unwrapped value)
+           which made `!judge || submittingFn` always truthy — button
+           was disabled regardless of state, click silently no-op'd.
+           Local-state bare access is fine elsewhere; the store-
+           property pattern needs the parens. -->
       <button
         type="button"
         data-submit-review
         @click="handleSubmit()"
-        x-disabled="!judge || reviewsStore.submitting"
+        x-disabled="!judge() || reviewsStore.submitting()"
         class="px-5 py-2 font-semibold text-sm text-white rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-900 focus-visible:outline-offset-2 shadow-sm"
         x-class="[
-          judge && !reviewsStore.submitting
+          judge() && !reviewsStore.submitting()
             ? 'bg-gray-900 hover:bg-gray-700'
             : 'bg-gray-300 cursor-not-allowed'
         ]"
-        :text="reviewsStore.submitting ? 'Submitting…' : 'Submit Review'"
+        :text="reviewsStore.submitting() ? 'Submitting…' : 'Submit Review'"
       >Submit Review</button>
     </div>
   </div>

@@ -1,6 +1,9 @@
 <script client>
+  import type { CourtHouse, Judge } from '~/resources/types'
+
   const auth = useStore('auth')
   const search = useStore('search')
+  const judgesStore = useStore('judges')
 
   // `auth.isAuthenticated` is a derived signal that reads `token()` —
   // capturing it here keeps the :if bindings reactive without us having
@@ -17,8 +20,128 @@
     await auth.logout()
   }
 
+  // ── Typeahead dropdown ────────────────────────────────────────────
+  //
+  // Reuses `judgesStore.searchJudges()` for debounced + abort-on-stale
+  // server search. Courts are filtered client-side from the already-
+  // fetched directory list — there's no dedicated courts-search
+  // endpoint, and the directory is small enough to filter in-process.
+  // Fetch-once-on-mount keeps the courts list warm for filtering.
+  let courtsHydrated = false
+  function ensureCourtsLoaded(): void {
+    if (courtsHydrated) return
+    courtsHydrated = true
+    if (judgesStore.courtHouses().length === 0)
+      judgesStore.fetchCourtHouses()
+  }
+
+  // Dropdown visibility. Three signals so each :if binding subscribes
+  // to a plain `state` rather than a derived expression — the
+  // cross-store reactivity bridge pattern from Bench/Judge/ReviewJudgeSearch
+  // (whose comment block documents why an `effect()` writing into
+  // plain state beats derived/inline-expression alternatives).
+  const showDropdown = state<boolean>(false)
+  const showEmpty = state<boolean>(false)
+  const filteredCourtResults = state<CourtHouse[]>([])
+
+  // Highlighted index for arrow-key navigation. -1 = nothing highlighted
+  // (mouse mode). Combined judges-then-courts ordering.
+  const highlight = state<number>(-1)
+
+  function handleHeaderInput(event: Event): void {
+    const value = (event.target as HTMLInputElement).value
+    search.setQuery(value)
+    judgesStore.searchJudges(value)
+    ensureCourtsLoaded()
+
+    const q = value.trim().toLowerCase()
+    if (!q) {
+      filteredCourtResults.set([])
+    }
+    else {
+      filteredCourtResults.set(
+        judgesStore.courtHouses().filter(c =>
+          c.name.toLowerCase().includes(q)
+          || (c.city ?? '').toLowerCase().includes(q)
+          || (c.state ?? '').toLowerCase().includes(q),
+        ).slice(0, 5),
+      )
+    }
+    highlight.set(-1)
+  }
+
+  effect(() => {
+    const q = search.query().trim()
+    const loading = judgesStore.searchLoading()
+    const judgeCount = judgesStore.searchResults().length
+    const courtCount = filteredCourtResults().length
+    showDropdown.set(q.length > 0 && (judgeCount > 0 || courtCount > 0))
+    showEmpty.set(q.length > 0 && !loading && judgeCount === 0 && courtCount === 0)
+  })
+
+  function closeDropdown(): void {
+    showDropdown.set(false)
+    showEmpty.set(false)
+    highlight.set(-1)
+  }
+
+  // Delay the blur-driven close so an mousedown on a result still
+  // fires its @click before the dropdown vanishes. 150ms is the same
+  // tolerance modern autocomplete UIs use.
+  function handleBlur(): void {
+    setTimeout(closeDropdown, 150)
+  }
+
+  function pickJudge(j: Judge): void {
+    closeDropdown()
+    navigate(`/judges/${j.id}/profile`, true)
+  }
+
+  function pickCourt(c: CourtHouse): void {
+    closeDropdown()
+    navigate(`/court-houses/${c.id}/profile`, true)
+  }
+
   function submitHeaderSearch(): void {
+    closeDropdown()
     search.navigateToSearch()
+  }
+
+  // Keyboard nav. Up/Down moves through the combined list (judges then
+  // courts); Enter on a highlighted row picks; Enter on no selection
+  // falls through to form submit. Escape closes the dropdown.
+  function totalResultCount(): number {
+    return judgesStore.searchResults().length + filteredCourtResults().length
+  }
+
+  function handleKeydown(event: KeyboardEvent): void {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      const n = totalResultCount()
+      if (n === 0) return
+      highlight.set((highlight() + 1) % n)
+    }
+    else if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      const n = totalResultCount()
+      if (n === 0) return
+      highlight.set(highlight() <= 0 ? n - 1 : highlight() - 1)
+    }
+    else if (event.key === 'Escape') {
+      closeDropdown()
+    }
+    else if (event.key === 'Enter') {
+      const idx = highlight()
+      if (idx < 0) return // let the form submit fire
+      event.preventDefault()
+      const judges = judgesStore.searchResults()
+      if (idx < judges.length) {
+        pickJudge(judges[idx])
+        return
+      }
+      const court = filteredCourtResults()[idx - judges.length]
+      if (court) pickCourt(court)
+    }
   }
 
   // Global broken-image fallback. Avatar URLs (judge.photo, author.imageUrl)
@@ -62,11 +185,83 @@
         <StxLink to="/reviews" class="font-semibold text-gray-900 text-sm/6 border-b-2 border-transparent hover:border-gray-500 duration-200 transition-colors">Reviews</StxLink>
       </div>
     </div>
-    <div class="hidden lg:flex flex-1 justify-center mx-8 max-w-md">
+    <div class="hidden lg:flex flex-1 justify-center mx-8 max-w-md relative">
       <form class="w-full" @submit.prevent="submitHeaderSearch()">
         <label for="header-search" class="sr-only">Search</label>
-        <input id="header-search" type="text" x-model="search.query" placeholder="Search judges or courts..." class="block px-3 py-2 w-full text-gray-900 sm:text-sm placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-200 ring-inset rounded-lg focus:ring-2 focus:ring-gray-600 focus:ring-inset">
+        <!-- `:value`+`@input` rather than `x-model` so the keystroke
+             handler can fire `searchJudges` debounce + courts filter +
+             dropdown visibility on every change. `x-model` would
+             still work but layering the side effects on top would
+             require an extra watcher. -->
+        <input
+          id="header-search"
+          type="text"
+          :value="search.query()"
+          @input="handleHeaderInput($event)"
+          @keydown="handleKeydown($event)"
+          @blur="handleBlur()"
+          autocomplete="off"
+          placeholder="Search judges or courts..."
+          class="block px-3 py-2 w-full text-gray-900 sm:text-sm placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-200 ring-inset rounded-lg focus:ring-2 focus:ring-gray-600 focus:ring-inset"
+        >
       </form>
+
+      <!-- Dropdown. Absolute-positioned under the input. `showDropdown`
+           is a plain state signal toggled by the effect above. Two
+           sections — Judges first, Courts second — to match the
+           /search page's grouping.
+
+           CSS-toggled (x-class hidden) rather than `:if`. The bindIf
+           remove-then-readd cycle drops the nested `:for`/:text
+           bindings on the re-add when `showDropdown` first flips
+           false → true (same footgun we hit on the login error
+           banner). Element stays in DOM; visibility toggles. -->
+      <div
+        class="absolute top-full left-0 right-0 mt-1 z-20 overflow-hidden bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto"
+        x-class="showDropdown() ? '' : 'hidden'"
+      >
+        <div class="py-1" x-class="judgesStore.searchResults().length > 0 ? '' : 'hidden'">
+          <div class="px-3 py-1.5 font-semibold text-gray-500 text-xs tracking-wider uppercase">Judges</div>
+          <button
+            :for="result in judgesStore.searchResults()"
+            type="button"
+            @mousedown.prevent="pickJudge(result)"
+            class="flex w-full items-center gap-x-3 px-3 py-2 text-left hover:bg-gray-50"
+          >
+            <img class="h-8 w-8 rounded-full object-cover" x-src="result.photo" x-alt="result.name">
+            <div class="flex-1 min-w-0">
+              <p class="font-medium text-gray-900 text-sm truncate" :text="result.name"></p>
+              <p class="text-gray-500 text-xs truncate" :text="(result.court && result.court.name) ? result.court.name : (result.location || '')"></p>
+            </div>
+          </button>
+        </div>
+        <div class="py-1 border-t border-gray-100" x-class="filteredCourtResults().length > 0 ? '' : 'hidden'">
+          <div class="px-3 py-1.5 font-semibold text-gray-500 text-xs tracking-wider uppercase">Courthouses</div>
+          <button
+            :for="court in filteredCourtResults()"
+            type="button"
+            @mousedown.prevent="pickCourt(court)"
+            class="flex w-full items-center gap-x-3 px-3 py-2 text-left hover:bg-gray-50"
+          >
+            <div class="h-8 w-8 flex-shrink-0 rounded bg-gray-100 flex items-center justify-center">
+              <svg class="h-4 w-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3A1 1 0 003 7v11a1 1 0 001 1h12a1 1 0 001-1V7a1 1 0 00-.606-.92l-7-3zM5 9h2v6H5V9zm6 0h2v6h-2V9z"/></svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="font-medium text-gray-900 text-sm truncate" :text="court.name"></p>
+              <p class="text-gray-500 text-xs truncate" :text="(court.city || '') + (court.state ? ', ' + court.state : '')"></p>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Empty-state. Only when there's a query, no loading, and zero
+           results across both groups. Same x-class-hidden pattern. -->
+      <div
+        class="absolute top-full left-0 right-0 mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-3 text-gray-500 text-sm"
+        x-class="showEmpty() ? '' : 'hidden'"
+      >
+        No matches. Press Enter to search all results.
+      </div>
     </div>
     <div class="hidden lg:flex lg:flex-1 lg:justify-end gap-x-4 items-center">
       <div :if="!isAuthenticated" class="flex gap-x-6 items-center">
