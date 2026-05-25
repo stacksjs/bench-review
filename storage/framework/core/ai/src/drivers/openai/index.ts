@@ -6,6 +6,9 @@
  */
 
 import type { AIDriver, AIDriverConfig, AIMessage, AIResult, ChatCompletionOptions, EmbeddingsResponse, OpenAIAPIResponse } from '../../types'
+import { fetchWithRetry } from '../../utils/retry'
+import { recordUsage } from '../../utils/usage'
+import { normalizeMessagesForProvider } from '../../utils/vision'
 
 export interface OpenAIDriverConfig extends AIDriverConfig {
   apiKey: string
@@ -54,7 +57,10 @@ export function createOpenAIDriver(config: OpenAIDriverConfig): AIDriver {
         throw new Error('OpenAI API key not set. Configure your API key in settings.')
       }
 
-      const response = await fetch(`${baseUrl}/chat/completions`, {
+      // Retry-aware fetch (stacksjs/stacks#1878 A-5). Honors 429
+      // `Retry-After` and backs off on 5xx; throws to the caller
+      // only after retries are exhausted or for non-retryable 4xx.
+      const response = await fetchWithRetry(`${baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -117,6 +123,33 @@ export function createOpenAIDriver(config: OpenAIDriverConfig): AIDriver {
       const decoder = new TextDecoder()
       let buffer = ''
 
+      // Inner helper: parse a single SSE data payload and either
+      // yield content or throw on a server-side error event
+      // (stacksjs/stacks#1878 A-2). Returns a one-shot generator
+      // so the outer loop's yield semantics are preserved.
+      const handlePayload = function* (data: string) {
+        if (data === '[DONE]') return
+        let parsed: any
+        try {
+          parsed = JSON.parse(data)
+        }
+        catch {
+          // Genuinely invalid JSON — skip rather than abort the stream.
+          return
+        }
+        // OpenAI surfaces mid-stream errors as `{ error: { message, type, ... } }`.
+        // Pre-fix this was dropped on the floor (the `choices[0]?.delta`
+        // lookup returned undefined), so the consumer saw a clean
+        // end-of-stream and assumed success. Now: throw so the caller
+        // knows the response was truncated.
+        if (parsed?.error) {
+          const msg = parsed.error.message || JSON.stringify(parsed.error)
+          throw new Error(`[openai/stream] mid-stream error: ${msg}`)
+        }
+        const content = parsed.choices?.[0]?.delta?.content
+        if (content) yield content
+      }
+
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
@@ -127,34 +160,14 @@ export function createOpenAIDriver(config: OpenAIDriverConfig): AIDriver {
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            const data = line.slice(6)
-            if (data === '[DONE]') continue
-
-            try {
-              const parsed = JSON.parse(data) as any
-              const content = parsed.choices[0]?.delta?.content
-              if (content) yield content
-            }
-            catch {
-              // Skip invalid JSON
-            }
+            yield * handlePayload(line.slice(6))
           }
         }
       }
 
-      // Process any remaining data in the buffer
+      // Process any remaining data in the buffer.
       if (buffer.startsWith('data: ')) {
-        const data = buffer.slice(6)
-        if (data !== '[DONE]') {
-          try {
-            const parsed = JSON.parse(data) as any
-            const content = parsed.choices[0]?.delta?.content
-            if (content) yield content
-          }
-          catch {
-            // Skip invalid JSON
-          }
-        }
+        yield * handlePayload(buffer.slice(6))
       }
     },
 
@@ -206,7 +219,16 @@ export async function chat(
     stop,
   } = options
 
-  const response = await fetch(`${config.baseUrl || DEFAULT_BASE_URL}/chat/completions`, {
+  // Normalize content arrays into OpenAI's wire format
+  // (stacksjs/stacks#1878 A-3). Apps that authored messages with
+  // Anthropic-style `{ type: 'image', source: {...} }` blocks
+  // (or use cross-driver helpers) get the right shape.
+  const normalizedMessages = normalizeMessagesForProvider(messages, 'openai')
+
+  // Track wall-clock duration for usage reporters (#1878 A-6).
+  const startedAt = Date.now()
+
+  const response = await fetchWithRetry(`${config.baseUrl || DEFAULT_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -218,7 +240,7 @@ export async function chat(
       temperature,
       top_p: topP,
       stop,
-      messages,
+      messages: normalizedMessages,
     }),
   })
 
@@ -233,7 +255,7 @@ export async function chat(
     throw new Error('OpenAI API returned empty choices')
   }
 
-  return {
+  const result: AIResult = {
     content: data.choices[0].message.content,
     model: data.model,
     usage: {
@@ -243,6 +265,20 @@ export async function chat(
     },
     finishReason: data.choices[0].finish_reason,
   }
+
+  // Fire registered usage reporters (#1878 A-6). Apps install via
+  // `onUsage(reporter)`; default is no-op. Errors are swallowed.
+  recordUsage({
+    provider: 'openai',
+    model: data.model,
+    promptTokens: result.usage!.promptTokens,
+    completionTokens: result.usage!.completionTokens,
+    totalTokens: result.usage!.totalTokens,
+    durationMs: Date.now() - startedAt,
+    timestamp: Date.now(),
+  })
+
+  return result
 }
 
 /**
@@ -274,7 +310,7 @@ export async function* streamChat(
       top_p: topP,
       stop,
       stream: true,
-      messages,
+      messages: normalizeMessagesForProvider(messages, 'openai'),
     }),
   })
 

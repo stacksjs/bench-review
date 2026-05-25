@@ -75,6 +75,19 @@ export {
 } from './translator'
 
 export {
+  ensureLocalesLoaded,
+  resolveRequestLocale,
+  applyRequestLocale,
+} from './bootstrap'
+
+export {
+  createLocaleSwitchResponse,
+  localizePath,
+  stripLocalePrefix,
+  type LocaleSwitchConfig,
+} from './locale-switch'
+
+export {
   formatDate,
   formatTime,
   formatDateTime,

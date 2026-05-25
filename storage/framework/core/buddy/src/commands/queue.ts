@@ -27,18 +27,23 @@ export function queue(buddy: CLI): void {
     .action(async (options: CliQueueOptions & { concurrency?: string }) => {
       log.debug('Running `buddy queue:work` ...', options)
 
-      // Two-phase shutdown for queue workers. SIGTERM lets in-flight jobs
-      // finish (or hand off to retry) before we tear the process down;
-      // a follow-up SIGKILL after a 10-second grace window prevents a
-      // misbehaving job from holding the process forever. Without this,
-      // `Ctrl+C` during dev would orphan the bun-queue Redis connection
-      // and leave reserved jobs locked until their reservation expired.
+      // Two-phase shutdown for queue workers. SIGTERM signals
+      // `stopProcessor()` to drain in-flight jobs within the grace
+      // window (stacksjs/stacks#1872 Q-10 — previously the worker
+      // exited immediately and left jobs mid-handle); a follow-up
+      // SIGKILL after the timeout prevents a misbehaving job from
+      // holding the process forever. Jobs that don't finish in time
+      // are released by the next worker's reservation sweep (Q-2).
       const SHUTDOWN_GRACE_MS = 10_000
       let shuttingDown = false
       const cleanup = (signal: NodeJS.Signals) => {
         if (shuttingDown) return
         shuttingDown = true
         log.info(`[queue] Received ${signal}, draining workers (max ${SHUTDOWN_GRACE_MS / 1000}s)…`)
+        // Fire the in-process drain in parallel with the kill timer
+        // so an unresponsive handler can't out-wait the timeout.
+        import('@stacksjs/queue').then(({ stopProcessor }) => stopProcessor({ graceMs: SHUTDOWN_GRACE_MS }))
+          .catch(error => log.error('[queue] stopProcessor failed', error))
         setTimeout(() => {
           log.warn('[queue] Drain timeout exceeded — forcing shutdown.')
           process.exit(ExitCode.FatalError)
@@ -66,6 +71,7 @@ export function queue(buddy: CLI): void {
     .command('queue:failed', 'List all failed jobs')
     .option('-p, --project [project]', descriptions.project, { default: false })
     .option('-q, --queue [queue]', descriptions.queue, { default: false })
+    .option('--since [duration]', 'Only show jobs failed since (e.g. 1h, 30m, 2d)', { default: false })
     .option('--verbose', descriptions.verbose, { default: false })
     .action(async (options: CliQueueOptions) => {
       log.debug('Running `buddy queue:failed` ...', options)
@@ -141,6 +147,35 @@ export function queue(buddy: CLI): void {
 
       const queueName = options.queue || 'default'
       await outro(`Cleared all jobs from the "${queueName}" queue`, {
+        startTime: perf,
+        useSeconds: true,
+      })
+      process.exit(ExitCode.Success)
+    })
+
+  buddy
+    .command('queue:list', 'List queued jobs (flat row view, filterable by queue/status)')
+    .option('-p, --project [project]', descriptions.project, { default: false })
+    .option('-q, --queue [queue]', descriptions.queue, { default: false })
+    .option('--status [status]', 'Filter by pending | reserved | delayed', { default: false })
+    .option('--limit [limit]', 'Maximum rows to display (default 50)', { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (options: CliQueueOptions) => {
+      log.debug('Running `buddy queue:list` ...', options)
+
+      const perf = await intro('buddy queue:list')
+      const result = await runAction(Action.QueueList, options)
+
+      if (result.isErr) {
+        await outro(
+          'While running the queue:list command, there was an issue',
+          { startTime: perf, useSeconds: true },
+          result.error,
+        )
+        process.exit(ExitCode.FatalError)
+      }
+
+      await outro('Listed queued jobs', {
         startTime: perf,
         useSeconds: true,
       })

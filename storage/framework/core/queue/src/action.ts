@@ -1,5 +1,6 @@
 import type { JobOptions } from '@stacksjs/types'
 import { env as envVars } from '@stacksjs/env'
+import { createEnvelope } from './envelope'
 
 function getQueueDriver(): string {
   return envVars.QUEUE_DRIVER || 'sync'
@@ -63,8 +64,15 @@ export class Job {
 
   /**
    * Dispatch the job to the configured queue driver.
+   *
+   * The payload is generic so callers get compile-time checking when
+   * the job declares its expected shape — e.g. `JobAction<{ userId: number }>`
+   * rejects `dispatch({ usrId: 1 })` at the type level. Defaults to
+   * `unknown` (not `any`) so dispatchers that DON'T set a generic still
+   * force callers to narrow before reading properties off the
+   * downstream handler. (stacksjs/stacks#1872 Q-9.)
    */
-  async dispatch(payload?: any): Promise<void> {
+  async dispatch<T = unknown>(payload?: T): Promise<void> {
     // Check if queue is faked (testing mode)
     const { isFaked, getFakeQueue } = await import('./testing')
     if (isFaked()) {
@@ -90,14 +98,24 @@ export class Job {
       return this.dispatchToDatabase(payload)
     }
 
-    // Fallback to sync
-    return this.dispatchNow(payload)
+    // Stubbed-but-advertised drivers OR unknown driver — loud-fail
+    // instead of silently degrading to inline sync (stacksjs/stacks#1872 Q-1).
+    if (driver === 'sqs' || driver === 'memory' || driver === 'beanstalkd') {
+      throw new Error(
+        `[queue] Driver "${driver}" is not implemented yet. `
+        + `Set QUEUE_DRIVER to one of: redis, database, sync.`,
+      )
+    }
+    throw new Error(
+      `[queue] Unknown QUEUE_DRIVER "${driver}". `
+      + `Allowed values: redis, database, sync.`,
+    )
   }
 
   /**
    * Dispatch only if the condition is true.
    */
-  async dispatchIf(condition: boolean, payload?: any): Promise<void> {
+  async dispatchIf<T = unknown>(condition: boolean, payload?: T): Promise<void> {
     if (condition) {
       return this.dispatch(payload)
     }
@@ -106,7 +124,7 @@ export class Job {
   /**
    * Dispatch unless the condition is true.
    */
-  async dispatchUnless(condition: boolean, payload?: any): Promise<void> {
+  async dispatchUnless<T = unknown>(condition: boolean, payload?: T): Promise<void> {
     if (!condition) {
       return this.dispatch(payload)
     }
@@ -115,7 +133,7 @@ export class Job {
   /**
    * Dispatch with a delay (in seconds).
    */
-  async dispatchAfter(delaySeconds: number, payload?: any): Promise<void> {
+  async dispatchAfter<T = unknown>(delaySeconds: number, payload?: T): Promise<void> {
     const driver = getQueueDriver()
 
     if (driver === 'redis') {
@@ -134,7 +152,7 @@ export class Job {
   /**
    * Execute the job immediately, bypassing the queue.
    */
-  async dispatchNow(payload?: any): Promise<void> {
+  async dispatchNow<T = unknown>(payload?: T): Promise<void> {
     if (typeof this.handle === 'function') {
       await this.handle(payload)
     }
@@ -154,16 +172,14 @@ export class Job {
     const now = Math.floor(Date.now() / 1000)
     const availableAt = opts?.delay ? now + opts.delay : now
 
-    const payloadObj = {
-      jobName: this.name,
-      payload,
-      options: {
-        queue: this.queue,
-        tries: this.tries,
-        timeout: this.timeout,
-        backoff: this.backoff,
-      },
-    }
+    // Unified envelope (stacksjs/stacks#1884 Q-6) — see job.ts for
+    // the full rationale.
+    const envelope = createEnvelope(this.name, payload, {
+      queue: this.queue,
+      tries: typeof this.tries === 'number' ? this.tries : undefined,
+      timeout: this.timeout,
+      backoff: Array.isArray(this.backoff) ? this.backoff : undefined,
+    })
 
     const { db } = await import('@stacksjs/database')
 
@@ -171,7 +187,7 @@ export class Job {
       .insertInto('jobs')
       .values({
         queue: this.queue || 'default',
-        payload: JSON.stringify(payloadObj),
+        payload: JSON.stringify(envelope),
         attempts: 0,
         reserved_at: null,
         available_at: availableAt,
@@ -183,19 +199,29 @@ export class Job {
   private async dispatchToRedis(payload?: any, opts?: { delay?: number }): Promise<void> {
     const { RedisQueue } = await import('./drivers/redis')
     const { queue: queueConfig } = await import('@stacksjs/config')
-    const redisConfig = (queueConfig as any)?.connections?.redis
+    // Typed end-to-end via `StacksOptions['queue']` —
+    // stacksjs/stacks#1875 T-6 dropped the `as any` cast that
+    // escaped that typing.
+    const redisConfig = queueConfig?.connections?.redis
 
     if (!redisConfig) {
       throw new Error('Redis queue connection is not configured. Check config/queue.ts')
     }
 
-    const queue = new RedisQueue(this.queue || 'default', redisConfig as any)
+    const queue = new RedisQueue(this.queue || 'default', redisConfig)
+
+    // Same envelope as the database path (stacksjs/stacks#1884 Q-6) —
+    // bun-queue takes the envelope as opaque data; the worker side
+    // parses through `parseEnvelope` regardless of driver.
+    const envelope = createEnvelope(this.name, payload, {
+      queue: this.queue,
+      tries: typeof this.tries === 'number' ? this.tries : undefined,
+      timeout: this.timeout,
+      backoff: Array.isArray(this.backoff) ? this.backoff : undefined,
+    })
 
     await queue.add(
-      {
-        jobName: this.name,
-        payload,
-      } as any,
+      envelope,
       {
         delay: opts?.delay,
         maxTries: typeof this.tries === 'number' ? this.tries : undefined,

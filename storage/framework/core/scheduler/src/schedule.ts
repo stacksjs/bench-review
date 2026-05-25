@@ -7,6 +7,8 @@ import { runAction } from '@stacksjs/actions'
 import { log, runCommand } from '@stacksjs/cli'
 import { parse } from '@stacksjs/cron'
 import { runJob } from '@stacksjs/queue'
+import type { SchedulerLockHandle } from './scheduler-lock'
+import { acquireSchedulerLock } from './scheduler-lock'
 
 /**
  * Schedule class for creating and managing scheduled tasks.
@@ -31,11 +33,15 @@ export class Schedule implements UntimedSchedule {
   private timezone: Timezone = 'America/Los_Angeles'
   private readonly task: () => void
   private static lockDir = join(process.cwd(), 'storage', 'framework', 'locks')
-  private static activeLocks = new Set<string>()
+  private static activeLocks = new Map<string, SchedulerLockHandle>()
   private shouldPreventOverlap = false
   private overlapExpiresAfterMinutes = 24 * 60
   private shouldRunOnOneServer = false
   private shouldRunInBackground = false
+  /** stdout/stderr redirect target (S-3). Null = no capture. */
+  private outputPath: string | null = null
+  /** When true, append to outputPath; otherwise overwrite per run. */
+  private outputAppend = false
   private options: {
     timezone?: string
     catch?: CatchCallbackFn
@@ -239,62 +245,201 @@ export class Schedule implements UntimedSchedule {
     return this
   }
 
-  // --- Lock management ---
+  /**
+   * Redirect this task's stdout/stderr to `path` (overwrite mode).
+   * Implemented for `schedule.command(...)` shell tasks
+   * (stacksjs/stacks#1877 S-3) — captures the spawned process's
+   * stdio to the file. For `schedule.job(...)` / `schedule.action(...)`
+   * tasks, the framework's logger already routes to whatever
+   * sink is configured globally, so this option is a no-op for
+   * those (with a one-time warn).
+   *
+   * @example
+   * ```ts
+   * schedule.command('backup.sh').daily().sendOutputTo('/var/log/stacks/backup.log')
+   * ```
+   */
+  sendOutputTo(path: string): this {
+    this.outputPath = path
+    this.outputAppend = false
+    return this
+  }
 
-  private acquireLock(name: string): boolean {
-    const lockFile = join(Schedule.lockDir, `${name}.lock`)
+  /**
+   * Same as `sendOutputTo` but appends instead of overwriting. Use
+   * when you want a rolling log of every scheduled run.
+   */
+  appendOutputTo(path: string): this {
+    this.outputPath = path
+    this.outputAppend = true
+    return this
+  }
 
-    if (!existsSync(Schedule.lockDir)) {
-      mkdirSync(Schedule.lockDir, { recursive: true })
+  /**
+   * Fire the task once for every cron slot that was missed since
+   * `since` (stacksjs/stacks#1877 Cr-4). The default scheduler
+   * search-forward semantics discard missed runs silently — a
+   * server that was down for 5 minutes loses 5 ticks of a
+   * `* * * * *` task. This helper walks the cron expression
+   * forward from `since` and invokes the task for each matching
+   * slot up to `Date.now()`.
+   *
+   * Persistence is the caller's responsibility: store the task's
+   * lastRunAt timestamp somewhere (DB, file, etc.) on every run,
+   * then pass that timestamp as `since` on the next boot.
+   *
+   * `max` (default 100) caps the catch-up so a long outage doesn't
+   * bury the system in stale work. Beyond `max`, the helper logs
+   * a warn and skips ahead to the most recent slot.
+   *
+   * @example
+   * ```ts
+   * // Inside the task: write lastRunAt after each successful run.
+   * await schedule.job('ProcessQueue')
+   *   .everyMinute()
+   *   .runMissed({ since: lastSavedRunAt, max: 60 })
+   * ```
+   */
+  async runMissed(opts: { since: Date | number, max?: number }): Promise<number> {
+    if (!this.cronPattern) {
+      log.warn('[scheduler] runMissed() requires a cron-based schedule; interval-based tasks (everySecond) have no concept of missed slots')
+      return 0
+    }
+    const max = opts.max ?? 100
+    const since = opts.since instanceof Date ? opts.since.getTime() : opts.since
+    const now = Date.now()
+    if (since >= now) return 0
+
+    const slots: Date[] = []
+    // parseCron's internal search starts from `relativeDate`'s next
+    // minute, so passing `since` as-is correctly finds the first
+    // matching slot AFTER `since`. Right-boundary is INCLUSIVE
+    // (`> now`, not `>= now`) so a slot whose minute matches "now"
+    // is treated as missed too — common case after a server boot
+    // where the scheduler's first tick lands a fraction of a second
+    // after a cron slot. We capture +1 over `max` so the cap-warn
+    // below knows whether we overflowed.
+    let cursor = since
+    while (slots.length < max + 1) {
+      const next = parse(this.cronPattern, cursor)
+      if (!next || next.getTime() > now) break
+      slots.push(next)
+      cursor = next.getTime()
     }
 
-    if (Schedule.activeLocks.has(name)) {
-      if (existsSync(lockFile)) {
-        try {
-          const stats = statSync(lockFile)
-          const ageMs = Date.now() - stats.mtimeMs
-          const expiryMs = this.overlapExpiresAfterMinutes * 60 * 1000
-          if (ageMs < expiryMs) {
-            return false
-          }
-        }
-        catch {
-          // If we can't stat the file, proceed with acquiring
-        }
-      }
+    if (slots.length > max) {
+      log.warn(`[scheduler] runMissed: ${slots.length} missed slots since ${new Date(since).toISOString()}, capping at ${max} — older runs dropped`)
+      slots.splice(0, slots.length - max)
     }
 
-    try {
-      writeFileSync(lockFile, String(Date.now()), { flag: 'wx' })
-    }
-    catch {
+    let fired = 0
+    for (const slot of slots) {
       try {
-        const stats = statSync(lockFile)
-        const ageMs = Date.now() - stats.mtimeMs
-        const expiryMs = this.overlapExpiresAfterMinutes * 60 * 1000
-        if (ageMs < expiryMs) {
-          return false
-        }
-        writeFileSync(lockFile, String(Date.now()))
+        const result = this.task() as unknown
+        if (result && typeof (result as Promise<unknown>).then === 'function')
+          await (result as Promise<unknown>)
+        fired++
       }
-      catch {
-        return false
+      catch (err) {
+        log.error(`[scheduler] runMissed slot ${slot.toISOString()} failed: ${err instanceof Error ? err.message : String(err)}`)
+        if (this.options.catch) this.options.catch(err as Error)
+      }
+    }
+    return fired
+  }
+
+  /**
+   * Snapshot every currently-registered scheduled job
+   * (stacksjs/stacks#1877 S-1). Returned objects share the
+   * `ScheduledJob` shape with `pattern` / `timezone` / `name` /
+   * `nextRun` populated. Used by `buddy schedule:list` to give
+   * operators a view of what's scheduled and when it next runs,
+   * without having to read source.
+   */
+  static listJobs(): Array<{ name: string, pattern?: string, timezone?: Timezone, nextRun: Date | null }> {
+    const out: Array<{ name: string, pattern?: string, timezone?: Timezone, nextRun: Date | null }> = []
+    for (const [name, job] of Schedule.jobs) {
+      out.push({
+        name,
+        pattern: job.pattern,
+        timezone: job.timezone,
+        nextRun: job.nextRun ? job.nextRun() : null,
+      })
+    }
+    return out
+  }
+
+  /**
+   * Snapshot currently-held overlap / one-server locks (the JS-side
+   * activeLocks map). Used by `buddy schedule:status` to surface
+   * which tasks are mid-flight when a tick fires
+   * (stacksjs/stacks#1877 S-1). Does NOT cross instance boundaries —
+   * for cluster-wide lock state, query the database directly.
+   */
+  static listLocks(): string[] {
+    return Array.from(Schedule.activeLocks.keys())
+  }
+
+  // --- Lock management ---
+  //
+  // Pre-fix (#1877 Cr-3): file-only lock in `storage/framework/locks/<name>.lock`.
+  // Worked for a single process but completely failed to serialize across
+  // instances — `onOneServer()` and `withoutOverlapping()` both silently
+  // no-op'd in multi-instance deployments because each box had its own
+  // lock directory.
+  //
+  // Post-fix: pair the file lock with a DB-backed advisory lock when a
+  // SQL connection is available. PG advisory locks are session-scoped
+  // (auto-release on disconnect), MySQL named locks the same. SQLite
+  // falls back to file-only since SQLite is single-writer anyway.
+
+  private async acquireLock(name: string): Promise<boolean> {
+    // Already locked by this process? — fast path, no DB round-trip.
+    if (Schedule.activeLocks.has(name)) return false
+
+    const expiryMs = this.overlapExpiresAfterMinutes * 60 * 1000
+
+    // Resolve the SQL dialect + connection lazily so the scheduler
+    // doesn't import @stacksjs/database at module-load time (tests
+    // and CLI scripts that don't touch the DB shouldn't pay for it).
+    // `onOneServer()` REQUIRES the DB; `withoutOverlapping()` works
+    // with either path.
+    let dialect: 'sqlite' | 'mysql' | 'postgres' | null = null
+    let adminDb: { unsafe: (sql: string) => Promise<unknown> } | null = null
+
+    if (this.shouldRunOnOneServer) {
+      try {
+        const { db } = await import('@stacksjs/database')
+        // The Stacks db proxy exposes a Bun.SQL-compatible `unsafe`
+        // method — same shape `migration-lock.ts` uses.
+        adminDb = db as unknown as { unsafe: (sql: string) => Promise<unknown> }
+        // Inspect env to determine dialect (no driver-detect API on
+        // the db proxy itself).
+        const driver = (await import('@stacksjs/env')).env.DB_CONNECTION || 'sqlite'
+        if (driver === 'postgres' || driver === 'mysql' || driver === 'sqlite') {
+          dialect = driver
+        }
+      }
+      catch (err) {
+        // No DB connection available — onOneServer() degrades to
+        // file-lock-only with a warning. Better than silently
+        // running on every instance.
+        log.warn(`[scheduler] onOneServer() couldn't reach DB; falling back to file-only lock (which only serializes within this process): ${err instanceof Error ? err.message : String(err)}`)
       }
     }
 
-    Schedule.activeLocks.add(name)
+    const handle = await acquireSchedulerLock(name, expiryMs, dialect, adminDb, Schedule.lockDir)
+    if (!handle) return false
+
+    Schedule.activeLocks.set(name, handle)
     return true
   }
 
-  private releaseLock(name: string): void {
-    const lockFile = join(Schedule.lockDir, `${name}.lock`)
+  private async releaseLock(name: string): Promise<void> {
+    const handle = Schedule.activeLocks.get(name)
+    if (!handle) return
     Schedule.activeLocks.delete(name)
-    try {
-      unlinkSync(lockFile)
-    }
-    catch {
-      // Lock file already removed
-    }
+    await handle.release()
   }
 
   // --- Task wrapping ---
@@ -306,36 +451,104 @@ export class Schedule implements UntimedSchedule {
     if (this.shouldPreventOverlap || this.shouldRunOnOneServer) {
       const self = this
       const innerTask = wrappedTask
+      // Lock acquisition is async now (DB advisory lock can require a
+      // round-trip) but cron ticks are sync. Run the lock acquire in
+      // the background and gate execution behind it — if acquire
+      // fails, log + skip; if it succeeds, run + release in finally.
       wrappedTask = () => {
-        if (!self.acquireLock(taskName)) {
-          log.info(`Skipping overlapping task: ${taskName}`)
-          return
-        }
-        try {
-          const result: any = innerTask()
-          if (result && typeof result === 'object' && typeof (result as any).finally === 'function') {
-            (result as Promise<any>).finally(() => self.releaseLock(taskName))
+        void (async () => {
+          const acquired = await self.acquireLock(taskName)
+          if (!acquired) {
+            log.info(`Skipping overlapping task: ${taskName}`)
+            return
           }
-          else {
-            self.releaseLock(taskName)
+          try {
+            const result: unknown = innerTask()
+            if (result && typeof result === 'object' && typeof (result as { finally?: unknown }).finally === 'function') {
+              await (result as Promise<unknown>)
+            }
           }
-        }
-        catch (error) {
-          self.releaseLock(taskName)
-          throw error
-        }
+          catch (error) {
+            log.error(`[scheduler] task ${taskName} threw: ${error instanceof Error ? error.message : String(error)}`)
+          }
+          finally {
+            await self.releaseLock(taskName)
+          }
+        })()
       }
     }
 
     if (this.shouldRunInBackground) {
       const innerTask = wrappedTask
+      const outputPath = this.outputPath
+      const outputAppend = this.outputAppend
       wrappedTask = () => {
+        // Capture stdout + stderr to a log file when one's configured
+        // (stacksjs/stacks#1877 S-2 + S-3). Previously `stdio: 'ignore'`
+        // dropped every byte from the child — a crashing background
+        // task produced no signal at all. Now: redirect to the user's
+        // `.sendOutputTo(path)` target when set, otherwise pipe to
+        // the parent process's stderr so at least the launching
+        // operator sees the failure.
+        let stdoutFd: number | 'inherit' = 'inherit'
+        let stderrFd: number | 'inherit' = 'inherit'
+        let closeFd: number | null = null
+        if (outputPath) {
+          try {
+            // Lazy-import to keep the sync prelude small; spawn is
+            // already from node:child_process at module-load time.
+            // eslint-disable-next-line ts/no-require-imports
+            const { openSync } = require('node:fs') as typeof import('node:fs')
+            const fd = openSync(outputPath, outputAppend ? 'a' : 'w')
+            stdoutFd = fd
+            stderrFd = fd
+            closeFd = fd
+          }
+          catch (err) {
+            log.warn(`[scheduler] couldn't open ${outputPath} for background task ${taskName}: ${err instanceof Error ? err.message : String(err)}; falling back to inherit`)
+          }
+        }
+
         const child = spawn(process.execPath, ['-e', `(${innerTask.toString()})()`], {
           detached: true,
-          stdio: 'ignore',
+          stdio: ['ignore', stdoutFd, stderrFd],
         })
         child.on('error', (error) => {
           log.error(`Background task ${taskName} failed to spawn: ${error.message}`)
+          if (closeFd !== null) {
+            try {
+              // eslint-disable-next-line ts/no-require-imports
+              const { closeSync } = require('node:fs') as typeof import('node:fs')
+              closeSync(closeFd)
+            }
+            catch {
+              // Already closed — fine.
+            }
+          }
+        })
+        // Crash visibility (stacksjs/stacks#1877 S-2). Before this
+        // listener, a child that exited with a non-zero code was
+        // silently lost — `.unref()` releases the child to the OS
+        // and the scheduler moves on. Now: log the exit code so
+        // operators see the failure in logs and can match it to
+        // the task name.
+        child.on('exit', (code, signal) => {
+          if (code !== 0 && code !== null) {
+            log.error(`[scheduler] background task ${taskName} (pid: ${child.pid}) exited with code ${code}`)
+          }
+          else if (signal) {
+            log.warn(`[scheduler] background task ${taskName} (pid: ${child.pid}) terminated by signal ${signal}`)
+          }
+          if (closeFd !== null) {
+            try {
+              // eslint-disable-next-line ts/no-require-imports
+              const { closeSync } = require('node:fs') as typeof import('node:fs')
+              closeSync(closeFd)
+            }
+            catch {
+              // Already closed — fine.
+            }
+          }
         })
         child.unref()
         log.info(`Task ${taskName} spawned in background (pid: ${child.pid})`)
@@ -354,17 +567,27 @@ export class Schedule implements UntimedSchedule {
       return parse(this.cronPattern)
     }
 
-    // Timezone-aware scheduling:
-    // 1. Get "now" in the configured timezone
-    // 2. Parse for next match from that local time
-    // 3. Compute delay and add to real now
-    const now = new Date()
-    const localNow = new Date(now.toLocaleString('en-US', { timeZone: this.timezone }))
-    const nextLocal = parse(this.cronPattern, localNow)
-    if (!nextLocal) return null
-
-    const delayMs = nextLocal.getTime() - localNow.getTime()
-    return new Date(now.getTime() + delayMs)
+    // Timezone-aware scheduling via parseCron's `tz` option
+    // (stacksjs/stacks#1877 Cr-1 — closes the DST drift gap).
+    //
+    // Pre-fix: this method computed `localNow = new Date(now.toLocaleString(tz))`,
+    // parsed the cron against that local time in UTC mode, then added
+    // the resulting delta back to `now.getTime()`. That worked when the
+    // TZ offset was stable but went off by ±1h across DST transitions —
+    // the offset on the "local now" side and the "local match" side
+    // differed by an hour during spring-forward / fall-back windows,
+    // so the wall-clock delta no longer mapped cleanly to UTC.
+    //
+    // Post-fix: parseCron's tz-aware part-extractor uses
+    // `Intl.DateTimeFormat.formatToParts` which auto-handles DST.
+    // The search loop walks UTC milliseconds; field comparisons run
+    // against the local-in-tz view of each candidate instant. Spring-
+    // forward: the cron's target local time is skipped that day
+    // (the task doesn't fire because the wall-clock instant doesn't
+    // exist). Fall-back: the target local time happens twice, and
+    // the scheduler fires twice on the transition day — apps that
+    // care need idempotency keys or exclusive locks on the task body.
+    return parse(this.cronPattern, undefined, { tz: this.timezone })
   }
 
   private start(): ScheduledJob {
@@ -392,8 +615,15 @@ export class Schedule implements UntimedSchedule {
       return this.getNextRunTime()
     }
 
-    const job: ScheduledJob = { stop, nextRun }
+    const job: ScheduledJob = {
+      stop,
+      nextRun,
+      pattern: this.intervalMs !== null ? `every ${this.intervalMs / 1000}s` : this.cronPattern,
+      timezone: this.timezone,
+      name: this.options.name,
+    }
 
+    const taskName = this.options.name || 'unnamed-task'
     const executeTask = () => {
       if (this.options.maxRuns && runCount >= this.options.maxRuns) {
         stop()
@@ -406,10 +636,25 @@ export class Schedule implements UntimedSchedule {
         // would otherwise become an unhandled rejection (the synchronous
         // try/catch above can't see it). Now those route through the
         // configured `.catch` handler just like sync errors do.
+        //
+        // Limitation (stacksjs/stacks#1877 S-4): this only catches the
+        // returned Promise's own rejection. A callback that detaches
+        // an INNER promise (fire-and-forget fetch, dangling .then
+        // chain) can still throw asynchronously after we've moved on
+        // — there's no general way to capture those from outside the
+        // callback. Apps that rely on the .catch handler firing for
+        // every error MUST `await` every inner promise; we can't fix
+        // that boundary, only document it.
         if (result && typeof (result as Promise<unknown>).then === 'function') {
           (result as Promise<unknown>).catch((error: unknown) => {
             if (this.options.catch) {
               this.options.catch(error as Error)
+            }
+            else {
+              // No user catch installed — log so the rejection is
+              // at least visible. Previously a missing catch + a
+              // rejecting task = silent failure.
+              log.error(`[scheduler] task ${taskName} async error (no .catch handler installed): ${error instanceof Error ? error.message : String(error)}`)
             }
           })
         }
@@ -417,6 +662,9 @@ export class Schedule implements UntimedSchedule {
       catch (error) {
         if (this.options.catch) {
           this.options.catch(error as Error)
+        }
+        else {
+          log.error(`[scheduler] task ${taskName} sync error (no .catch handler installed): ${error instanceof Error ? error.message : String(error)}`)
         }
       }
     }
@@ -500,11 +748,44 @@ export class Schedule implements UntimedSchedule {
   }
 
   static command(cmd: string): UntimedSchedule {
-    return new Schedule(async () => {
+    // Defer field-reads to task-execution time so `.sendOutputTo(...)`
+    // chained AFTER `.command(...)` is observed (stacksjs/stacks#1877
+    // S-3). Holder pattern lets us reference the Schedule instance
+    // inside the task closure without circular construction.
+    let instance: Schedule | null = null
+    const task = async () => {
+      const outputPath = instance?.outputPath ?? null
+      const outputAppend = instance?.outputAppend ?? false
       try {
         log.info(`Executing command: ${cmd}`)
-        const result = await runCommand(cmd)
+        if (outputPath) {
+          // Spawn directly so we can redirect stdio to the file —
+          // runCommand wraps a Bun.spawn that doesn't expose the
+          // stdio redirect option.
+          const { spawn: childSpawn } = await import('node:child_process')
+          const { openSync, closeSync } = await import('node:fs')
+          const flag = outputAppend ? 'a' : 'w'
+          const fd = openSync(outputPath, flag)
+          try {
+            await new Promise<void>((resolve, reject) => {
+              const child = childSpawn(cmd, {
+                shell: true,
+                stdio: ['ignore', fd, fd],
+              })
+              child.on('error', reject)
+              child.on('exit', (code) => {
+                if (code === 0) resolve()
+                else reject(new Error(`Command '${cmd}' exited with code ${code}`))
+              })
+            })
+          }
+          finally {
+            closeSync(fd)
+          }
+          return
+        }
 
+        const result = await runCommand(cmd)
         if (result.isErr) {
           log.error(result.error)
           throw result.error
@@ -514,7 +795,9 @@ export class Schedule implements UntimedSchedule {
         log.error(`Command execution failed: ${error}`)
         throw error
       }
-    }).withName(`command-${cmd}`) as UntimedSchedule
+    }
+    instance = new Schedule(task)
+    return instance.withName(`command-${cmd}`) as UntimedSchedule
   }
 
   /**

@@ -57,8 +57,18 @@ export class InMemoryStorageAdapter implements StorageAdapter {
       return contents
     }
     else {
-      // ReadableStream
-      const reader = contents.getReader()
+      // Web-standard ReadableStream only — see s3.ts:contentsToBuffer
+      // (stacksjs/stacks#1873 S-15) for the same guard.
+      const stream = contents as unknown as { getReader?: ReadableStream['getReader'] }
+      if (typeof stream.getReader !== 'function') {
+        throw new TypeError(
+          '[storage/memory] contents must be a web-standard ReadableStream '
+          + '(with .getReader()), not a Node stream.Readable. '
+          + 'Convert via Readable.toWeb(nodeStream) before passing.',
+        )
+      }
+
+      const reader = stream.getReader.call(contents as ReadableStream)
       const chunks: Uint8Array[] = []
 
       while (true) {
@@ -346,8 +356,12 @@ export class InMemoryStorageAdapter implements StorageAdapter {
   }
 
   async publicUrl(path: string, options: PublicUrlOptions = {}): Promise<string> {
-    const domain = options.domain || 'http://localhost'
-    return `${domain}/${this.normalizePath(path)}`
+    // Mirrors local.ts (stacksjs/stacks#1873 S-9): explicit domain
+    // wins, otherwise fall back to APP_URL, otherwise localhost.
+    // Pre-fix the memory driver silently localhost-prefixed every
+    // URL even in production — same bug shape as the local driver.
+    const base = (options.domain || process.env.APP_URL || 'http://localhost').replace(/\/$/, '')
+    return `${base}/${this.normalizePath(path)}`
   }
 
   async temporaryUrl(path: string, options: TemporaryUrlOptions): Promise<string> {

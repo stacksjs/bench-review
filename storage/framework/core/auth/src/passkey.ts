@@ -70,6 +70,47 @@ export async function getUserPasskey(userId: number, passkeyId: string): Promise
   return row as unknown as PasskeyAttribute | undefined
 }
 
+/**
+ * Persist the post-verification authenticator counter and refresh the
+ * passkey's last-used timestamp. WebAuthn's anti-cloning guarantee
+ * depends on the relying party rejecting any authentication whose
+ * `newCounter` is **not strictly greater** than the stored value —
+ * authenticators monotonically increment their counter on every use,
+ * so a counter that doesn't advance (or goes backwards) signals a
+ * cloned or replayed credential.
+ *
+ * Returns `true` when the counter was updated successfully; `false`
+ * when the new counter is not greater than the stored one (the
+ * authentication MUST be rejected by the caller in that case).
+ * stacksjs/stacks#1861 A-4.
+ */
+export async function updatePasskeyCounter(
+  userId: number,
+  passkeyId: string,
+  newCounter: number,
+): Promise<boolean> {
+  // Authenticators that don't implement a counter (some platform
+  // authenticators) always send 0 — accept those at face value as
+  // long as the stored value is also 0. The strictly-greater check
+  // applies only when the device claims a non-zero counter.
+  const passkey = await getUserPasskey(userId, passkeyId)
+  if (!passkey) return false
+
+  const stored = Number(passkey.counter ?? 0)
+  if (newCounter !== 0 && newCounter <= stored) {
+    return false
+  }
+
+  await db
+    .updateTable('passkeys')
+    .set({ counter: newCounter, last_used_at: formatDateTime() } as never)
+    .where('id', '=', passkeyId)
+    .where('user_id', '=', userId)
+    .execute()
+
+  return true
+}
+
 export async function setCurrentRegistrationOptions(
   user: UserModel,
   verified: VerifiedRegistrationResponse,
@@ -117,4 +158,94 @@ function formatDateTime(): string {
   const seconds = pad(date.getSeconds())
 
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+}
+
+// =============================================================================
+// WebAuthn challenge persistence (stacksjs/stacks#1866)
+// =============================================================================
+//
+// WebAuthn relying parties MUST verify the assertion's challenge
+// against a server-issued nonce. Previously Stacks returned the
+// challenge in `generateOptions` and trusted the client to echo it
+// back on verify — so any attacker who captured the assertion AND the
+// challenge could replay the response. Persisting the challenge
+// server-side and consuming it on verify closes that gap.
+//
+// The default TTL is 5 minutes — long enough for slow biometric
+// flows, short enough to bound the replay window. Override per-call
+// via the `ttlSeconds` parameter.
+
+export type WebAuthnChallengePurpose = 'registration' | 'authentication'
+
+const DEFAULT_CHALLENGE_TTL_SECONDS = 5 * 60
+
+/**
+ * Persist a server-issued WebAuthn challenge for the given user +
+ * purpose. Deletes any prior challenge for the same (user, purpose)
+ * pair so a fresh `generateOptions` invalidates the previous one.
+ *
+ * The unique index on `(user_id, purpose)` enforces single-outstanding
+ * at the DB layer; this delete makes the upsert safe even on installs
+ * that ran an earlier auth:setup before the unique index existed.
+ */
+export async function storeWebAuthnChallenge(
+  userId: number,
+  challenge: string,
+  purpose: WebAuthnChallengePurpose,
+  ttlSeconds: number = DEFAULT_CHALLENGE_TTL_SECONDS,
+): Promise<void> {
+  const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString()
+
+  await db
+    .deleteFrom('webauthn_challenges')
+    .where('user_id', '=', userId)
+    .where('purpose', '=', purpose)
+    .execute()
+
+  await db
+    .insertInto('webauthn_challenges')
+    .values({
+      user_id: userId,
+      challenge,
+      purpose,
+      expires_at: expiresAt,
+    } as never)
+    .execute()
+}
+
+/**
+ * Read + delete (single-use) a WebAuthn challenge for the given user
+ * + purpose. Returns `null` when no outstanding challenge exists or
+ * when the stored challenge has expired.
+ *
+ * Single-use semantics matter: a successful verify must invalidate
+ * the challenge so a captured assertion can't be replayed even within
+ * the TTL window. Callers MUST treat a `null` return as a verification
+ * failure.
+ */
+export async function consumeWebAuthnChallenge(
+  userId: number,
+  purpose: WebAuthnChallengePurpose,
+): Promise<string | null> {
+  const row = await db
+    .selectFrom('webauthn_challenges')
+    .where('user_id', '=', userId)
+    .where('purpose', '=', purpose)
+    .selectAll()
+    .executeTakeFirst()
+
+  if (!row) return null
+
+  // Delete BEFORE checking expiry so an expired row doesn't linger
+  // and consume the unique slot for the next legitimate generate.
+  await db
+    .deleteFrom('webauthn_challenges')
+    .where('user_id', '=', userId)
+    .where('purpose', '=', purpose)
+    .execute()
+
+  const expiresAt = row.expires_at ? new Date(String(row.expires_at)).getTime() : 0
+  if (Date.now() > expiresAt) return null
+
+  return String(row.challenge)
 }

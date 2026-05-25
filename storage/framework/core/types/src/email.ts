@@ -340,6 +340,17 @@ export interface EmailMessage {
   cc?: string | string[] | EmailAddress[]
   /** Blind carbon copy recipient(s) */
   bcc?: string | string[] | EmailAddress[]
+  /**
+   * Reply-To address(es) for the outgoing message.
+   *
+   * Drivers must propagate this to the provider's equivalent field
+   * (`ReplyToAddresses` on SES, `h:Reply-To` on Mailgun, `reply_to` on
+   * SendGrid, a `Reply-To:` header for SMTP). Previously the field
+   * lived as an `as any` stash on the message (stacksjs/stacks#1871 M-4)
+   * — promoting it to a first-class slot means drivers can be
+   * checked at compile time for coverage.
+   */
+  replyTo?: EmailAddress | EmailAddress[] | string | string[]
   /** Email subject line */
   subject: string
   /** Path to email template (Vue component) */
@@ -364,6 +375,30 @@ export interface EmailMessage {
   onError?: (error: Error) => Promise<{ message: string }> | { message: string }
   /** Optional custom handler */
   handle?: () => Promise<{ message: string }> | { message: string }
+  /**
+   * Caller-supplied idempotency key (stacksjs/stacks#1871 M-8).
+   *
+   * When set, `mail.send()` consults an `email_idempotency` dedup
+   * table before dispatching to the driver:
+   *   - hit: returns the cached EmailResult from the first send
+   *   - miss: dispatches, then records the result under the key
+   *
+   * Why it matters: queued send retries (the framework retries 3×
+   * with backoff) and external retry loops (webhook handlers that
+   * re-fire on transient failures, request POSTs that the user
+   * double-clicks) can otherwise deliver the same email multiple
+   * times. The key turns those retries into safe no-ops.
+   *
+   * Construction guidance: derive the key from the business event
+   * the email represents — e.g. `welcome:${userId}`,
+   * `order-confirmation:${orderId}:${attempt}`, not from message
+   * content (which would collide across unrelated sends).
+   *
+   * The dedup table is opt-in. When the migration hasn't been run
+   * yet, the framework warns once and falls back to "send every
+   * time" so unrelated apps aren't broken by the new behavior.
+   */
+  idempotencyKey?: string
 }
 
 // Email interfaces

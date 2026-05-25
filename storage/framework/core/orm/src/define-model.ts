@@ -1,5 +1,6 @@
 import { createModel, type ModelDefinition as BQBModelDefinition, registerModel } from '@stacksjs/query-builder'
 import type { InferRelationNames } from '@stacksjs/query-builder'
+import type { SearchOptions } from '@stacksjs/types'
 import { log } from '@stacksjs/logging'
 import { snakeCase } from '@stacksjs/strings'
 import { AsyncLocalStorage } from 'node:async_hooks'
@@ -43,6 +44,27 @@ export function withoutEvents<T>(fn: () => T | Promise<T>): Promise<T> {
 // prevents TypeScript from providing contextual types for callback parameters.
 /**
  * Built-in cast types for model attributes.
+ *
+ * ### Timezone contract (stacksjs/stacks#1876 O-5, D-5)
+ *
+ * `datetime` and `date` casts persist values in **UTC** regardless of
+ * which driver is connected. The `set` direction uses
+ * `Date.toISOString()`, which always emits `Z`-suffixed UTC. The
+ * `get` direction parses the stored string back into a JavaScript
+ * `Date`, which represents an instant on the universal timeline —
+ * timezone presentation is the caller's responsibility (typically via
+ * `Intl.DateTimeFormat` at the render layer, or a Temporal-API
+ * adapter).
+ *
+ * **Why UTC-only:** Per-driver behavior diverges sharply on
+ * timezone-aware columns. PostgreSQL has `timestamptz` (timezone-
+ * aware); MySQL stores `TIMESTAMP` as UTC but presents in the
+ * session timezone; SQLite has no timezone concept at all and stores
+ * ISO strings verbatim. The ORM normalizes them to a single
+ * convention (UTC on the wire) so multi-driver apps behave the same
+ * across environments. Apps that need original-timezone preservation
+ * should store the user's TZ as a separate column and convert at
+ * the render layer.
  */
 export type CastType = 'string' | 'number' | 'boolean' | 'json' | 'datetime' | 'date' | 'array' | 'integer' | 'float'
 
@@ -52,6 +74,22 @@ export type CastType = 'string' | 'number' | 'boolean' | 'json' | 'datetime' | '
 export interface CasterInterface {
   get(value: unknown): unknown
   set(value: unknown): unknown
+}
+
+// Track which JSON-cast columns have already logged a parse failure so
+// a corrupted row doesn't spam the log on every read
+// (stacksjs/stacks#1876 O-4). Set is keyed by `${typeof v}:${preview}`
+// so genuinely different corruptions each get logged once.
+const jsonParseFailureSeen = new Set<string>()
+
+function logJsonParseFailure(raw: unknown, err: unknown): void {
+  const preview = typeof raw === 'string' ? raw.slice(0, 80) : String(raw)
+  const key = `${typeof raw}:${preview}`
+  if (jsonParseFailureSeen.has(key)) return
+  jsonParseFailureSeen.add(key)
+  const message = err instanceof Error ? err.message : String(err)
+  // eslint-disable-next-line no-console
+  console.error(`[orm] JSON cast failed to parse value (returning null): ${message} — value preview: ${JSON.stringify(preview)}`)
 }
 
 const builtInCasters: Record<CastType, CasterInterface> = {
@@ -78,7 +116,22 @@ const builtInCasters: Record<CastType, CasterInterface> = {
   json: {
     get: (v) => {
       if (v == null) return null
-      if (typeof v === 'string') { try { return JSON.parse(v) } catch { return v } }
+      if (typeof v === 'string') {
+        try {
+          return JSON.parse(v)
+        }
+        catch (err) {
+          // Previously the catch returned the unparsed string, so callers
+          // expecting `typeof row.config === 'object'` silently
+          // type-cast wrong and crashed downstream
+          // (stacksjs/stacks#1876 O-4). Now: log the corruption once
+          // per distinct shape so it's visible, and return null (the
+          // typed default) so consumers don't accidentally string-`.length`
+          // a malformed JSON column.
+          logJsonParseFailure(v, err)
+          return null
+        }
+      }
       return v
     },
     set: (v) => {
@@ -87,10 +140,19 @@ const builtInCasters: Record<CastType, CasterInterface> = {
     },
   },
   datetime: {
+    // UTC-only by contract (see CastType docstring). The returned
+    // `Date` is timezone-agnostic; convert via `toLocaleString(tz)`
+    // or Intl at render time when local-time display is needed.
     get: (v) => v ? new Date(v as string) : null,
     set: (v) => v instanceof Date ? v.toISOString() : v,
   },
   date: {
+    // Date-only field, persisted as YYYY-MM-DD derived from the UTC
+    // calendar day. A noon-local Date in UTC-5 stored as a `date`
+    // becomes the next day's UTC date — that's the trade-off of the
+    // UTC-only contract. Callers that need local-calendar-day
+    // semantics should convert to UTC at the boundary themselves
+    // (e.g. `new Date(Date.UTC(y, m, d))` from local Y/M/D parts).
     get: (v) => v ? new Date(v as string) : null,
     set: (v) => v instanceof Date ? v.toISOString().split('T')[0] : v,
   },
@@ -261,6 +323,30 @@ function wrapModelInstance<T extends object>(
       if (prop === 'deleteQuietly') {
         return function () {
           return withoutEvents(() => (target as any).delete())
+        }
+      }
+
+      if (prop === 'toSearchableObject') {
+        return function toSearchableObject() {
+          const def = (target as any)._definition as { traits?: { useSearch?: boolean | SearchOptions } } | undefined
+          const search = def?.traits?.useSearch
+          if (!search || typeof search !== 'object') return null
+
+          const attrs = (target as any)._attributes as Record<string, unknown> | undefined
+          if (!attrs) return null
+
+          const doc: Record<string, unknown> = {}
+          const keys = search.displayable?.length
+            ? search.displayable
+            : [...search.searchable ?? [], ...search.filterable ?? [], ...search.sortable ?? [], 'id']
+
+          for (const key of keys) {
+            const snake = snakeCase(key)
+            doc[snake] = attrs[snake] ?? attrs[key]
+          }
+
+          if (attrs.id != null) doc.id = String(attrs.id)
+          return doc
         }
       }
 
@@ -1062,6 +1148,28 @@ interface StacksModelDefinition {
   table: string
   primaryKey?: string
   autoIncrement?: boolean
+  /**
+   * Per-model declarative behaviors. Common entries:
+   *   - `observe: true | ['create','update','delete']` — emit
+   *     framework events (`<model>:created` etc.) on lifecycle hooks
+   *   - `useAudit`, `useSoftDeletes`, `useTimestamps`, etc.
+   *   - `broadcastOn(model): string | string[]` — channels to push
+   *     model lifecycle events to via `@stacksjs/realtime`. Requires
+   *     `broadcastWith` to be set too; only fires when `observe` is
+   *     enabled (stacksjs/stacks#1874 F-10).
+   *   - `broadcastWith(model): Record<string, unknown>` — payload
+   *     shape the realtime subscribers receive. Lets you broadcast
+   *     a curated public projection instead of the full row.
+   *
+   * @example
+   * ```ts
+   * traits: {
+   *   observe: true,
+   *   broadcastOn: post => [`user.${post.user_id}`, 'feed'],
+   *   broadcastWith: post => ({ id: post.id, title: post.title, author: post.author?.name }),
+   * }
+   * ```
+   */
   traits?: Record<string, unknown>
   indexes?: Array<{ name: string, columns: string[] }>
   casts?: Record<string, CastType | CasterInterface>
@@ -1082,7 +1190,7 @@ import { createBillableMethods } from './traits/billable'
 import { createLikeableMethods } from './traits/likeable'
 import { createTwoFactorMethods } from './traits/two-factor'
 import { createSoftDeleteMethods, resolveSoftDeleteOptions, cascadeSoftDelete } from './traits/soft-deletes'
-import { applyAudit } from './traits/audit'
+import { applyAudit, resolveAuditOptions } from './traits/audit'
 import { collectEncryptedAttributes, decryptValue, encryptValue, isEncrypted } from './utils/encrypted'
 
 /**
@@ -1133,8 +1241,10 @@ import { collectEncryptedAttributes, decryptValue, encryptValue, isEncrypted } f
 export function defineModel<const TDef extends ModelDefinition>(definition: TDef) {
   log.debug(`[orm] Defining model: ${definition.name} (table: ${definition.table})`)
 
-  // Build event hooks from observer configuration
-  const hooks = buildEventHooks(definition as unknown as BQBModelDefinition)
+  // Build event hooks from observer configuration and search indexing
+  const observeHooks = buildEventHooks(definition as unknown as BQBModelDefinition)
+  const searchHooks = buildSearchHooks(definition as unknown as BQBModelDefinition)
+  const hooks = mergeModelHooks(observeHooks, searchHooks)
 
   // Merge hooks into definition
   const defWithHooks = hooks
@@ -1195,8 +1305,16 @@ export function defineModel<const TDef extends ModelDefinition>(definition: TDef
   // Audit trait must run AFTER soft-delete wiring so it wraps the final
   // `delete` (which the soft-delete trait may have aliased to softDelete).
   // Wrapping earlier would leave the softDelete shim's writes unaudited.
-  if ((definition as { traits?: { useAudit?: unknown } }).traits?.useAudit) {
-    applyAudit(baseModel, definition.name, definition.primaryKey || 'id')
+  //
+  // `useAudit: true` keeps the legacy best-effort behavior. To opt
+  // into transactional auditing (audit failure rolls back the user
+  // write — required for compliance scenarios), declare
+  // `traits.useAudit: { transactional: true }` instead
+  // (stacksjs/stacks#1876 X-2).
+  const useAuditDecl = (definition as { traits?: { useAudit?: unknown } }).traits?.useAudit
+  if (useAuditDecl) {
+    const auditOpts = resolveAuditOptions(useAuditDecl)
+    applyAudit(baseModel, definition.name, definition.primaryKey || 'id', auditOpts)
   }
 
   // Build trait methods based on model config
@@ -1258,21 +1376,78 @@ function buildEventHooks(definition: BQBModelDefinition): BQBModelDefinition['ho
   // INSIDE the dispatcher (rather than at the hook caller) so even
   // explicit `dispatchEvent` calls from elsewhere honour the
   // `withoutEvents` ALS scope without each call site having to remember.
-  const dispatchEvent = (event: string, data: any) => {
-    if (eventsAreSuppressed()) return Promise.resolve()
-    return import('@stacksjs/events')
-      .then(({ dispatch }) => dispatch(event, data))
-      .catch((err) => {
-        // Only silence module resolution errors (events package may not exist in browser/tests)
-        if (err && typeof err === 'object' && 'code' in err && err.code === 'MODULE_NOT_FOUND') {
-          return
-        }
-        // Log actual event handler errors instead of swallowing them
-        console.error(`[ORM] Event '${event}' handler error:`, err)
-      })
+  //
+  // Re-throw listener errors by default (stacksjs/stacks#1876 O-2).
+  // Previously this swallowed every exception and only logged to
+  // console.error, which meant a queue dispatch failing inside an
+  // `updated` listener looked like a successful save with a missing
+  // background job — silent data drift. Now: the model save fails
+  // when a listener fails, matching Laravel's semantics. Listeners
+  // that are genuinely best-effort (analytics, observability) should
+  // catch their own errors. Opt out globally via
+  // `STACKS_ORM_EVENT_ERRORS=swallow` for legacy code that hasn't
+  // audited its listeners yet.
+  const dispatchEvent = async (event: string, data: any) => {
+    if (eventsAreSuppressed()) return
+    try {
+      const { dispatch } = await import('@stacksjs/events')
+      await dispatch(event, data)
+    }
+    catch (err) {
+      // MODULE_NOT_FOUND is the expected shape when the events package
+      // isn't installed (browser bundles, some test envs) — silence it.
+      if (err && typeof err === 'object' && 'code' in err && err.code === 'MODULE_NOT_FOUND')
+        return
+      console.error(`[ORM] Event '${event}' handler error:`, err)
+      if (process.env.STACKS_ORM_EVENT_ERRORS !== 'swallow') throw err
+    }
   }
 
-  // Dispatches a before-event and returns false if the handler cancels the operation
+  // Model-level broadcasting (stacksjs/stacks#1874 F-10).
+  //
+  // Opt-in via `traits.broadcastOn` (channels) + `traits.broadcastWith`
+  // (payload shape). When both are declared, the post-write hooks
+  // dispatch to `@stacksjs/realtime` with the same event name shape
+  // (`<model>:<verb>`) as the events bus uses, so subscribers see
+  // consistent naming across both channels.
+  //
+  // Errors are LOGGED-AND-SWALLOWED by default — broadcasting is a
+  // notification side-channel, not the source of truth, and a flaky
+  // websocket layer must not break model saves. Opt in to throw via
+  // `STACKS_ORM_BROADCAST_ERRORS=throw` for tests that want to
+  // surface mis-wired broadcasts loudly.
+  const broadcastOnFn = (definition as { traits?: { broadcastOn?: (model: any) => string | string[] } }).traits?.broadcastOn
+  const broadcastWithFn = (definition as { traits?: { broadcastWith?: (model: any) => Record<string, unknown> } }).traits?.broadcastWith
+  const broadcastingEnabled = typeof broadcastOnFn === 'function' && typeof broadcastWithFn === 'function'
+
+  const dispatchBroadcast = async (event: string, model: any): Promise<void> => {
+    if (!broadcastingEnabled) return
+    if (eventsAreSuppressed()) return
+    try {
+      const channelsRaw = broadcastOnFn!(model)
+      const channels = Array.isArray(channelsRaw) ? channelsRaw : [channelsRaw]
+      const payload = broadcastWithFn!(model)
+      const realtime = await import('@stacksjs/realtime').catch(() => null) as { broadcast?: (channel: string, event: string, data: unknown) => Promise<void> | void } | null
+      const broadcast = realtime?.broadcast
+      if (typeof broadcast !== 'function') return
+      for (const channel of channels) {
+        if (typeof channel !== 'string' || channel.length === 0) continue
+        await broadcast(channel, event, payload)
+      }
+    }
+    catch (err) {
+      if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'MODULE_NOT_FOUND')
+        return
+      console.error(`[ORM] Broadcast '${event}' handler error:`, err)
+      if (process.env.STACKS_ORM_BROADCAST_ERRORS === 'throw') throw err
+    }
+  }
+
+  // Dispatches a before-event and returns false if the handler cancels
+  // the operation. Same re-throw policy as `dispatchEvent` — a broken
+  // `before*` listener used to silently allow the operation through
+  // because the catch returned `true` (default-allow). Now: the save
+  // fails on listener error unless STACKS_ORM_EVENT_ERRORS=swallow.
   const dispatchBeforeEvent = async (event: string, data: any): Promise<boolean> => {
     if (eventsAreSuppressed()) return true
     try {
@@ -1283,10 +1458,10 @@ function buildEventHooks(definition: BQBModelDefinition): BQBModelDefinition['ho
       if (Array.isArray(results) && results.some(r => r === false)) return false
     }
     catch (err) {
-      if (err && typeof err === 'object' && 'code' in err && err.code === 'MODULE_NOT_FOUND') {
+      if (err && typeof err === 'object' && 'code' in err && err.code === 'MODULE_NOT_FOUND')
         return true
-      }
       console.error(`[ORM] Before-event '${event}' handler error:`, err)
+      if (process.env.STACKS_ORM_EVENT_ERRORS !== 'swallow') throw err
     }
     return true
   }
@@ -1314,6 +1489,9 @@ function buildEventHooks(definition: BQBModelDefinition): BQBModelDefinition['ho
       // already fired for the insert path.
       await dispatchEvent(`${modelName}:created`, model)
       await dispatchEvent(`${modelName}:saved`, model)
+      // Broadcast AFTER the event dispatch so any event-listener-side
+      // mutation of the model is reflected in the broadcast payload.
+      await dispatchBroadcast(`${modelName}:created`, model)
     }
   }
   if (events.includes('update')) {
@@ -1327,6 +1505,7 @@ function buildEventHooks(definition: BQBModelDefinition): BQBModelDefinition['ho
     hooks.afterUpdate = async (model: any) => {
       await dispatchEvent(`${modelName}:updated`, model)
       await dispatchEvent(`${modelName}:saved`, model)
+      await dispatchBroadcast(`${modelName}:updated`, model)
     }
   }
   if (events.includes('delete')) {
@@ -1335,10 +1514,78 @@ function buildEventHooks(definition: BQBModelDefinition): BQBModelDefinition['ho
       const shouldProceed = await dispatchBeforeEvent(`${modelName}:deleting`, model)
       if (!shouldProceed) throw new Error(`[ORM] ${modelName}:deleting event cancelled the operation`)
     }
-    hooks.afterDelete = (model: any) => dispatchEvent(`${modelName}:deleted`, model)
+    hooks.afterDelete = async (model: any) => {
+      await dispatchEvent(`${modelName}:deleted`, model)
+      await dispatchBroadcast(`${modelName}:deleted`, model)
+    }
   }
 
   return hooks
+}
+
+function mergeModelHooks(
+  ...sets: Array<BQBModelDefinition['hooks'] | undefined>
+): BQBModelDefinition['hooks'] | undefined {
+  const merged: NonNullable<BQBModelDefinition['hooks']> = {}
+  const names = new Set<string>()
+
+  for (const set of sets) {
+    if (!set) continue
+    for (const name of Object.keys(set)) names.add(name)
+  }
+
+  for (const name of names) {
+    const fns = sets.map(s => s?.[name as keyof NonNullable<BQBModelDefinition['hooks']>]).filter((fn): fn is (...args: any[]) => any => typeof fn === 'function')
+    if (!fns.length) continue
+    ;(merged as Record<string, (...args: any[]) => any>)[name] = async (...args: any[]) => {
+      for (const fn of fns) await fn(...args)
+    }
+  }
+
+  return Object.keys(merged).length ? merged : undefined
+}
+
+/**
+ * Scout-style search index sync when `traits.useSearch` is set.
+ * Indexes on create/update and removes on delete without requiring `observe: true`.
+ */
+function buildSearchHooks(definition: BQBModelDefinition): BQBModelDefinition['hooks'] | undefined {
+  const useSearch = definition.traits?.useSearch
+  if (!useSearch) return undefined
+
+  const tableName = definition.table || snakeCase(`${definition.name}s`)
+
+  const syncDocument = async (model: any) => {
+    if (eventsAreSuppressed()) return
+    try {
+      const { useSearchEngine } = await import('@stacksjs/search-engine')
+      const wrapped = wrapModelInstance(model)
+      const doc = (wrapped as any).toSearchableObject?.()
+      if (doc) await useSearchEngine().addDocument(tableName, doc)
+    }
+    catch (err) {
+      log.warn(`[orm/search] Failed to index ${definition.name}: ${(err as Error).message}`)
+    }
+  }
+
+  const removeDocument = async (model: any) => {
+    if (eventsAreSuppressed()) return
+    const id = model?.id ?? model?._attributes?.id
+    if (id == null) return
+    try {
+      const { useSearchEngine } = await import('@stacksjs/search-engine')
+      await useSearchEngine().deleteDocument(tableName, Number(id))
+    }
+    catch (err) {
+      log.warn(`[orm/search] Failed to remove ${definition.name}#${id}: ${(err as Error).message}`)
+    }
+  }
+
+  return {
+    afterCreate: syncDocument,
+    afterUpdate: syncDocument,
+    afterDelete: removeDocument,
+  }
 }
 
 export interface TraitMethods {
@@ -1442,22 +1689,55 @@ function applySoftDeletes(
   // ever fired — the audit's #11 specifically called this out, since a
   // listener watching for "user came back" via `restored` was never going
   // to receive the event.
+  //
+  // Cascade is wrapped in a transaction (stacksjs/stacks#1876 O-3) so
+  // a child-cascade failure rolls back the parent's soft-delete /
+  // restore. Without this, the parent committed first and a failing
+  // child left the schema in an inconsistent state with no signal to
+  // the caller. The transaction is opt-out via
+  // `STACKS_ORM_CASCADE_SWALLOW=true` (the cascadeChildren callsite
+  // honors the same env var — same boundary, same opt-out).
+  const transactional = process.env.STACKS_ORM_CASCADE_SWALLOW !== 'true'
+
   const softDeleteFn = async (id: number | string): Promise<boolean> => {
-    const ok = await helpers.softDelete(id)
-    if (ok && options.cascade?.length)
-      await cascadeSoftDelete(parentDef, options, id, 'softDelete')
-    return ok
+    if (!options.cascade?.length || !transactional) {
+      const ok = await helpers.softDelete(id)
+      if (ok && options.cascade?.length)
+        await cascadeSoftDelete(parentDef, options, id, 'softDelete')
+      return ok
+    }
+    const { db } = await import('@stacksjs/database')
+    return await db.transaction(async () => {
+      const ok = await helpers.softDelete(id)
+      if (ok)
+        await cascadeSoftDelete(parentDef, options, id, 'softDelete')
+      return ok
+    })
   }
 
   const restoreFn = async (id: number | string): Promise<boolean> => {
     const proceed = await fireRestoring(id)
     if (!proceed) return false
-    const ok = await helpers.restore(id)
-    if (ok) {
-      if (options.cascade?.length)
-        await cascadeSoftDelete(parentDef, options, id, 'restore')
-      await fireRestored(id)
+    if (!options.cascade?.length || !transactional) {
+      const ok = await helpers.restore(id)
+      if (ok) {
+        if (options.cascade?.length)
+          await cascadeSoftDelete(parentDef, options, id, 'restore')
+        await fireRestored(id)
+      }
+      return ok
     }
+    const { db } = await import('@stacksjs/database')
+    const ok = await db.transaction(async () => {
+      const inner = await helpers.restore(id)
+      if (inner)
+        await cascadeSoftDelete(parentDef, options, id, 'restore')
+      return inner
+    })
+    // Fire `restored` AFTER the transaction commits — listeners that
+    // run side effects (queue jobs, audit log) should observe the
+    // restored state, not the in-flight transaction snapshot.
+    if (ok) await fireRestored(id)
     return ok
   }
 

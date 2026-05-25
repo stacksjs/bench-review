@@ -32,6 +32,7 @@ import {
   setConfig,
 } from '@stacksjs/query-builder'
 import { db } from './utils'
+import { acquireMigrationLock } from './migration-lock'
 
 // Use environment variables via @stacksjs/env for proper type coercion
 import { env as envVars } from '@stacksjs/env'
@@ -56,12 +57,32 @@ function getDriver(): string {
   return dbConfig.default || 'sqlite'
 }
 
+/**
+ * Narrow `DB_CONNECTION` to a SQL dialect the migration runner and
+ * bun-query-builder can actually execute against. Previously this
+ * silently fell back to `'sqlite'` for any unrecognized driver —
+ * including `'dynamodb'`, which was advertised in env types and config
+ * validators but has no working SQL path. Result: `DB_CONNECTION=dynamodb`
+ * would silently run SQLite migrations against a non-existent file
+ * (stacksjs/stacks#1876 D-4).
+ *
+ * Now: throw with a clear pointer. Apps that genuinely want DynamoDB
+ * should use the entity-style `dynamo.entity(...)` API directly
+ * instead of the SQL ORM/migration path.
+ */
 function getDialect(): 'sqlite' | 'mysql' | 'postgres' {
   const driver = getDriver()
-  if (driver === 'sqlite') return 'sqlite'
-  if (driver === 'mysql') return 'mysql'
-  if (driver === 'postgres') return 'postgres'
-  return 'sqlite'
+  if (driver === 'sqlite' || driver === 'mysql' || driver === 'postgres') return driver
+  if (driver === 'dynamodb') {
+    throw new Error(
+      '[database] DB_CONNECTION=dynamodb is not compatible with the SQL migration runner. '
+      + 'DynamoDB has no schema-migration concept — use the entity-style `dynamo.entity(...)` '
+      + 'API from @stacksjs/database directly. To run SQL migrations, set DB_CONNECTION to one of: sqlite, mysql, postgres.',
+    )
+  }
+  throw new Error(
+    `[database] Unknown DB_CONNECTION "${driver}". Allowed values: sqlite, mysql, postgres, dynamodb.`,
+  )
 }
 
 /**
@@ -73,8 +94,15 @@ function configureQueryBuilder(): void {
 
   setConfig({
     dialect,
-    // Suppress bun-query-builder's `-- …` chatter on no-op runs.
-    // Stacks' buddy CLI already surfaces progress via intro/outro.
+    // bun-query-builder defaults to `verbose: true`, which dumps an
+    // unconditional wall of `-- Comparing with stored snapshot`,
+    // `-- Found N script files`, `-- Migrations table ready` etc. to
+    // stdout on every `buddy migrate` (including no-op re-runs). Stacks
+    // surfaces its own progress via the buddy CLI's intro/outro pair,
+    // so silence the library chatter by default. Users can flip this
+    // back via `setConfig({ verbose: true })` from their own config or
+    // by exporting `STACKS_QB_VERBOSE=1` (intentionally not wired yet —
+    // add it if a real debugging need shows up).
     verbose: false,
     database: {
       database: connectionConfig?.name || connectionConfig?.database || 'stacks',
@@ -447,12 +475,80 @@ async function restoreHiddenMigrations(hidden: Array<{ original: string, hidden:
 }
 
 /**
+ * Count how many migrations have been recorded as applied in the
+ * `migrations` table. Returns 0 when the table doesn't exist yet
+ * (fresh database, first ever migration) — bun-query-builder
+ * creates the table during the first `executeMigration` call.
+ *
+ * Used by {@link runDatabaseMigration} before + after the migration
+ * run so the caller can report `applied = afterCount - beforeCount`
+ * — distinguishes the "nothing to migrate" path from a real apply
+ * in the CLI outro (user-reported messaging gap).
+ */
+async function countAppliedMigrations(): Promise<number> {
+  try {
+    const row = await (db as any)
+      .selectFrom('migrations')
+      .select((eb: any) => eb.fn.count<number>('id').as('n'))
+      .executeTakeFirst()
+    if (!row) return 0
+    const n = Number(row.n ?? row.N ?? 0)
+    return Number.isFinite(n) ? n : 0
+  }
+  catch {
+    // Table doesn't exist yet — pre-first-migration state. Treat as
+    // zero so a fresh DB shows "applied N" on the first run rather
+    // than throwing here and pretending nothing happened.
+    return 0
+  }
+}
+
+/**
+ * Persist the last migration outcome for the CLI parent process to
+ * pick up. The migrate / migrate:fresh subprocesses run in a forked
+ * `bun` invocation and exit only with a status code, so the parent
+ * `buddy migrate` command has no in-process way to learn how many
+ * migrations actually ran. This marker file is the handoff.
+ *
+ * Buddy reads + deletes after the subprocess exits. Errors writing
+ * the marker are swallowed — the migration itself succeeded; failing
+ * to record the count just means the outro falls back to the
+ * generic "Migrated your <env> database." message.
+ */
+async function writeMigrateMarker(appliedCount: number): Promise<void> {
+  try {
+    const fs = await import('node:fs/promises')
+    const dir = path.projectPath('.stacks')
+    await fs.mkdir(dir, { recursive: true })
+    const file = `${dir}/last-migrate-result.json`
+    const body = JSON.stringify({
+      appliedCount,
+      completedAt: new Date().toISOString(),
+    })
+    await fs.writeFile(file, body, 'utf8')
+  }
+  catch {
+    // Don't fail the migration because we couldn't write a marker;
+    // the buddy CLI's outro will just use its generic fallback.
+  }
+}
+
+/**
  * Run database migrations
  */
 export async function runDatabaseMigration(): Promise<Result<string, Error>> {
   const startedAt = Date.now()
   const hidden = await hideDisabledFeatureMigrations()
+  // Lock handle is acquired AFTER ensureDatabaseExists (PG/MySQL need
+  // the target DB to exist before we can connect to it for the
+  // advisory lock). SQLite is fine to lock immediately.
+  let lockHandle: { release: () => Promise<void> } | null = null
   try {
+    // Step-progress logs stay at debug. On a no-op run (the common case
+    // when the user re-issues `buddy migrate` against a clean DB) we
+    // want a clean intro→outro pair from the buddy CLI, not a wall of
+    // "Migrating database... / Database migration completed" lines
+    // that duplicate what the outro already prints with timing.
     log.debug('Migrating database...')
 
     // Ensure the database exists before running migrations (PostgreSQL/MySQL)
@@ -461,19 +557,44 @@ export async function runDatabaseMigration(): Promise<Result<string, Error>> {
     // Configure bun-query-builder with stacks database settings
     configureQueryBuilder()
 
-    // Preprocess migrations for SQLite compatibility
-    if (getDialect() === 'sqlite') {
+    // Acquire the distributed migration lock (stacksjs/stacks#1876 D-1).
+    // Without this, two concurrent runners (parallel CI jobs, two app
+    // instances on boot) race the migrations table and corrupt state —
+    // both read the same "pending" list, both run the same SQL, both
+    // try to insert the same record. The lock is advisory on PG/MySQL
+    // (auto-released on disconnect) and file-based on SQLite (with a
+    // 60s staleness fallback so a crashed holder doesn't block forever).
+    const dialect = getDialect()
+    const lockDb = dialect === 'sqlite' ? null : createQueryBuilder()
+    lockHandle = await acquireMigrationLock(dialect, lockDb)
+
+    // Preprocess migrations for SQLite compatibility — runs *after*
+    // the lock is held so concurrent processes can't corrupt each
+    // other's disk state (stacksjs/stacks#1876 D-2).
+    if (dialect === 'sqlite') {
       preprocessSqliteMigrations()
     }
 
     const modelsDir = path.userModelsPath()
 
+    // Count applied-before so we can compute the delta after the
+    // migration run. Lets the buddy CLI distinguish "nothing to
+    // migrate" from "applied N" in the outro (user-reported
+    // messaging gap).
+    const appliedBefore = await countAppliedMigrations()
+
     // Execute existing migration files
     log.debug(`[migration] Running migrations from: ${modelsDir}`)
     await qbExecuteMigration(modelsDir)
 
-    log.debug(`Database migration completed in ${Date.now() - startedAt}ms.`)
-    return ok('Database migration completed.')
+    const appliedAfter = await countAppliedMigrations()
+    const appliedCount = Math.max(0, appliedAfter - appliedBefore)
+    await writeMigrateMarker(appliedCount)
+
+    log.debug(`Database migration completed in ${Date.now() - startedAt}ms (applied ${appliedCount}).`)
+    return ok(appliedCount === 0
+      ? 'Nothing to migrate.'
+      : `Applied ${appliedCount} migration${appliedCount === 1 ? '' : 's'}.`)
   }
   catch (error) {
     // Surface enough context for the user to act on the failure: which
@@ -486,6 +607,16 @@ export async function runDatabaseMigration(): Promise<Result<string, Error>> {
     return err(handleError('Migration failed', error))
   }
   finally {
+    if (lockHandle) {
+      try {
+        await lockHandle.release()
+      }
+      catch {
+        // Best effort; advisory locks auto-release on disconnect and
+        // SQLite file locks have a staleness fallback. Don't shadow
+        // the original failure with a release error.
+      }
+    }
     await restoreHiddenMigrations(hidden)
   }
 }
@@ -618,6 +749,10 @@ async function dropFrameworkTables(dialect: 'sqlite' | 'mysql' | 'postgres'): Pr
  */
 export async function generateMigrations(): Promise<Result<string, Error>> {
   try {
+    // Step-progress at debug — buddy's intro/outro carries the user-
+    // visible signal. On a no-op generate we want zero lines between
+    // those two; on a real generate the per-file written count below
+    // is the meaningful breadcrumb.
     log.debug('Generating migrations...')
 
     // Configure bun-query-builder with stacks database settings
@@ -635,6 +770,10 @@ export async function generateMigrations(): Promise<Result<string, Error>> {
 
     if (result.hasChanges) {
       const written = persistGeneratedMigrations(result.sqlStatements ?? [])
+      // Only announce when we actually wrote files. `hasChanges` can be
+      // true while `written === 0` if the qb diff restated statements
+      // already covered by committed migrations — that's a no-op from
+      // the user's perspective, so stay quiet.
       if (written > 0)
         log.success(`Generated ${written} migration file${written === 1 ? '' : 's'}`)
       else

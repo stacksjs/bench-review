@@ -1,12 +1,15 @@
 import type { EmailDriver, EmailMessage, EmailResult } from '@stacksjs/types'
 import { config } from '@stacksjs/config'
+import { log } from '@stacksjs/logging'
 import type { Message } from './types'
+import { CaptureEmailDriver } from './drivers/capture'
 import { LogEmailDriver } from './drivers/log'
 import { MailgunDriver } from './drivers/mailgun'
 import { MailtrapDriver } from './drivers/mailtrap'
 import { SendGridDriver } from './drivers/sendgrid'
 import { SESDriver } from './drivers/ses'
 import { SMTPDriver } from './drivers/smtp'
+import { findEmailByIdempotencyKey, recordEmailIdempotency } from './idempotency'
 
 /** Result returned by email handler callbacks */
 interface EmailHandlerResult {
@@ -131,6 +134,10 @@ class Mail {
     this.drivers.set('mailgun', new MailgunDriver())
     this.drivers.set('mailtrap', new MailtrapDriver())
     this.drivers.set('smtp', new SMTPDriver())
+    // Tests-only in-memory capture (stacksjs/stacks#1871 M-12). Cheap
+    // to register even when unused — the driver only holds an empty
+    // array until something calls `send()`.
+    this.drivers.set('capture', new CaptureEmailDriver())
   }
 
   public async send(message: EmailMessage): Promise<EmailResult> {
@@ -149,15 +156,35 @@ class Mail {
       )
     }
 
+    // Idempotency-key short-circuit (stacksjs/stacks#1871 M-8). A
+    // retry with the same key returns the cached EmailResult from
+    // the first successful send instead of re-dispatching to the
+    // driver. Both the lookup and the recording silently degrade
+    // when the email_idempotency table isn't migrated yet — same
+    // opt-in pattern as #1879 Co-3's order dedup.
+    if (message.idempotencyKey) {
+      const cached = await findEmailByIdempotencyKey(message.idempotencyKey)
+      if (cached) return cached
+    }
+
     const defaultFrom: EmailFromAddress = {
       name: config.email.from?.name || 'Stacks',
       address: config.email.from?.address || 'no-reply@stacksjs.com',
     }
 
-    return driver.send({
+    const result = await driver.send({
       ...message,
       from: message.from || defaultFrom,
     })
+
+    // Record AFTER the successful dispatch so a driver failure
+    // doesn't lock the key — the caller can retry. Failed results
+    // are filtered inside recordEmailIdempotency.
+    if (message.idempotencyKey) {
+      await recordEmailIdempotency(message.idempotencyKey, message, result)
+    }
+
+    return result
   }
 
   // Create a new Mail instance with a different driver (doesn't mutate the singleton)
@@ -171,60 +198,72 @@ class Mail {
 
   /**
    * Queue an email for background sending via the job system.
-   * Falls back to synchronous send if queue driver is 'sync'.
+   * Falls back to synchronous send if the queue system isn't loaded
+   * or the dispatch fails; the failure is logged so a dropped queue
+   * doesn't silently degrade to inline sends without anyone noticing
+   * (stacksjs/stacks#1871 M-11).
    */
   public async queue(message: EmailMessage): Promise<void> {
-    try {
+    await this.dispatchOrFallback(message, async () => {
       const { job } = await import('@stacksjs/queue')
-      await job('SendEmail', {
-        message,
-        driver: this.defaultDriver,
-      })
+      await job('SendEmail', { message, driver: this.defaultDriver })
         .onQueue('emails')
         .dispatch()
-    }
-    catch {
-      // Queue system not available, fall back to sync send
-      await this.send(message)
-    }
+    }, { context: 'queue' })
   }
 
   /**
    * Queue an email for sending after a delay (in seconds).
    */
   public async later(delaySeconds: number, message: EmailMessage): Promise<void> {
-    try {
+    await this.dispatchOrFallback(message, async () => {
       const { job } = await import('@stacksjs/queue')
-      await job('SendEmail', {
-        message,
-        driver: this.defaultDriver,
-      })
+      await job('SendEmail', { message, driver: this.defaultDriver })
         .onQueue('emails')
         .delay(delaySeconds)
         .dispatch()
-    }
-    catch {
-      // Queue system not available, fall back to sync send
-      await this.send(message)
-    }
+    }, { context: 'later', delaySeconds })
   }
 
   /**
    * Queue an email on a specific named queue.
    */
   public async queueOn(queueName: string, message: EmailMessage): Promise<void> {
-    try {
+    await this.dispatchOrFallback(message, async () => {
       const { job } = await import('@stacksjs/queue')
-      await job('SendEmail', {
-        message,
-        driver: this.defaultDriver,
-      })
+      await job('SendEmail', { message, driver: this.defaultDriver })
         .onQueue(queueName)
         .dispatch()
+    }, { context: 'queueOn', queueName })
+  }
+
+  /**
+   * Run the queue-dispatch closure; if it throws (queue package not
+   * loaded, broker connection lost, serializer crash, …) log the
+   * failure and fall back to a synchronous send. Previously the
+   * dispatch error was swallowed and apps had no signal that their
+   * background-send pipeline had silently degraded to inline sends —
+   * worth knowing before a worker's worth of sends starts blocking
+   * the request thread. See stacksjs/stacks#1871 M-11.
+   */
+  private async dispatchOrFallback(
+    message: EmailMessage,
+    dispatch: () => Promise<void>,
+    logExtra: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      await dispatch()
+      return
     }
-    catch {
-      await this.send(message)
+    catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
+      log.warn(
+        '[email] Queue dispatch failed; falling back to synchronous send. '
+        + 'Background email pipeline is degraded — check the queue worker / broker.',
+        { ...logExtra, reason },
+      )
     }
+    await this.send(message)
   }
 }
 

@@ -7,14 +7,20 @@ import type { Operator, SubqueryBuilder } from '@stacksjs/orm'
  *
  * @template T - The table type (e.g., PersonalAccessTokensTable)
  * @template M - The model return type (e.g., AccessTokenModel)
- * @template R - The JSON response type
+ * @template R - The JSON response type. Defaults to `unknown` so callers
+ *   are forced to narrow before reading properties off the result —
+ *   previously this defaulted to `any`, which let `.toJson().foo` compile
+ *   even when `foo` didn't exist on the row (stacksjs/stacks#1876 O-6).
  * @template Rel - The string-literal union of relation names this model can eager-load.
  *   Defaults to `string` for backwards compat when generators don't supply
- *   the union; downstream generated wrappers should narrow this to the
+ *   the union; downstream generated wrappers MUST narrow this to the
  *   actual relation names so `.with(['posts'])` autocompletes and typos
- *   become compile errors.
+ *   become compile errors. Generator authors: derive the union from
+ *   `definition.belongsTo | hasMany | hasOne | belongsToMany | hasOneThrough
+ *   | hasManyThrough` joined into a literal-string union, and pass it as
+ *   the fourth type arg when building the per-model wrapper.
  */
-export interface QueryBuilder<T, M, R = any, Rel extends string = string> {
+export interface QueryBuilder<T, M, R = unknown, Rel extends string = string> {
   /**
    * Adds a basic where clause to the query.
    *
@@ -113,10 +119,27 @@ export interface QueryBuilder<T, M, R = any, Rel extends string = string> {
   /**
    * Adds a where clause with a raw SQL condition.
    *
-   * @param sqlStatement - The raw SQL statement
+   * Accepts only a {@link RawBuilder} (typically produced by a
+   * `sql\`...\`` tagged-template, which separates SQL fragments from
+   * parameter values). Bare strings are intentionally rejected at the
+   * type level — they enabled SQL injection when consumers
+   * concatenated user input (`Model.whereRaw(\`status = '${req.body.status}'\`)`),
+   * which the audit (stacksjs/stacks#1858) tagged as Q-3.
+   *
+   * To build a raw fragment safely:
+   *
+   * ```ts
+   * import { sql } from '@stacksjs/database'
+   * Model.whereRaw(sql\`status = ${userStatus} AND active = true\`)
+   * ```
+   *
+   * The `sql` tagged template ensures values land as parameters rather
+   * than concatenated text.
+   *
+   * @param raw - A RawBuilder fragment carrying SQL + parameters.
    * @returns The model instance for chaining
    */
-  whereRaw: (sqlStatement: string) => M
+  whereRaw: (raw: RawBuilder<unknown>) => M
 
   /**
    * Adds a where clause with the "like" operator.
@@ -147,10 +170,19 @@ export interface QueryBuilder<T, M, R = any, Rel extends string = string> {
   /**
    * Specify which columns to select in the query.
    *
-   * @param params - Array of columns, raw builder or string
+   * Accepts either a typed array of known column names (`keyof R`) or
+   * a {@link RawBuilder} fragment. Bare strings are no longer
+   * accepted at the type level — they let consumers pass
+   * `req.query.fields` straight through to the SELECT list, which
+   * is a SQL-injection vector on SQLite (where the framework's
+   * identifier-quote is a no-op; stacksjs/stacks#1858 Q-7). To
+   * project specific columns, pass them as the typed array; to
+   * project a computed expression, build it via `sql\`...\``.
+   *
+   * @param params - Typed column list or RawBuilder fragment
    * @returns The model instance for chaining
    */
-  select: (params: (keyof R)[] | RawBuilder<string> | string) => M
+  select: (params: (keyof R)[] | RawBuilder<string>) => M
 
   /**
    * Get the first record matching the query conditions.

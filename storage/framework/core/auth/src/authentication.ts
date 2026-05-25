@@ -11,14 +11,47 @@ import type {
 import { config } from '@stacksjs/config'
 import { db } from '@stacksjs/database'
 import { HttpError } from '@stacksjs/error-handling'
+import type { EnhancedRequest } from '@stacksjs/bun-router'
 import { formatDate, User } from '@stacksjs/orm'
-import { request } from '@stacksjs/router'
+import { getCurrentRequest, request } from '@stacksjs/router'
 import { Buffer } from 'node:buffer'
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { decrypt, encrypt, verifyHash } from '@stacksjs/security'
 import { log } from '@stacksjs/logging'
+import { DUMMY_BCRYPT_HASH } from './internal-constants'
 import { RateLimiter } from './rate-limiter'
-import { TokenManager } from './token'
+
+/**
+ * Per-request auth state, scoped to the active `EnhancedRequest` via
+ * a Symbol-keyed slot on the request object. Replaces the three
+ * `private static` fields on `Auth` (`authUser`, `currentToken`,
+ * `clientSecret`) that were shared across every concurrent request
+ * in the process — a textbook cross-tenant state-leak vector.
+ *
+ * The container is lazily allocated on first read inside a request
+ * scope. Outside a request scope (CLI scripts, queued jobs, tests
+ * that don't call `runWithRequest`) `authStateOrNull()` returns
+ * `null`, which the `Auth` methods interpret as "no caching" — every
+ * lookup hits the DB. See stacksjs/stacks#1860 A-2.
+ */
+interface RequestAuthState {
+  authUser?: UserModel
+  currentToken?: PersonalAccessToken
+  clientSecret?: string
+}
+
+const REQUEST_AUTH_STATE_KEY = Symbol.for('stacks.requestAuthState')
+
+function authStateOrNull(): RequestAuthState | null {
+  const req = getCurrentRequest() as (EnhancedRequest & { [k: symbol]: unknown }) | undefined
+  if (!req) return null
+  let state = req[REQUEST_AUTH_STATE_KEY] as RequestAuthState | undefined
+  if (!state) {
+    state = {}
+    ;(req as Record<symbol, unknown>)[REQUEST_AUTH_STATE_KEY] = state
+  }
+  return state
+}
 
 /**
  * Hash a token using SHA-256 before storing in the database.
@@ -27,12 +60,15 @@ import { TokenManager } from './token'
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
-import { parseScopes } from './tokens'
+import { createToken as createRawToken, parseScopes } from './tokens'
 
 export class Auth {
-  private static authUser: UserModel | undefined = undefined
-  private static clientSecret: string | undefined = undefined
-  private static currentToken: PersonalAccessToken | undefined = undefined
+  // Per-request state lives on the request object via `authStateOrNull()`
+  // (stacksjs/stacks#1860 A-2). The previous `private static` fields
+  // (`authUser`, `currentToken`, `clientSecret`) were shared across
+  // every concurrent request in the process — a cross-request leak
+  // where one request's user could surface in another's `Auth.user()`
+  // call if the second request raced the first's middleware.
 
   // ============================================================================
   // INTERNAL HELPERS
@@ -75,18 +111,63 @@ export class Auth {
   }
 
   private static async getClientSecret(): Promise<string> {
-    if (this.clientSecret)
-      return this.clientSecret
+    const state = authStateOrNull()
+    if (state?.clientSecret)
+      return state.clientSecret
 
     const client = await this.getPersonalAccessClient()
-    this.clientSecret = client.secret
+    if (state) state.clientSecret = client.secret
     return client.secret
+  }
+
+  /**
+   * Encrypt the bearer token's embedded numeric DB id.
+   *
+   * Uses the framework-wide `config.app.key` as the passphrase rather
+   * than the OAuth client's secret (the old behaviour). Two reasons:
+   *
+   *   1. Decouples token encryption from the secret, so the secret
+   *      can be hashed at rest (stacksjs/stacks#1861 M-1).
+   *   2. Removes the static `Auth.clientSecret` cache from the hot
+   *      path of every token mint/verify.
+   *
+   * Tokens minted before the change decrypt via {@link decryptTokenId}'s
+   * fallback path.
+   */
+  private static async encryptTokenId(id: string | number): Promise<string> {
+    return await encrypt(String(id))
+  }
+
+  /**
+   * Decrypt a bearer-token-embedded id with backward-compat for tokens
+   * minted before the key swap. Returns the plaintext id string on
+   * success or `null` on failure; never throws.
+   */
+  private static async decryptTokenId(encryptedId: string): Promise<string | null> {
+    try {
+      return await decrypt(encryptedId)
+    }
+    catch {
+      // Backward-compat: tokens minted before stacksjs/stacks#1861 M-1
+      // were encrypted with the OAuth client's plaintext secret as the
+      // passphrase. Try that once so existing sessions survive the
+      // upgrade. After every active session naturally rotates onto
+      // the new key, this branch can be deleted.
+      try {
+        const clientSecret = await this.getClientSecret()
+        return await decrypt(encryptedId, clientSecret)
+      }
+      catch {
+        return null
+      }
+    }
   }
 
   private static async getPersonalAccessClient(): Promise<OAuthClientRow> {
     try {
       const client = await db.selectFrom('oauth_clients')
         .where('personal_access_client', '=', true)
+        .where('revoked', '=', false)
         .selectAll()
         .executeTakeFirst()
 
@@ -105,19 +186,50 @@ export class Auth {
   }
 
   private static async validateClient(clientId: number, clientSecret: string): Promise<boolean> {
+    // Filter by `revoked = false` at the DB layer so a revoked client
+    // can't validate even with a correct secret. The previous code
+    // only checked secret equality, so `revokeClient()` flips
+    // `oauth_clients.revoked = true` but `requestToken` continued to
+    // mint tokens for the revoked client. See stacksjs/stacks#1860 H-4.
     const client = await db.selectFrom('oauth_clients')
       .where('id', '=', clientId)
+      .where('revoked', '=', false)
       .selectAll()
       .executeTakeFirst()
 
-    if (!client?.secret)
+    // Always run a `timingSafeEqual` against a fixed buffer so the
+    // missing-client and wrong-secret branches spend the same CPU.
+    // Without the dummy compare, an attacker could probe valid client
+    // IDs by observing response-time differences between "client
+    // missing" (fast) and "client found, secret wrong" (slow). See
+    // stacksjs/stacks#1861 L-2.
+    const provided = Buffer.from(clientSecret)
+    if (!client?.secret) {
+      const dummy = Buffer.alloc(Math.max(provided.length, 1))
+      const padded = provided.length > 0 ? provided : Buffer.alloc(1)
+      timingSafeEqual(dummy, padded)
       return false
+    }
 
-    const a = Buffer.from(String(client.secret))
-    const b = Buffer.from(clientSecret)
-    if (a.length !== b.length)
+    const stored = String(client.secret)
+
+    // bcrypt hashes always start with `$2`. Rows inserted before
+    // stacksjs/stacks#1861 M-1 hold the plaintext secret and don't
+    // match that prefix; rows inserted after hold the bcrypt hash.
+    // verifyHash handles the secure compare for the hashed path;
+    // legacy plaintext rows fall through to the existing
+    // timing-safe byte comparison so they keep working until the
+    // operator re-issues the client secret.
+    if (stored.startsWith('$2')) {
+      return await verifyHash(clientSecret, stored)
+    }
+
+    const storedBuf = Buffer.from(stored)
+    if (storedBuf.length !== provided.length) {
+      timingSafeEqual(storedBuf, storedBuf)
       return false
-    return timingSafeEqual(a, b)
+    }
+    return timingSafeEqual(storedBuf, provided)
   }
 
   private static async getTokenFromId(tokenId: number): Promise<PersonalAccessToken | null> {
@@ -169,20 +281,30 @@ export class Auth {
     // The per-IP throttle middleware on /api/auth/login is the first
     // line; this is the second (in case the attacker rotates IPs but
     // keeps targeting one inbox).
-    if (RateLimiter.isRateLimited(email))
-      return false
+    const isRateLimited = RateLimiter.isRateLimited(email)
 
     const user = await User.where('email', '=', email).first()
     const authPass = credentials[password] || ''
 
     // Always run hash verification to prevent timing-based user enumeration
-    // If user doesn't exist, verify against a dummy hash
-    const hashToVerify = user?.password || '$2b$12$000000000000000000000uGByljkdFkOJRCRiYZGFOAstyLlSgTSW'
+    // AND to close the lockout-timing oracle (stacksjs/stacks#1860 H-9):
+    // the previous early-return on rate-limit skipped the hash entirely,
+    // so an attacker could distinguish "locked out" (fast response) from
+    // "wrong password" (slow bcrypt) and confirm which accounts they'd
+    // already triggered the lockout on. Running the hash unconditionally
+    // makes both paths spend the same CPU.
+    const hashToVerify = user?.password || DUMMY_BCRYPT_HASH
     const hashCheck = await verifyHash(authPass, hashToVerify)
+
+    // If the account is currently locked out, refuse — AFTER the dummy
+    // hash above so the response timing matches the wrong-password branch.
+    if (isRateLimited)
+      return false
 
     if (hashCheck && user) {
       RateLimiter.resetAttempts(email)
-      this.authUser = user
+      const state = authStateOrNull()
+      if (state) state.authUser = user
       return true
     }
 
@@ -206,7 +328,7 @@ export class Auth {
     const authPass = credentials[password] || ''
 
     // Always run hash verification to prevent timing-based user enumeration
-    const hashToVerify = user?.password || '$2b$12$000000000000000000000uGByljkdFkOJRCRiYZGFOAstyLlSgTSW'
+    const hashToVerify = user?.password || DUMMY_BCRYPT_HASH
     const hashCheck = await verifyHash(authPass, hashToVerify)
 
     return hashCheck && !!user
@@ -225,11 +347,12 @@ export class Auth {
     { user: UserModel, token: AuthToken, refreshToken?: string, expiresIn?: number } | null
   > {
     const isValid = await this.attempt(credentials)
-    if (!isValid || !this.authUser)
+    const authedUser = authStateOrNull()?.authUser
+    if (!isValid || !authedUser)
       return null
 
-    const { plainTextToken, refreshToken, expiresIn } = await this.createTokenForUser(this.authUser, options)
-    return { user: this.authUser, token: plainTextToken, refreshToken, expiresIn }
+    const { plainTextToken, refreshToken, expiresIn } = await this.createTokenForUser(authedUser, options)
+    return { user: authedUser, token: plainTextToken, refreshToken, expiresIn }
   }
 
   /**
@@ -243,7 +366,8 @@ export class Auth {
     if (!user)
       return null
 
-    this.authUser = user
+    const state = authStateOrNull()
+    if (state) state.authUser = user
     const { plainTextToken, refreshToken, expiresIn } = await this.createTokenForUser(user, options)
     return { user, token: plainTextToken, refreshToken, expiresIn }
   }
@@ -262,8 +386,7 @@ export class Auth {
     if (bearerToken) {
       const parsed = this.parseToken(bearerToken)
       if (parsed) {
-        const clientSecret = await this.getClientSecret()
-        const decryptedId = await decrypt(parsed.encryptedId, clientSecret).catch(() => null)
+        const decryptedId = await this.decryptTokenId(parsed.encryptedId)
         if (decryptedId) {
           // Revoke any refresh tokens linked to this access token before
           // we revoke the access row itself.
@@ -276,8 +399,11 @@ export class Auth {
       await this.revokeToken(bearerToken)
     }
 
-    this.authUser = undefined
-    this.currentToken = undefined
+    const state = authStateOrNull()
+    if (state) {
+      state.authUser = undefined
+      state.currentToken = undefined
+    }
   }
 
   // ============================================================================
@@ -289,16 +415,17 @@ export class Auth {
    * Similar to Laravel's Auth::user()
    */
   public static async user(): Promise<UserModel | undefined> {
-    if (this.authUser)
-      return this.authUser
+    const state = authStateOrNull()
+    if (state?.authUser)
+      return state.authUser
 
     const bearerToken = this.getBearerToken()
     if (!bearerToken)
       return undefined
 
     const user = await this.getUserFromToken(bearerToken)
-    if (user)
-      this.authUser = user
+    if (user && state)
+      state.authUser = user
 
     return user
   }
@@ -334,7 +461,8 @@ export class Auth {
    * Similar to Laravel's Auth::setUser()
    */
   public static setUser(user: UserModel): void {
-    this.authUser = user
+    const state = authStateOrNull()
+    if (state) state.authUser = user
   }
 
   // ============================================================================
@@ -357,9 +485,6 @@ export class Auth {
     user: UserModel,
     options?: TokenCreateOptions,
   ): Promise<NewAccessToken> {
-    const client = await this.getPersonalAccessClient()
-    const clientSecret = await this.getClientSecret()
-
     const name = options?.name ?? config.auth.defaultTokenName ?? 'auth-token'
     const abilities = options?.abilities ?? options?.scopes ?? config.auth.defaultAbilities ?? ['*']
 
@@ -368,88 +493,53 @@ export class Auth {
     const accessTtlMs = options?.expiresInMinutes !== undefined
       ? options.expiresInMinutes * 60 * 1000
       : (config.auth.tokenExpiry ?? 60 * 60 * 1000)
-    const expiresAt = options?.expiresAt ?? new Date(Date.now() + accessTtlMs)
+    const explicitExpiresAt = options?.expiresAt
+    const expiresAt = explicitExpiresAt ?? new Date(Date.now() + accessTtlMs)
+    const expiresInMinutes = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / (60 * 1000)))
+    const refreshExpiresInDays = options?.refreshExpiresInDays
+      ?? Math.max(1, Math.round((config.auth.refreshTokenExpiry ?? 30 * 24 * 60 * 60 * 1000) / (24 * 60 * 60 * 1000)))
 
-    // Generate a JWT-like token with embedded metadata. Use the resolved
-    // expiry so the JWT's `exp` claim matches the DB row instead of
-    // hard-coding 30 days as before.
-    const expiresInSeconds = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000))
-    const token = TokenManager.generateJWT(user.id, expiresInSeconds)
-
-    // Hash the token before storing — only the hash is persisted
-    const hashedToken = hashToken(token)
     log.debug(`[auth] Creating token for user#${user.id}: ${name}`)
 
-    // Store the hashed token in the database
-    await db.insertInto('oauth_access_tokens')
-      .values({
-        user_id: user.id,
-        oauth_client_id: client.id,
-        name,
-        token: hashedToken,
-        scopes: JSON.stringify(abilities),
-        revoked: false,
-        expires_at: formatDate(expiresAt),
-      })
-      .execute()
-
-    // Get the inserted token record by the hashed value
-    const insertedToken = await db.selectFrom('oauth_access_tokens')
-      .where('token', '=', hashedToken)
-      .selectAll()
-      .executeTakeFirst()
-
-    const insertId = Number(insertedToken?.id)
-
-    if (!insertId)
-      throw new HttpError(500, 'Failed to create token')
-
-    // Encrypt the token ID using client secret
-    const encryptedId = await encrypt(insertId.toString(), clientSecret)
-
-    // Combine into final token format: token:encryptedId
-    const plainTextToken = `${token}:${encryptedId}` as AuthToken
-
-    const accessToken: PersonalAccessToken = {
-      id: insertId,
-      userId: user.id,
-      clientId: client.id,
+    // Delegate to the canonical `tokens.ts:createToken` so the bearer
+    // shape is the raw 40-byte hex used throughout the framework
+    // (`tokens.ts:findToken`, `revokeToken`, `currentAccessToken`,
+    // `tokenCan`, …). Previously this method emitted a separate
+    // `${jwt}:${encryptedId}` shape that the `tokens.ts` helpers
+    // couldn't resolve — `revokeOtherTokens` then degraded into
+    // `revokeAllTokens` for any Auth-minted session. See
+    // stacksjs/stacks#1867.
+    const result = await createRawToken(
+      user.id as number,
       name,
-      scopes: abilities,
       abilities,
-      expiresAt,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      revoked: false,
+      {
+        expiresInMinutes,
+        withRefreshToken: options?.withRefreshToken !== false,
+        refreshExpiresInDays,
+      },
+    )
+
+    const plainTextToken = result.plainTextToken as AuthToken
+    const accessToken: PersonalAccessToken = {
+      id: result.accessToken.id,
+      userId: result.accessToken.userId,
+      clientId: result.accessToken.clientId,
+      name: result.accessToken.name,
+      scopes: result.accessToken.scopes,
+      abilities,
+      expiresAt: result.accessToken.expiresAt ?? expiresAt,
+      createdAt: result.accessToken.createdAt,
+      updatedAt: result.accessToken.updatedAt,
+      revoked: result.accessToken.revoked,
       plainTextToken,
-    }
-
-    // Issue a paired refresh token unless explicitly opted out. Stored
-    // hashed against the access-token id; rotated on every refresh
-    // exchange via /auth/refresh (see RefreshTokenAction + tokens.ts).
-    let refreshTokenPlain: string | undefined
-    if (options?.withRefreshToken !== false) {
-      const refreshTtlDays = options?.refreshExpiresInDays
-        ?? Math.max(1, Math.round((config.auth.refreshTokenExpiry ?? 30 * 24 * 60 * 60 * 1000) / (24 * 60 * 60 * 1000)))
-      refreshTokenPlain = randomBytes(40).toString('hex')
-      const hashedRefresh = hashToken(refreshTokenPlain)
-      const refreshExpiresAt = new Date(Date.now() + refreshTtlDays * 24 * 60 * 60 * 1000)
-
-      await db.insertInto('oauth_refresh_tokens')
-        .values({
-          access_token_id: insertId,
-          token: hashedRefresh,
-          revoked: false,
-          expires_at: formatDate(refreshExpiresAt),
-        })
-        .execute()
     }
 
     return {
       accessToken,
       plainTextToken,
-      refreshToken: refreshTokenPlain,
-      expiresIn: expiresInSeconds,
+      refreshToken: result.refreshToken,
+      expiresIn: result.expiresIn,
     }
   }
 
@@ -475,10 +565,11 @@ export class Auth {
       throw new HttpError(401, 'Invalid client credentials')
 
     const isValid = await this.attempt(credentials)
-    if (!isValid || !this.authUser)
+    const authedUser = authStateOrNull()?.authUser
+    if (!isValid || !authedUser)
       return null
 
-    return { token: await this.createToken(this.authUser, 'user-auth-token') }
+    return { token: await this.createToken(authedUser, 'user-auth-token') }
   }
 
   // ============================================================================
@@ -494,8 +585,7 @@ export class Auth {
       return false
 
     const { plainToken, encryptedId } = parsed
-    const clientSecret = await this.getClientSecret()
-    const decryptedId = await decrypt(encryptedId, clientSecret)
+    const decryptedId = await this.decryptTokenId(encryptedId)
     if (!decryptedId)
       return false
 
@@ -534,21 +624,20 @@ export class Auth {
     if (accessToken.revoked)
       return false
 
-    // Rotate token if it's been used for more than configured hours
-    const rotationHours = config.auth.tokenRotation ?? 24
-    const lastUsed = accessToken.updated_at ? new Date(String(accessToken.updated_at)) : new Date()
-    const now = new Date()
-    const hoursSinceLastUse = (now.getTime() - lastUsed.getTime()) / (1000 * 60 * 60)
-
-    if (hoursSinceLastUse >= rotationHours) {
-      await this.rotateToken(token)
-    }
-    else {
-      await db.updateTable('oauth_access_tokens')
-        .set({ updated_at: formatDate(now) })
-        .where('id', '=', accessToken.id)
-        .execute()
-    }
+    // Mark the token as freshly-used. Used to be a rotation path here
+    // (`if (hoursSinceLastUse >= 24h) await this.rotateToken(token)`)
+    // but the rotated bearer was **discarded** by the caller —
+    // `validateToken` only returns a boolean — so the DB hash got
+    // replaced with the new token's hash while the user's bearer was
+    // still the old one. Every subsequent request then failed auth.
+    // Rotation is now an explicit `Auth.rotateToken(oldToken)` call
+    // available to userland: callers (e.g., an `/auth/refresh`
+    // endpoint) take the new bearer and return it to the client in
+    // the response. See stacksjs/stacks#1860 A-3.
+    await db.updateTable('oauth_access_tokens')
+      .set({ updated_at: formatDate(new Date()) })
+      .where('id', '=', accessToken.id)
+      .execute()
 
     return true
   }
@@ -562,8 +651,7 @@ export class Auth {
       return undefined
 
     const { plainToken, encryptedId } = parsed
-    const clientSecret = await this.getClientSecret()
-    const decryptedId = await decrypt(encryptedId, clientSecret)
+    const decryptedId = await this.decryptTokenId(encryptedId)
     if (!decryptedId)
       return undefined
 
@@ -585,8 +673,10 @@ export class Auth {
     if (accessToken.revoked)
       return undefined
 
-    // Cache the current token for ability checks
-    this.currentToken = await this.getTokenFromId(accessToken.id as number) ?? undefined
+    // Cache the current token for ability checks (per-request).
+    const stateForToken = authStateOrNull()
+    if (stateForToken)
+      stateForToken.currentToken = await this.getTokenFromId(accessToken.id as number) ?? undefined
 
     await db.updateTable('oauth_access_tokens')
       .set({ updated_at: formatDate(new Date()) })
@@ -604,8 +694,9 @@ export class Auth {
    * Similar to Laravel's $request->user()->currentAccessToken()
    */
   public static async currentAccessToken(): Promise<PersonalAccessToken | undefined> {
-    if (this.currentToken)
-      return this.currentToken
+    const state = authStateOrNull()
+    if (state?.currentToken)
+      return state.currentToken
 
     const bearerToken = this.getBearerToken()
     if (!bearerToken)
@@ -615,14 +706,13 @@ export class Auth {
     if (!parsed)
       return undefined
 
-    const clientSecret = await this.getClientSecret()
-    const decryptedId = await decrypt(parsed.encryptedId, clientSecret)
+    const decryptedId = await this.decryptTokenId(parsed.encryptedId)
     if (!decryptedId)
       return undefined
 
     const token = await this.getTokenFromId(Number(decryptedId))
-    if (token)
-      this.currentToken = token
+    if (token && state)
+      state.currentToken = token
 
     return token ?? undefined
   }
@@ -664,25 +754,29 @@ export class Auth {
   }
 
   /**
-   * Check if current token has ALL specified abilities
+   * Check if current token has ALL specified abilities.
+   *
+   * Fetches the token once and checks abilities locally. The previous
+   * implementation re-called `tokenCan(ability)` per iteration, which
+   * re-fetched the token from the DB on every cache miss
+   * (stacksjs/stacks#1860 M-4).
    */
   public static async tokenCanAll(abilities: string[]): Promise<boolean> {
-    for (const ability of abilities) {
-      if (!(await this.tokenCan(ability)))
-        return false
-    }
-    return true
+    const token = await this.currentAccessToken()
+    if (!token) return false
+    if (token.abilities.includes('*')) return true
+    return abilities.every(a => token.abilities.includes(a))
   }
 
   /**
-   * Check if current token has ANY of the specified abilities
+   * Check if current token has ANY of the specified abilities. Same
+   * single-fetch optimization as `tokenCanAll` (stacksjs/stacks#1860 M-4).
    */
   public static async tokenCanAny(abilities: string[]): Promise<boolean> {
-    for (const ability of abilities) {
-      if (await this.tokenCan(ability))
-        return true
-    }
-    return false
+    const token = await this.currentAccessToken()
+    if (!token) return false
+    if (token.abilities.includes('*')) return true
+    return abilities.some(a => token.abilities.includes(a))
   }
 
   // ============================================================================
@@ -726,8 +820,7 @@ export class Auth {
     if (!parsed)
       return
 
-    const clientSecret = await this.getClientSecret()
-    const decryptedId = await decrypt(parsed.encryptedId, clientSecret)
+    const decryptedId = await this.decryptTokenId(parsed.encryptedId)
     if (!decryptedId)
       return
 
@@ -804,62 +897,44 @@ export class Auth {
   }
 
   /**
-   * Rotate (refresh) a token
+   * Rotate (refresh) a bearer.
+   *
+   * Revokes the old token and mints a fresh one with the same name +
+   * abilities + remaining-lifetime expiry. Returns the new bearer
+   * (raw shape from `tokens.ts:createToken`) or `null` when the old
+   * bearer didn't match a live row.
+   *
+   * Accepts both bearer shapes: the legacy `${jwt}:${encryptedId}`
+   * form (via `bearerLookupHash` in `tokens.ts`) and the canonical
+   * raw form (stacksjs/stacks#1867).
    */
   public static async rotateToken(oldToken: string): Promise<AuthToken | null> {
-    const parsed = this.parseToken(oldToken)
-    if (!parsed)
-      return null
+    // Look up the existing row through `findToken` so the legacy
+    // jwt:encryptedId shape resolves via `bearerLookupHash`.
+    const { findToken: findRawToken, revokeToken: revokeRawToken } = await import('./tokens')
+    const existing = await findRawToken(oldToken)
+    if (!existing) return null
 
-    const { plainToken, encryptedId } = parsed
-    const clientSecret = await this.getClientSecret()
-    const decryptedId = await decrypt(encryptedId, clientSecret)
-    if (!decryptedId)
-      return null
+    const remainingMs = existing.expiresAt ? existing.expiresAt.getTime() - Date.now() : (config.auth.tokenExpiry ?? 60 * 60 * 1000)
+    const expiresInMinutes = Math.max(1, Math.floor(remainingMs / (60 * 1000)))
 
-    const accessToken = await db.selectFrom('oauth_access_tokens')
-      .where('id', '=', Number(decryptedId))
-      .selectAll()
-      .executeTakeFirst()
+    // Revoke the old row before minting the new one. Sequencing
+    // matters: a crash between the two leaves the user without a
+    // valid token but doesn't leave a stale shadow row.
+    await revokeRawToken(oldToken)
 
-    if (!accessToken)
-      return null
+    // Mint a fresh token via the canonical path so the new bearer
+    // matches the raw shape used by every helper in tokens.ts.
+    const user = await User.find(existing.userId as number)
+    if (!user) return null
+    const result = await this.createTokenForUser(user, {
+      name: existing.name,
+      abilities: existing.scopes ?? ['*'],
+      expiresInMinutes,
+      withRefreshToken: false,
+    })
 
-    // The DB stores the *hashed* token (see createTokenForUser line ~380);
-    // the previous direct `!== plainToken` comparison could never match,
-    // so rotateToken silently returned null on every call. Hash + use a
-    // timing-safe compare to mirror validateToken's contract.
-    const hashedPlainToken = hashToken(plainToken)
-    const storedHash = String(accessToken.token)
-    if (hashedPlainToken.length !== storedHash.length)
-      return null
-    const tokenMatches = timingSafeEqual(
-      Buffer.from(hashedPlainToken, 'utf-8'),
-      Buffer.from(storedHash, 'utf-8'),
-    )
-    if (!tokenMatches)
-      return null
-
-    // Generate new JWT token. Match the expiry to the row's existing
-    // expires_at (rotation extends a token's freshness window without
-    // pushing past its original lifetime).
-    const expiresAtMs = accessToken.expires_at ? new Date(String(accessToken.expires_at)).getTime() : Date.now() + (config.auth.tokenExpiry ?? 60 * 60 * 1000)
-    const expiresInSeconds = Math.max(1, Math.floor((expiresAtMs - Date.now()) / 1000))
-    const newToken = TokenManager.generateJWT(accessToken.user_id as number, expiresInSeconds)
-
-    // Update the token (store the *hash*, never the plaintext JWT — the
-    // raw JWT is only ever returned to the caller, never persisted).
-    await db.updateTable('oauth_access_tokens')
-      .set({
-        token: hashToken(newToken),
-        updated_at: formatDate(new Date()),
-      })
-      .where('id', '=', accessToken.id)
-      .execute()
-
-    // Return new token with encrypted ID
-    const newEncryptedId = await encrypt(accessToken.id.toString(), clientSecret)
-    return `${newToken}:${newEncryptedId}` as AuthToken
+    return result.plainTextToken
   }
 
   /**
@@ -889,11 +964,12 @@ export class Auth {
     const authPass = credentials[password] || ''
 
     // Always run hash verification to prevent timing-based user enumeration
-    const hashToVerify = user?.password || '$2b$12$000000000000000000000uGByljkdFkOJRCRiYZGFOAstyLlSgTSW'
+    const hashToVerify = user?.password || DUMMY_BCRYPT_HASH
     const hashCheck = await verifyHash(authPass, hashToVerify)
 
     if (hashCheck && user) {
-      this.authUser = user
+      const state = authStateOrNull()
+      if (state) state.authUser = user
       return true
     }
 
@@ -916,11 +992,16 @@ export class Auth {
   }
 
   /**
-   * Clear the auth state (useful for testing)
+   * Clear the auth state on the active request (useful for testing).
+   * No-op outside a request scope — there's no shared state to clear
+   * after stacksjs/stacks#1860 A-2 moved the fields onto the request.
    */
   public static clearState(): void {
-    this.authUser = undefined
-    this.currentToken = undefined
-    this.clientSecret = undefined
+    const state = authStateOrNull()
+    if (state) {
+      state.authUser = undefined
+      state.currentToken = undefined
+      state.clientSecret = undefined
+    }
   }
 }

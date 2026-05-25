@@ -17,6 +17,25 @@ export { Job } from './action'
 export { Jobs, job, jobBatch, runJob } from './job'
 
 // =============================================================================
+// Job dispatch idempotency (stacksjs/stacks#1872 Q-8)
+// =============================================================================
+export { hasDispatchedKey, recordDispatchedKey } from './idempotency'
+
+// =============================================================================
+// Unified job envelope (stacksjs/stacks#1884 — Q-6 from #1872)
+// Single shape across database + redis drivers; back-compat parser
+// handles the pre-#1884 implicit-v0 shape and the Laravel-import
+// legacy `{ job, data }` form.
+// =============================================================================
+export {
+  clearEnvelopeWarnings,
+  createEnvelope,
+  JOB_ENVELOPE_VERSION,
+  parseEnvelope,
+} from './envelope'
+export type { JobEnvelope, JobEnvelopeOptions, ParsedEnvelope } from './envelope'
+
+// =============================================================================
 // Per-job progress + cancellation (cache-backed; safe across processes)
 // =============================================================================
 export { setJobProgress, getJobProgress, cancelJob, isJobCancelled, clearJobState } from './job-progress'

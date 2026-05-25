@@ -169,11 +169,20 @@ export class Database {
   }
 
   /**
-   * Close the database connection
+   * Close the database connection.
+   *
+   * Returns a `Promise<void>` that resolves once the underlying
+   * `bun-query-builder` close call has drained its connections.
+   * Previously this was `close(): void` and the underlying async
+   * `close()` was called without `await`, so the method returned
+   * before pooled connections were released — callers waiting on
+   * `await database.close()` saw an immediate resolve and the
+   * process could exit mid-shutdown with sockets still open
+   * (stacksjs/stacks#1862 L-36).
    */
-  close(): void {
-    if (this._queryBuilder && typeof (this._queryBuilder as any).close === 'function') {
-      (this._queryBuilder as any).close()
+  async close(): Promise<void> {
+    if (this._queryBuilder && typeof (this._queryBuilder as { close?: () => Promise<void> | void }).close === 'function') {
+      await (this._queryBuilder as { close: () => Promise<void> | void }).close()
     }
     this._queryBuilder = null
     this._initialized = false
@@ -227,8 +236,27 @@ export class Database {
         break
       }
 
+      case 'dynamodb' as SupportedDialect:
+        // DynamoDB has no SQL connection — it's accessed via the
+        // dedicated entity-style `dynamo.entity(...)` API instead. Set
+        // DB_CONNECTION to sqlite/mysql/postgres if you want the SQL
+        // path (migrations, ORM models, query builder)
+        // (stacksjs/stacks#1876 D-4). Throwing here means a
+        // mis-configured env surfaces immediately instead of silently
+        // falling back to an in-memory SQLite that loses data on restart.
+        throw new Error(
+          '[database] DB_CONNECTION=dynamodb is not a SQL driver. '
+          + 'Use the entity-style `dynamo.entity(...)` API for DynamoDB access, '
+          + 'or set DB_CONNECTION to sqlite/mysql/postgres for SQL workloads.',
+        )
+
       default:
-        connection = { database: ':memory:' }
+        // An unrecognized DB_CONNECTION used to silently land here and
+        // get an in-memory SQLite — a worst-case "it works on my machine"
+        // surprise. Loud-fail instead.
+        throw new Error(
+          `[database] Unknown DB_CONNECTION "${String(driver)}". Allowed values: sqlite, mysql, postgres.`,
+        )
     }
 
     return new Database({

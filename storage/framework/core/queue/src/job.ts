@@ -7,6 +7,8 @@
 
 import { appPath } from '@stacksjs/path'
 import { env as envVars } from '@stacksjs/env'
+import { createEnvelope } from './envelope'
+import { hasDispatchedKey, recordDispatchedKey } from './idempotency'
 
 function getQueueDriver(): string {
   return envVars.QUEUE_DRIVER || 'sync'
@@ -28,6 +30,22 @@ export interface JobDispatchOptions {
   backoff?: number[]
   /** Additional context */
   context?: any
+  /**
+   * Caller-supplied idempotency key (stacksjs/stacks#1872 Q-8).
+   *
+   * When set, `dispatch()` consults the `job_idempotency` dedup
+   * table before enqueuing. A second dispatch with the same key
+   * is a no-op — the framework returns without re-pushing to the
+   * queue. Closes the duplicate-job loophole that double-clicked
+   * buttons and webhook-retry loops opened.
+   *
+   * Construction guidance: derive the key from the business event
+   * (e.g. `process-order:${orderId}`,
+   * `send-welcome:${userId}`), not from job-name + payload (which
+   * would collide across unrelated dispatches and prevent legitimate
+   * re-runs).
+   */
+  idempotencyKey?: string
 }
 
 /**
@@ -90,6 +108,17 @@ class JobBuilder {
   }
 
   /**
+   * Attach an idempotency key so duplicate dispatches are
+   * deduplicated against the `job_idempotency` table
+   * (stacksjs/stacks#1872 Q-8). See {@link JobDispatchOptions.idempotencyKey}
+   * for construction guidance.
+   */
+  withIdempotencyKey(key: string): this {
+    this.options.idempotencyKey = key
+    return this
+  }
+
+  /**
    * Dispatch the job to the queue
    */
   async dispatch(): Promise<void> {
@@ -98,6 +127,15 @@ class JobBuilder {
     if (isFaked()) {
       getFakeQueue()?.dispatch(this.name, this.payload, this.options as any)
       return
+    }
+
+    // Idempotency-key short-circuit (stacksjs/stacks#1872 Q-8). A
+    // second dispatch under the same key returns without enqueuing.
+    // The lookup degrades to "always miss" with a warn when the
+    // dedup table isn't migrated yet — opt-in pattern matching
+    // #1879 Co-3 (orders) and #1871 M-8 (email).
+    if (this.options.idempotencyKey) {
+      if (await hasDispatchedKey(this.options.idempotencyKey)) return
     }
 
     const driver = getQueueDriver()
@@ -111,8 +149,33 @@ class JobBuilder {
     else if (driver === 'sync') {
       await runJob(this.name, { payload: this.payload, context: this.options.context })
     }
+    else if (driver === 'sqs' || driver === 'memory' || driver === 'beanstalkd') {
+      // Listed in config schemas but never implemented (stacksjs/stacks#1872 Q-1).
+      // The previous fallback ran the job inline via `runJob` — same behavior
+      // as `sync` but without telling the caller their background pipeline
+      // had silently degraded to blocking sends. Loud-fail instead.
+      throw new Error(
+        `[queue] Driver "${driver}" is not implemented yet. `
+        + `Set QUEUE_DRIVER to one of: redis, database, sync.`,
+      )
+    }
     else {
-      await runJob(this.name, { payload: this.payload, context: this.options.context })
+      // Genuinely unknown driver — also loud-fail. A typo in QUEUE_DRIVER
+      // used to silently run jobs synchronously, which is the worst kind
+      // of "it works on my machine" surprise.
+      throw new Error(
+        `[queue] Unknown QUEUE_DRIVER "${driver}". `
+        + `Allowed values: redis, database, sync.`,
+      )
+    }
+
+    // Record AFTER the driver dispatch succeeds so a failed enqueue
+    // (driver down, schema mismatch) doesn't lock the key — the
+    // caller can retry. Sync-driver dispatches are also recorded so
+    // an at-most-once contract holds across drivers (a `sync` retry
+    // with the same key shouldn't re-run either).
+    if (this.options.idempotencyKey) {
+      await recordDispatchedKey(this.options.idempotencyKey, this.name, this.options.queue)
     }
   }
 
@@ -141,11 +204,17 @@ class JobBuilder {
     const now = Math.floor(Date.now() / 1000)
     const availableAt = this.options.delay ? now + this.options.delay : now
 
-    const payloadObj = {
-      jobName: this.name,
-      payload: this.payload,
-      options: this.options,
-    }
+    // Unified envelope (stacksjs/stacks#1884 Q-6). Both database
+    // and redis drivers write through `createEnvelope` so a worker
+    // processing one driver can deserialize jobs queued under the
+    // other — fixes the silent in-flight job loss when teams
+    // switch QUEUE_DRIVER mid-flight.
+    const envelope = createEnvelope(this.name, this.payload, {
+      queue: this.options.queue,
+      timeout: this.options.timeout,
+      tries: this.options.tries,
+      backoff: this.options.backoff,
+    })
 
     const { db } = await import('@stacksjs/database')
 
@@ -153,7 +222,7 @@ class JobBuilder {
       .insertInto('jobs')
       .values({
         queue: this.options.queue || 'default',
-        payload: JSON.stringify(payloadObj),
+        payload: JSON.stringify(envelope),
         attempts: 0,
         reserved_at: null,
         available_at: availableAt,
@@ -168,19 +237,33 @@ class JobBuilder {
   private async dispatchToRedis(): Promise<void> {
     const { RedisQueue } = await import('./drivers/redis')
     const { queue: queueConfig } = await import('@stacksjs/config')
-    const redisConfig = (queueConfig as any)?.connections?.redis
+    // `queueConfig` is typed as `StacksOptions['queue']` already — the
+    // previous `as any` cast (stacksjs/stacks#1875 T-6) escaped that
+    // typing so a config-shape rename would silently break here.
+    const redisConfig = queueConfig?.connections?.redis
 
     if (!redisConfig) {
       throw new Error('Redis queue connection is not configured. Check config/queue.ts')
     }
 
-    const queue = new RedisQueue(this.options.queue || 'default', redisConfig as any)
+    const queue = new RedisQueue(this.options.queue || 'default', redisConfig)
+
+    // Same envelope shape as the database driver writes
+    // (stacksjs/stacks#1884 Q-6). bun-queue's `Queue.add(data, opts)`
+    // takes `data` as opaque `T` — wrapping the framework envelope
+    // inside is transparent to bun-queue. Options stay on bun-queue's
+    // separate opts arg AND inside the envelope so a worker reading
+    // the envelope sees the same retry/timeout/backoff config the
+    // bun-queue layer is already enforcing.
+    const envelope = createEnvelope(this.name, this.payload, {
+      queue: this.options.queue,
+      timeout: this.options.timeout,
+      tries: this.options.tries,
+      backoff: this.options.backoff,
+    })
 
     await queue.add(
-      {
-        jobName: this.name,
-        payload: this.payload,
-      } as any,
+      envelope,
       {
         delay: this.options.delay,
         maxTries: this.options.tries,
@@ -279,6 +362,15 @@ export const Jobs = {
   /** Schedule the job to run after `seconds` of delay. */
   dispatchAfter(seconds: number, name: string, payload?: any): JobBuilder {
     return new JobBuilder(name, payload).delay(seconds)
+  },
+
+  /**
+   * Dispatch with an idempotency key in one call
+   * (stacksjs/stacks#1872 Q-8). Equivalent to
+   * `Jobs.make(name, payload).withIdempotencyKey(key).dispatch()`.
+   */
+  async dispatchOnce(key: string, name: string, payload?: any): Promise<void> {
+    await new JobBuilder(name, payload).withIdempotencyKey(key).dispatch()
   },
 }
 
