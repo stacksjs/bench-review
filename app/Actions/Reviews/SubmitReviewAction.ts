@@ -2,6 +2,7 @@ import { Action } from '@stacksjs/actions'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { sanitizeReviewHtml } from '../../Helpers/sanitizeReviewHtml'
 
 interface SubmitPayload {
   judge_id?: number
@@ -71,7 +72,22 @@ export default new Action({
     const judgeId = Number(body.judge_id)
     const rating = Number(body.rating)
     const title = String(body.title ?? '').trim()
-    const content = String(body.content ?? '').trim()
+    // Strip inline styles, classes, and disallowed tags BEFORE
+    // persistence. Pasted content from external CMSes routinely
+    // arrives wrapped in `<div style="float:left;width:…">` which
+    // collapses the article column for every reader, and a
+    // `<script>` would otherwise execute via the article view's
+    // `x-html` binding. See app/Helpers/sanitizeReviewHtml.ts for
+    // the whitelist + rationale.
+    const content = (await sanitizeReviewHtml(String(body.content ?? ''))).trim()
+    // Re-validate length AFTER sanitisation. The declarative
+    // `validations` check bounds the raw input (10–10000 chars),
+    // but sanitisation only strips — never adds — so a 200-char
+    // raw blob that's 100% inline-style wrappers could collapse to
+    // an empty string. Without this guard the user would land a
+    // visibly-empty review past the moderation queue.
+    if (content.length < 10)
+      return response.json({ error: 'Review must be at least 10 characters once formatting is cleaned up.' }, 422)
     const type = body.type ?? 'neutral'
 
     // Cross-field check that declarative validations can't express:
@@ -113,6 +129,31 @@ export default new Action({
       .selectAll()
       .where('uuid' as any, '=', uuid)
       .executeTakeFirst()
+
+    // Best-effort acknowledgement email. The submission has already
+    // succeeded — the row is in the DB and the response will go out
+    // either way — so any mail error is swallowed and logged. SMTP
+    // catchers in dev sometimes aren't running; production with a
+    // real driver will deliver normally. Same pattern as the password
+    // reset action.
+    const recipient = (authUser as any)?.email as string | undefined
+    if (recipient && (inserted as any)?.id) {
+      try {
+        const { mail } = await import('@stacksjs/email')
+        const judgeName = (judge as any)?.name ?? 'this judge'
+        const reviewerName = (authUser as any)?.name || 'there'
+        const articleUrl = `${process.env.APP_URL || 'http://localhost:4000'}/article/${(inserted as any).id}`
+        await mail.send({
+          to: recipient,
+          subject: `Your review of ${judgeName} is pending moderation`,
+          text: `Hi ${reviewerName},\n\nThanks for sharing your review of ${judgeName}. It's now in the moderation queue and a member of our team will take a look shortly — we typically publish within a day.\n\nYou can preview your review any time at:\n${articleUrl}\n\nYou'll get another email when a moderator approves or declines it.\n\n— Bench Review\n`,
+          html: `<p>Hi ${reviewerName},</p><p>Thanks for sharing your review of <strong>${judgeName}</strong>. It's now in the moderation queue and a member of our team will take a look shortly — we typically publish within a day.</p><p>You can preview your review any time:</p><p><a href="${articleUrl}">${articleUrl}</a></p><p>You'll get another email when a moderator approves or declines it.</p><p>— Bench Review</p>`,
+        })
+      }
+      catch (err) {
+        console.warn('[submit-review] mail.send failed — review still saved.', err instanceof Error ? err.message : err)
+      }
+    }
 
     return response.json({ ok: true, review: inserted }, 201)
   },

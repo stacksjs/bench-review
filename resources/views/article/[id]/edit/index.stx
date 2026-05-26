@@ -1,0 +1,7 @@
+@extends('layouts/default')
+
+@section('title', 'Edit Review - Bench Review')
+
+@section('content')
+  @include('Bench/ArticleEdit')
+@endsection

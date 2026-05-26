@@ -1,0 +1,268 @@
+<script client>
+  // Dedicated edit page for an author's own review. Mounted at
+  // /article/:id/edit (see resources/views/article/[id]/edit/index.stx).
+  //
+  // Security model:
+  //   - Server is the source of truth. PATCH /api/me/reviews/:id has
+  //     `auth` middleware and the action itself 404s any non-owner —
+  //     a hostile caller can't mutate a row they don't own.
+  //   - This component adds a UX-level redirect: on mount we fetch
+  //     the row and, if the current viewer isn't the author, bounce
+  //     to /article/:id (or /login if anonymous). The redirect keeps
+  //     unauthorized visitors out of the form UI; it's not the
+  //     security boundary — the API gate above is.
+  //
+  // URL-as-state: opening the edit form pushes /article/:id/edit;
+  // saving / cancelling navigates back to /article/:id. Hard-reload
+  // safe — there's no transient "editing" signal to lose on refresh.
+
+  const reviewsStore = useStore('reviews')
+  const authStore = useStore('auth')
+  const stars: number[] = [1, 2, 3, 4, 5]
+
+  // Resolve :id from URL. window.stx._rp is unset on hard reload
+  // (see feedback_stx_rp_unset_on_hard_reload), so the pathname
+  // parse is the canonical fallback. Router param wins when present.
+  function resolveReviewId(): number {
+    if (typeof window === 'undefined') return 0
+    const fromRouter = Number((window as any).stx?._rp?.id)
+    if (Number.isFinite(fromRouter) && fromRouter > 0) return fromRouter
+    const m = window.location.pathname.match(/^\/article\/(\d+)\/edit/)
+    return m ? Number(m[1]) : 0
+  }
+
+  const reviewId = resolveReviewId()
+
+  // Form state. Initialised empty; seeded from the fetched row in
+  // the mount handler once reviewsStore.current() resolves. Keeping
+  // these as separate signals (rather than a single object) is what
+  // lets x-model="editTitle" / x-model="editRating" stay reactive.
+  const editTitle = state<string>('')
+  const editContent = state<string>('')
+  const editRating = state<number>(0)
+  const editError = state<string>('')
+  const editSaving = state<boolean>(false)
+  const ready = state<boolean>(false)
+
+  // Source-row mirrors for the header chip (judge name, current
+  // status). The page uses these for visual context only — the
+  // actual edit submits whatever the form fields hold.
+  const judgeName = derived<string>(() => (reviewsStore.current() as any)?.judge?.name ?? 'Judge')
+  const currentStatus = derived<string>(() => reviewsStore.current()?.status ?? '')
+
+  // Bounce non-owners. Runs after fetchById resolves. We can't gate
+  // earlier because the row's user_id only arrives with the fetch.
+  // Anonymous users get punted through login with a `next` param so
+  // they land back here after auth.
+  function enforceOwnership(): void {
+    if (typeof window === 'undefined') return
+    const row = reviewsStore.current()
+    const me = authStore.user()
+
+    if (reviewsStore.currentNotFound()) {
+      navigate(`/article/${reviewId}`, true)
+      return
+    }
+    if (!row) return
+
+    if (!me) {
+      const next = encodeURIComponent(`/article/${reviewId}/edit`)
+      navigate(`/login?next=${next}`, true)
+      return
+    }
+
+    const authorId = (row as any).user_id
+    if (authorId == null || Number(authorId) !== Number((me as any).id)) {
+      navigate(`/article/${reviewId}`, true)
+      return
+    }
+
+    // Owner confirmed — seed the form once.
+    if (!ready()) {
+      editTitle.set(String(row.title ?? ''))
+      editContent.set(String((row as any).content ?? ''))
+      editRating.set(Number(row.rating ?? 0))
+      ready.set(true)
+
+      // Seed the rich editor's editable element with the existing
+      // HTML. The editor mounts via its own MutationObserver, so the
+      // host is already in the DOM by the time this runs; we push
+      // content imperatively because data-no-draft skipped the
+      // localStorage restore that would otherwise hydrate it.
+      Promise.resolve().then(() => {
+        const wrapper = document.querySelector('[data-edit-richtext-host]') as HTMLElement | null
+        const host = wrapper?.querySelector('[data-richtext-host]') as HTMLElement | null
+        const editor = host && (host as any).__richtextEditor
+        const editable = host?.querySelector('.medium-editor-element') as HTMLElement | null
+        const initialHtml = String((row as any).content ?? '')
+        if (editor && typeof editor.setContent === 'function')
+          editor.setContent(initialHtml)
+        else if (editable)
+          editable.innerHTML = initialHtml
+      })
+    }
+  }
+
+  onMount(() => {
+    if (reviewId <= 0) {
+      navigate('/reviews', true)
+      return
+    }
+    // Kick off the fetch, then run the ownership check as soon as
+    // the store's `current` signal flips. effect() re-runs on every
+    // change to read-tracked signals, so a subsequent SPA nav into
+    // the page (with a stale `current`) also re-validates.
+    reviewsStore.fetchById(reviewId)
+    effect(() => { enforceOwnership() })
+  })
+
+  function cancelEdit(): void {
+    navigate(`/article/${reviewId}`, true)
+  }
+
+  async function saveEdit(): Promise<void> {
+    if (editSaving()) return
+
+    const title = editTitle().trim()
+    if (title.length < 3) {
+      editError.set('Title must be at least 3 characters.')
+      return
+    }
+    const content = editContent().trim()
+    if (content.length < 10) {
+      editError.set('Review content must be at least 10 characters.')
+      return
+    }
+    const rating = Number(editRating())
+    if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+      editError.set('Pick a star rating from 1 to 5.')
+      return
+    }
+
+    editSaving.set(true)
+    editError.set('')
+    const result = await reviewsStore.updateOwn(reviewId, {
+      title,
+      content,
+      rating,
+      // Mirror SubmitReviewAction's rating-to-type mapping so the
+      // chip color stays consistent if the rating moves between
+      // positive / neutral / negative bands on edit.
+      type: rating >= 4 ? 'positive' : rating <= 2 ? 'negative' : 'neutral',
+    })
+    editSaving.set(false)
+
+    if (!result.ok) {
+      editError.set(result.error || 'Could not save changes.')
+      return
+    }
+    navigate(`/article/${reviewId}`, true)
+  }
+</script>
+
+<div class="min-h-screen bg-white">
+  <!-- Loading shell — shown while reviewsStore.fetchById is in
+       flight. Header is rendered immediately so the user has an
+       anchor to read; the form section flips in once `ready` is
+       set by enforceOwnership(). -->
+  <div class="mx-auto pb-32 pt-12 sm:pt-16 px-4 sm:px-6 max-w-3xl">
+    <div class="mb-8">
+      <StxLink x-to="`/article/${reviewId}`" class="inline-flex items-center gap-1.5 text-gray-500 text-sm hover:text-gray-900 hover:underline underline-offset-2">
+        ← Back to review
+      </StxLink>
+      <h1 class="mt-4 font-serif font-bold text-3xl text-gray-900 tracking-tight">Edit your review</h1>
+      <p class="mt-2 text-gray-500 text-sm">
+        Saving resubmits the review for moderation. It returns to the pending queue regardless of its current status.
+      </p>
+    </div>
+
+    <!-- Form. Hidden until ownership has been confirmed and the row
+         has been seeded, so unauthorized viewers never see the
+         fields flash before the redirect fires. -->
+    <div
+      class="p-6 bg-white border border-gray-200 rounded-lg shadow-sm"
+      x-class="ready ? '' : 'hidden'"
+    >
+      <div class="space-y-4">
+        <div>
+          <label for="edit-title" class="block font-medium text-gray-900 text-sm">Title</label>
+          <input
+            id="edit-title"
+            type="text"
+            x-model="editTitle"
+            x-disabled="editSaving"
+            class="block mt-1 px-3 py-2 w-full text-sm bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:opacity-50"
+          >
+        </div>
+
+        <div>
+          <label class="block font-medium text-gray-900 text-sm">Content</label>
+          <!-- Rich-text editor. The wrapper carries data-no-draft so
+               the editor's mount logic skips the localStorage compose
+               draft restore (otherwise an article edit would clobber
+               an in-progress new-review draft). data-edit-richtext-host
+               is the selector enforceOwnership() uses to seed the
+               existing HTML once the row has loaded. (No backticks in
+               this comment — stx's script-merge would leak it to the
+               DOM; see feedback_stx_backtick_in_html_comment.) -->
+          <div
+            data-no-draft
+            data-edit-richtext-host
+            class="mt-1 border border-gray-300 focus-within:border-gray-900 focus-within:ring-2 focus-within:ring-gray-200 rounded-md shadow-sm transition-colors overflow-hidden"
+            @richtext-change="editContent.set($event.detail.html)"
+          >
+            @include('Bench/RichTextEditor')
+          </div>
+          <p class="mt-2 text-gray-500 text-xs">Formatting carries through. Edits go back into the moderation queue.</p>
+        </div>
+
+        <div>
+          <label class="block font-medium text-gray-900 text-sm">Overall rating</label>
+          <div class="flex gap-x-1 mt-1">
+            <button
+              :for="star in stars"
+              type="button"
+              x-disabled="editSaving"
+              @click="editRating.set(star)"
+              class="text-2xl leading-none transition-colors disabled:opacity-50"
+              x-class="editRating >= star ? 'text-yellow-400' : 'text-gray-300 hover:text-gray-400'"
+            >★</button>
+          </div>
+        </div>
+
+        <div
+          role="alert"
+          class="px-3 py-2 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
+          x-class="editError() ? '' : 'hidden'"
+          :text="editError()"
+        ></div>
+
+        <div class="flex justify-end gap-x-2 pt-2">
+          <button
+            type="button"
+            @click="cancelEdit()"
+            x-disabled="editSaving"
+            class="px-4 py-2 font-semibold text-gray-700 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+          >Cancel</button>
+          <button
+            type="button"
+            @click="saveEdit()"
+            x-disabled="editSaving"
+            class="px-4 py-2 font-semibold text-white text-sm bg-gray-900 hover:bg-gray-800 rounded-md disabled:opacity-50"
+            :text="editSaving() ? 'Saving…' : 'Save & resubmit'"
+          >Save &amp; resubmit</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Verifying shell. Visible only while ownership is being
+         resolved — keeps the page from looking blank during the
+         single round-trip on hard reload. -->
+    <div
+      class="p-6 text-gray-500 text-sm bg-gray-50 border border-gray-200 rounded-lg"
+      x-class="ready ? 'hidden' : ''"
+    >
+      Verifying access…
+    </div>
+  </div>
+</div>

@@ -3,6 +3,7 @@ import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { sanitizeReviewHtml } from '../../Helpers/sanitizeReviewHtml'
 
 /**
  * PATCH /api/me/reviews/{id} — author edits their own review and
@@ -12,23 +13,24 @@ import { schema } from '@stacksjs/validation'
  *   - Only the row's author can call this. Non-owners get 404 (same
  *     response shape as a missing row — non-existence and access-
  *     denial indistinguishable from outside).
- *   - Published reviews are off-limits to edit. Once moderation has
- *     approved content, silent edits afterwards would let an author
- *     bait-and-switch — write something innocuous, get approved,
- *     swap it for something else. The author can delete-and-rewrite
- *     instead. Pending and rejected rows ARE editable, since neither
- *     has been seen by any reader yet.
+ *   - All statuses are editable (pending / rejected / published). The
+ *     bait-and-switch risk on published edits is mitigated by the
+ *     side effect below: every edit drops the row back into the
+ *     moderation queue, so swapped content has to be re-approved
+ *     before it goes live again.
  *
  * Side effect: every successful edit resets `status = 'pending'`. A
  * rejected review re-enters the moderation queue; a pending review
- * stays pending but with refreshed content. The moderator gets to
- * see whatever the author wrote MOST RECENTLY — never a stale draft.
+ * stays pending but with refreshed content; a published review
+ * disappears from the public feed until a moderator re-approves it.
+ * The moderator sees whatever the author wrote MOST RECENTLY — never
+ * a stale draft.
  */
 const ALLOWED_TYPES = new Set(['positive', 'negative', 'neutral'])
 
 export default new Action({
   name: 'Update My Review',
-  description: 'Edit a pending/rejected review you authored; resets status to pending',
+  description: 'Edit any review you authored; resets status to pending for re-moderation',
   method: 'PATCH',
   validations: {
     id: {
@@ -53,9 +55,6 @@ export default new Action({
     if (!existing || existing.user_id == null || Number(existing.user_id) !== Number(userId))
       return response.json({ error: 'Review not found' }, 404)
 
-    if (existing.status === 'published')
-      return response.json({ error: 'Published reviews can\'t be edited. Delete and rewrite if you need to change them.' }, 422)
-
     // Body fields. All optional individually — we accept partial
     // patches so the client can send only what changed. Validations
     // are inline rather than declarative-on-Action because the
@@ -75,10 +74,15 @@ export default new Action({
     }
 
     if (typeof contentInput === 'string') {
-      const c = contentInput.trim()
-      if (c.length < 10 || c.length > 10000)
-        return response.json({ error: 'Content must be between 10 and 10000 characters.' }, 422)
-      patch.content = c
+      // Sanitize BEFORE the length check — pasted content commonly
+      // arrives wrapped in `<div style="…">` and shrinks substantially
+      // once stripped. See app/Helpers/sanitizeReviewHtml.ts. The 10000
+      // upper bound also stops a megabyte of pasted markup from
+      // squeezing past now that we know the cleaned size.
+      const cleaned = (await sanitizeReviewHtml(contentInput)).trim()
+      if (cleaned.length < 10 || cleaned.length > 10000)
+        return response.json({ error: 'Content must be between 10 and 10000 characters once formatting is cleaned up.' }, 422)
+      patch.content = cleaned
     }
 
     if (ratingInput !== undefined && ratingInput !== null) {
