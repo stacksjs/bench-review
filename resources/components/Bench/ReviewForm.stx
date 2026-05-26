@@ -240,7 +240,7 @@
       from your profile.
     </p>
     <div class="mt-6 flex flex-wrap gap-3 items-center justify-center">
-      <StxLink to="/profile" class="px-4 py-2 font-semibold text-sm text-white bg-gray-900 hover:bg-gray-700 rounded-md transition-colors shadow-sm">View my profile</StxLink>
+      <StxLink to="/my-reviews?status=pending" class="px-4 py-2 font-semibold text-sm text-white bg-gray-900 hover:bg-gray-700 rounded-md transition-colors shadow-sm">View my reviews</StxLink>
       <StxLink x-to="`/judges/${submitted().judgeId}/profile`" class="px-4 py-2 font-semibold text-gray-700 text-sm bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 rounded-md transition-colors">Back to the judge</StxLink>
       <StxLink to="/review" class="px-4 py-2 font-semibold text-gray-700 text-sm bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 rounded-md transition-colors">Write another</StxLink>
     </div>

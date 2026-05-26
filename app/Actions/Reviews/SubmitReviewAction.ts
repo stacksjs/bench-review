@@ -2,6 +2,7 @@ import { Action } from '@stacksjs/actions'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { escapeHtml, renderReviewEmail } from '../../Helpers/reviewEmailTemplate'
 import { sanitizeReviewHtml } from '../../Helpers/sanitizeReviewHtml'
 
 interface SubmitPayload {
@@ -143,11 +144,24 @@ export default new Action({
         const judgeName = (judge as any)?.name ?? 'this judge'
         const reviewerName = (authUser as any)?.name || 'there'
         const articleUrl = `${process.env.APP_URL || 'http://localhost:4000'}/article/${(inserted as any).id}`
+        const safeJudge = escapeHtml(judgeName)
         await mail.send({
           to: recipient,
           subject: `Your review of ${judgeName} is pending moderation`,
           text: `Hi ${reviewerName},\n\nThanks for sharing your review of ${judgeName}. It's now in the moderation queue and a member of our team will take a look shortly — we typically publish within a day.\n\nYou can preview your review any time at:\n${articleUrl}\n\nYou'll get another email when a moderator approves or declines it.\n\n— Bench Review\n`,
-          html: `<p>Hi ${reviewerName},</p><p>Thanks for sharing your review of <strong>${judgeName}</strong>. It's now in the moderation queue and a member of our team will take a look shortly — we typically publish within a day.</p><p>You can preview your review any time:</p><p><a href="${articleUrl}">${articleUrl}</a></p><p>You'll get another email when a moderator approves or declines it.</p><p>— Bench Review</p>`,
+          html: renderReviewEmail({
+            preheader: `Your review of ${judgeName} is in the moderation queue. We typically publish within a day.`,
+            heading: `Thanks — your review is in.`,
+            greeting: `Hi ${reviewerName},`,
+            bodyHtml: `
+              <p style="margin:0 0 14px 0;">Thanks for sharing your review of <strong>${safeJudge}</strong>. It's now in the moderation queue and a member of our team will take a look shortly — we typically publish within a day.</p>
+              <p style="margin:0 0 14px 0;">You can preview your review any time using the link below. You'll get another email the moment a moderator approves or declines it.</p>
+            `,
+            ctaText: 'Preview your review',
+            ctaUrl: articleUrl,
+            accent: 'amber',
+            footerNote: `Status: pending moderation. We'll email you with an update as soon as it changes.`,
+          }),
         })
       }
       catch (err) {

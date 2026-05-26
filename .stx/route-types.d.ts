@@ -29,6 +29,7 @@ declare module "stx/routes" {
     '/jtest': {  }
     '/judges': {  }
     '/login': {  }
+    '/my-reviews': {  }
     '/notifications': {  }
     '/paywall': {  }
     '/privacy': {  }

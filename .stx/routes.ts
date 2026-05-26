@@ -30,6 +30,7 @@ export const routes = [
   { pattern: '/jtest', filePath: 'resources/views/jtest/index.stx', isDynamic: false, params: [] },
   { pattern: '/judges', filePath: 'resources/views/judges/index.stx', isDynamic: false, params: [] },
   { pattern: '/login', filePath: 'resources/views/login.stx', isDynamic: false, params: [] },
+  { pattern: '/my-reviews', filePath: 'resources/views/my-reviews.stx', isDynamic: false, params: [] },
   { pattern: '/notifications', filePath: 'resources/views/notifications.stx', isDynamic: false, params: [] },
   { pattern: '/paywall', filePath: 'resources/views/paywall.stx', isDynamic: false, params: [] },
   { pattern: '/privacy', filePath: 'resources/views/privacy.stx', isDynamic: false, params: [] },

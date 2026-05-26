@@ -1,0 +1,254 @@
+<script client>
+  import type { ProfileReviewRow } from '~/resources/stores/profile'
+
+  // Dedicated "My reviews" page. The profile dashboard only shows the
+  // most recent 5; this page is the full list with status filtering.
+  //
+  // Data sourcing: re-uses the `profile` store's `myReviews` slice
+  // (already fetched by /api/me/reviews). Two pages over the same
+  // store means navigating between /profile and /my-reviews shares
+  // a cache — no double-fetch on every nav.
+  //
+  // Filter is URL-driven so a deep link (e.g. /my-reviews?status=rejected
+  // from a moderation email) lands on the right tab.
+
+  const profileStore = useStore('profile')
+  const authStore = useStore('auth')
+
+  // Filter signal. Initialised from the URL on first paint so a
+  // ?status=pending deep link survives the hard reload. Defaults to
+  // 'all' for a clean entry from the nav.
+  type StatusFilter = 'all' | 'pending' | 'published' | 'rejected'
+  const initialFilter = ((): StatusFilter => {
+    if (typeof window === 'undefined') return 'all'
+    const raw = new URLSearchParams(window.location.search).get('status') as StatusFilter | null
+    return raw === 'pending' || raw === 'published' || raw === 'rejected' ? raw : 'all'
+  })()
+  const statusFilter = state<StatusFilter>(initialFilter)
+
+  // Fetch in both top-level (hydration) and onMount (SPA nav).
+  let hasFetched = false
+  function fetchOnce(): void {
+    if (hasFetched) return
+    hasFetched = true
+    profileStore.fetchMyReviews()
+  }
+  fetchOnce()
+  onMount(() => fetchOnce())
+
+  function setFilter(next: StatusFilter): void {
+    statusFilter.set(next)
+    // Push the filter to the URL so the browser back button + share
+    // links work. `replace` (not `push`) so rapid pill clicks don't
+    // bloat the history stack.
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      if (next === 'all') url.searchParams.delete('status')
+      else url.searchParams.set('status', next)
+      window.history.replaceState({}, '', url.toString())
+    }
+  }
+
+  function formatDate(dateStr: string | null | undefined): string {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  }
+
+  function snippet(html: string | null | undefined, max = 180): string {
+    if (!html) return ''
+    const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+    return text.length > max ? `${text.slice(0, max - 1)}…` : text
+  }
+
+  // Derived counts per status — drives the pill labels and the
+  // empty-state copy. Computed once over the full list, cheap.
+  const counts = derived(() => {
+    const rows = profileStore.myReviews()
+    const c = { all: rows.length, pending: 0, published: 0, rejected: 0 }
+    for (const r of rows) {
+      const s = (r.status || '').toLowerCase()
+      if (s === 'pending') c.pending++
+      else if (s === 'published') c.published++
+      else if (s === 'rejected') c.rejected++
+    }
+    return c
+  })
+
+  // Filtered + sorted view. The API already returns reverse-
+  // chronological (`ORDER BY created_at DESC`), so we just filter.
+  const filtered = derived<ProfileReviewRow[]>(() => {
+    const f = statusFilter()
+    const rows = profileStore.myReviews()
+    if (f === 'all') return rows
+    return rows.filter(r => (r.status || '').toLowerCase() === f)
+  })
+
+  // Empty-state copy keyed off the current filter so the message
+  // matches the tab the user is on. "No published reviews yet" reads
+  // very differently from "No declined reviews — nice work".
+  const emptyTitle = derived<string>(() => {
+    const f = statusFilter()
+    if (f === 'pending') return 'No reviews waiting on moderation.'
+    if (f === 'published') return 'No published reviews yet.'
+    if (f === 'rejected') return 'No declined reviews.'
+    return 'You haven\'t written any reviews yet.'
+  })
+  const emptyHint = derived<string>(() => {
+    const f = statusFilter()
+    if (f === 'pending') return 'Submissions appear here while a moderator takes a look — usually under a day.'
+    if (f === 'published') return 'Once a moderator approves a submission it shows up here and on the public feed.'
+    if (f === 'rejected') return 'Declined reviews show up here. You can edit and resubmit, or write a fresh one.'
+    return 'Pick a judge from the directory and share what working with them was like. Clerks, attorneys, and court staff all welcome.'
+  })
+
+  function statusBadgeClasses(status: string | undefined): string {
+    const s = (status || '').toLowerCase()
+    if (s === 'pending') return 'bg-amber-50 text-amber-800 ring-amber-200/60'
+    if (s === 'rejected') return 'bg-red-50 text-red-800 ring-red-200/60'
+    if (s === 'published') return 'bg-emerald-50 text-emerald-800 ring-emerald-200/60'
+    return 'bg-gray-50 text-gray-700 ring-gray-200/60'
+  }
+  function statusLabel(status: string | undefined): string {
+    const s = (status || '').toLowerCase()
+    if (s === 'pending') return 'Pending'
+    if (s === 'rejected') return 'Declined'
+    if (s === 'published') return 'Published'
+    return 'Unknown'
+  }
+</script>
+
+<div class="min-h-screen bg-gray-50">
+  <div class="mx-auto px-4 py-10 sm:px-6 lg:px-8 max-w-5xl">
+    <!-- Page header -->
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p class="font-medium text-amber-600 text-xs tracking-widest uppercase">Your contributions</p>
+        <h1 class="mt-2 font-serif font-bold text-3xl text-gray-900 sm:text-4xl tracking-tight">My reviews</h1>
+        <p class="mt-2 text-gray-500 text-sm">Everything you've submitted — across every status. Click a row to read, edit, or delete.</p>
+      </div>
+      <div class="flex flex-shrink-0 gap-2">
+        <StxLink to="/profile" class="inline-flex items-center px-3 py-2 font-medium text-gray-700 text-sm bg-white border border-gray-200 rounded-md hover:bg-gray-50">
+          ← Profile
+        </StxLink>
+        <StxLink to="/review" class="inline-flex items-center px-3 py-2 font-medium text-white text-sm bg-gray-900 rounded-md hover:bg-gray-800">
+          Write a review
+        </StxLink>
+      </div>
+    </div>
+
+    <!-- Status filter pills. Click pushes a `?status=` query param;
+         counts come from the derived `counts` over the full list so
+         the user always sees how many sit in each bucket without
+         having to switch tabs. -->
+    <div class="flex flex-wrap gap-2 mt-8" role="tablist" aria-label="Filter by status">
+      <button
+        type="button"
+        role="tab"
+        @click="setFilter('all')"
+        class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        x-class="statusFilter === 'all' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+      >
+        All
+        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="statusFilter === 'all' ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-600'" :text="counts.all"></span>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        @click="setFilter('pending')"
+        class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        x-class="statusFilter === 'pending' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+      >
+        Pending
+        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="statusFilter === 'pending' ? 'bg-white/15 text-white' : 'bg-amber-50 text-amber-700'" :text="counts.pending"></span>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        @click="setFilter('published')"
+        class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        x-class="statusFilter === 'published' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+      >
+        Published
+        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="statusFilter === 'published' ? 'bg-white/15 text-white' : 'bg-emerald-50 text-emerald-700'" :text="counts.published"></span>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        @click="setFilter('rejected')"
+        class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        x-class="statusFilter === 'rejected' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+      >
+        Declined
+        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="statusFilter === 'rejected' ? 'bg-white/15 text-white' : 'bg-red-50 text-red-700'" :text="counts.rejected"></span>
+      </button>
+    </div>
+
+    <!-- Loading shell — shown only on the first fetch, never on
+         subsequent SPA nav (the store keeps the cache). -->
+    <div :if="profileStore.loading && !profileStore.loaded" class="mt-10 p-10 text-center text-gray-500 text-sm bg-white border border-gray-200 rounded-lg">
+      Loading your reviews…
+    </div>
+
+    <!-- Empty state — filter-aware copy + CTA. Hidden during the
+         initial load to avoid the "no reviews" flash before the
+         first fetch returns. -->
+    <div :if="profileStore.loaded && filtered.length === 0" class="mt-10 p-10 text-center bg-white border border-gray-200 rounded-lg">
+      <p class="font-semibold text-gray-900 text-base" :text="emptyTitle"></p>
+      <p class="mt-2 mx-auto max-w-md text-gray-500 text-sm" :text="emptyHint"></p>
+      <StxLink to="/review" class="inline-flex items-center mt-6 px-4 py-2 font-medium text-white text-sm bg-gray-900 rounded-md hover:bg-gray-800">
+        Write a review
+      </StxLink>
+    </div>
+
+    <!-- List. Each row is a card; click anywhere on the title or
+         body navigates to /article/:id where edit/delete live. We
+         deliberately don't inline destructive actions here — a
+         single-click delete on a list view is a footgun. -->
+    <ul :if="filtered.length > 0" class="space-y-4 mt-8">
+      <li :for="r in filtered" class="p-5 bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all">
+        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <StxLink
+            x-to="`/article/${r.id}`"
+            class="font-semibold text-gray-900 text-base hover:underline underline-offset-2 decoration-gray-300"
+            :text="r.title"
+          ></StxLink>
+          <span
+            class="inline-flex items-center px-2 py-0.5 font-medium text-xs ring-1 rounded-full"
+            x-class="statusBadgeClasses(r.status)"
+            :text="statusLabel(r.status)"
+          ></span>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-gray-500 text-xs">
+          <span :if="r.judge">
+            Review of
+            <StxLink
+              x-to="`/judges/${r.judge.id}/profile`"
+              class="text-gray-700 hover:underline underline-offset-2"
+              :text="r.judge.name"
+            ></StxLink>
+          </span>
+          <span class="text-gray-300">·</span>
+          <span :text="formatDate(r.created_at)"></span>
+          <span class="text-gray-300">·</span>
+          <span class="inline-flex items-center gap-1 tabular-nums" :text="`${r.rating}/5`"></span>
+          <span :if="r.likes && r.likes > 0" class="text-gray-300">·</span>
+          <span :if="r.likes && r.likes > 0" class="inline-flex items-center gap-1" :text="`${r.likes} ${r.likes === 1 ? 'reaction' : 'reactions'}`"></span>
+        </div>
+
+        <p class="mt-3 text-gray-600 text-sm line-clamp-2" :text="snippet(r.content)"></p>
+
+        <div class="flex flex-wrap items-center gap-x-4 mt-4 pt-3 border-t border-gray-100 text-sm">
+          <StxLink x-to="`/article/${r.id}`" class="font-medium text-gray-900 hover:underline underline-offset-2">
+            Open →
+          </StxLink>
+          <StxLink x-to="`/article/${r.id}/edit`" class="font-medium text-gray-600 hover:text-gray-900 hover:underline underline-offset-2">
+            Edit
+          </StxLink>
+        </div>
+      </li>
+    </ul>
+  </div>
+</div>

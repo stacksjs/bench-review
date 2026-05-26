@@ -136,7 +136,7 @@
       <div class="p-6 bg-white border border-gray-200 rounded-2xl lg:col-span-2">
         <div class="flex items-center justify-between">
           <h2 class="font-semibold text-base text-gray-900">Recent reviews</h2>
-          <StxLink to="/reviews" class="font-medium text-gray-600 text-sm hover:text-gray-900">All reviews</StxLink>
+          <StxLink to="/my-reviews" class="font-medium text-gray-600 text-sm hover:text-gray-900">See all →</StxLink>
         </div>
 
         <div :if="profileStore.loading && profileStore.totalReviews === 0" class="py-12 text-center text-gray-500 text-sm">

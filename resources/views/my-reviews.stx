@@ -1,0 +1,15 @@
+@extends('layouts/default')
+
+@section('title', 'My reviews - Bench Review')
+
+<script server>
+  // Auth-gate at stx-serve. Anonymous visitors get bounced to /login;
+  // the SPA's auth-store cookie is the source of truth and matches
+  // the API's `auth` middleware on /api/me/reviews. Same pattern as
+  // resources/views/profile/index.stx.
+  definePageMeta({ middleware: ['auth'] })
+</script>
+
+@section('content')
+  @include('Bench/MyReviewsView')
+@endsection
