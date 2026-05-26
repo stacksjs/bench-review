@@ -105,8 +105,9 @@
               <p class="mt-1 text-gray-400 text-xs" :text="memberSince"></p>
             </div>
           </div>
-          <div class="flex gap-2">
-            <StxLink to="/settings" class="inline-flex items-center px-4 py-2 font-medium text-gray-900 text-sm bg-white rounded-lg hover:bg-gray-100 transition-colors">Edit profile</StxLink>
+          <div class="flex flex-wrap gap-2">
+            <StxLink to="/my-reviews" class="inline-flex items-center px-4 py-2 font-medium text-gray-900 text-sm bg-white rounded-lg hover:bg-gray-100 transition-colors">My reviews</StxLink>
+            <StxLink to="/settings" class="inline-flex items-center px-4 py-2 font-medium text-white text-sm bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">Edit profile</StxLink>
             <StxLink to="/review" class="inline-flex items-center px-4 py-2 font-medium text-white text-sm bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">Write a review</StxLink>
           </div>
         </div>

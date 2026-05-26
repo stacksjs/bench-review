@@ -378,10 +378,13 @@
             </svg>
             <!-- Unread badge. CSS-toggled via x-class hidden so the
                  :text binding to unreadCount() stays subscribed when
-                 the badge re-appears after a markAllRead. -->
+                 the badge re-appears after a markAllRead. Call the
+                 derived (hasUnread()) — bare ref evaluates as a
+                 function reference (always truthy) and the badge
+                 would render even with zero unread. -->
             <span
               class="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 font-semibold text-[10px] text-white bg-red-500 rounded-full ring-2 ring-white"
-              x-class="notifications.hasUnread ? '' : 'hidden'"
+              x-class="notifications.hasUnread() ? '' : 'hidden'"
               :text="notifications.unreadCount() > 99 ? '99+' : notifications.unreadCount()"
             ></span>
           </button>
