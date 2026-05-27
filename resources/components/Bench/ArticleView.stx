@@ -191,6 +191,73 @@
     return 'bg-gray-50 text-gray-700 ring-gray-200/60'
   })
 
+  // ── Reader: report/flag (bench-review#27) ───────────────────────
+  //
+  // Anonymous-friendly. Anyone can flag any review; signed-in users
+  // are deduped server-side on (review_id, user_id) so they can't
+  // spam the queue with the same flag. Dialog is template-rendered
+  // and gated via x-class hidden so the radios stay subscribed
+  // across open/close cycles.
+
+  const flagOpen = state<boolean>(false)
+  const flagReason = state<string>('off_topic')
+  const flagDetails = state<string>('')
+  const flagSubmitting = state<boolean>(false)
+  const flagError = state<string>('')
+  const flagSubmitted = state<boolean>(false)
+  const flagReasonOptions = [
+    { value: 'off_topic', label: 'Off-topic — not actually about this judge' },
+    { value: 'harassment', label: 'Harassment or personal attack' },
+    { value: 'spam', label: 'Spam or promotional content' },
+    { value: 'privacy', label: 'Reveals private information' },
+    { value: 'inaccurate', label: 'Factually inaccurate' },
+    { value: 'other', label: 'Other — see details' },
+  ]
+
+  function openFlagDialog(): void {
+    flagOpen.set(true)
+    flagError.set('')
+    flagSubmitted.set(false)
+  }
+  function closeFlagDialog(): void {
+    flagOpen.set(false)
+  }
+  async function submitFlag(): Promise<void> {
+    if (flagSubmitting()) return
+    if (!reviewId) {
+      flagError.set('Cannot identify the review.')
+      return
+    }
+    flagSubmitting.set(true)
+    flagError.set('')
+    try {
+      const res = await authStore.authFetch(`/api/reviews/${reviewId}/flag`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reason: flagReason(),
+          details: flagDetails().trim() || null,
+        }),
+      })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean, error?: string, duplicate?: boolean }
+      if (!res.ok || !data.ok) {
+        flagError.set(data.error || 'Could not send the report — try again.')
+        return
+      }
+      flagSubmitted.set(true)
+      flagDetails.set('')
+      // Auto-dismiss after 2s so the user gets the confirmation and
+      // the dialog clears itself.
+      setTimeout(() => { flagOpen.set(false); flagSubmitted.set(false) }, 2000)
+    }
+    catch (err) {
+      flagError.set(err instanceof Error ? err.message : 'Network error')
+    }
+    finally {
+      flagSubmitting.set(false)
+    }
+  }
+
   // ── Author actions ──────────────────────────────────────────────
   //
   // Edit navigates to /article/:id/edit (its own page, ownership
@@ -228,6 +295,29 @@
   const judgeId = derived<number | null>(() => (reviewsStore.current() as any)?.judge?.id ?? null)
   const judgeCourt = derived<string>(() => (reviewsStore.current() as any)?.judge?.court ?? '')
   const judgeImage = derived<string>(() => (reviewsStore.current() as any)?.judge?.image_url ?? '')
+
+  // Reviewer cross-link (bench-review#29, #36). Reads from the
+  // server-built `author` payload (NOT the raw `user_id` on the row)
+  // so anonymized reviews surface with `id: null` and the link
+  // doesn't render. ShowReviewAction populates this via the
+  // `publicReviewerFor` helper — single source of truth for "who
+  // does the public see". Seeded/factory reviews with no author
+  // also drop through to no link.
+  const reviewerId = derived<number | null>(() => {
+    const v = (reviewsStore.current() as any)?.author?.id
+    return v == null ? null : Number(v)
+  })
+  const reviewerName = derived<string>(() => {
+    return (reviewsStore.current() as any)?.author?.name || ''
+  })
+  // Cross-link visible only when we have a clickable user. Anonymous
+  // reviewer names still surface elsewhere (the article doesn't show
+  // the name standalone today — feed cards do), just without the
+  // link out to /user/{id}.
+  const hasReviewerLink = derived<boolean>(() => reviewerId() !== null && reviewerName().length > 0)
+  // For the "by <name>" copy: when we have a name but no link
+  // (anonymized + role known), render plain text.
+  const hasReviewerName = derived<boolean>(() => reviewerName().length > 0)
 
   // Tiny avatar fallback: build two initials from the judge name so
   // a missing image_url renders a tasteful monogram instead of a
@@ -340,6 +430,16 @@
       <span :text="date"></span>
       <span class="hidden sm:inline text-gray-300">·</span>
       <span :text="`${readMinutes} min read`"></span>
+      <!-- Reviewer line. Three rendering modes (bench-review#29, #36):
+           - Linked: real user → "by <Name>" with click-through to /user/:id
+           - Plain:  anonymized → "by Anonymous attorney" with no link
+           - Hidden: factory/seeded with no author → row stays clean -->
+      <span :if="hasReviewerName" class="hidden sm:inline text-gray-300">·</span>
+      <span :if="hasReviewerLink" class="text-gray-500">
+        by
+        <StxLink x-to="`/user/${reviewerId}`" class="ml-1 text-gray-700 hover:underline underline-offset-2" :text="reviewerName"></StxLink>
+      </span>
+      <span :if="hasReviewerName && !hasReviewerLink()" class="text-gray-500" :text="`by ${reviewerName()}`"></span>
     </div>
 
     <!-- Judge byline. Medium-style author row: round avatar + name + court.
@@ -465,6 +565,79 @@
         <StxLink x-to="`/reviews`" class="text-gray-600 hover:text-gray-900 hover:underline underline-offset-2">
           ← All reviews
         </StxLink>
+        <!-- Report link — only shown when the viewer isn't the author
+             (authors don't need to flag themselves; they have edit/
+             delete on the banner). Resolves bench-review#27. -->
+        <button
+          type="button"
+          @click="openFlagDialog()"
+          class="text-gray-400 text-xs hover:text-red-600 hover:underline underline-offset-2 transition-colors"
+          x-class="isMine() ? 'hidden' : ''"
+        >Report</button>
+      </div>
+    </div>
+
+    <!-- Flag dialog. Inline so it can read the same court/review
+         context derived above. Same x-class hidden pattern as the
+         status banner — keeps the inner reactive bindings subscribed
+         across open/close cycles. -->
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40"
+      x-class="flagOpen() ? '' : 'hidden'"
+      @click.self="closeFlagDialog()"
+    >
+      <div class="w-full max-w-md p-6 bg-white rounded-lg shadow-xl">
+        <h3 class="font-semibold text-base text-gray-900">Report this review</h3>
+        <p class="mt-1 text-gray-500 text-xs">A moderator will look at flagged reviews and decide what to do. Reporters stay anonymous to the author either way.</p>
+
+        <div class="mt-4">
+          <label class="block font-medium text-gray-900 text-xs">What's wrong with it?</label>
+          <div class="mt-2 space-y-1.5">
+            <label :for="opt in flagReasonOptions" class="flex items-center gap-2 px-3 py-2 text-gray-700 text-sm bg-white border border-gray-200 hover:bg-gray-50 rounded-md cursor-pointer transition-colors">
+              <input type="radio" name="flag_reason" x-model="flagReason" :value="opt.value">
+              <span :text="opt.label"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <label for="flag-details" class="block font-medium text-gray-900 text-xs">Optional details</label>
+          <textarea
+            id="flag-details"
+            x-model="flagDetails"
+            rows="3"
+            placeholder="Give us more context — only the moderator sees this."
+            class="block mt-1 px-3 py-2 w-full text-gray-900 sm:leading-6 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
+          ></textarea>
+        </div>
+
+        <div
+          role="alert"
+          class="mt-3 px-3 py-2 text-red-800 text-xs bg-red-50 border border-red-200 rounded-md"
+          x-class="flagError() ? '' : 'hidden'"
+          :text="flagError()"
+        ></div>
+
+        <div
+          role="status"
+          class="mt-3 px-3 py-2 text-emerald-800 text-xs bg-emerald-50 border border-emerald-200 rounded-md"
+          x-class="flagSubmitted() ? '' : 'hidden'"
+        >Thanks — a moderator will take a look.</div>
+
+        <div class="flex justify-end gap-x-2 mt-5">
+          <button
+            type="button"
+            @click="closeFlagDialog()"
+            class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          >Cancel</button>
+          <button
+            type="button"
+            @click="submitFlag()"
+            x-disabled="flagSubmitting"
+            class="px-3 py-1.5 font-medium text-white text-sm bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50"
+            :text="flagSubmitting() ? 'Sending…' : 'Send report'"
+          ></button>
+        </div>
       </div>
     </div>
   </article>

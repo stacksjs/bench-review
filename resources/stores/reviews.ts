@@ -34,6 +34,9 @@ export interface SubmitReviewPayload {
   content: string
   rating: number
   type?: 'positive' | 'negative' | 'neutral'
+  // bench-review#36 — when true, public surfaces render the author
+  // as "Anonymous <role_label>" instead of their real name.
+  anonymized?: boolean
 }
 
 export interface SubmitResult {
@@ -114,16 +117,22 @@ defineStore('reviews', () => {
     }
   }
 
-  async function fetchByJudge(judgeId: number): Promise<void> {
+  async function fetchByJudge(judgeId: number, page = 1, perPage = 25): Promise<void> {
     // Mark this judge as in-flight without overwriting other judges'
     // load state — multiple panels can request different judges in
     // parallel without flickering each other's spinners.
     loadingByJudge.set({ ...loadingByJudge(), [judgeId]: true })
     try {
-      const res = await useStore('auth').authFetch(`/api/judges/${judgeId}/reviews`)
+      const url = `/api/judges/${judgeId}/reviews?page=${page}&per_page=${perPage}`
+      const res = await useStore('auth').authFetch(url)
       if (!res.ok) return
-      const data = await res.json() as JudgeReviewRow[]
-      byJudge.set({ ...byJudge(), [judgeId]: Array.isArray(data) ? data : [] })
+      // bench-review#28 — endpoint now returns the canonical paginator
+      // (`{ data, current_page, total, ... }`) instead of a raw array.
+      // The Array.isArray fallback keeps us safe if the endpoint shape
+      // ever regresses or a future endpoint variant returns an array.
+      const json = await res.json() as { data?: JudgeReviewRow[] } | JudgeReviewRow[]
+      const rows = Array.isArray(json) ? json : (json?.data ?? [])
+      byJudge.set({ ...byJudge(), [judgeId]: rows })
     }
     catch (err) {
       console.error(`[reviews] fetchByJudge(${judgeId}) failed:`, err)

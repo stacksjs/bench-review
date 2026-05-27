@@ -99,6 +99,16 @@ export default new Action({
       patch.type = t
     }
 
+    // Anonymity toggle (bench-review#36). Authors can flip the
+    // anonymity flag at any time — privacy is a continuous control,
+    // not a one-shot at submit. Every edit kicks the review back to
+    // pending anyway, so the public surfaces re-render with the new
+    // flag after re-approval.
+    const anonInput = (request as any).get?.('anonymized')
+    if (anonInput !== undefined && anonInput !== null) {
+      patch.anonymized = anonInput === true || anonInput === 'true' || anonInput === 1 || anonInput === '1' ? 1 : 0
+    }
+
     if (Object.keys(patch).length === 0)
       return response.json({ error: 'No editable fields supplied.' }, 422)
 

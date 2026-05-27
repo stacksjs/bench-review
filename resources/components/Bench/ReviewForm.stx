@@ -20,6 +20,12 @@
   const demeanor = state<StarRating>(0)
   const hoverDemeanor = state<StarRating>(0)
   const judge = state<SelectedJudge | null>(null)
+  // Anonymity toggle (bench-review#36). Defaults OFF — anonymity is
+  // an explicit opt-in, not the default privacy posture. Clerks /
+  // attorneys flip this on; named reviewers benefit from leaving it
+  // off (the verified-credentials badge in #37 won't surface for
+  // anonymous reviews).
+  const anonymized = state<boolean>(false)
 
   const stars: StarRating[] = [1, 2, 3, 4, 5]
 
@@ -182,6 +188,7 @@
         content,
         rating: overall,
         type: ratingType(overall),
+        anonymized: anonymized(),
       })
 
       if (!result.ok) { submitError.set(result.error || 'Failed to submit review.'); return }
@@ -435,6 +442,25 @@
       x-class="submitError() ? '' : 'hidden'"
       :text="submitError()"
     ></div>
+
+    <!-- Anonymity toggle (bench-review#36). Default OFF — anonymity
+         is an explicit opt-in. Surfaces above the action bar so the
+         user makes the call BEFORE the submit click rather than as
+         an afterthought. Bench-review's audience (clerks, court
+         staff, junior attorneys) often genuinely needs this; for
+         everyone else, leaving it off boosts the future verified-
+         credentials badge (#37) on their review. -->
+    <label class="flex gap-3 items-start mb-5 p-4 bg-amber-50/50 border border-amber-200/60 rounded-md cursor-pointer hover:bg-amber-50">
+      <input
+        type="checkbox"
+        x-model="anonymized"
+        class="mt-0.5 h-4 w-4 text-gray-900 border-gray-300 rounded focus:ring-2 focus:ring-gray-900 focus:ring-offset-0"
+      >
+      <div class="flex-1">
+        <p class="font-semibold text-gray-900 text-sm">Post this review anonymously</p>
+        <p class="mt-1 text-gray-600 text-xs leading-relaxed">Your name won't appear publicly — readers see "Anonymous reviewer" (or your role, if set in settings). A moderator still sees your identity for review. Useful for clerks, court staff, or attorneys reviewing under retaliation risk.</p>
+      </div>
+    </label>
 
     <div class="flex gap-x-4 items-center justify-end">
       <button type="button" @click="handleCancel()" class="px-4 py-2 font-semibold text-gray-700 text-sm border border-gray-200 rounded-md hover:bg-gray-50 hover:border-gray-300 transition-colors">Cancel</button>

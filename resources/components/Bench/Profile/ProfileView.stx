@@ -140,9 +140,19 @@
           <StxLink to="/my-reviews" class="font-medium text-gray-600 text-sm hover:text-gray-900">See all →</StxLink>
         </div>
 
-        <div :if="profileStore.loading && profileStore.totalReviews === 0" class="py-12 text-center text-gray-500 text-sm">
-          Loading your reviews…
-        </div>
+        <!-- Loading skeleton (bench-review#35). Mirrors the dot+title+body
+             shape of the recent-reviews list below so the layout stays
+             stable when real data lands. -->
+        <ul :if="profileStore.loading && profileStore.totalReviews === 0" class="mt-6 space-y-6">
+          <li :for="i in [1, 2, 3]" class="flex gap-4 animate-pulse">
+            <div class="flex-none h-2 w-2 mt-2 bg-gray-200 rounded-full"></div>
+            <div class="flex-1 min-w-0 space-y-2">
+              <div class="h-3 w-2/3 bg-gray-200 rounded"></div>
+              <div class="h-2 w-5/6 bg-gray-100 rounded"></div>
+              <div class="h-2 w-1/3 bg-gray-100 rounded"></div>
+            </div>
+          </li>
+        </ul>
         <div :if="!profileStore.loading && profileStore.totalReviews === 0" class="py-12 text-center">
           <p class="text-gray-500 text-sm">You haven't written any reviews yet.</p>
           <StxLink to="/review" class="inline-block mt-3 px-4 py-2 font-medium text-white text-sm bg-gray-900 hover:bg-gray-700 rounded-lg transition-colors">Write your first review</StxLink>

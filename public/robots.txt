@@ -1,0 +1,23 @@
+# Bench Review crawl policy
+# See app/Actions/SitemapAction.ts for the live sitemap source.
+
+User-agent: *
+Allow: /
+
+# Surfaces that should never be indexed:
+# - /api/* — JSON endpoints, no human-readable content
+# - /admin/* — moderator-only screens
+# - /settings, /notifications, /my-reviews — authenticated user views
+# - /reset-password, /forgot-password — token-bearing flows
+Disallow: /api/
+Disallow: /admin/
+Disallow: /settings
+Disallow: /notifications
+Disallow: /my-reviews
+Disallow: /reset-password
+Disallow: /forgot-password
+
+# The sitemap is generated live from the database (judges, courthouses,
+# published reviews + static public pages). Cached for 1 hour at the
+# response layer; safe for crawlers to refetch on their normal cadence.
+Sitemap: http://localhost:4000/api/sitemap.xml

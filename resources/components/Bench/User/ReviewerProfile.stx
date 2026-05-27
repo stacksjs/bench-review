@@ -1,0 +1,250 @@
+<script client>
+  // Public reviewer profile (bench-review#29). Renders one user's
+  // identity + published-review history. Anonymous and authenticated
+  // viewers both land here; gating happens server-side in
+  // UserShowAction (PII filtered) and UserReviewsAction (status=
+  // published only).
+  //
+  // Bare-shell pattern + script in component file (not view) per
+  // feedback_stx_view_vs_component_scripts.
+
+  const authStore = useStore('auth')
+
+  interface PublicUser {
+    id: number
+    name: string
+    created_at: string | null
+    review_count: number
+    judges_reviewed: number
+    total_likes: number
+    avg_rating: number | null
+  }
+  interface ReviewCard {
+    id: number
+    title: string
+    content: string
+    rating: number
+    type: string | null
+    likes: number
+    created_at: string | null
+    judge_id: number | null
+    judge: { id: number, name: string, image_url: string | null } | null
+  }
+
+  const user = state<PublicUser | null>(null)
+  const userLoaded = state<boolean>(false)
+  const userNotFound = state<boolean>(false)
+  const reviews = state<ReviewCard[]>([])
+  const reviewsLoaded = state<boolean>(false)
+
+  function resolveUserId(): number {
+    if (typeof window === 'undefined') return 0
+    const fromRouter = Number((window as any).stx?._rp?.id)
+    if (Number.isFinite(fromRouter) && fromRouter > 0) return fromRouter
+    const m = window.location.pathname.match(/^\/user\/(\d+)/)
+    return m ? Number(m[1]) : 0
+  }
+
+  const userId = resolveUserId()
+
+  async function loadProfile(): Promise<void> {
+    if (!userId) return
+    try {
+      const res = await authStore.authFetch(`/api/users/${userId}`)
+      if (res.status === 404) { userNotFound.set(true); return }
+      if (!res.ok) return
+      user.set(await res.json() as PublicUser)
+    }
+    catch (err) {
+      console.error('[reviewer-profile] user fetch failed:', err)
+    }
+    finally {
+      userLoaded.set(true)
+    }
+  }
+
+  async function loadReviews(): Promise<void> {
+    if (!userId) return
+    try {
+      const res = await authStore.authFetch(`/api/users/${userId}/reviews?per_page=20`)
+      if (!res.ok) return
+      const data = await res.json() as { data?: ReviewCard[] } | ReviewCard[]
+      reviews.set(Array.isArray(data) ? data : (data?.data ?? []))
+    }
+    catch (err) {
+      console.error('[reviewer-profile] reviews fetch failed:', err)
+    }
+    finally {
+      reviewsLoaded.set(true)
+    }
+  }
+
+  onMount(() => {
+    loadProfile()
+    loadReviews()
+  })
+
+  // Display helpers.
+  const displayName = derived<string>(() => user()?.name || '')
+  const memberSince = derived<string>(() => {
+    const u = user()
+    if (!u?.created_at) return ''
+    const d = new Date(u.created_at)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+  })
+  // Two-letter avatar fallback. Same convention as the bell-dropdown
+  // and BenchHeader user-menu — keeps the cross-surface look consistent.
+  const initials = derived<string>(() => {
+    const raw = (user()?.name || '').replace(/^(hon\.|judge|mr\.|mrs\.|ms\.|dr\.)\s+/i, '').trim()
+    const parts = raw.split(/\s+/).filter(Boolean)
+    if (parts.length === 0) return '?'
+    if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase()
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  })
+  const reviewCountLabel = derived<string>(() => {
+    const u = user()
+    if (!u) return '0 reviews'
+    return `${u.review_count} ${u.review_count === 1 ? 'review' : 'reviews'}`
+  })
+
+  function formatDate(dateStr: string | null | undefined): string {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  }
+
+  function snippet(html: string | null | undefined, max = 180): string {
+    if (!html) return ''
+    const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+    return text.length > max ? `${text.slice(0, max - 1)}…` : text
+  }
+
+  // Is this the viewer looking at their own profile? Switch the
+  // primary CTA from "Write a review" to "Edit your profile" in that
+  // case, and surface the link to /my-reviews.
+  const isOwnProfile = derived<boolean>(() => {
+    const me = authStore.user()
+    return !!me && Number((me as any).id) === userId
+  })
+</script>
+
+<div class="min-h-screen bg-gray-50">
+  <!-- Not-found state. Renders inline so the layout chrome stays
+       intact (no full-page 404). -->
+  <div :if="userNotFound" class="mx-auto px-4 py-24 sm:px-6 lg:px-8 max-w-3xl text-center">
+    <p class="font-medium text-amber-600 text-xs tracking-widest uppercase">404 — not found</p>
+    <h1 class="mt-4 font-serif font-bold text-4xl text-gray-900 tracking-tight">Reviewer not found</h1>
+    <p class="mt-4 text-base text-gray-500">The reviewer you're looking for either doesn't exist or has been removed.</p>
+    <StxLink to="/reviews" class="inline-block mt-8 font-semibold text-gray-900 text-sm hover:underline underline-offset-4">
+      ← Back to all reviews
+    </StxLink>
+  </div>
+
+  <!-- Loaded state -->
+  <div :if="!userNotFound" class="mx-auto px-4 py-10 sm:px-6 lg:px-8 max-w-5xl">
+    <!-- Identity header -->
+    <div class="overflow-hidden bg-gray-900 rounded-2xl">
+      <div class="p-10">
+        <div class="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex gap-4 items-center">
+            <span class="inline-flex items-center justify-center h-20 w-20 font-semibold text-amber-700 text-xl bg-amber-50 ring-2 ring-white/20 rounded-full" :text="initials"></span>
+            <div>
+              <h1 class="font-bold text-2xl text-white" :text="displayName"></h1>
+              <p :if="memberSince" class="mt-1 text-gray-400 text-sm" :text="`Member since ${memberSince}`"></p>
+              <p class="mt-1 text-gray-400 text-xs" :text="reviewCountLabel"></p>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <StxLink
+              :if="isOwnProfile"
+              to="/settings"
+              class="inline-flex items-center px-4 py-2 font-medium text-gray-900 text-sm bg-white rounded-lg hover:bg-gray-100 transition-colors"
+            >Edit your profile</StxLink>
+            <StxLink
+              :if="isOwnProfile"
+              to="/my-reviews"
+              class="inline-flex items-center px-4 py-2 font-medium text-white text-sm bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+            >Manage your reviews</StxLink>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Aggregate stats -->
+    <div class="grid gap-4 grid-cols-2 mt-8 lg:grid-cols-4">
+      <div class="p-6 bg-white border border-gray-200 rounded-xl">
+        <p class="text-gray-500 text-sm">Reviews</p>
+        <p class="mt-1 font-semibold text-3xl text-gray-900" :text="user()?.review_count ?? 0"></p>
+      </div>
+      <div class="p-6 bg-white border border-gray-200 rounded-xl">
+        <p class="text-gray-500 text-sm">Judges Reviewed</p>
+        <p class="mt-1 font-semibold text-3xl text-gray-900" :text="user()?.judges_reviewed ?? 0"></p>
+      </div>
+      <div class="p-6 bg-white border border-gray-200 rounded-xl">
+        <p class="text-gray-500 text-sm">Average Rating</p>
+        <p class="mt-1 font-semibold text-3xl text-gray-900" :text="user()?.avg_rating == null ? '—' : user().avg_rating"></p>
+      </div>
+      <div class="p-6 bg-white border border-gray-200 rounded-xl">
+        <p class="text-gray-500 text-sm">Total Likes</p>
+        <p class="mt-1 font-semibold text-3xl text-gray-900" :text="user()?.total_likes ?? 0"></p>
+      </div>
+    </div>
+
+    <!-- Reviews list -->
+    <div class="mt-10">
+      <h2 class="font-semibold text-base text-gray-900" :text="`${displayName}'s published reviews`"></h2>
+
+      <!-- Loading skeleton -->
+      <ul :if="!reviewsLoaded" class="mt-6 space-y-4">
+        <li :for="i in [1, 2, 3]" class="p-5 bg-white border border-gray-200 rounded-lg animate-pulse">
+          <div class="flex items-baseline gap-3">
+            <div class="h-4 w-1/3 bg-gray-200 rounded"></div>
+            <div class="h-4 w-16 bg-gray-100 rounded-full"></div>
+          </div>
+          <div class="mt-3 space-y-2">
+            <div class="h-3 w-full bg-gray-200 rounded"></div>
+            <div class="h-3 w-4/5 bg-gray-200 rounded"></div>
+          </div>
+        </li>
+      </ul>
+
+      <!-- Empty state -->
+      <div :if="reviewsLoaded && reviews.length === 0" class="mt-6 p-10 text-center bg-white border border-gray-200 rounded-lg">
+        <p class="font-semibold text-gray-900 text-base">No published reviews yet.</p>
+        <p class="mt-2 text-gray-500 text-sm" :text="isOwnProfile() ? 'When a moderator approves your first review, it lands here.' : 'This reviewer hasn\\'t had a review published yet.'"></p>
+      </div>
+
+      <!-- Reviews -->
+      <ul :if="reviews.length > 0" class="space-y-4 mt-6">
+        <li :for="r in reviews" class="p-5 bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all">
+          <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <StxLink
+              x-to="`/article/${r.id}`"
+              class="font-semibold text-gray-900 text-base hover:underline underline-offset-2 decoration-gray-300"
+              :text="r.title"
+            ></StxLink>
+            <span :if="r.judge" class="text-gray-500 text-xs">
+              on
+              <StxLink x-to="`/judges/${r.judge.id}/profile`" class="text-gray-700 hover:underline underline-offset-2" :text="r.judge.name"></StxLink>
+            </span>
+          </div>
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-gray-500 text-xs">
+            <span :text="formatDate(r.created_at)"></span>
+            <span class="text-gray-300">·</span>
+            <span class="inline-flex items-center gap-1 tabular-nums" :text="`${r.rating}/5`"></span>
+            <span :if="r.likes && r.likes > 0" class="text-gray-300">·</span>
+            <span :if="r.likes && r.likes > 0" class="inline-flex items-center gap-1" :text="`${r.likes} ${r.likes === 1 ? 'reaction' : 'reactions'}`"></span>
+          </div>
+          <p class="mt-3 text-gray-600 text-sm line-clamp-2" :text="snippet(r.content)"></p>
+          <div class="flex flex-wrap items-center gap-x-4 mt-4 pt-3 border-t border-gray-100 text-sm">
+            <StxLink x-to="`/article/${r.id}`" class="font-medium text-gray-900 hover:underline underline-offset-2">
+              Read review →
+            </StxLink>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>

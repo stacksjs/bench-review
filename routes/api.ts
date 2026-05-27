@@ -21,6 +21,27 @@ import { response, route } from '@stacksjs/router'
 route.get('/', () => response.text('hello'))
 route.get('/coming-soon', 'Controllers/ComingSoonController@index')
 
+// Public reviewer profile (bench-review#29). Public-safe payload —
+// no email, no PII. Aggregates over published reviews only.
+route.get('/users/{id}', 'Actions/Users/UserShowAction')
+  .name('bench.users.show')
+
+route.get('/users/{id}/reviews', 'Actions/Users/UserReviewsAction')
+  .name('bench.users.reviews')
+
+// Home page activity slices — trending judges, top-rated judges,
+// active reviewers in one round-trip. See HomeHighlightsAction for the
+// per-section query details. Resolves bench-review#34.
+route.get('/home/highlights', 'Actions/HomeHighlightsAction')
+  .name('bench.home.highlights')
+
+// SEO surface. Sitemap lives under /api/ since this file auto-prefixes,
+// but robots.txt is a static file in public/ that points at the full
+// URL so search engines find it the standard way. See public/robots.txt
+// + app/Actions/SitemapAction.ts.
+route.get('/sitemap.xml', 'Actions/SitemapAction')
+  .name('bench.sitemap')
+
 // Newsletter signup. The framework's defaults/routes/dashboard.ts also
 // declares this route, but a user route wins — keeping it here makes the
 // endpoint visible in app code and lets us swap to a bench-review-specific
@@ -103,6 +124,14 @@ route.post('/reviews', 'Actions/Reviews/SubmitReviewAction')
   .middleware('auth')
   .skipCsrf()
 
+// Community report/flag on a review. Anonymous flagging is allowed
+// — the trust model needs friction-free reporting. Signed-in flags
+// are idempotent on (review_id, user_id). See FlagReviewAction for
+// the rate-limit / abuse notes. Resolves bench-review#27.
+route.post('/reviews/{id}/flag', 'Actions/Reviews/FlagReviewAction')
+  .name('bench.reviews.flag')
+  .skipCsrf()
+
 // Toggle "people find this helpful" on a review. POST is idempotent on
 // (user_id, judge_review_id): an existing like is removed, a missing
 // one is created. The action keeps the denormalised `likes` counter
@@ -129,6 +158,15 @@ route.patch('/me/reviews/{id}', 'Actions/Me/UpdateMyReviewAction')
 
 route.delete('/me/reviews/{id}', 'Actions/Me/DeleteMyReviewAction')
   .name('bench.me.reviews.destroy')
+  .middleware('auth')
+  .skipCsrf()
+
+// Authenticated password change. Settings form (SettingsView.stx)
+// posts here; the action verifies the current password against the
+// stored bcrypt hash before updating. See app/Actions/Me/ChangePasswordAction.ts
+// for the security notes (no enumeration leak, no surprise token revoke).
+route.patch('/me/password', 'Actions/Me/ChangePasswordAction')
+  .name('bench.me.password.change')
   .middleware('auth')
   .skipCsrf()
 

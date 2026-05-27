@@ -62,6 +62,11 @@
   async function savePassword(): Promise<void> {
     pwStatus.set('idle')
     pwError.set('')
+    if (!currentPassword()) {
+      pwStatus.set('error')
+      pwError.set('Enter your current password.')
+      return
+    }
     if (newPassword().length < 8) {
       pwStatus.set('error')
       pwError.set('Password must be at least 8 characters.')
@@ -73,15 +78,32 @@
       return
     }
     pwStatus.set('saving')
-    // No /api/me/password endpoint yet. Leave the call site primed so
-    // dropping it in is a one-line change later.
-    setTimeout(() => {
+    try {
+      const res = await authStore.authFetch('/api/me/password', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          current_password: currentPassword(),
+          new_password: newPassword(),
+          new_password_confirmation: confirmPassword(),
+        }),
+      })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean, error?: string }
+      if (!res.ok || !data.ok) {
+        pwStatus.set('error')
+        pwError.set(data.error || 'Could not change password.')
+        return
+      }
       pwStatus.set('saved')
       currentPassword.set('')
       newPassword.set('')
       confirmPassword.set('')
       setTimeout(() => pwStatus.set('idle'), 2000)
-    }, 350)
+    }
+    catch (err) {
+      pwStatus.set('error')
+      pwError.set(err instanceof Error ? err.message : 'Network error')
+    }
   }
 </script>
 

@@ -77,6 +77,24 @@
     return Number.isFinite(lat) && Number.isFinite(lng)
   })
 
+  // Stat panel — values are computed server-side in CourtHouseIndexAction
+  // and hydrated into the judges store cache. Format with locale-aware
+  // thousand separators; avg_rating shows em-dash when no published
+  // reviews exist yet so the panel doesn't read "0.0 avg rating" on a
+  // brand new courthouse. Cases-per-year was hardcoded "12k" — dropped
+  // because we have no real data source for it.
+  function formatCount(n: any): string {
+    const v = Number(n ?? 0)
+    return Number.isFinite(v) ? v.toLocaleString() : '0'
+  }
+  const activeJudges = derived<string>(() => formatCount(court()?.active_judges))
+  const totalReviews = derived<string>(() => formatCount(court()?.total_reviews))
+  const avgRating = derived<string>(() => {
+    const v = court()?.avg_rating
+    if (v == null) return '—'
+    return Number(v).toFixed(1)
+  })
+
   // Marker icons ship as relative images/marker-icon.png URLs that
   // 404 once Bun's bundler relocates the JS. CDN fallback is the
   // standard escape. Pinned to 1.9.4 to match the installed package.
@@ -183,22 +201,18 @@
 
   <div class="mt-12">
     <h3 class="font-semibold text-base text-gray-800">By the numbers</h3>
-    <dl class="grid gap-4 grid-cols-2 sm:grid-cols-4 mt-4">
+    <dl class="grid gap-4 grid-cols-1 sm:grid-cols-3 mt-4">
       <div class="px-4 py-3 bg-off-gray rounded-lg">
         <dt class="text-gray-500 text-xs">Active Judges</dt>
-        <dd class="mt-1 font-semibold text-2xl text-gray-900">24</dd>
+        <dd class="mt-1 font-semibold text-2xl text-gray-900" :text="activeJudges"></dd>
       </div>
       <div class="px-4 py-3 bg-off-gray rounded-lg">
-        <dt class="text-gray-500 text-xs">Total Reviews</dt>
-        <dd class="mt-1 font-semibold text-2xl text-gray-900">1,287</dd>
+        <dt class="text-gray-500 text-xs">Published Reviews</dt>
+        <dd class="mt-1 font-semibold text-2xl text-gray-900" :text="totalReviews"></dd>
       </div>
       <div class="px-4 py-3 bg-off-gray rounded-lg">
         <dt class="text-gray-500 text-xs">Avg Rating</dt>
-        <dd class="mt-1 font-semibold text-2xl text-gray-900">4.4</dd>
-      </div>
-      <div class="px-4 py-3 bg-off-gray rounded-lg">
-        <dt class="text-gray-500 text-xs">Cases / yr</dt>
-        <dd class="mt-1 font-semibold text-2xl text-gray-900">12k</dd>
+        <dd class="mt-1 font-semibold text-2xl text-gray-900" :text="avgRating"></dd>
       </div>
     </dl>
   </div>

@@ -1,9 +1,32 @@
 <script client>
-  import type { Judge } from '~/resources/types'
+  import type { Judge, PracticeArea } from '~/resources/types'
 
   const judgesStore = useStore('judges')
   const searchQuery = state<string>('')
   const stars: number[] = [1, 2, 3, 4, 5]
+
+  // Practice-area filter (bench-review#38). URL-driven via
+  // ?practice_area=family so deep links + shares preserve the filter.
+  // 'all' means no filter applied.
+  type PracticeFilter = 'all' | PracticeArea
+  const PRACTICE_AREAS: PracticeArea[] = ['criminal', 'civil', 'family', 'probate', 'appellate', 'bankruptcy', 'other']
+  function readInitialFilter(): PracticeFilter {
+    if (typeof window === 'undefined') return 'all'
+    const raw = new URLSearchParams(window.location.search).get('practice_area') as PracticeFilter | null
+    return raw && PRACTICE_AREAS.includes(raw as PracticeArea) ? (raw as PracticeFilter) : 'all'
+  }
+  const practiceFilter = state<PracticeFilter>(readInitialFilter())
+
+  function setPracticeFilter(next: PracticeFilter): void {
+    practiceFilter.set(next)
+    if (typeof window === 'undefined') return
+    const url = new URL(window.location.href)
+    if (next === 'all') url.searchParams.delete('practice_area')
+    else url.searchParams.set('practice_area', next)
+    // replaceState rather than push — rapid pill clicks shouldn't
+    // bloat the history stack the user has to back through.
+    window.history.replaceState({}, '', url.toString())
+  }
 
   // Fetch on first mount only — the store's internal `judges` state
   // sticks around across SPA navigations, so revisiting the page
@@ -14,16 +37,36 @@
       judgesStore.fetchJudges()
   })
 
+  // Live counts per practice area over the unfiltered roster — drives
+  // the pill labels so the user sees "Civil (12)" instead of bare
+  // "Civil". Computed once over the full list; cheap.
+  const practiceCounts = derived(() => {
+    const counts: Record<string, number> = { all: 0, criminal: 0, civil: 0, family: 0, probate: 0, appellate: 0, bankruptcy: 0, other: 0 }
+    for (const j of judgesStore.judges() as any[]) {
+      counts.all++
+      const pa = (j.practice_area || '').toString().toLowerCase()
+      if (pa in counts) counts[pa]++
+    }
+    return counts
+  })
+
   const filteredJudges = derived<Judge[]>(() => {
     const q = searchQuery()
-    const all = judgesStore.judges()
-    if (!q) return all
-    const needle = q.toLowerCase()
-    return all.filter(j =>
-      j.name.toLowerCase().includes(needle)
-      || j.court.name.toLowerCase().includes(needle)
-      || j.location.toLowerCase().includes(needle),
-    )
+    const pf = practiceFilter()
+    let rows = judgesStore.judges()
+
+    if (pf !== 'all')
+      rows = rows.filter((j: any) => (j.practice_area || '').toString().toLowerCase() === pf)
+
+    if (q) {
+      const needle = q.toLowerCase()
+      rows = rows.filter(j =>
+        j.name.toLowerCase().includes(needle)
+        || j.court.name.toLowerCase().includes(needle)
+        || j.location.toLowerCase().includes(needle),
+      )
+    }
+    return rows
   })
 </script>
 
@@ -32,6 +75,33 @@
     <div class="mb-16 text-center">
       <h1 class="font-bold text-4xl text-gray-900 tracking-tight sm:text-5xl">Judicial Directory</h1>
       <p class="mt-4 text-gray-600 text-lg">Find and review judges across the United States</p>
+    </div>
+
+    <!-- Practice-area filter pills (bench-review#38). Sit above the
+         search/select panel so the user's first filter act is by
+         specialty, then they narrow further with the text search.
+         URL-driven via ?practice_area=<value>. -->
+    <div class="flex flex-wrap gap-2 mb-6" role="tablist" aria-label="Filter by practice area">
+      <button
+        type="button"
+        role="tab"
+        @click="setPracticeFilter('all')"
+        class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        x-class="practiceFilter === 'all' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+      >
+        All
+        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="practiceFilter === 'all' ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-600'" :text="practiceCounts.all"></span>
+      </button>
+      <button :for="area in PRACTICE_AREAS"
+        type="button"
+        role="tab"
+        @click="setPracticeFilter(area)"
+        class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors capitalize"
+        x-class="practiceFilter === area ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+      >
+        <span :text="area"></span>
+        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="practiceFilter === area ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-600'" :text="practiceCounts[area]"></span>
+      </button>
     </div>
 
     <div class="mb-12 p-6 bg-white border border-gray-100 rounded-2xl shadow-sm">

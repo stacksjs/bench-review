@@ -2,6 +2,7 @@ import { Action } from '@stacksjs/actions'
 import { Auth } from '@stacksjs/auth'
 import { request, response } from '@stacksjs/router'
 import { hydrateLikeData } from '../../Helpers/reviewLikes'
+import { publicReviewerFor } from '../../Helpers/reviewerLabel'
 
 /**
  * GET /api/reviews/:id — one review with judge context.
@@ -64,6 +65,40 @@ export default new Action({
       }
     }
 
-    return response.json({ ...hydrated, judge })
+    // Author payload with anonymity gating (bench-review#36).
+    //
+    // The viewer's relationship to the row drives whether they see
+    // the real author or the public-anon substitute:
+    //   - the author themselves → real name (so /my-reviews and
+    //     hard-reload on their own article still feel personal)
+    //   - everyone else → publicReviewerFor() applies the flag
+    //
+    // `publicReviewerFor` returns `id: null` for anonymous reviews
+    // — that's intentional so anonymous reviewer rows can't link
+    // back to `/user/{id}` by construction. Belt + suspenders: the
+    // client treats null-id as "no profile link".
+    let author: { id: number | null, name: string, role_label: string | null } | null = null
+    if (authorId != null) {
+      const u = await User.where('id', Number(authorId)).first()
+      if (u) {
+        const ur = (u as any).toJSON ? (u as any).toJSON() : u
+        const isViewerAuthor = false
+        // Viewer-is-author already short-circuited above for non-
+        // published reviews. For published rows, check explicitly so
+        // the author sees their own identity even on the public page.
+        const viewerIsAuthor = await Auth.user()
+          .then(me => me && Number((me as any).id) === Number(authorId))
+          .catch(() => false)
+
+        if (viewerIsAuthor) {
+          author = { id: ur.id, name: ur.name, role_label: ur.role_label ?? null }
+        }
+        else {
+          author = publicReviewerFor(hydrated as any, ur)
+        }
+      }
+    }
+
+    return response.json({ ...hydrated, judge, author })
   },
 })

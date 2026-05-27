@@ -73,6 +73,12 @@ export default new Action({
     const judgeId = Number(body.judge_id)
     const rating = Number(body.rating)
     const title = String(body.title ?? '').trim()
+    // Anonymity flag (bench-review#36). Accept truthy values
+    // (boolean true OR string "true"/"1") so different client
+    // serializers work. Author's identity stays on the row in the
+    // DB; only the public render layer substitutes the name.
+    const anonRaw = (body as any).anonymized
+    const anonymized = anonRaw === true || anonRaw === 'true' || anonRaw === 1 || anonRaw === '1' ? 1 : 0
     // Strip inline styles, classes, and disallowed tags BEFORE
     // persistence. Pasted content from external CMSes routinely
     // arrives wrapped in `<div style="float:left;width:…">` which
@@ -121,6 +127,7 @@ export default new Action({
       comments: 0,
       judge_id: judgeId,
       user_id: userId,
+      anonymized,
       uuid,
       created_at: now,
       updated_at: now,

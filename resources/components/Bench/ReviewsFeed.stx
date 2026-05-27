@@ -199,8 +199,33 @@
     x-class="likeError() ? '' : 'hidden'"
     :text="likeError()"
   ></div>
-  <div :if="reviewsStore.loadingLatest && reviews.length === 0" class="py-12 text-center text-gray-500 text-sm">
-    Loading reviews…
+  <!-- Loading skeleton (bench-review#35). Renders three placeholder
+       review cards matching the eventual layout (avatar circle + name
+       line + meta line + 3-line body + footer chip row) so the feed
+       doesn't shift when the real data lands. animate-pulse is the
+       Tailwind/crosswind shimmer; no custom CSS needed. -->
+  <div :if="reviewsStore.loadingLatest && reviews.length === 0" class="space-y-6">
+    <div :for="i in [1, 2, 3]" class="py-6 animate-pulse border-b border-gray-200">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center">
+          <div class="h-10 w-10 bg-gray-200 rounded-full"></div>
+          <div class="ml-3 space-y-1.5">
+            <div class="h-3 w-32 bg-gray-200 rounded"></div>
+            <div class="h-2 w-20 bg-gray-100 rounded"></div>
+          </div>
+        </div>
+        <div class="h-2 w-16 bg-gray-100 rounded"></div>
+      </div>
+      <div class="mt-5 space-y-2">
+        <div class="h-3 w-3/4 bg-gray-200 rounded"></div>
+        <div class="h-3 w-full bg-gray-200 rounded"></div>
+        <div class="h-3 w-5/6 bg-gray-200 rounded"></div>
+      </div>
+      <div class="flex items-center gap-3 mt-5">
+        <div class="h-6 w-24 bg-gray-100 rounded-full"></div>
+        <div class="h-6 w-20 bg-gray-100 rounded-full"></div>
+      </div>
+    </div>
   </div>
   <!-- Two empty states: filter-narrowed vs genuinely empty. The
        judgesStore.activeCategory signal drives the distinction so the
@@ -223,13 +248,13 @@
           <div :if="review.author.id === 0" class="flex-shrink-0">
             <img class="h-8 w-8 rounded-full grayscale filter" x-src="review.author.imageUrl" x-alt="review.author.name" />
           </div>
-          <StxLink :if="review.author.id !== 0" x-to="`/profile/${review.author.id}`" class="flex-shrink-0">
+          <StxLink :if="review.author.id !== 0" x-to="`/user/${review.author.id}`" class="flex-shrink-0">
             <img class="h-8 w-8 rounded-full grayscale filter" x-src="review.author.imageUrl" x-alt="review.author.name" />
           </StxLink>
           <div class="ml-2">
             <p class="font-medium text-gray-900 text-sm">
               <span :if="review.author.id === 0" :text="review.author.name"></span>
-              <StxLink :if="review.author.id !== 0" x-to="`/profile/${review.author.id}`" class="hover:underline" :text="review.author.name"></StxLink>
+              <StxLink :if="review.author.id !== 0" x-to="`/user/${review.author.id}`" class="hover:underline" :text="review.author.name"></StxLink>
             </p>
             <p class="text-gray-500 text-xs">reviewed</p>
           </div>
