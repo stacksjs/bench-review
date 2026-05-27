@@ -116,6 +116,70 @@ EMAILJS_SECURE=true
 
 Learn more in the docs.
 
+## 🧱 Email components (`<EmailLayout>` & co.)
+
+Bundled stx components for composing Outlook / Gmail-safe HTML in
+`resources/components/Email/`. Drop them into any `.stx` template;
+the framework auto-discovers them when rendering through
+`@stacksjs/email`'s `template()` helper.
+
+| Component         | Slot/content | Notable props |
+|---|---|---|
+| `<EmailLayout>`   | default + `head`/`header`/`footer` slots | `title`, `width` (px), `bodyBg`, `contentBg` |
+| `<EmailSection>`  | default      | `padding`, `background` |
+| `<EmailText>`     | default      | `size` (`sm`/`md`/`lg`/`heading`), `align`, `color`, `spacing` |
+| `<EmailButton>`   | default = button label | `href` (required), `color`, `bg`, `padX`, `padY` |
+| `<EmailDivider>`  | none         | `color`, `spacing` |
+| `<EmailImage>`    | none         | `src` (required), `alt` (required), `width`, `height`, `display` |
+| `<EmailLink>`     | default      | `href` (required), `color`, `underline` |
+
+Each one renders bulletproof table-based markup with inline styles
+so it works in Outlook 2007-2019, Gmail (web + Android), and Apple
+Mail without an inliner pass. Example:
+
+```stx
+<script server>
+const userName = props.userName || 'there'
+const appUrl = props.appUrl || 'https://stacksjs.com'
+</script>
+
+<EmailLayout title="Welcome">
+  <EmailText size="heading">Welcome aboard, {{ userName }}!</EmailText>
+  <EmailText>Thanks for signing up — here's a button to get started:</EmailText>
+  <EmailButton href="{{ appUrl }}">Open the app</EmailButton>
+  <EmailDivider />
+  <EmailText size="sm" color="#6b7280" spacing="0">Reply to this email if you have questions.</EmailText>
+</EmailLayout>
+```
+
+The bundled `welcome.stx`, `password-reset.stx`, `password-changed.stx`,
+and `email-verification.stx` are written using these components — they
+double as worked examples. Copy + edit for app-specific designs.
+
+## 🎨 CSS inlining
+
+Gmail (especially the Android app) and older Outlook clients strip
+or ignore `<style>` blocks, so styles have to ride on each element via
+`style="…"`. Stacks ships a pass-through inliner that runs after
+`renderEmail()` and before the result hands back:
+
+- **On by default in production** (`APP_ENV` or `NODE_ENV` is
+  `production`). Off in dev so previews show the un-mutated stx
+  output.
+- **Per-call opt-out** via `template(name, { inline: false })`.
+- **Per-block opt-out** via `<style data-inline="false">…</style>` —
+  those blocks pass through untouched. Useful for `@media`-queried
+  responsive rules that aren't inline-friendly anyway.
+
+The inliner handles class / id / tag / chained selectors (`.btn`,
+`#cta`, `p`, `a.btn`, `.btn.primary`). Selectors with descendant
+combinators, pseudo-classes, or `@media` queries stay in a slimmed
+`<style>` block so clients that DO support styles still pick them up.
+
+The bundled `<EmailLayout>` & co. components are already inline-styled
+by construction, so the inliner is mainly a safety net for userland
+CSS — drop a `<style>` block in your template and let it rip.
+
 ## 🧪 Testing
 
 ```bash

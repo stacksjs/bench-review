@@ -136,7 +136,7 @@ export interface SeedSummary {
 /**
  * Parsed model with seeding information
  */
-interface SeederModel {
+export interface SeederModel {
   name: string
   table: string
   count: number
@@ -410,6 +410,16 @@ async function generateRecords(model: SeederModel, verbose: boolean = false): Pr
 }
 
 /**
+ * Direct entry point for `factory.generate(Model, opts)` — exported
+ * under a distinct name so the new public API in `factory.ts` can call
+ * into the same insert path the legacy walker uses without leaking the
+ * `SeederModel` type. See stacksjs/stacks#1919.
+ */
+export function seedModelDirect(model: SeederModel, options: SeederConfig): Promise<SeedResult> {
+  return seedModel(model, options)
+}
+
+/**
  * Seed a single model
  */
 async function seedModel(model: SeederModel, options: SeederConfig): Promise<SeedResult> {
@@ -418,7 +428,7 @@ async function seedModel(model: SeederModel, options: SeederConfig): Promise<See
   try {
     // Check if the table exists before attempting to seed
     try {
-      await db.selectFrom(model.table as any).limit(0).execute()
+      await db.selectFrom(model.table).limit(0).execute()
     }
     catch (tableErr: any) {
       const msg = tableErr?.message || ''
@@ -438,7 +448,7 @@ async function seedModel(model: SeederModel, options: SeederConfig): Promise<See
     }
 
     if (!options.fresh) {
-      const existing = await db.selectFrom(model.table as any)
+      const existing = await db.selectFrom(model.table)
         .selectAll()
         .limit(1)
         .executeTakeFirst()
@@ -472,7 +482,7 @@ async function seedModel(model: SeederModel, options: SeederConfig): Promise<See
     // Truncate table if fresh option is enabled
     if (options.fresh) {
       try {
-        await db.deleteFrom(model.table as any).execute()
+        await db.deleteFrom(model.table).execute()
         if (options.verbose) {
           log.info(`  Truncated table: ${model.table}`)
         }
@@ -489,7 +499,7 @@ async function seedModel(model: SeederModel, options: SeederConfig): Promise<See
     for (let i = 0; i < records.length; i += batchSize) {
       const batch = records.slice(i, i + batchSize)
 
-      await db.insertInto(model.table as any)
+      await db.insertInto(model.table)
         .values(batch as any)
         .execute()
 
@@ -554,6 +564,13 @@ function sortModelsByDependencies(models: SeederModel[]): SeederModel[] {
  * Seeds the database using model factory functions
  * Loads models from both framework defaults and user-defined models,
  * with user models taking precedence.
+ *
+ * @deprecated stacksjs/stacks#1919 — the model auto-walker is no
+ * longer invoked by `./buddy seed`. Migrate each `useSeeder` trait to
+ * a class seeder via `./buddy seed:scaffold`, then call
+ * `factory.generate(Model, opts)` from inside each seeder. This
+ * function remains exported for programmatic back-compat but is
+ * scheduled for removal.
  */
 export async function seed(config: SeederConfig = {}): Promise<SeedSummary> {
   const startTime = Date.now()
@@ -581,6 +598,19 @@ export async function seed(config: SeederConfig = {}): Promise<SeedSummary> {
       duration: Date.now() - startTime,
     }
   }
+
+  // stacksjs/stacks#1919 — the `useSeeder` auto-walker is being
+  // collapsed into `factory.generate(Model, opts)`, which class
+  // seeders invoke explicitly. Emit a one-shot deprecation warning so
+  // users know the dual-pipeline footgun (walker rows + class seeder
+  // rows on the same table) is going away. The walker keeps firing
+  // for now to preserve back-compat; removal lands in a future major.
+  log.warn(
+    `[seed] The \`useSeeder\` trait + auto-walker is deprecated (stacksjs/stacks#1919). `
+    + `Run \`./buddy seed:scaffold\` to generate class seeders for every \`useSeeder\` model, `
+    + `then remove the trait from each model. The walker is scheduled for removal in a future major. `
+    + `Affected: ${models.map(m => m.name).join(', ')}`,
+  )
 
   // Filter models if only/except is specified
   if (config.only && config.only.length > 0) {

@@ -1,8 +1,9 @@
 import { config } from '@stacksjs/config'
 import { log } from '@stacksjs/logging'
 import { fs } from '@stacksjs/storage'
-import { resourcesPath } from '@stacksjs/path'
+import { defaultsResourcesPath, resourcesPath } from '@stacksjs/path'
 import { join } from 'node:path'
+import { inlineCss, shouldInlineByDefault } from './css-inliner'
 
 export interface TemplateResult {
   html: string
@@ -60,6 +61,16 @@ export interface TemplateOptions {
   layout?: string | false
   /** Subject line for the email */
   subject?: string
+  /**
+   * Run the CSS inliner over the rendered HTML before returning.
+   * Defaults to ON when `APP_ENV` / `NODE_ENV` is `production`,
+   * OFF in dev so previews show the un-mutated stx output. Pass
+   * `inline: true` from a one-off send to force inlining outside
+   * prod (useful for staging-deploy email QA).
+   *
+   * stacksjs/stacks#1902 (B2).
+   */
+  inline?: boolean
 }
 
 /**
@@ -260,6 +271,7 @@ export async function template(
     variables = {},
     layout = 'base',
     subject = '',
+    inline = shouldInlineByDefault(),
   } = options
 
   // Merge default variables with provided ones
@@ -277,13 +289,33 @@ export async function template(
     return { html: '', text: '' }
   }
 
-  // Use STX engine for .stx templates
+  // Use STX engine for .stx templates. `renderEmail` is the public
+  // entry point from `@stacksjs/stx` (re-exported through the package
+  // root) that handles the full <script server> + props + layout
+  // chain. Dynamic import so test runs / CLI scripts that never load
+  // an email template pay zero startup cost for the stx graph.
+  //
+  // `componentsDir` points stx at the bundled `<EmailLayout>` /
+  // `<EmailButton>` / etc. component library (stacksjs/stacks#1901)
+  // so email templates can drop them in by name. Userland is free
+  // to define its own components alongside its templates — stx
+  // walks the standard `components/` paths too — but the bundled
+  // set is always reachable from this directory.
   if (resolved.type === 'stx') {
     try {
-      // @ts-ignore - renderEmail may not be exported yet from stx
       const { renderEmail } = await import('@stacksjs/stx')
-      const result = await renderEmail(resolved.path, allVariables)
-      return result
+      const result = await renderEmail(resolved.path, allVariables, {
+        componentsDir: defaultsResourcesPath('components/Email'),
+      })
+      // CSS inlining pass (stacksjs/stacks#1902 B2). The bundled
+      // <EmailLayout> & co. components are already inline-styled, so
+      // this is mostly for userland `<style>` blocks. `inline: false`
+      // is honoured for dev preview; `shouldInlineByDefault()`
+      // returns true only in production.
+      return {
+        ...result,
+        html: inlineCss(result.html, { inline }),
+      }
     }
     catch (error: unknown) {
       log.warn(`[email] STX template rendering failed for ${templateName}: ${error instanceof Error ? error.message : String(error)}`)
@@ -321,6 +353,9 @@ export async function template(
   else {
     html = content
   }
+
+  // CSS inlining pass — same gate as the stx path (stacksjs/stacks#1902).
+  html = inlineCss(html, { inline })
 
   // Generate plain text version
   const text = htmlToText(html)
