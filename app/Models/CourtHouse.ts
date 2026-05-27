@@ -18,10 +18,15 @@ export default defineModel({
     useUuid: true,
     useTimestamps: true,
     useSearch: {
-      displayable: ['id', 'name', 'image'],
-      searchable: ['name'],
+      // bench-review#41 — Meilisearch index settings. city + state +
+      // address are all same-table columns so they're real searchable
+      // (this is the case Meilisearch shines at — typo-tolerant city
+      // lookup, partial address match). state added as filterable so
+      // a future /court-houses filter pill can use the facet API.
+      displayable: ['id', 'name', 'image', 'city', 'state', 'address', 'zip_code'],
+      searchable: ['name', 'city', 'state', 'address'],
       sortable: ['created_at', 'updated_at'],
-      filterable: [],
+      filterable: ['state'],
     },
 
     useSeeder: {

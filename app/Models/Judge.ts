@@ -18,10 +18,17 @@ export default defineModel({
     useUuid: true,
     useTimestamps: true,
     useSearch: {
-      displayable: ['id', 'name', 'imageUrl'],
+      // bench-review#41 — Meilisearch index settings. Searchable
+      // stays same-table for now (cross-table court_name search
+      // waits on upstream stacksjs/stacks#1918 — toSearchableObject
+      // doesn't follow belongsTo relations). practice_area is added
+      // as filterable so the directory filter pills (#38) can use
+      // the Meili facet API instead of client-side filter once the
+      // SearchView migration lands.
+      displayable: ['id', 'name', 'image_url', 'practice_area', 'court_house_id'],
       searchable: ['name'],
       sortable: ['created_at', 'updated_at'],
-      filterable: [],
+      filterable: ['practice_area', 'court_house_id'],
     },
 
     useSeeder: {

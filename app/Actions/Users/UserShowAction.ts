@@ -37,12 +37,34 @@ export default new Action({
     const userId = Number((request as any).params?.id)
 
     const user = await db.selectFrom('users' as any)
-      .select(['id', 'name', 'created_at'] as any)
+      .select(['id', 'name', 'created_at', 'credential_type', 'credential_state', 'credential_verified_at'] as any)
       .where('id' as any, '=', userId)
-      .executeTakeFirst() as { id: number, name: string, created_at: string | null } | undefined
+      .executeTakeFirst() as {
+        id: number
+        name: string
+        created_at: string | null
+        credential_type: string | null
+        credential_state: string | null
+        credential_verified_at: string | null
+      } | undefined
 
     if (!user)
       return response.json({ error: 'User not found' }, 404)
+
+    // Verified-credential surface (bench-review#37). Only the
+    // PUBLIC-SAFE bits leak — type label + state + a boolean. The
+    // claim timestamp, admin-id, rejection note, and proof-storage
+    // path all stay private to the user themselves + admins. A
+    // future "view this reviewer's credential proof" feature for
+    // logged-in users would need an explicit consent flow.
+    const verified = user.credential_verified_at != null
+    const credential = verified
+      ? {
+          type: user.credential_type,
+          state: user.credential_state,
+          verified: true,
+        }
+      : null
 
     // Aggregates over the user's published reviews, split into three
     // narrow queries because (a) bqb's `.select([...])` string-column
@@ -94,6 +116,7 @@ export default new Action({
       judges_reviewed: judgesReviewed,
       total_likes: totalLikes,
       avg_rating: avgRating,
+      credential,
     })
   },
 })

@@ -124,6 +124,22 @@ route.post('/reviews', 'Actions/Reviews/SubmitReviewAction')
   .middleware('auth')
   .skipCsrf()
 
+// Comments under reviews (bench-review#44). Auto-published; admin
+// can take a specific comment down via status='rejected'. Submit is
+// auth-gated; reads are public (only published comments leak).
+route.get('/reviews/{id}/comments', 'Actions/Reviews/CommentsForReviewAction')
+  .name('bench.reviews.comments.index')
+
+route.post('/reviews/{id}/comments', 'Actions/Reviews/CommentSubmitAction')
+  .name('bench.reviews.comments.submit')
+  .middleware('auth')
+  .skipCsrf()
+
+route.delete('/me/comments/{id}', 'Actions/Me/DeleteMyCommentAction')
+  .name('bench.me.comments.destroy')
+  .middleware('auth')
+  .skipCsrf()
+
 // Community report/flag on a review. Anonymous flagging is allowed
 // — the trust model needs friction-free reporting. Signed-in flags
 // are idempotent on (review_id, user_id). See FlagReviewAction for
@@ -159,6 +175,26 @@ route.patch('/me/reviews/{id}', 'Actions/Me/UpdateMyReviewAction')
 route.delete('/me/reviews/{id}', 'Actions/Me/DeleteMyReviewAction')
   .name('bench.me.reviews.destroy')
   .middleware('auth')
+  .skipCsrf()
+
+// Self-declared credential claim (bench-review#37). User submits
+// their role + state; admin verifies out-of-band and approves via
+// the admin endpoints below. See app/Actions/Me/UpdateCredentialClaimAction.ts.
+route.patch('/me/credentials', 'Actions/Me/UpdateCredentialClaimAction')
+  .name('bench.me.credentials.update')
+  .middleware('auth')
+  .skipCsrf()
+
+// Admin credential review queue + approve/reject endpoint.
+route.get('/admin/credentials', 'Actions/Admin/Credentials/CredentialQueueIndexAction')
+  .name('bench.admin.credentials.index')
+  .middleware('auth')
+  .middleware('admin')
+
+route.post('/admin/credentials/{id}/verify', 'Actions/Admin/Credentials/VerifyCredentialAction')
+  .name('bench.admin.credentials.verify')
+  .middleware('auth')
+  .middleware('admin')
   .skipCsrf()
 
 // Authenticated password change. Settings form (SettingsView.stx)

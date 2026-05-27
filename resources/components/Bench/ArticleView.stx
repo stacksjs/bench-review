@@ -16,6 +16,25 @@
   const reviewsStore = useStore('reviews')
   const authStore = useStore('auth')
   const stars: number[] = [1, 2, 3, 4, 5]
+
+  // OG / Twitter card defaults (bench-review#32). Static per-page-
+  // type baseline so the article URL renders SOME preview card in
+  // Slack / Twitter / iMessage instead of a bare URL. Per-review
+  // dynamic interpolation (real title / snippet / judge image)
+  // needs a `<script server>` block doing a DB lookup at template
+  // render time, since crawlers don't execute JS — that's tracked
+  // as a follow-up; this is the pragmatic MVP.
+  useSeoMeta({
+    description: 'A judge review on Bench Review — read what clerks, attorneys, and court staff said about working with this judge.',
+    ogTitle: 'A judge review — Bench Review',
+    ogDescription: 'Read what clerks, attorneys, and court staff have said about appearing before this judge.',
+    ogType: 'article',
+    ogImage: '/images/og-default.jpg',
+    twitterCard: 'summary_large_image',
+    twitterTitle: 'A judge review — Bench Review',
+    twitterDescription: 'Read what clerks, attorneys, and court staff have said about appearing before this judge.',
+    twitterImage: '/images/og-default.jpg',
+  })
   const readingProgress = state<number>(0)
   // `liked` is derived from the store rather than held locally so a
   // toggle elsewhere in the SPA (feed card, nav-and-back, parallel
@@ -482,6 +501,12 @@
          splices the matched block right at the comment location,
          which busts the page.) -->
     <div class="article-body mt-10 text-gray-800" x-html="content"></div>
+
+    <!-- Comments thread (bench-review#44). Renders below the article
+         body so readers can react without scrolling past the chrome.
+         Self-contained component — owns its own data fetch + composer
+         state and reads the review id from the URL. -->
+    @include('Bench/Comments')
 
     <!-- Footer row: "people find this helpful" + status pill + back link.
          Helpful-button area hidden entirely for unpublished reviews —

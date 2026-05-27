@@ -38,6 +38,21 @@
     return courtsStore.courtHouses().find((c: any) => Number(c.id) === id) || null
   })
 
+  // OG / Twitter card defaults (bench-review#32). Generic per-
+  // page-type baseline; per-courthouse interpolation needs
+  // server-side data resolution (follow-up).
+  useSeoMeta({
+    description: 'Courthouse profile on Bench Review — judges sitting on this bench, plus reviews from the people who appear before them.',
+    ogTitle: 'Courthouse profile — Bench Review',
+    ogDescription: 'Judges, reviews, and contact info for this courthouse.',
+    ogType: 'place',
+    ogImage: '/images/og-default.jpg',
+    twitterCard: 'summary_large_image',
+    twitterTitle: 'Courthouse profile — Bench Review',
+    twitterDescription: 'Judges, reviews, and contact info for this courthouse.',
+    twitterImage: '/images/og-default.jpg',
+  })
+
   const courtName = derived<string>(() => (currentCourt() as any)?.name || 'Loading…')
   const courtCity = derived<string>(() => (currentCourt() as any)?.city || '')
   const courtState = derived<string>(() => (currentCourt() as any)?.state || '')

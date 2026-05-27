@@ -1,0 +1,231 @@
+<script client>
+  // Comments section under an article (bench-review#44).
+  //
+  // Renders below the article body. Self-contained:
+  //   - resolves the review id from the URL (same pattern as
+  //     ArticleEdit — pathname-based fallback because
+  //     window.stx._rp is unset on hard reload)
+  //   - fetches /api/reviews/{id}/comments on mount
+  //   - composer for signed-in users (auto-publishing; comments hit
+  //     status='published' immediately per the action body)
+  //   - per-row Delete for the author's own comments
+  //
+  // Anonymity follows the same flag as the parent review:
+  // publicReviewerFor on the server returns `author.id = null` for
+  // anonymized comments and the link doesn't render here either.
+
+  const authStore = useStore('auth')
+
+  interface CommentRow {
+    id: number
+    body: string
+    created_at: string | null
+    author: { id: number | null, name: string, role_label: string | null }
+  }
+
+  function resolveReviewId(): number {
+    if (typeof window === 'undefined') return 0
+    const fromRouter = Number((window as any).stx?._rp?.id)
+    if (Number.isFinite(fromRouter) && fromRouter > 0) return fromRouter
+    const m = window.location.pathname.match(/^\/article\/(\d+)/)
+    return m ? Number(m[1]) : 0
+  }
+
+  const reviewIdForComments = resolveReviewId()
+  const comments = state<CommentRow[]>([])
+  const commentsLoaded = state<boolean>(false)
+  const commentDraft = state<string>('')
+  const commentAnon = state<boolean>(false)
+  const commentSubmitting = state<boolean>(false)
+  const commentError = state<string>('')
+
+  async function loadComments(): Promise<void> {
+    if (!reviewIdForComments) return
+    try {
+      const res = await authStore.authFetch(`/api/reviews/${reviewIdForComments}/comments?per_page=50`)
+      if (!res.ok) return
+      const json = await res.json() as { data?: CommentRow[] } | CommentRow[]
+      comments.set(Array.isArray(json) ? json : (json?.data ?? []))
+    }
+    catch (err) {
+      console.error('[comments] fetch failed:', err)
+    }
+    finally {
+      commentsLoaded.set(true)
+    }
+  }
+
+  onMount(() => { loadComments() })
+
+  async function submitComment(): Promise<void> {
+    if (commentSubmitting()) return
+    const body = commentDraft().trim()
+    if (body.length < 5) {
+      commentError.set('Comment must be at least 5 characters.')
+      return
+    }
+    commentSubmitting.set(true)
+    commentError.set('')
+    try {
+      const res = await authStore.authFetch(`/api/reviews/${reviewIdForComments}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body, anonymized: commentAnon() }),
+      })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean, error?: string, comment?: any }
+      if (!res.ok || !data.ok) {
+        commentError.set(data.error || 'Could not post comment.')
+        return
+      }
+      commentDraft.set('')
+      commentAnon.set(false)
+      // Refetch the full list so we see the canonical server-side
+      // ordering + the new comment's gated-author shape (in case the
+      // client guessed wrong on what the public sees).
+      await loadComments()
+    }
+    catch (err) {
+      commentError.set(err instanceof Error ? err.message : 'Network error')
+    }
+    finally {
+      commentSubmitting.set(false)
+    }
+  }
+
+  async function deleteComment(commentId: number): Promise<void> {
+    if (typeof window === 'undefined') return
+    const ok = window.confirm('Delete this comment? This cannot be undone.')
+    if (!ok) return
+    try {
+      const res = await authStore.authFetch(`/api/me/comments/${commentId}`, { method: 'DELETE' })
+      if (!res.ok) return
+      comments.set(comments().filter(c => c.id !== commentId))
+    }
+    catch (err) {
+      console.error('[comments] delete failed:', err)
+    }
+  }
+
+  function formatDate(dateStr: string | null | undefined): string {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (Number.isNaN(d.getTime())) return ''
+    const diffMs = Date.now() - d.getTime()
+    const minutes = Math.floor(diffMs / 60000)
+    if (minutes < 1) return 'just now'
+    if (minutes < 60) return `${minutes}m ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours}h ago`
+    const days = Math.floor(hours / 24)
+    if (days < 7) return `${days}d ago`
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  // Is the comment author the viewer? Drives the per-row Delete affordance.
+  function isMyComment(c: CommentRow): boolean {
+    const me = authStore.user()
+    return !!me && !!c.author && Number(c.author.id) === Number((me as any).id)
+  }
+
+  // Initial for the avatar circle when the comment author has no
+  // image. Same convention as the bell-dropdown / user-menu avatar.
+  function initialFor(name: string | null | undefined): string {
+    if (!name) return '?'
+    const raw = name.replace(/^(hon\.|judge|mr\.|mrs\.|ms\.|dr\.)\s+/i, '').trim()
+    return raw.charAt(0).toUpperCase() || '?'
+  }
+
+  const isAuthenticated = authStore.isAuthenticated
+</script>
+
+<section class="mt-12 pt-8 border-t border-gray-200">
+  <header class="flex items-end justify-between">
+    <h2 class="font-semibold text-gray-900 text-base" :text="`Comments (${comments.length})`"></h2>
+  </header>
+
+  <!-- Composer. Signed-in users only; anonymous viewers see a "Sign
+       in to comment" CTA in the same slot so the surface isn't
+       blank for them. -->
+  <div :if="isAuthenticated" class="mt-5 p-4 bg-white border border-gray-200 rounded-lg">
+    <textarea
+      x-model="commentDraft"
+      rows="3"
+      placeholder="Add a comment — context, clarification, or a respectful pushback."
+      class="block w-full px-3 py-2 text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
+    ></textarea>
+
+    <div
+      role="alert"
+      class="mt-2 px-3 py-2 text-red-800 text-xs bg-red-50 border border-red-200 rounded-md"
+      x-class="commentError() ? '' : 'hidden'"
+      :text="commentError()"
+    ></div>
+
+    <div class="flex flex-wrap items-center justify-between gap-2 mt-3">
+      <label class="flex gap-2 items-center text-gray-600 text-xs cursor-pointer">
+        <input type="checkbox" x-model="commentAnon" class="h-4 w-4 text-gray-900 border-gray-300 rounded focus:ring-2 focus:ring-gray-900">
+        Post anonymously
+      </label>
+      <button
+        type="button"
+        @click="submitComment()"
+        x-disabled="commentSubmitting"
+        class="px-4 py-2 font-semibold text-white text-sm bg-gray-900 hover:bg-gray-800 rounded-md disabled:opacity-50"
+        :text="commentSubmitting() ? 'Posting…' : 'Post comment'"
+      ></button>
+    </div>
+  </div>
+
+  <div :if="!isAuthenticated" class="mt-5 p-5 text-center bg-gray-50 border border-gray-200 rounded-lg">
+    <p class="text-gray-600 text-sm">
+      <StxLink to="/login" class="font-semibold text-gray-900 hover:underline underline-offset-2">Sign in</StxLink>
+      to leave a comment.
+    </p>
+  </div>
+
+  <!-- Loading skeleton -->
+  <ul :if="!commentsLoaded" class="mt-6 space-y-4">
+    <li :for="i in [1, 2]" class="p-4 bg-white border border-gray-100 rounded-lg animate-pulse">
+      <div class="flex items-center gap-3">
+        <div class="h-8 w-8 bg-gray-200 rounded-full"></div>
+        <div class="flex-1 space-y-1.5">
+          <div class="h-3 w-24 bg-gray-200 rounded"></div>
+          <div class="h-2 w-16 bg-gray-100 rounded"></div>
+        </div>
+      </div>
+      <div class="mt-3 space-y-1.5">
+        <div class="h-3 w-full bg-gray-200 rounded"></div>
+        <div class="h-3 w-4/5 bg-gray-200 rounded"></div>
+      </div>
+    </li>
+  </ul>
+
+  <!-- Empty state -->
+  <div :if="commentsLoaded && comments.length === 0" class="mt-6 p-8 text-center text-gray-500 text-sm bg-gray-50 border border-gray-200 border-dashed rounded-lg">
+    No comments yet. Be the first to add context.
+  </div>
+
+  <!-- Comments list -->
+  <ul :if="comments.length > 0" class="space-y-4 mt-6">
+    <li :for="c in comments" class="p-4 bg-white border border-gray-100 rounded-lg">
+      <div class="flex items-start gap-3">
+        <span class="inline-flex flex-none items-center justify-center h-8 w-8 font-semibold text-amber-700 text-xs bg-amber-50 ring-1 ring-amber-200/60 rounded-full" :text="initialFor(c.author && c.author.name)"></span>
+        <div class="flex-1 min-w-0">
+          <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <!-- Linked when we have a real reviewer id (non-anonymous); plain text otherwise. -->
+            <StxLink :if="c.author && c.author.id" x-to="`/user/${c.author.id}`" class="font-medium text-gray-900 text-sm hover:underline underline-offset-2" :text="c.author.name"></StxLink>
+            <span :if="!(c.author && c.author.id)" class="font-medium text-gray-700 text-sm" :text="c.author && c.author.name || 'Anonymous reviewer'"></span>
+            <span class="text-gray-400 text-xs" :text="formatDate(c.created_at)"></span>
+          </div>
+          <p class="mt-1 leading-relaxed text-gray-700 text-sm" :text="c.body"></p>
+          <button
+            :if="isMyComment(c)"
+            type="button"
+            @click="deleteComment(c.id)"
+            class="mt-2 text-red-600 text-xs hover:text-red-700 hover:underline underline-offset-2"
+          >Delete</button>
+        </div>
+      </div>
+    </li>
+  </ul>
+</section>

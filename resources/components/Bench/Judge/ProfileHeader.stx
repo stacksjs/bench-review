@@ -46,6 +46,21 @@
     return judgesStore.judges().find((j: any) => Number(j.id) === id) || null
   })
 
+  // OG / Twitter card defaults (bench-review#32). Generic per-
+  // page-type baseline; per-judge interpolation needs server-side
+  // data resolution (follow-up).
+  useSeoMeta({
+    description: 'Judge profile and reviews on Bench Review — see what attorneys, clerks, and court staff have said.',
+    ogTitle: 'Judge profile — Bench Review',
+    ogDescription: 'Reviews of this judge from clerks, attorneys, and court staff.',
+    ogType: 'profile',
+    ogImage: '/images/og-default.jpg',
+    twitterCard: 'summary_large_image',
+    twitterTitle: 'Judge profile — Bench Review',
+    twitterDescription: 'Reviews of this judge from clerks, attorneys, and court staff.',
+    twitterImage: '/images/og-default.jpg',
+  })
+
   const judgeName = derived<string>(() => currentJudge()?.name || 'Loading…')
   const judgeImage = derived<string>(() => {
     const j: any = currentJudge()

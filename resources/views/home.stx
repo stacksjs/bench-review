@@ -7,6 +7,24 @@
 
   useHead({ title: 'Find and Review Judges - Bench Review' })
 
+  // OG / Twitter card defaults (bench-review#32). Static at this
+  // surface — the home page doesn't need per-row personalization.
+  // Per-row pages (article, judge profile) set their own via the
+  // same useSeoMeta path. og:image points at the public Bench
+  // Review logo / hero artwork once we have one; for now reuses
+  // the existing scales-of-justice asset.
+  useSeoMeta({
+    description: 'Reviews of judges across the United States — from clerks, attorneys, and court staff. Bring real transparency to the bench.',
+    ogTitle: 'Bench Review — find and review judges',
+    ogDescription: 'A directory of judges and courthouses, with reviews from the people who appear before them. Anonymous reviews welcome for clerks, court staff, and attorneys under retaliation risk.',
+    ogType: 'website',
+    ogImage: '/images/og-default.jpg',
+    twitterCard: 'summary_large_image',
+    twitterTitle: 'Bench Review — find and review judges',
+    twitterDescription: 'A directory of judges and courthouses, with reviews from the people who appear before them.',
+    twitterImage: '/images/og-default.jpg',
+  })
+
   const search = useStore('search')
   const judgesStore = useStore('judges')
   const reviewsStore = useStore('reviews')

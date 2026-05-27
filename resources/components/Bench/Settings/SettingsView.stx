@@ -18,6 +18,15 @@
   const currentPassword = state<string>('')
   const newPassword = state<string>('')
   const confirmPassword = state<string>('')
+
+  // Credential claim form (bench-review#37). Pre-filled from
+  // authStore.user() if the user has a claim already; otherwise
+  // empty. Submitting kicks the claim back to the admin queue —
+  // any prior verification is cleared so the admin can re-check.
+  const credentialType = state<string>(((authStore.user() as any)?.credential_type) || '')
+  const credentialState = state<string>(((authStore.user() as any)?.credential_state) || '')
+  const credentialStatus = state<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const credentialError = state<string>('')
   const saveStatus = state<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const saveError = state<string>('')
   const pwStatus = state<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -56,6 +65,44 @@
     catch (err) {
       saveStatus.set('error')
       saveError.set(err instanceof Error ? err.message : 'Failed to save')
+    }
+  }
+
+  async function saveCredentialClaim(): Promise<void> {
+    credentialStatus.set('idle')
+    credentialError.set('')
+    if (!credentialType()) {
+      credentialStatus.set('error')
+      credentialError.set('Pick a credential type.')
+      return
+    }
+    if (!credentialState()) {
+      credentialStatus.set('error')
+      credentialError.set('Pick a state (or FEDERAL).')
+      return
+    }
+    credentialStatus.set('saving')
+    try {
+      const res = await authStore.authFetch('/api/me/credentials', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          credential_type: credentialType(),
+          credential_state: credentialState().toUpperCase(),
+        }),
+      })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean, error?: string }
+      if (!res.ok || !data.ok) {
+        credentialStatus.set('error')
+        credentialError.set(data.error || 'Could not save credential claim.')
+        return
+      }
+      credentialStatus.set('saved')
+      setTimeout(() => credentialStatus.set('idle'), 2000)
+    }
+    catch (err) {
+      credentialStatus.set('error')
+      credentialError.set(err instanceof Error ? err.message : 'Network error')
     }
   }
 
@@ -219,6 +266,73 @@
             class="px-4 py-2 font-semibold text-sm text-white bg-gray-900 hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md transition-colors shadow-sm"
             :text="pwStatus === 'saving' ? 'Updating…' : 'Update password'"
           >Update password</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Verified credentials (bench-review#37). User declares their
+         role; an admin verifies out-of-band. The claim itself is
+         self-service; the badge comes from admin approval. Editing
+         either field clears any prior verification — admin sees the
+         new claim independently. -->
+    <section class="mt-6 overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-sm">
+      <div class="px-6 py-5 sm:px-8 border-b border-gray-100">
+        <h2 class="font-semibold text-base text-gray-900">Verified credentials</h2>
+        <p class="mt-1 text-gray-500 text-sm">Declare your professional role. A moderator will verify against external evidence (email, video call, employer corroboration) before the verified badge appears on your reviews.</p>
+      </div>
+      <div class="px-6 py-6 sm:px-8 space-y-5">
+        <div class="grid gap-x-6 gap-y-5 grid-cols-1 sm:grid-cols-2">
+          <div>
+            <label for="cred-type" class="block font-medium text-gray-900 text-sm">Role</label>
+            <select
+              id="cred-type"
+              x-model="credentialType"
+              x-disabled="credentialStatus === 'saving'"
+              class="block mt-1 px-3 py-2 w-full text-sm bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
+            >
+              <option value="">— Select —</option>
+              <option value="bar_admission">Attorney (bar admission)</option>
+              <option value="clerk_position">Clerk</option>
+              <option value="court_staff">Court staff</option>
+              <option value="judicial_appointment">Judicial officer</option>
+            </select>
+          </div>
+          <div>
+            <label for="cred-state" class="block font-medium text-gray-900 text-sm">Jurisdiction</label>
+            <input
+              id="cred-state"
+              type="text"
+              x-model="credentialState"
+              x-disabled="credentialStatus === 'saving'"
+              placeholder="CA, NY, FEDERAL"
+              class="block mt-1 px-3 py-2 w-full text-sm bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
+              maxlength="7"
+            >
+            <p class="mt-1 text-gray-500 text-xs">Two-letter state code, or FEDERAL for federal-level credentials.</p>
+          </div>
+        </div>
+
+        <div
+          role="alert"
+          class="px-3 py-2 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
+          x-class="credentialStatus === 'error' ? '' : 'hidden'"
+          :text="credentialError()"
+        ></div>
+
+        <div
+          role="status"
+          class="px-3 py-2 text-emerald-800 text-sm bg-emerald-50 border border-emerald-200 rounded-md"
+          x-class="credentialStatus === 'saved' ? '' : 'hidden'"
+        >Claim submitted — a moderator will review it. The badge appears on your reviews after verification.</div>
+
+        <div class="flex justify-end">
+          <button
+            type="button"
+            @click="saveCredentialClaim()"
+            x-disabled="credentialStatus === 'saving'"
+            class="px-4 py-2 font-semibold text-white text-sm bg-gray-900 hover:bg-gray-800 rounded-md disabled:opacity-50"
+            :text="credentialStatus === 'saving' ? 'Submitting…' : 'Submit claim for verification'"
+          ></button>
         </div>
       </div>
     </section>

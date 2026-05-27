@@ -18,10 +18,19 @@ export default defineModel({
     useUuid: true,
     useTimestamps: true,
     useSearch: {
-      displayable: ['id', 'title', 'content', 'rating'],
+      // bench-review#41 — Meilisearch index settings. Status filter
+      // is load-bearing: every public search path queries
+      // `status = 'published'`, so the index needs it as filterable.
+      // judge_id + user_id are filterable so future "this judge's
+      // reviews" + "this user's reviews" surfaces can hit the index.
+      // anonymized is filterable so the public profile path (which
+      // excludes anonymized — see bench-review#36) can be expressed
+      // as a Meili filter when we migrate UserReviewsAction to the
+      // index.
+      displayable: ['id', 'title', 'content', 'rating', 'type', 'status', 'judge_id', 'user_id', 'anonymized', 'created_at'],
       searchable: ['title', 'content'],
       sortable: ['created_at', 'updated_at', 'rating'],
-      filterable: ['rating', 'status', 'type'],
+      filterable: ['rating', 'status', 'type', 'judge_id', 'user_id', 'anonymized'],
     },
 
     // `useSeeder` deliberately disabled. The ORM's factory-driven path

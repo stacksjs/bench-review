@@ -30,13 +30,21 @@ export default defineModel({
     billable: true,
     useUuid: true,
     useTimestamps: true, // defaults to true, `timestampable` used as an alias
-    useSearch: {
-      displayable: ['id', 'name', 'email'], // the fields to become d (defaults to all fields)
-      searchable: ['name', 'email'], // the fields to become searchable (defaults to all fields)
-      sortable: ['created_at', 'updated_at'], // the fields to become sortable (defaults to all fields)
-      filterable: [], // the fields to become filterable (defaults to all fields)
-      // options: {}, // you may pass options to the search engine
-    },
+    // `useSearch` deliberately disabled (bench-review#41). Indexing
+    // user rows would push email into a shared search service —
+    // PII leak surface. Admin user-search uses the DB-side LIKE
+    // query in `/admin/users` which is fine for moderation scale.
+    // Reviewer public profile (#29) is the only viewer-facing path
+    // and lands directly on /user/:id rather than going through a
+    // search box. If a public reviewer-search ever ships, do it via
+    // a separate read-projection (`name` only) into a sibling index.
+    //
+    // useSearch: {
+    //   searchable: ['name'],
+    //   displayable: ['id', 'name'],
+    //   sortable: ['created_at'],
+    //   filterable: [],
+    // },
 
     // `useSeeder` deliberately disabled. Auto-firing the factory on
     // every `./buddy migrate` minted 10 fresh faker users per run —
