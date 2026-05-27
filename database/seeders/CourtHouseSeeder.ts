@@ -20,6 +20,10 @@ import { db, Seeder } from '@stacksjs/database'
  */
 export default class CourtHouseSeeder extends Seeder {
   async run(): Promise<void> {
+    // Lat/lng pairs are real building-level coordinates. The
+    // /court-houses/:id/profile map renders these via Leaflet + OSM
+    // tiles — wrong coords would land the marker on a sidewalk
+    // somewhere unrelated.
     const rows = [
       {
         name: 'Supreme Court of the United States',
@@ -28,6 +32,8 @@ export default class CourtHouseSeeder extends Seeder {
         city: 'Washington',
         state: 'DC',
         zip_code: '20543',
+        latitude: 38.8906,
+        longitude: -77.0044,
       },
       {
         name: 'US Court of Appeals for the Ninth Circuit',
@@ -36,6 +42,8 @@ export default class CourtHouseSeeder extends Seeder {
         city: 'San Francisco',
         state: 'CA',
         zip_code: '94103',
+        latitude: 37.7811,
+        longitude: -122.4140,
       },
       {
         name: 'Stanley Mosk Courthouse',
@@ -44,6 +52,8 @@ export default class CourtHouseSeeder extends Seeder {
         city: 'Los Angeles',
         state: 'CA',
         zip_code: '90012',
+        latitude: 34.0552,
+        longitude: -118.2429,
       },
       {
         name: 'New York County Supreme Court',
@@ -52,6 +62,8 @@ export default class CourtHouseSeeder extends Seeder {
         city: 'New York',
         state: 'NY',
         zip_code: '10007',
+        latitude: 40.7144,
+        longitude: -74.0017,
       },
       {
         name: 'Daniel Patrick Moynihan US Courthouse',
@@ -60,6 +72,8 @@ export default class CourtHouseSeeder extends Seeder {
         city: 'New York',
         state: 'NY',
         zip_code: '10007',
+        latitude: 40.7146,
+        longitude: -74.0026,
       },
       {
         name: 'E. Barrett Prettyman United States Courthouse',
@@ -68,17 +82,29 @@ export default class CourtHouseSeeder extends Seeder {
         city: 'Washington',
         state: 'DC',
         zip_code: '20001',
+        latitude: 38.8938,
+        longitude: -77.0151,
       },
     ]
 
+    // Upsert by name: if the row already exists, update its columns
+    // (so adding lat/lng to this seeder backfills existing DBs without
+    // requiring `./buddy seed --fresh`). New rows get inserted.
     for (const row of rows) {
       const existing = await db.selectFrom('court_houses' as any)
         .select(['id'] as any)
         .where('name' as any, '=', row.name)
-        .executeTakeFirst()
-      if (existing)
-        continue
-      await db.insertInto('court_houses' as any).values(row as any).execute()
+        .executeTakeFirst() as { id: number } | undefined
+
+      if (existing) {
+        await db.updateTable('court_houses' as any)
+          .set(row as any)
+          .where('id' as any, '=', existing.id)
+          .execute()
+      }
+      else {
+        await db.insertInto('court_houses' as any).values(row as any).execute()
+      }
     }
   }
 }

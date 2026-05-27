@@ -409,11 +409,10 @@
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
             </svg>
-            <span class="tabular-nums" :text="likes"></span>
             <!-- Caption shifts based on count + own-like state so the
                  button reads naturally at 0, 1, and N — and credits the
                  reader directly when they're the one who reacted. -->
-            <span class="text-xs text-current/80" :text="liked ? (likes === 1 ? 'You find this helpful' : `You and ${likes - 1} ${likes === 2 ? 'other' : 'others'} find this helpful`) : (likes === 0 ? 'Be the first to find this helpful' : likes === 1 ? '1 person finds this helpful' : `${likes} people find this helpful`)"></span>
+            <span class="text-xs text-current/80" :text="liked ? (likes === 1 ? 'You find this helpful' : `You and ${likes - 1} ${likes === 2 ? 'other' : 'others'} find this helpful`) : (likes === 0 ? 'Be the first to find this helpful' : likes === 1 ? 'One person finds this helpful' : `${likes} people find this helpful`)"></span>
           </button>
           <!-- Author view: read-only badge showing how readers reacted.
                Same icon + count + caption shape, no click handler, no

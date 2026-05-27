@@ -120,6 +120,40 @@ export default defineModel({
       },
       factory: faker => faker.location.zipCode(),
     },
+
+    // Geo coords for the courthouse profile's "Visit this court" map.
+    // Optional so existing rows in DBs that pre-date this migration
+    // don't require a backfill — the map host hides itself when the
+    // pair is missing. CourtHouseSeeder carries the real lat/lng for
+    // the curated US courthouses; the factory falls back to faker for
+    // dev/QA filler rows.
+    latitude: {
+      required: false,
+      order: 7,
+      fillable: true,
+      validation: {
+        rule: schema.number().min(-90).max(90),
+        message: {
+          min: 'Latitude must be between -90 and 90',
+          max: 'Latitude must be between -90 and 90',
+        },
+      },
+      factory: faker => Number(faker.location.latitude()),
+    },
+
+    longitude: {
+      required: false,
+      order: 8,
+      fillable: true,
+      validation: {
+        rule: schema.number().min(-180).max(180),
+        message: {
+          min: 'Longitude must be between -180 and 180',
+          max: 'Longitude must be between -180 and 180',
+        },
+      },
+      factory: faker => Number(faker.location.longitude()),
+    },
   },
 
   dashboard: {

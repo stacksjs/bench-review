@@ -1,6 +1,161 @@
+<script client>
+  import 'leaflet/dist/leaflet.css'
+  import L from 'leaflet'
+
+  // Self-contained court profile body. Owns:
+  //   - resolving the court id from the URL (same pathname fallback
+  //     as ArticleView + CourtHeader — _rp is undefined during hard-
+  //     reload hydration)
+  //   - reading the matching row out of judgesStore's courtHouses
+  //     cache (already fetched by CourtHeader's mount; we fetch again
+  //     to be safe on direct nav into the tab)
+  //   - mounting a leaflet map with an OSM tile layer + a marker on
+  //     the court's lat/lng once the row loads
+  //
+  // The original template had bare court.name / court.address ident
+  // references with no script client block to define court — silently
+  // rendered empty. This block plugs that gap as well as wiring the
+  // map. (No backticks in line comments — Bun's parser chokes on them
+  // even inside // — see standing memory note.)
+
+  function resolveCourtId(): number {
+    if (typeof window === 'undefined') return 0
+    const fromRouter = Number((window as any).stx?._rp?.id)
+    if (Number.isFinite(fromRouter) && fromRouter > 0) return fromRouter
+    const m = window.location.pathname.match(/^\/court-houses\/(\d+)/)
+    return m ? Number(m[1]) : 0
+  }
+
+  const courtProfileId = state<number>(resolveCourtId())
+  const courtsStore = useStore('judges')
+
+  let courtsFetched = false
+  function fetchCourtsOnce(): void {
+    if (courtsFetched) return
+    courtsFetched = true
+    if (courtsStore.courtHouses().length === 0)
+      courtsStore.fetchCourtHouses()
+  }
+  fetchCourtsOnce()
+
+  // The court object the template binds to. Re-derives on every
+  // courtHouses() update so the map remount effect below fires after
+  // the cache populates.
+  const court = derived<any>(() => {
+    const id = courtProfileId()
+    if (!id) return null
+    return courtsStore.courtHouses().find((c: any) => Number(c.id) === id) || null
+  })
+
+  // Convenience derived for the template — keeps the markup simple
+  // and avoids inline court() call syntax inside :text interpolations.
+  const courtName = derived<string>(() => (court() as any)?.name || 'this courthouse')
+  const courtCity = derived<string>(() => (court() as any)?.city || '')
+  const courtState = derived<string>(() => (court() as any)?.state || '')
+  const aboutText = derived<string>(() => {
+    const n = courtName()
+    const c = courtCity()
+    const s = courtState()
+    const where = [c, s].filter(Boolean).join(', ')
+    const tail = 'It hears a wide range of matters including criminal, civil, family, and probate cases, with judges appointed for a mix of trial and appellate responsibilities.'
+    return where
+      ? `The ${n} serves the community of ${where}. ${tail}`
+      : `${n} hears a wide range of matters including criminal, civil, family, and probate cases.`
+  })
+  const courtAddress = derived<string>(() => {
+    const c: any = court()
+    if (!c) return ''
+    const line1 = [c.address].filter(Boolean).join(' ')
+    const line2 = [c.city, c.state, c.zip_code ?? c.zipCode].filter(Boolean).join(', ')
+    return [line1, line2].filter(Boolean).join(' · ')
+  })
+  const hasCoords = derived<boolean>(() => {
+    const c: any = court()
+    if (!c) return false
+    const lat = Number(c.latitude)
+    const lng = Number(c.longitude)
+    return Number.isFinite(lat) && Number.isFinite(lng)
+  })
+
+  // Marker icons ship as relative images/marker-icon.png URLs that
+  // 404 once Bun's bundler relocates the JS. CDN fallback is the
+  // standard escape. Pinned to 1.9.4 to match the installed package.
+  if (typeof window !== 'undefined') {
+    const ICON_BASE = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images'
+    L.Icon.Default.mergeOptions({
+      iconUrl: `${ICON_BASE}/marker-icon.png`,
+      iconRetinaUrl: `${ICON_BASE}/marker-icon-2x.png`,
+      shadowUrl: `${ICON_BASE}/marker-shadow.png`,
+    })
+  }
+
+  // Map + marker instances held outside the effect so re-runs reuse
+  // them instead of stacking layers on top of each other. SPA nav
+  // between two courts pans + re-pops the marker; a fresh mount
+  // creates them.
+  let mapInstance: any = null
+  let markerInstance: any = null
+
+  function mountOrUpdateMap(c: any): void {
+    if (typeof window === 'undefined') return
+    const host = document.querySelector('[data-court-map]') as HTMLElement | null
+    if (!host) return
+    const lat = Number(c?.latitude)
+    const lng = Number(c?.longitude)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
+
+    if (!mapInstance) {
+      mapInstance = L.map(host, {
+        zoomControl: true,
+        attributionControl: true,
+      }).setView([lat, lng], 16)
+
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19,
+      }).addTo(mapInstance)
+
+      markerInstance = L.marker([lat, lng]).addTo(mapInstance)
+      if (c.name) markerInstance.bindPopup(String(c.name)).openPopup()
+    }
+    else {
+      mapInstance.setView([lat, lng], 16)
+      if (markerInstance) {
+        markerInstance.setLatLng([lat, lng])
+        if (c.name) markerInstance.setPopupContent(String(c.name))
+      }
+    }
+
+    // Leaflet caches the host's bounding rect at construction time.
+    // If the parent column resizes (sticky header collapses, sidebar
+    // toggles), tiles can render at the wrong size — invalidateSize()
+    // re-measures. Cheap, idempotent.
+    setTimeout(() => mapInstance?.invalidateSize(), 0)
+  }
+
+  onMount(() => {
+    courtProfileId.set(resolveCourtId())
+    fetchCourtsOnce()
+    // Re-runs whenever court() changes — initially null, then the
+    // real row once the courtHouses cache populates.
+    effect(() => {
+      const c = court()
+      if (c) mountOrUpdateMap(c)
+    })
+  })
+
+  onDestroy(() => {
+    if (mapInstance) {
+      mapInstance.remove()
+      mapInstance = null
+      markerInstance = null
+    }
+  })
+</script>
+
 <div class="lg:col-span-2 lg:row-end-2 lg:row-span-2 -mx-4 px-4 py-8 sm:mx-0 sm:pb-14 sm:px-8 xl:pb-20 xl:pt-16 xl:px-16 bg-white ring-1 ring-gray-900/5 sm:rounded-lg shadow-sm">
   <h2 class="font-semibold text-base text-gray-800">About this court</h2>
-  <p class="mt-4 leading-7 text-gray-600" :text="`The ${court.name} serves the community of ${court.city}, ${court.state}. It hears a wide range of matters including criminal, civil, family, and probate cases, with judges appointed for a mix of trial and appellate responsibilities.`"></p>
+  <p class="mt-4 leading-7 text-gray-600" :text="aboutText"></p>
 
   <dl class="grid grid-cols-1 sm:grid-cols-2 mt-8 text-sm/6">
     <div class="sm:pr-4">
@@ -50,10 +205,26 @@
 
   <div class="mt-12">
     <h3 class="font-semibold text-base text-gray-800">Visit this court</h3>
-    <div class="overflow-hidden mt-4 h-64 w-full bg-gray-100 rounded-lg">
+    <p class="mt-1 text-gray-500 text-xs" :text="courtAddress"></p>
+
+    <!-- Map host. Leaflet measures the element at construction time,
+         so the explicit h-64 (256px) on the host is required — without
+         a height the tiles can't lay out. The fallback panel below
+         renders when the row has no lat/lng (rare for the curated US
+         courthouses; common for factory-seeded filler rows). -->
+    <div
+      data-court-map
+      class="overflow-hidden mt-4 h-64 w-full bg-gray-100 rounded-lg"
+      x-class="hasCoords ? '' : 'hidden'"
+    ></div>
+
+    <div
+      class="overflow-hidden mt-4 h-64 w-full bg-gray-100 rounded-lg"
+      x-class="hasCoords ? 'hidden' : ''"
+    >
       <div class="flex flex-col items-center justify-center h-full text-gray-400">
         <Icon name="map-pin" size="48" />
-        <p class="mt-3 text-sm" :text="`Map placeholder — ${court.address}`"></p>
+        <p class="mt-3 text-sm">Map unavailable — no coordinates on record for this court.</p>
       </div>
     </div>
   </div>
