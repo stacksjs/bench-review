@@ -119,8 +119,36 @@ route.get('/reviews/{id}', 'Actions/Reviews/ShowReviewAction')
 route.get('/judges/{id}/reviews', 'Actions/Reviews/ReviewsByJudgeAction')
   .name('bench.judges.reviews')
 
+// Judge recent rulings (bench-review#39). Public read; admin-only
+// write. Until an automated CourtListener / PACER / state-docket
+// pipeline lands, the cache is curated by moderators via the admin
+// create endpoint. The render surface is provider-agnostic so
+// switching to automated population is one helper file.
+route.get('/judges/{id}/opinions', 'Actions/Judges/JudgeOpinionsAction')
+  .name('bench.judges.opinions')
+
+route.post('/admin/judges/{id}/opinions', 'Actions/Admin/Opinions/CreateJudgeOpinionAction')
+  .name('bench.admin.judges.opinions.create')
+  .middleware('auth')
+  .middleware('admin')
+  .skipCsrf()
+
 route.post('/reviews', 'Actions/Reviews/SubmitReviewAction')
   .name('bench.reviews.submit')
+  .middleware('auth')
+  .skipCsrf()
+
+// Review photos (bench-review#31). Author-only upload + delete.
+// Upload runs every image through sharp's EXIF strip + a 3-size
+// resize ladder; on-disk variants live under storage/uploads/.
+// See app/Helpers/reviewPhotos.ts for the pipeline.
+route.post('/reviews/{id}/photos', 'Actions/Reviews/UploadReviewPhotosAction')
+  .name('bench.reviews.photos.upload')
+  .middleware('auth')
+  .skipCsrf()
+
+route.delete('/me/photos/{id}', 'Actions/Me/DeleteMyReviewPhotoAction')
+  .name('bench.me.photos.destroy')
   .middleware('auth')
   .skipCsrf()
 
@@ -203,6 +231,23 @@ route.post('/admin/credentials/{id}/verify', 'Actions/Admin/Credentials/VerifyCr
 // for the security notes (no enumeration leak, no surprise token revoke).
 route.patch('/me/password', 'Actions/Me/ChangePasswordAction')
   .name('bench.me.password.change')
+  .middleware('auth')
+  .skipCsrf()
+
+// Server-side compose-draft autosave (bench-review#26). One action
+// handles GET / PUT / DELETE — one draft per user, enforced by the
+// unique index on review_drafts.user_id. The editor's existing
+// localStorage cache stays as the per-tab fast path; this endpoint
+// is the cross-device source of truth.
+route.get('/me/draft', 'Actions/Me/DraftAction')
+  .name('bench.me.draft.get')
+  .middleware('auth')
+route.put('/me/draft', 'Actions/Me/DraftAction')
+  .name('bench.me.draft.put')
+  .middleware('auth')
+  .skipCsrf()
+route.delete('/me/draft', 'Actions/Me/DraftAction')
+  .name('bench.me.draft.destroy')
   .middleware('auth')
   .skipCsrf()
 

@@ -99,6 +99,16 @@ export default new Action({
       }
     }
 
-    return response.json({ ...hydrated, judge, author })
+    // Attached photos (bench-review#31). Empty array when no
+    // uploads exist; the article gallery hides itself in that case.
+    // Ordered by `order_index` so author-specified gallery order is
+    // honoured.
+    const photos = await db.selectFrom('review_photos' as any)
+      .select(['id', 'thumb_url', 'card_url', 'full_url', 'width', 'height', 'order_index'] as any)
+      .where('judge_review_id' as any, '=', id)
+      .orderBy('order_index' as any, 'asc')
+      .execute() as Array<Record<string, any>>
+
+    return response.json({ ...hydrated, judge, author, photos })
   },
 })

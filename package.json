@@ -21,6 +21,7 @@
     "ofetch": "^1.5.1",
     "perfect-debounce": "^2.1.0",
     "pretty-bytes": "^7.1.0",
+    "sharp": "^0.34.5",
     "stacks": "workspace:*",
     "ts-broadcasting": "^0.0.4",
     "ts-medium-editor": "^0.1.0"

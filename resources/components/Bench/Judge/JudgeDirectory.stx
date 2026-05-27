@@ -19,12 +19,47 @@
 
   function setPracticeFilter(next: PracticeFilter): void {
     practiceFilter.set(next)
+    syncFilterUrl()
+  }
+
+  // Additional filter axes (bench-review#30). State, rating
+  // threshold, has-reviews — all URL-driven, all compose with the
+  // existing practice-area filter and the text-search box.
+  type RatingFilter = 'all' | '4' | '3' | '2'
+  type HasReviewsFilter = 'all' | 'with' | 'without'
+
+  function readQueryString(key: string, fallback: string): string {
+    if (typeof window === 'undefined') return fallback
+    return new URLSearchParams(window.location.search).get(key) || fallback
+  }
+  const stateFilter = state<string>(() => {
+    const raw = readQueryString('state', 'all')
+    return /^[A-Z]{2}$/.test(raw) ? raw : 'all'
+  })
+  const ratingFilter = state<RatingFilter>((() => {
+    const raw = readQueryString('rating', 'all')
+    return raw === '4' || raw === '3' || raw === '2' ? raw : 'all'
+  })() as RatingFilter)
+  const hasReviewsFilter = state<HasReviewsFilter>((() => {
+    const raw = readQueryString('has_reviews', 'all')
+    return raw === 'with' || raw === 'without' ? raw : 'all'
+  })() as HasReviewsFilter)
+
+  function setStateFilter(next: string): void { stateFilter.set(next); syncFilterUrl() }
+  function setRatingFilter(next: RatingFilter): void { ratingFilter.set(next); syncFilterUrl() }
+  function setHasReviewsFilter(next: HasReviewsFilter): void { hasReviewsFilter.set(next); syncFilterUrl() }
+
+  function syncFilterUrl(): void {
     if (typeof window === 'undefined') return
     const url = new URL(window.location.href)
-    if (next === 'all') url.searchParams.delete('practice_area')
-    else url.searchParams.set('practice_area', next)
-    // replaceState rather than push — rapid pill clicks shouldn't
-    // bloat the history stack the user has to back through.
+    const apply = (key: string, value: string, defaultVal: string) => {
+      if (value === defaultVal) url.searchParams.delete(key)
+      else url.searchParams.set(key, value)
+    }
+    apply('practice_area', practiceFilter(), 'all')
+    apply('state', stateFilter(), 'all')
+    apply('rating', ratingFilter(), 'all')
+    apply('has_reviews', hasReviewsFilter(), 'all')
     window.history.replaceState({}, '', url.toString())
   }
 
@@ -50,13 +85,48 @@
     return counts
   })
 
+  // Available states for the state pill row. Derived from the loaded
+  // judges' courthouse rows; we only surface states that actually
+  // have a judge to filter to.
+  const availableStates = derived<string[]>(() => {
+    const set = new Set<string>()
+    for (const j of judgesStore.judges() as any[]) {
+      const s = j.court?.state || j.location?.match(/, ([A-Z]{2})$/)?.[1]
+      if (s) set.add(String(s).toUpperCase())
+    }
+    return Array.from(set).sort()
+  })
+
+  function judgeState(j: any): string {
+    return (j.court?.state || j.location?.match(/, ([A-Z]{2})$/)?.[1] || '').toUpperCase()
+  }
+  function judgeReviewCount(j: any): number {
+    return Number(j.reviewCount ?? j.review_count ?? 0)
+  }
+  function judgeAvgRating(j: any): number {
+    return Number(j.rating ?? j.avg_rating ?? 0)
+  }
+
   const filteredJudges = derived<Judge[]>(() => {
     const q = searchQuery()
     const pf = practiceFilter()
+    const sf = stateFilter()
+    const rf = ratingFilter()
+    const hr = hasReviewsFilter()
     let rows = judgesStore.judges()
 
     if (pf !== 'all')
       rows = rows.filter((j: any) => (j.practice_area || '').toString().toLowerCase() === pf)
+    if (sf !== 'all')
+      rows = rows.filter((j: any) => judgeState(j) === sf)
+    if (rf !== 'all') {
+      const threshold = Number(rf)
+      rows = rows.filter((j: any) => judgeAvgRating(j) >= threshold)
+    }
+    if (hr === 'with')
+      rows = rows.filter((j: any) => judgeReviewCount(j) > 0)
+    else if (hr === 'without')
+      rows = rows.filter((j: any) => judgeReviewCount(j) === 0)
 
     if (q) {
       const needle = q.toLowerCase()
@@ -121,28 +191,86 @@
             </div>
           </div>
         </div>
-        <div class="flex flex-wrap gap-4">
-          <select class="pl-4 pr-10 py-3 text-gray-900 sm:leading-6 sm:text-sm bg-gray-50 border-0 ring-1 ring-gray-200 ring-inset rounded-xl focus:ring-2 focus:ring-inset focus:ring-softBrown duration-200 transition-all">
-            <option>All Courts</option>
-            <option>Supreme Court</option>
-            <option>Appellate Court</option>
-            <option>District Court</option>
-          </select>
-          <select class="pl-4 pr-10 py-3 text-gray-900 sm:leading-6 sm:text-sm bg-gray-50 border-0 ring-1 ring-gray-200 ring-inset rounded-xl focus:ring-2 focus:ring-inset focus:ring-softBrown duration-200 transition-all">
-            <option>All States</option>
-            <option>California</option>
-            <option>New York</option>
-            <option>Texas</option>
-            <option>Florida</option>
-          </select>
-          <select class="pl-4 pr-10 py-3 text-gray-900 sm:leading-6 sm:text-sm bg-gray-50 border-0 ring-1 ring-gray-200 ring-inset rounded-xl focus:ring-2 focus:ring-inset focus:ring-softBrown duration-200 transition-all">
-            <option>Rating</option>
-            <option>4+ Stars</option>
-            <option>3+ Stars</option>
-            <option>2+ Stars</option>
-          </select>
-        </div>
       </div>
+    </div>
+
+    <!-- State filter (bench-review#30). Auto-populated from the
+         loaded judges' courthouse rows. Only shows states that
+         actually have judges to filter to. -->
+    <div :if="availableStates.length > 0" class="flex flex-wrap gap-2 mb-3" role="tablist" aria-label="Filter by state">
+      <button
+        type="button"
+        role="tab"
+        @click="setStateFilter('all')"
+        class="inline-flex items-center px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        x-class="stateFilter === 'all' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+      >All states</button>
+      <button :for="s in availableStates"
+        type="button"
+        role="tab"
+        @click="setStateFilter(s)"
+        class="inline-flex items-center px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        x-class="stateFilter === s ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+        :text="s"
+      ></button>
+    </div>
+
+    <!-- Rating-threshold + activity filter rows. URL-driven via
+         ?rating=N&has_reviews=with|without. Compose with the
+         state + practice-area filters above. -->
+    <div class="flex flex-wrap gap-2 mb-3" role="tablist" aria-label="Filter by rating">
+      <button
+        type="button"
+        role="tab"
+        @click="setRatingFilter('all')"
+        class="inline-flex items-center px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        x-class="ratingFilter === 'all' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+      >Any rating</button>
+      <button
+        type="button"
+        role="tab"
+        @click="setRatingFilter('4')"
+        class="inline-flex items-center px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        x-class="ratingFilter === '4' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+      >4★ and up</button>
+      <button
+        type="button"
+        role="tab"
+        @click="setRatingFilter('3')"
+        class="inline-flex items-center px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        x-class="ratingFilter === '3' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+      >3★ and up</button>
+      <button
+        type="button"
+        role="tab"
+        @click="setRatingFilter('2')"
+        class="inline-flex items-center px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        x-class="ratingFilter === '2' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+      >2★ and up</button>
+    </div>
+
+    <div class="flex flex-wrap gap-2 mb-6" role="tablist" aria-label="Filter by review activity">
+      <button
+        type="button"
+        role="tab"
+        @click="setHasReviewsFilter('all')"
+        class="inline-flex items-center px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        x-class="hasReviewsFilter === 'all' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+      >Any activity</button>
+      <button
+        type="button"
+        role="tab"
+        @click="setHasReviewsFilter('with')"
+        class="inline-flex items-center px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        x-class="hasReviewsFilter === 'with' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+      >With reviews</button>
+      <button
+        type="button"
+        role="tab"
+        @click="setHasReviewsFilter('without')"
+        class="inline-flex items-center px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        x-class="hasReviewsFilter === 'without' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+      >Without reviews</button>
     </div>
 
     <div class="grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">

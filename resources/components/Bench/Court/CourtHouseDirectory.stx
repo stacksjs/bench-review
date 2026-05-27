@@ -4,21 +4,98 @@
   const judgesStore = useStore('judges')
   const searchQuery = state<string>('')
 
+  // Filter state (bench-review#30). URL-driven so deep links + shares
+  // preserve the filter context. Two axes for courthouses: state
+  // (real column on the row) and has-reviews (derived from the
+  // courthouse's hydrated total_reviews, set by CourtHouseIndexAction
+  // in #40).
+  type HasReviewsFilter = 'all' | 'with' | 'without'
+  function readInitialState(): string {
+    if (typeof window === 'undefined') return 'all'
+    const raw = new URLSearchParams(window.location.search).get('state')
+    return raw && /^[A-Z]{2}$/.test(raw) ? raw : 'all'
+  }
+  function readInitialHasReviews(): HasReviewsFilter {
+    if (typeof window === 'undefined') return 'all'
+    const raw = new URLSearchParams(window.location.search).get('has_reviews') as HasReviewsFilter | null
+    return raw === 'with' || raw === 'without' ? raw : 'all'
+  }
+  const stateFilter = state<string>(readInitialState())
+  const hasReviewsFilter = state<HasReviewsFilter>(readInitialHasReviews())
+
+  function setStateFilter(next: string): void {
+    stateFilter.set(next)
+    syncUrl()
+  }
+  function setHasReviewsFilter(next: HasReviewsFilter): void {
+    hasReviewsFilter.set(next)
+    syncUrl()
+  }
+  function syncUrl(): void {
+    if (typeof window === 'undefined') return
+    const url = new URL(window.location.href)
+    if (stateFilter() === 'all') url.searchParams.delete('state')
+    else url.searchParams.set('state', stateFilter())
+    if (hasReviewsFilter() === 'all') url.searchParams.delete('has_reviews')
+    else url.searchParams.set('has_reviews', hasReviewsFilter())
+    window.history.replaceState({}, '', url.toString())
+  }
+
   onMount(() => {
     if (judgesStore.courtHouses().length === 0)
       judgesStore.fetchCourtHouses()
   })
 
+  // Derive the list of available states from the loaded courthouses
+  // so the pill row only shows states that actually have a court.
+  // Sorted alphabetically; "all" pill always renders first.
+  const availableStates = derived<string[]>(() => {
+    const set = new Set<string>()
+    for (const c of judgesStore.courtHouses() as any[]) {
+      if (c.state) set.add(String(c.state).toUpperCase())
+    }
+    return Array.from(set).sort()
+  })
+
+  // Live counts per state + per has-reviews state. Drives the pill
+  // labels so the user sees "California (4)" rather than bare names.
+  const courtCounts = derived(() => {
+    const all = judgesStore.courtHouses() as any[]
+    const byState: Record<string, number> = { all: all.length }
+    let withReviews = 0
+    let withoutReviews = 0
+    for (const c of all) {
+      const s = String(c.state || '').toUpperCase() || 'UNK'
+      byState[s] = (byState[s] ?? 0) + 1
+      const tr = Number(c.total_reviews ?? 0)
+      if (tr > 0) withReviews++
+      else withoutReviews++
+    }
+    return { byState, withReviews, withoutReviews }
+  })
+
   const filteredCourtHouses = derived<CourtHouse[]>(() => {
     const q = searchQuery()
-    const all = judgesStore.courtHouses()
-    if (!q) return all
-    const needle = q.toLowerCase()
-    return all.filter(court =>
-      court.name.toLowerCase().includes(needle)
-      || (court.city ?? '').toLowerCase().includes(needle)
-      || (court.state ?? '').toLowerCase().includes(needle),
-    )
+    const sf = stateFilter()
+    const hr = hasReviewsFilter()
+    let rows = judgesStore.courtHouses() as any[]
+
+    if (sf !== 'all')
+      rows = rows.filter(c => String(c.state || '').toUpperCase() === sf)
+    if (hr === 'with')
+      rows = rows.filter(c => Number(c.total_reviews ?? 0) > 0)
+    else if (hr === 'without')
+      rows = rows.filter(c => Number(c.total_reviews ?? 0) === 0)
+
+    if (q) {
+      const needle = q.toLowerCase()
+      rows = rows.filter(c =>
+        c.name.toLowerCase().includes(needle)
+        || (c.city ?? '').toLowerCase().includes(needle)
+        || (c.state ?? '').toLowerCase().includes(needle),
+      )
+    }
+    return rows
   })
 </script>
 
@@ -30,36 +107,75 @@
       <p class="mt-4 text-gray-600 text-lg">Find courthouses across the United States</p>
     </div>
 
-    <!-- Search and Filter Section -->
+    <!-- State filter pills (bench-review#30). Auto-populated from
+         the loaded courthouses so we only show states that actually
+         have a court. URL-driven via ?state=CA. -->
+    <div class="flex flex-wrap gap-2 mb-4" role="tablist" aria-label="Filter by state">
+      <button
+        type="button"
+        role="tab"
+        @click="setStateFilter('all')"
+        class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        x-class="stateFilter === 'all' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+      >
+        All states
+        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="stateFilter === 'all' ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-600'" :text="courtCounts.byState.all"></span>
+      </button>
+      <button :for="s in availableStates"
+        type="button"
+        role="tab"
+        @click="setStateFilter(s)"
+        class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        x-class="stateFilter === s ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+      >
+        <span :text="s"></span>
+        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="stateFilter === s ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-600'" :text="courtCounts.byState[s] || 0"></span>
+      </button>
+    </div>
+
+    <!-- Has-reviews filter pills. Separate row so it composes with
+         the state filter above. -->
+    <div class="flex flex-wrap gap-2 mb-6" role="tablist" aria-label="Filter by review activity">
+      <button
+        type="button"
+        role="tab"
+        @click="setHasReviewsFilter('all')"
+        class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        x-class="hasReviewsFilter === 'all' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+      >Any activity</button>
+      <button
+        type="button"
+        role="tab"
+        @click="setHasReviewsFilter('with')"
+        class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        x-class="hasReviewsFilter === 'with' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+      >
+        With reviews
+        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="hasReviewsFilter === 'with' ? 'bg-white/15 text-white' : 'bg-emerald-50 text-emerald-700'" :text="courtCounts.withReviews"></span>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        @click="setHasReviewsFilter('without')"
+        class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        x-class="hasReviewsFilter === 'without' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+      >
+        Without reviews
+        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="hasReviewsFilter === 'without' ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-600'" :text="courtCounts.withoutReviews"></span>
+      </button>
+    </div>
+
+    <!-- Search field. Composes on top of the pill filters above. -->
     <div class="mb-12 p-6 bg-white border border-gray-100 rounded-2xl shadow-sm">
-      <div class="flex flex-col gap-6 lg:flex-row">
-        <div class="flex-1">
-          <div class="relative">
-            <input
-              type="text"
-              x-model="searchQuery"
-              placeholder="Search by name, city, or state..."
-              class="block pl-12 pr-4 py-3 w-full text-gray-900 sm:leading-6 sm:text-sm placeholder:text-gray-400 bg-gray-50 border-0 ring-1 ring-gray-200 ring-inset rounded-xl focus:ring-2 focus:ring-inset focus:ring-softBrown duration-200 transition-all"
-            >
-            <div class="flex absolute inset-y-0 left-0 items-center pl-4">
-              <Icon name="search" size="20" class="text-gray-400" />
-            </div>
-          </div>
-        </div>
-        <div class="flex flex-wrap gap-4">
-          <select class="pl-4 pr-10 py-3 text-gray-900 sm:leading-6 sm:text-sm bg-gray-50 border-0 ring-1 ring-gray-200 ring-inset rounded-xl focus:ring-2 focus:ring-inset focus:ring-softBrown duration-200 transition-all">
-            <option>All Courts</option>
-            <option>Supreme Court</option>
-            <option>Appellate Court</option>
-            <option>District Court</option>
-          </select>
-          <select class="pl-4 pr-10 py-3 text-gray-900 sm:leading-6 sm:text-sm bg-gray-50 border-0 ring-1 ring-gray-200 ring-inset rounded-xl focus:ring-2 focus:ring-inset focus:ring-softBrown duration-200 transition-all">
-            <option>All States</option>
-            <option>California</option>
-            <option>New York</option>
-            <option>Texas</option>
-            <option>Florida</option>
-          </select>
+      <div class="relative">
+        <input
+          type="text"
+          x-model="searchQuery"
+          placeholder="Search by name, city, or state..."
+          class="block pl-12 pr-4 py-3 w-full text-gray-900 sm:leading-6 sm:text-sm placeholder:text-gray-400 bg-gray-50 border-0 ring-1 ring-gray-200 ring-inset rounded-xl focus:ring-2 focus:ring-inset focus:ring-softBrown duration-200 transition-all"
+        >
+        <div class="flex absolute inset-y-0 left-0 items-center pl-4">
+          <Icon name="search" size="20" class="text-gray-400" />
         </div>
       </div>
     </div>

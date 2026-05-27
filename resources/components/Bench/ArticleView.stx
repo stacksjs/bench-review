@@ -315,6 +315,22 @@
   const judgeCourt = derived<string>(() => (reviewsStore.current() as any)?.judge?.court ?? '')
   const judgeImage = derived<string>(() => (reviewsStore.current() as any)?.judge?.image_url ?? '')
 
+  // Attached photos (bench-review#31). Returned by ShowReviewAction
+  // as a sibling array on the review payload. Empty list hides the
+  // gallery section.
+  interface ArticlePhoto { id: number, thumb_url: string, card_url: string, full_url: string, width: number, height: number }
+  const photos = derived<ArticlePhoto[]>(() => (reviewsStore.current() as any)?.photos ?? [])
+  const hasPhotos = derived<boolean>(() => photos().length > 0)
+  // Single-photo gallery is just one large card; 2+ go in a 2-col
+  // grid that flows to 3-col on wider screens. The cap is enforced
+  // server-side at 4 per review (see UploadReviewPhotosAction).
+  const photoGridClass = derived<string>(() => {
+    const n = photos().length
+    if (n <= 1) return 'grid-cols-1'
+    if (n === 2) return 'grid-cols-2'
+    return 'grid-cols-2 lg:grid-cols-3'
+  })
+
   // Reviewer cross-link (bench-review#29, #36). Reads from the
   // server-built `author` payload (NOT the raw `user_id` on the row)
   // so anonymized reviews surface with `id: null` and the link
@@ -500,6 +516,28 @@
          comments — stx's template scanner processes them anyway and
          splices the matched block right at the comment location,
          which busts the page.) -->
+    <!-- Photo gallery (bench-review#31). Renders the 800w card
+         variant; clicking a photo opens the 1600w full variant in a
+         new tab (lightbox is a follow-up). Hidden entirely when no
+         photos are attached. -->
+    <div :if="hasPhotos" class="mt-10">
+      <div class="grid gap-3" x-class="photoGridClass">
+        <a :for="p in photos"
+          x-href="p.full_url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="overflow-hidden bg-gray-100 rounded-lg hover:opacity-95 transition-opacity"
+        >
+          <img
+            x-src="p.card_url"
+            x-alt="`Photo attached to this review`"
+            loading="lazy"
+            class="block object-cover w-full aspect-[4/3]"
+          />
+        </a>
+      </div>
+    </div>
+
     <div class="article-body mt-10 text-gray-800" x-html="content"></div>
 
     <!-- Comments thread (bench-review#44). Renders below the article

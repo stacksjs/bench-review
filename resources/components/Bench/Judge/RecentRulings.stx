@@ -1,0 +1,139 @@
+<script client>
+  // Recent rulings tab (bench-review#39). Reads the judge id from
+  // URL pathname (same fallback as other judge tabs — _rp is unset
+  // on hard reload), fetches /api/judges/{id}/opinions, renders a
+  // paginated list of recent opinions.
+  //
+  // Source-of-data note: until an automated CourtListener / PACER /
+  // state-docket pipeline lands, opinions are curated by moderators
+  // via the admin POST endpoint. The empty state explains the gap
+  // honestly rather than hiding it — readers know they're seeing a
+  // moderator-curated view, not an exhaustive docket.
+
+  const authStore = useStore('auth')
+
+  interface OpinionRow {
+    id: number
+    case_name: string
+    citation: string | null
+    decision_date: string | null
+    summary: string | null
+    outcome_label: string | null
+    source_url: string | null
+    source_provider: string
+  }
+
+  function resolveJudgeId(): number {
+    if (typeof window === 'undefined') return 0
+    const fromRouter = Number((window as any).stx?._rp?.id)
+    if (Number.isFinite(fromRouter) && fromRouter > 0) return fromRouter
+    const m = window.location.pathname.match(/^\/judges\/(\d+)/)
+    return m ? Number(m[1]) : 0
+  }
+
+  const rulingsJudgeId = resolveJudgeId()
+  const opinions = state<OpinionRow[]>([])
+  const opinionsLoaded = state<boolean>(false)
+
+  async function loadOpinions(): Promise<void> {
+    if (!rulingsJudgeId) return
+    try {
+      const res = await authStore.authFetch(`/api/judges/${rulingsJudgeId}/opinions?per_page=25`)
+      if (!res.ok) return
+      const json = await res.json() as { data?: OpinionRow[] } | OpinionRow[]
+      opinions.set(Array.isArray(json) ? json : (json?.data ?? []))
+    }
+    catch (err) {
+      console.error('[rulings] fetch failed:', err)
+    }
+    finally {
+      opinionsLoaded.set(true)
+    }
+  }
+
+  onMount(() => { loadOpinions() })
+
+  function formatDate(dateStr: string | null | undefined): string {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (Number.isNaN(d.getTime())) return dateStr // accept partial dates as-is
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
+  }
+
+  // Outcome label → tailwind class. Affirmed reads green; reversed
+  // reads amber/red; remand sits neutral. Loose color taxonomy that
+  // hints at the practical outcome without claiming legal precision.
+  function outcomeBadgeClasses(outcome: string | null): string {
+    if (!outcome) return 'bg-gray-100 text-gray-700 ring-gray-200/60'
+    const o = outcome.toLowerCase()
+    if (o === 'affirmed' || o === 'granted') return 'bg-emerald-50 text-emerald-800 ring-emerald-200/60'
+    if (o === 'reversed' || o === 'denied' || o === 'vacated') return 'bg-red-50 text-red-800 ring-red-200/60'
+    if (o === 'remanded') return 'bg-amber-50 text-amber-800 ring-amber-200/60'
+    if (o === 'dismissed' || o === 'settled') return 'bg-gray-100 text-gray-700 ring-gray-200/60'
+    return 'bg-gray-100 text-gray-700 ring-gray-200/60'
+  }
+</script>
+
+<div class="space-y-6">
+  <header>
+    <h2 class="font-semibold text-base text-gray-900">Recent rulings</h2>
+    <p class="mt-1 text-gray-500 text-sm">Opinions and rulings curated by moderators. Not a comprehensive docket — see the linked source for the full record.</p>
+  </header>
+
+  <!-- Loading skeleton -->
+  <ul :if="!opinionsLoaded" class="space-y-3">
+    <li :for="i in [1, 2, 3]" class="p-5 bg-white border border-gray-200 rounded-lg animate-pulse">
+      <div class="flex items-baseline gap-3">
+        <div class="h-4 w-2/3 bg-gray-200 rounded"></div>
+        <div class="h-4 w-16 bg-gray-100 rounded-full"></div>
+      </div>
+      <div class="mt-2 space-y-1.5">
+        <div class="h-3 w-1/2 bg-gray-100 rounded"></div>
+        <div class="h-3 w-full bg-gray-200 rounded"></div>
+      </div>
+    </li>
+  </ul>
+
+  <!-- Empty state — honest about why it's empty -->
+  <div :if="opinionsLoaded && opinions.length === 0" class="p-10 text-center bg-white border border-gray-200 border-dashed rounded-lg">
+    <p class="font-semibold text-gray-900 text-base">No rulings on file yet.</p>
+    <p class="mt-2 mx-auto max-w-md text-gray-500 text-sm">Bench Review curates rulings from public docket sources as moderators identify them. Automated docket integration is on the roadmap — for now this surface is moderator-curated.</p>
+  </div>
+
+  <!-- Opinions list -->
+  <ul :if="opinions.length > 0" class="space-y-3">
+    <li :for="o in opinions" class="p-5 bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0 flex-1">
+          <h3 class="font-semibold text-gray-900 text-base" :text="o.case_name"></h3>
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-gray-500 text-xs">
+            <span :if="o.decision_date" :text="formatDate(o.decision_date)"></span>
+            <span :if="o.decision_date && o.citation" class="text-gray-300">·</span>
+            <span :if="o.citation" class="font-mono text-gray-600" :text="o.citation"></span>
+            <span :if="(o.decision_date || o.citation) && o.source_provider !== 'manual'" class="text-gray-300">·</span>
+            <span :if="o.source_provider !== 'manual'" class="text-gray-500" :text="`via ${o.source_provider}`"></span>
+          </div>
+        </div>
+        <span
+          :if="o.outcome_label"
+          class="inline-flex items-center px-2.5 py-0.5 font-medium text-xs ring-1 rounded-full capitalize whitespace-nowrap"
+          x-class="outcomeBadgeClasses(o.outcome_label)"
+          :text="o.outcome_label"
+        ></span>
+      </div>
+      <p :if="o.summary" class="mt-3 leading-relaxed text-gray-700 text-sm" :text="o.summary"></p>
+      <a
+        :if="o.source_url"
+        x-href="o.source_url"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex items-center gap-1 mt-3 font-medium text-gray-700 text-xs hover:text-gray-900 hover:underline underline-offset-2"
+      >
+        Read the opinion
+        <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M6 3h7v7M13 3 3.5 12.5"/>
+        </svg>
+      </a>
+    </li>
+  </ul>
+</div>

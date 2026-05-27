@@ -144,6 +144,64 @@ defineStore('reviews', () => {
     }
   }
 
+  /**
+   * Server-side compose-draft autosave (bench-review#26).
+   *
+   * Three thin wrappers around /api/me/draft. The editor stores a
+   * per-tab copy in localStorage (fast) and chains here for cross-
+   * device sync (canonical). On submit success, clearDraft() runs
+   * so coming back to /review doesn't restore a stale draft on top
+   * of the freshly submitted review.
+   */
+  async function fetchDraft(): Promise<{ ok: boolean, draft?: any }> {
+    try {
+      const res = await useStore('auth').authFetch('/api/me/draft')
+      if (!res.ok) return { ok: false }
+      const data = await res.json() as { ok?: boolean, draft?: any }
+      return { ok: !!data?.ok, draft: data?.draft ?? null }
+    }
+    catch { return { ok: false } }
+  }
+  async function saveDraft(patch: { judge_id?: number | null, title?: string, content?: string, rating?: number | null, type?: string, anonymized?: boolean }): Promise<void> {
+    try {
+      await useStore('auth').authFetch('/api/me/draft', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      })
+    }
+    catch { /* drafts are best-effort — localStorage is the safety net */ }
+  }
+  async function clearDraft(): Promise<void> {
+    try {
+      await useStore('auth').authFetch('/api/me/draft', { method: 'DELETE' })
+    }
+    catch { /* best-effort */ }
+  }
+
+  /**
+   * Upload one or more photos for an existing review (bench-review#31).
+   * Multipart payload; the server handles EXIF strip + 3-size resize
+   * + storage. Returns the count of successfully persisted photos.
+   */
+  async function uploadPhotos(reviewId: number, formData: FormData): Promise<{ ok: boolean, added?: number, error?: string }> {
+    try {
+      // Don't set Content-Type — let the browser pick the multipart
+      // boundary. authFetch's default headers don't include it.
+      const res = await useStore('auth').authFetch(`/api/reviews/${reviewId}/photos`, {
+        method: 'POST',
+        body: formData,
+      })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean, added?: number, error?: string }
+      if (!res.ok || !data.ok)
+        return { ok: false, error: data.error || 'Photo upload failed' }
+      return { ok: true, added: data.added ?? 0 }
+    }
+    catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'Network error' }
+    }
+  }
+
   async function submit(payload: SubmitReviewPayload): Promise<SubmitResult> {
     submitting.set(true)
     try {
@@ -329,6 +387,10 @@ defineStore('reviews', () => {
     updateOwn,
     deleteOwn,
     toggleLike,
+    uploadPhotos,
+    fetchDraft,
+    saveDraft,
+    clearDraft,
     reviewsForJudge,
     isLoadingJudge,
   }
