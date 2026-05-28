@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS "judge_reviews" (
   "comments" INTEGER,
   "type" TEXT,
   "status" TEXT,
+  "anonymized" INTEGER default 0,
   "judge_id" INTEGER,
   "user_id" INTEGER,
   "created_at" TEXT not null default CURRENT_TIMESTAMP,

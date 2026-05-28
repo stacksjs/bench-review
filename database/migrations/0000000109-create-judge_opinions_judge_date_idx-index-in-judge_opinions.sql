@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "judge_opinions_judge_opinions_judge_date_idx" ON "judge_opinions" ("judge_id", "decision_date");

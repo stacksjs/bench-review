@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "review_drafts_review_drafts_user_unique" ON "review_drafts" ("user_id");

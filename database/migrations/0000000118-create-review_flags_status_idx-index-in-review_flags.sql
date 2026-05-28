@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "review_flags_review_flags_status_idx" ON "review_flags" ("status");

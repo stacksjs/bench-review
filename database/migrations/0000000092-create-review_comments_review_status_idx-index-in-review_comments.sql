@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "review_comments_review_comments_review_status_idx" ON "review_comments" ("judge_review_id", "status");

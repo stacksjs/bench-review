@@ -15,7 +15,12 @@
     <div class="flex items-center justify-between">
       <div class="flex items-center">
         <StxLink x-to="`/profile/${review.author.id}`" class="flex-shrink-0">
-          <img class="h-8 w-8 rounded-full grayscale filter" x-src="review.author.imageUrl" x-alt="review.author.name" />
+          <SafeImage
+            :src="review.author.imageUrl"
+            :alt="review.author.name"
+            className="h-8 w-8 rounded-full grayscale filter"
+            fallbackClassName="h-8 w-8 rounded-full"
+          />
         </StxLink>
         <div class="ml-2">
           <p class="font-medium text-gray-900 text-sm">

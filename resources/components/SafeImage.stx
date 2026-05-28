@@ -1,0 +1,70 @@
+<script server>
+// <SafeImage> — drop-in <img> replacement that falls back to a
+// placeholder URL when the original src 404s, with an optional class
+// swap so a grayscale-on-load avatar can render its fallback at full
+// tone.
+//
+// Why this exists: third-party image URLs (judge.photo, author
+// avatars from external CDNs, seed data pointing at unsplash links
+// that disappeared) frequently 404 in production. Without
+// intervention the browser draws the alt text inside the layout
+// frame, which looks like garbage. The component encapsulates the
+// fallback behaviour declaratively so callers don't have to wire a
+// global error handler.
+//
+// Why inline `onerror=` rather than a delegated capture-phase
+// listener: `error` events don't bubble. Attaching a listener
+// AFTER the <img> has already tried to load misses early failures
+// (cached 404s, network-offline first paint). Inline onerror is
+// parsed and attached synchronously with the element, before the
+// browser starts the request.
+//
+// Why a single window-level handler function rather than an
+// `onerror="..."` inline closure: keeps the rendered HTML tiny
+// (10-byte attribute vs. a 100-byte inline function body) and
+// idempotent across instances. The function is registered once
+// on first SSR hydration, even if there are 50 <SafeImage>s on
+// the page.
+//
+// Props:
+//   src                — image URL (required)
+//   alt                — alt text (defaults to empty)
+//   fallback           — URL to swap to on error (defaults to a
+//                        generic neutral placeholder)
+//   className          — class string applied at render time
+//   fallbackClassName  — class string to swap to on error. Useful
+//                        when the load-time classes (grayscale,
+//                        blur-up) shouldn't apply to the placeholder.
+//                        If omitted, className is kept.
+export const src = $props.src || ''
+export const alt = $props.alt || ''
+export const fallback = $props.fallback || '/images/avatars/default-user.svg'
+export const className = $props.className || ''
+export const fallbackClassName = $props.fallbackClassName || ''
+</script>
+
+<script client>
+  // Register the global handler once. Subsequent <SafeImage> mounts
+  // are no-ops. Reading config from data-* attributes on the <img>
+  // itself means each instance carries its own fallback + class swap
+  // without any shared state in this closure.
+  if (typeof window !== 'undefined' && !(window as any).__stxSafeImageHandler) {
+    ;(window as any).__stxSafeImageHandler = function (img: HTMLImageElement & { __stx_fallback_applied?: boolean }) {
+      if (img.__stx_fallback_applied) return
+      img.__stx_fallback_applied = true
+      const fb = img.dataset.fallback || '/images/avatars/default-user.svg'
+      const swapCls = img.dataset.fallbackClass
+      img.src = fb
+      if (swapCls != null && swapCls !== '') img.className = swapCls
+    }
+  }
+</script>
+
+<img
+  src="{{ src }}"
+  alt="{{ alt }}"
+  class="{{ className }}"
+  data-fallback="{{ fallback }}"
+  data-fallback-class="{{ fallbackClassName }}"
+  onerror="window.__stxSafeImageHandler(this)"
+/>

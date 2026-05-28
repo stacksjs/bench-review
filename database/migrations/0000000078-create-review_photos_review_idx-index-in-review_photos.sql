@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "review_photos_review_photos_review_idx" ON "review_photos" ("judge_review_id", "order_index");

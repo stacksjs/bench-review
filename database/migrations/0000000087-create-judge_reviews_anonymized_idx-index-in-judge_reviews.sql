@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "judge_reviews_judge_reviews_anonymized_idx" ON "judge_reviews" ("anonymized");

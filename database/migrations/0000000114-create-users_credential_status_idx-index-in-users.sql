@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "users_users_credential_status_idx" ON "users" ("credential_verified_at", "credential_claimed_at");
