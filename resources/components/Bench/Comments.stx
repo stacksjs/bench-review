@@ -140,13 +140,13 @@
 
 <section class="mt-12 pt-8 border-t border-gray-200">
   <header class="flex items-end justify-between">
-    <h2 class="font-semibold text-gray-900 text-base" :text="`Comments (${comments.length})`"></h2>
+    <h2 class="font-semibold text-gray-900 text-base" :text="`Comments (${comments().length})`"></h2>
   </header>
 
   <!-- Composer. Signed-in users only; anonymous viewers see a "Sign
        in to comment" CTA in the same slot so the surface isn't
        blank for them. -->
-  <div :if="isAuthenticated" class="mt-5 p-4 bg-white border border-gray-200 rounded-lg">
+  <div :if="isAuthenticated()" class="mt-5 p-4 bg-white border border-gray-200 rounded-lg">
     <textarea
       x-model="commentDraft"
       rows="3"
@@ -176,15 +176,17 @@
     </div>
   </div>
 
-  <div :if="!isAuthenticated" class="mt-5 p-5 text-center bg-gray-50 border border-gray-200 rounded-lg">
+  <div :else class="mt-5 p-5 text-center bg-gray-50 border border-gray-200 rounded-lg">
     <p class="text-gray-600 text-sm">
       <StxLink to="/login" class="font-semibold text-gray-900 hover:underline underline-offset-2">Sign in</StxLink>
       to leave a comment.
     </p>
   </div>
 
-  <!-- Loading skeleton -->
-  <ul :if="!commentsLoaded" class="mt-6 space-y-4">
+  <!-- Three mutually-exclusive states wired as one if/else-if/else chain
+       (stx#1734). One effect drives mutual exclusion, branches can't
+       transiently both render in a tick. -->
+  <ul :if="!commentsLoaded()" class="mt-6 space-y-4">
     <li :for="i in [1, 2]" class="p-4 bg-white border border-gray-100 rounded-lg animate-pulse">
       <div class="flex items-center gap-3">
         <div class="h-8 w-8 bg-gray-200 rounded-full"></div>
@@ -200,13 +202,11 @@
     </li>
   </ul>
 
-  <!-- Empty state -->
-  <div :if="commentsLoaded && comments.length === 0" class="mt-6 p-8 text-center text-gray-500 text-sm bg-gray-50 border border-gray-200 border-dashed rounded-lg">
+  <div :else-if="comments().length === 0" class="mt-6 p-8 text-center text-gray-500 text-sm bg-gray-50 border border-gray-200 border-dashed rounded-lg">
     No comments yet. Be the first to add context.
   </div>
 
-  <!-- Comments list -->
-  <ul :if="comments.length > 0" class="space-y-4 mt-6">
+  <ul :else class="space-y-4 mt-6">
     <li :for="c in comments" class="p-4 bg-white border border-gray-100 rounded-lg">
       <div class="flex items-start gap-3">
         <span class="inline-flex flex-none items-center justify-center h-8 w-8 font-semibold text-amber-700 text-xs bg-amber-50 ring-1 ring-amber-200/60 rounded-full" :text="initialFor(c.author && c.author.name)"></span>

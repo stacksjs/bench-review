@@ -369,11 +369,11 @@
       </div>
     </div>
     <div class="hidden lg:flex lg:flex-1 lg:justify-end gap-x-4 items-center">
-      <div :if="!isAuthenticated" class="flex gap-x-6 items-center">
+      <div :if="!isAuthenticated()" class="flex gap-x-6 items-center">
         <StxLink to="/login" class="font-semibold text-gray-900 text-sm/6">Log in</StxLink>
         <StxLink to="/register" class="font-semibold text-gray-900 text-sm/6">Sign up</StxLink>
       </div>
-      <div :if="isAuthenticated" class="flex gap-x-4 items-center">
+      <div :else class="flex gap-x-4 items-center">
         <!-- Admin shortcut. Visible only to users whose `roles` array
              (hydrated by the auth store's fetchMe from /api/me)
              contains 'admin'. The server still enforces access via

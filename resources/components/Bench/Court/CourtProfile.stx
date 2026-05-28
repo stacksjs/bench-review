@@ -229,12 +229,12 @@
     <div
       data-court-map
       class="overflow-hidden mt-4 h-64 w-full bg-gray-100 rounded-lg"
-      x-class="hasCoords ? '' : 'hidden'"
+      x-class="hasCoords() ? '' : 'hidden'"
     ></div>
 
     <div
       class="overflow-hidden mt-4 h-64 w-full bg-gray-100 rounded-lg"
-      x-class="hasCoords ? 'hidden' : ''"
+      x-class="hasCoords() ? 'hidden' : ''"
     >
       <div class="flex flex-col items-center justify-center h-full text-gray-400">
         <Icon name="map-pin" size="48" />

@@ -52,11 +52,11 @@
           <StxLink to="/judges/submit" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Submit a Judge</StxLink>
         </div>
         <div class="py-6">
-          <div :if="!isAuthenticated">
+          <div :if="!isAuthenticated()">
             <StxLink to="/register" class="block -mx-3 px-3 py-2.5 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Register</StxLink>
             <StxLink to="/login" class="block -mx-3 px-3 py-2.5 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Log in</StxLink>
           </div>
-          <div :if="isAuthenticated">
+          <div :else>
             <StxLink to="/logout" class="block -mx-3 px-3 py-2.5 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Log out</StxLink>
           </div>
         </div>
