@@ -12,6 +12,14 @@ export default defineModel({
       name: 'judge_reviews_title_index',
       columns: ['title'],
     },
+    // bench-review#36 — admin / moderation queries that segment by
+    // "shown to public as anonymous" hit this index. Public read paths
+    // already filter on `status='published'`; the anonymized flag is
+    // additive.
+    {
+      name: 'judge_reviews_anonymized_idx',
+      columns: ['anonymized'],
+    },
   ],
 
   traits: {
@@ -146,6 +154,23 @@ export default defineModel({
         },
       },
       factory: faker => faker.helpers.arrayElement(['published', 'pending', 'rejected']),
+    },
+
+    // bench-review#36 — anonymous-friendly review surface.
+    // When set, public render paths substitute the author with
+    // "Anonymous <role_label>" (or "Anonymous reviewer" if the user
+    // has no role declared). Author still sees their own identity
+    // on /my-reviews; admins still see the real author for moderation.
+    // NOT a deletion mechanism — the user_id link stays intact.
+    anonymized: {
+      required: true,
+      order: 8,
+      fillable: true,
+      default: 0,
+      validation: {
+        rule: schema.number().min(0).max(1),
+      },
+      factory: () => 0,
     },
   },
 

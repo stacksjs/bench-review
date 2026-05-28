@@ -21,6 +21,13 @@ export default defineModel({
       name: 'users_email_name_index',
       columns: ['email', 'name'],
     },
+    // bench-review#37 — admin verification queue ordering.
+    // The credentials index page sorts by claimed_at and filters by
+    // verified_at NULL; this composite makes that scan cheap.
+    {
+      name: 'users_credential_status_idx',
+      columns: ['credential_verified_at', 'credential_claimed_at'],
+    },
   ],
 
   traits: {
@@ -130,6 +137,72 @@ export default defineModel({
       },
 
       factory: faker => faker.internet.password(),
+    },
+
+    // bench-review#36 — self-declared role classification used to
+    // label anonymous reviewers ("Anonymous attorney" vs "Anonymous
+    // clerk") and as a credibility signal on non-anonymous reviews.
+    // NULLABLE so existing users aren't forced to backfill before
+    // their next login.
+    roleLabel: {
+      required: false,
+      fillable: true,
+      validation: {
+        rule: schema.string().max(64),
+      },
+    },
+
+    // bench-review#37 — self-declared credential claim + admin
+    // verification. The CLAIM is tracked; proof (bar card, clerk ID,
+    // court badge) lives out-of-band via admin verification against
+    // external evidence. All NULLABLE so existing users aren't
+    // forced into a backfill before they get a chance to declare.
+    credentialType: {
+      required: false,
+      fillable: true,
+      validation: {
+        rule: schema.string().max(64),
+      },
+    },
+
+    credentialState: {
+      required: false,
+      fillable: true,
+      validation: {
+        rule: schema.string().max(16),
+      },
+    },
+
+    credentialClaimedAt: {
+      required: false,
+      fillable: true,
+      validation: {
+        rule: schema.string(),
+      },
+    },
+
+    credentialVerifiedAt: {
+      required: false,
+      fillable: true,
+      validation: {
+        rule: schema.string(),
+      },
+    },
+
+    credentialVerifiedByUserId: {
+      required: false,
+      fillable: true,
+      validation: {
+        rule: schema.number().positive(),
+      },
+    },
+
+    credentialRejectionNote: {
+      required: false,
+      fillable: true,
+      validation: {
+        rule: schema.string().max(2000),
+      },
     },
   },
   get: {

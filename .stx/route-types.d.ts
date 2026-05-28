@@ -50,6 +50,7 @@ declare module "stx/routes" {
     '/judges/:id/cases': { id: string }
     '/judges/:id/profile': { id: string }
     '/judges/:id/reviews': { id: string }
+    '/judges/:id/rulings': { id: string }
     '/judges/review/:id': { id: string }
     '/article/:id': { id: string }
     '/blog/:id': { id: string }
