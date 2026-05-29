@@ -69,6 +69,9 @@
     unorderedlist: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>',
     orderedlist: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>',
     pre: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
+    justifyLeft: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>',
+    justifyCenter: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>',
+    justifyRight: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/></svg>',
   }
 
   // Friendly tooltip labels — these become the button's `title`
@@ -87,6 +90,9 @@
     unorderedlist: 'Bullet list',
     orderedlist: 'Numbered list',
     pre: 'Code block',
+    justifyLeft: 'Align left',
+    justifyCenter: 'Align center',
+    justifyRight: 'Align right',
   }
 
   function applyToolbarIcons(toolbarEl) {
@@ -126,69 +132,87 @@
     strikethrough: ['S', 'STRIKE', 'DEL'],
   }
 
-  // Map data-action → execCommand name for queryCommandState lookups.
-  // Most actions match 1:1; the ones that don't are listed here.
+  // Map data-action → execCommand name. The button's data-action
+  // attribute is usually the action name verbatim (bold, italic,
+  // justifyLeft, etc.); listed explicitly here so we don't trust
+  // accidental name drift.
   const ACTION_TO_COMMAND = {
     bold: 'bold',
     italic: 'italic',
     underline: 'underline',
     strikethrough: 'strikethrough',
+    justifyLeft: 'justifyLeft',
+    justifyCenter: 'justifyCenter',
+    justifyRight: 'justifyRight',
   }
 
   function attachCaretFixHandlers(toolbarEl, editable) {
     if (!toolbarEl) return
     toolbarEl.querySelectorAll('button[data-action]').forEach((btn) => {
+      if (btn.__benchClickPatched) return
+      btn.__benchClickPatched = true
       const action = btn.getAttribute('data-action')
+      const cmd = ACTION_TO_COMMAND[action]
+      if (!cmd) return
       const tags = FORMAT_TAGS[action]
-      if (!tags) return
+
+      // Two post-click fixes on top of the library's handler:
+      //
+      //   (a) Button-active sync. The library's `isSelectionFormatted`
+      //       walks ancestor tags (<B>/<EM>/<U>) and has no case for
+      //       alignment commands. That can't see the browser's pending-
+      //       format bit on a collapsed caret (toggling Italic OFF
+      //       while still inside <em> leaves <em> as an ancestor, so
+      //       the library re-lights the button even though the next
+      //       typed character will be plain). And it can never light
+      //       the alignment buttons since none of {justifyLeft,
+      //       justifyCenter, justifyRight} appear in its switch.
+      //       `document.queryCommandState` is the source of truth here
+      //       — it reads the pending-format bit for inline formats and
+      //       the current block alignment for justify commands.
+      //
+      //   (b) Caret-stickiness fix for inline formats. If the format
+      //       just turned OFF and the caret is still inside a matching
+      //       ancestor (<b>/<strong>/<i>/<em>/<u>/<s>), the next typed
+      //       character would inherit the format and the button would
+      //       re-light. Move the caret outside the ancestor so the
+      //       next keystroke lands in unformatted territory. Block-
+      //       level justify doesn't carry this stickiness — alignment
+      //       applies to the whole paragraph, not the caret position.
+      //
+      // Use setTimeout(20) so we run AFTER the library's setTimeout(10)
+      // updateButtonStates() — otherwise the library's bad decision
+      // overwrites our good one.
       btn.addEventListener('click', () => {
-        // Microtask-defer so MediumEditor's own click handler runs
-        // first (it updates `.medium-editor-button-active` after
-        // execCommand). Then we inspect the post-toggle state.
-        Promise.resolve().then(() => {
+        setTimeout(() => {
+          let isOn = false
+          try { isOn = document.queryCommandState(cmd) }
+          catch { isOn = false }
+          if (isOn) btn.classList.add('medium-editor-button-active')
+          else btn.classList.remove('medium-editor-button-active')
+
+          // Caret-stickiness only applies to inline formats with a
+          // collapsed selection that just turned OFF.
+          if (!tags || isOn) return
           const sel = window.getSelection()
           if (!sel || sel.rangeCount === 0) return
           const range = sel.getRangeAt(0)
           if (!range.collapsed) return
 
-          // For a collapsed selection (no text highlighted) the user
-          // is toggling PENDING format — what the next typed character
-          // will inherit. MediumEditor's checkActiveButtons reads
-          // queryCommandState which in many browsers does NOT report
-          // pending-format state, so the button visually stays off
-          // even though typing produces bold/italic text. Force the
-          // class to match queryCommandState directly — Chrome and
-          // Firefox both expose the pending bit here.
-          const cmd = ACTION_TO_COMMAND[action]
-          let isOn = false
-          if (cmd) {
-            try { isOn = document.queryCommandState(cmd) }
-            catch { isOn = false }
-            if (isOn) btn.classList.add('medium-editor-button-active')
-            else btn.classList.remove('medium-editor-button-active')
-          }
-
-          // Format just turned OFF — caret-stickiness fix: move the
-          // caret outside the matching ancestor so the next typed
-          // character lands UNFORMATTED. Without this the caret stays
-          // inside <b> and the next char gets bolded, re-flipping the
-          // button to active.
-          if (!isOn) {
-            let node = range.startContainer
-            let parent = node.nodeType === 3 ? node.parentElement : node
-            while (parent && parent !== editable) {
-              if (tags.includes(parent.tagName)) {
-                const newRange = document.createRange()
-                newRange.setStartAfter(parent)
-                newRange.collapse(true)
-                sel.removeAllRanges()
-                sel.addRange(newRange)
-                return
-              }
-              parent = parent.parentElement
+          let node = range.startContainer
+          let parent = node.nodeType === 3 ? node.parentElement : node
+          while (parent && parent !== editable) {
+            if (tags.includes(parent.tagName)) {
+              const out = document.createRange()
+              out.setStartAfter(parent)
+              out.collapse(true)
+              sel.removeAllRanges()
+              sel.addRange(out)
+              return
             }
+            parent = parent.parentElement
           }
-        })
+        }, 20)
       })
     })
   }
@@ -246,7 +270,7 @@
         hideOnClick: true,
       },
       toolbar: {
-        buttons: ['bold', 'italic', 'anchor', 'h2', 'h3', 'quote', 'unorderedlist', 'orderedlist'],
+        buttons: ['bold', 'italic', 'anchor', 'h2', 'h3', 'quote', 'unorderedlist', 'orderedlist', 'justifyLeft', 'justifyCenter', 'justifyRight'],
         // `static: true` makes the toolbar always-visible at the top of
         // the editable area, like a standard WYSIWYG editor. This is
         // what "show toolbar in the textarea" actually means in
