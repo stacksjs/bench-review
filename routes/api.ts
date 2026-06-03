@@ -115,6 +115,7 @@ route.get('/reviews', 'Actions/Reviews/LatestReviewsAction')
 
 route.get('/reviews/{id}', 'Actions/Reviews/ShowReviewAction')
   .name('bench.reviews.show')
+  .middleware('viewable-review')
 
 route.get('/judges/{id}/reviews', 'Actions/Reviews/ReviewsByJudgeAction')
   .name('bench.judges.reviews')

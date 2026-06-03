@@ -118,7 +118,7 @@ export default new Action({
     // database/seeders/ReviewSeeder.ts).
     const uuid = crypto.randomUUID()
     const now = new Date().toISOString()
-    await db.insertInto('judge_reviews' as any).values({
+    await db.insertInto('judge_reviews').values({
       title,
       content,
       rating,
@@ -133,9 +133,9 @@ export default new Action({
       updated_at: now,
     } as any).execute()
 
-    const inserted = await db.selectFrom('judge_reviews' as any)
+    const inserted = await db.selectFrom('judge_reviews')
       .selectAll()
-      .where('uuid' as any, '=', uuid)
+      .where('uuid', '=', uuid)
       .executeTakeFirst()
 
     // Best-effort acknowledgement email. The submission has already

@@ -34,7 +34,7 @@ export default new Action({
     // Trending — judges by review count in the last 7 days. Join the
     // judge row so the home page card has name + image + court name
     // ready to render.
-    const trendingRows = await (db.selectFrom('judge_reviews' as any) as any)
+    const trendingRows = await (db.selectFrom('judge_reviews') as any)
       .innerJoin('judges' as any, 'judges.id', '=', 'judge_reviews.judge_id')
       .leftJoin('court_houses' as any, 'court_houses.id', '=', 'judges.court_house_id')
       .select([
@@ -45,10 +45,10 @@ export default new Action({
         'COUNT(judge_reviews.id) as review_count',
         'AVG(judge_reviews.rating) as avg_rating',
       ])
-      .where('judge_reviews.status' as any, '=', 'published')
-      .where('judge_reviews.created_at' as any, '>=', sevenDaysAgo)
-      .groupBy('judges.id' as any)
-      .orderBy('review_count' as any, 'desc')
+      .where('judge_reviews.status', '=', 'published')
+      .where('judge_reviews.created_at', '>=', sevenDaysAgo)
+      .groupBy('judges.id')
+      .orderBy('review_count', 'desc')
       .limit(6)
       .execute() as Array<Record<string, any>>
 
@@ -56,7 +56,7 @@ export default new Action({
     // reviews so a single perfect score doesn't dominate. ORDER BY
     // avg DESC, then review_count DESC as a tiebreaker (more reviewed
     // means more credible at the same average).
-    const topRatedRows = await (db.selectFrom('judge_reviews' as any) as any)
+    const topRatedRows = await (db.selectFrom('judge_reviews') as any)
       .innerJoin('judges' as any, 'judges.id', '=', 'judge_reviews.judge_id')
       .leftJoin('court_houses' as any, 'court_houses.id', '=', 'judges.court_house_id')
       .select([
@@ -67,29 +67,29 @@ export default new Action({
         'COUNT(judge_reviews.id) as review_count',
         'AVG(judge_reviews.rating) as avg_rating',
       ])
-      .where('judge_reviews.status' as any, '=', 'published')
-      .groupBy('judges.id' as any)
+      .where('judge_reviews.status', '=', 'published')
+      .groupBy('judges.id')
       .having('COUNT(judge_reviews.id)' as any, '>=', 2)
-      .orderBy('avg_rating' as any, 'desc')
-      .orderBy('review_count' as any, 'desc')
+      .orderBy('avg_rating', 'desc')
+      .orderBy('review_count', 'desc')
       .limit(6)
       .execute() as Array<Record<string, any>>
 
     // Active reviewers — users who have the most published reviews in
     // the last 30 days. Public-safe payload only: id, name, count.
     // Anonymous reviews (user_id null) are excluded.
-    const reviewerRows = await (db.selectFrom('judge_reviews' as any) as any)
+    const reviewerRows = await (db.selectFrom('judge_reviews') as any)
       .innerJoin('users' as any, 'users.id', '=', 'judge_reviews.user_id')
       .select([
         'users.id as user_id',
         'users.name as user_name',
         'COUNT(judge_reviews.id) as review_count',
       ])
-      .where('judge_reviews.status' as any, '=', 'published')
-      .where('judge_reviews.created_at' as any, '>=', thirtyDaysAgo)
-      .where('judge_reviews.user_id' as any, 'is not', null)
-      .groupBy('users.id' as any)
-      .orderBy('review_count' as any, 'desc')
+      .where('judge_reviews.status', '=', 'published')
+      .where('judge_reviews.created_at', '>=', thirtyDaysAgo)
+      .where('judge_reviews.user_id', 'is not', null)
+      .groupBy('users.id')
+      .orderBy('review_count', 'desc')
       .limit(5)
       .execute() as Array<Record<string, any>>
 

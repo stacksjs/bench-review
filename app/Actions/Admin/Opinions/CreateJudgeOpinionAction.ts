@@ -39,9 +39,9 @@ export default new Action({
 
     // Confirm the judge exists before inserting. An opinion against
     // a missing judge is noise.
-    const judge = await db.selectFrom('judges' as any)
+    const judge = await db.selectFrom('judges')
       .select(['id'] as any)
-      .where('id' as any, '=', judgeId)
+      .where('id', '=', judgeId)
       .executeTakeFirst() as { id: number } | undefined
     if (!judge)
       return response.json({ error: 'Judge not found.' }, 404)
@@ -62,7 +62,7 @@ export default new Action({
       return response.json({ error: 'Source URL must be http(s)://...' }, 422)
 
     const now = new Date().toISOString()
-    await db.insertInto('judge_opinions' as any).values({
+    await db.insertInto('judge_opinions').values({
       judge_id: judgeId,
       case_name: caseName,
       citation,

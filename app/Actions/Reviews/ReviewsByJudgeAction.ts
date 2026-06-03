@@ -43,18 +43,18 @@ export default new Action({
     // needs to be run on the same builder shape and (b) hydrateLikeData
     // expects raw rows. The model layer's chainable .count() / .paginate()
     // are not reliable in our vendored framework copy (see issue body).
-    const countRow = await (db.selectFrom('judge_reviews' as any) as any)
+    const countRow = await (db.selectFrom('judge_reviews') as any)
       .select(['COUNT(*) as c'])
-      .where('judge_id' as any, '=', judgeId)
-      .where('status' as any, '=', 'published')
+      .where('judge_id', '=', judgeId)
+      .where('status', '=', 'published')
       .executeTakeFirst() as { c: number | string } | undefined
     const total = Number(countRow?.c ?? 0)
 
-    const rows = await (db.selectFrom('judge_reviews' as any) as any)
+    const rows = await (db.selectFrom('judge_reviews') as any)
       .selectAll()
-      .where('judge_id' as any, '=', judgeId)
-      .where('status' as any, '=', 'published')
-      .orderBy('created_at' as any, 'desc')
+      .where('judge_id', '=', judgeId)
+      .where('status', '=', 'published')
+      .orderBy('created_at', 'desc')
       .limit(perPage)
       .offset(offset)
       .execute() as Array<Record<string, any>>

@@ -55,9 +55,9 @@ export default new Action({
     // against nonexistent reviews are noise and dirty the moderator
     // queue. Also prevent the trivial "is this id taken" probe by
     // returning 404 in the same shape as anywhere else.
-    const review = await db.selectFrom('judge_reviews' as any)
+    const review = await db.selectFrom('judge_reviews')
       .select(['id'] as any)
-      .where('id' as any, '=', reviewId)
+      .where('id', '=', reviewId)
       .executeTakeFirst() as { id: number } | undefined
     if (!review)
       return response.json({ error: 'Review not found.' }, 404)
@@ -77,17 +77,17 @@ export default new Action({
     // creating a dupe row. Surfacing a 4xx for "already flagged" feels
     // hostile and exposes whether the user previously flagged.
     if (userId != null) {
-      const existing = await db.selectFrom('review_flags' as any)
+      const existing = await db.selectFrom('review_flags')
         .select(['id'] as any)
-        .where('judge_review_id' as any, '=', reviewId)
-        .where('user_id' as any, '=', userId)
+        .where('judge_review_id', '=', reviewId)
+        .where('user_id', '=', userId)
         .executeTakeFirst() as { id: number } | undefined
       if (existing)
         return response.json({ ok: true, duplicate: true })
     }
 
     const now = new Date().toISOString()
-    await db.insertInto('review_flags' as any).values({
+    await db.insertInto('review_flags').values({
       judge_review_id: reviewId,
       user_id: userId,
       reason,

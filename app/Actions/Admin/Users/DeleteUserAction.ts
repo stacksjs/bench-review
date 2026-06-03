@@ -47,9 +47,9 @@ export default new Action({
     if ((me as any)?.id === targetUserId)
       return response.json({ error: 'You cannot delete your own account from the admin panel.' }, 422)
 
-    const target = await db.selectFrom('users' as any)
+    const target = await db.selectFrom('users')
       .select(['id'] as any)
-      .where('id' as any, '=', targetUserId)
+      .where('id', '=', targetUserId)
       .executeTakeFirst()
     if (!target)
       return response.json({ error: 'User not found.' }, 404)
@@ -58,28 +58,28 @@ export default new Action({
     // than orphaning to `user_id = NULL` because seeded/anonymous
     // reviews already use NULL — keeping the convention clean keeps
     // the public-feed filter (`r.judge_id != null`) simple.
-    await db.deleteFrom('judge_reviews' as any).where('user_id' as any, '=', targetUserId).execute().catch(() => {})
-    await db.deleteFrom('judge_follows' as any).where('user_id' as any, '=', targetUserId).execute().catch(() => {})
+    await db.deleteFrom('judge_reviews').where('user_id', '=', targetUserId).execute().catch(() => {})
+    await db.deleteFrom('judge_follows').where('user_id', '=', targetUserId).execute().catch(() => {})
 
     // Token rows. The `personal_access_tokens` table is polymorphic
     // (`tokenable_type`/`tokenable_id`); the OAuth table is keyed by
     // `user_id`. Best-effort: if either table is missing on a fresh
     // checkout the `.catch(() => {})` makes the delete a no-op rather
     // than 500-ing the request.
-    await db.deleteFrom('personal_access_tokens' as any)
-      .where('tokenable_id' as any, '=', targetUserId)
+    await db.deleteFrom('personal_access_tokens')
+      .where('tokenable_id', '=', targetUserId)
       .execute()
       .catch(() => {})
-    await db.deleteFrom('oauth_access_tokens' as any)
-      .where('user_id' as any, '=', targetUserId)
+    await db.deleteFrom('oauth_access_tokens')
+      .where('user_id', '=', targetUserId)
       .execute()
       .catch(() => {})
 
     // RBAC pivots.
-    await db.deleteFrom('user_roles' as any).where('user_id' as any, '=', targetUserId).execute().catch(() => {})
-    await db.deleteFrom('user_permissions' as any).where('user_id' as any, '=', targetUserId).execute().catch(() => {})
+    await db.deleteFrom('user_roles').where('user_id', '=', targetUserId).execute().catch(() => {})
+    await db.deleteFrom('user_permissions').where('user_id', '=', targetUserId).execute().catch(() => {})
 
-    await db.deleteFrom('users' as any).where('id' as any, '=', targetUserId).execute()
+    await db.deleteFrom('users').where('id', '=', targetUserId).execute()
 
     return response.json({ ok: true, deleted: targetUserId })
   },

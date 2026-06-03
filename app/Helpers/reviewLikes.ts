@@ -55,10 +55,10 @@ export async function hydrateLikeData<T extends { id: number }>(
   // SQL fragment object would stringify to "[object Object]" and
   // SQLite would 500 with `no such column: object Object`. The
   // literal carries no user input so this is safe.
-  const countRows = await (db.selectFrom('judge_reviews_likes' as any) as any)
+  const countRows = await (db.selectFrom('judge_reviews_likes') as any)
     .select(['judge_review_id', 'COUNT(*) as c'])
-    .where('judge_review_id' as any, 'in', ids as any)
-    .groupBy('judge_review_id' as any)
+    .where('judge_review_id', 'in', ids as any)
+    .groupBy('judge_review_id')
     .execute() as Array<{ judge_review_id: number, c: number | string }>
 
   const countByReview = new Map<number, number>()
@@ -69,10 +69,10 @@ export async function hydrateLikeData<T extends { id: number }>(
   // Anonymous: skip the query entirely; everyone gets false.
   const likedByMe = new Set<number>()
   if (userId) {
-    const likedRows = await (db.selectFrom('judge_reviews_likes' as any) as any)
+    const likedRows = await (db.selectFrom('judge_reviews_likes') as any)
       .select('judge_review_id')
-      .where('user_id' as any, '=', userId)
-      .where('judge_review_id' as any, 'in', ids as any)
+      .where('user_id', '=', userId)
+      .where('judge_review_id', 'in', ids as any)
       .execute() as Array<{ judge_review_id: number }>
     for (const r of likedRows)
       likedByMe.add(Number(r.judge_review_id))

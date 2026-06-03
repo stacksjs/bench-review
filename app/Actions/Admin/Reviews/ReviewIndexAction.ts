@@ -40,17 +40,17 @@ export default new Action({
     // chained methods in call order, so orderBy-then-where produces
     // `... ORDER BY ... WHERE ...` which SQLite rejects. See
     // UserIndexAction for the same fix.
-    let listQuery: any = db.selectFrom('judge_reviews' as any)
+    let listQuery: any = db.selectFrom('judge_reviews')
       .selectAll()
 
-    let countQuery: any = db.selectFrom('judge_reviews' as any)
+    let countQuery: any = db.selectFrom('judge_reviews')
       // Plain-string COUNT — `db.fn.count` is undefined in this bqb
       // version. See UserIndexAction for the same pattern.
       .select(['COUNT(*) as total'] as any)
 
     if (status !== 'all') {
-      listQuery = listQuery.where('status' as any, '=', status)
-      countQuery = countQuery.where('status' as any, '=', status)
+      listQuery = listQuery.where('status', '=', status)
+      countQuery = countQuery.where('status', '=', status)
     }
 
     if (q.length > 0) {
@@ -61,7 +61,7 @@ export default new Action({
       countQuery = countQuery.where('title', 'like', like).orWhere('content', 'like', like)
     }
 
-    listQuery = listQuery.orderBy('created_at' as any, 'desc')
+    listQuery = listQuery.orderBy('created_at', 'desc')
 
     const [rows, totalRow] = await Promise.all([
       listQuery.limit(perPage).offset(offset).execute(),
@@ -75,10 +75,10 @@ export default new Action({
     const [judges, users] = await Promise.all([
       judgeIds.length === 0
         ? Promise.resolve([] as any[])
-        : db.selectFrom('judges' as any).select(['id', 'name'] as any).where('id' as any, 'in', judgeIds as any).execute(),
+        : db.selectFrom('judges').select(['id', 'name'] as any).where('id', 'in', judgeIds as any).execute(),
       userIds.length === 0
         ? Promise.resolve([] as any[])
-        : db.selectFrom('users' as any).select(['id', 'name', 'email'] as any).where('id' as any, 'in', userIds as any).execute(),
+        : db.selectFrom('users').select(['id', 'name', 'email'] as any).where('id', 'in', userIds as any).execute(),
     ])
 
     const judgeById = new Map<number, any>()
@@ -95,10 +95,10 @@ export default new Action({
     if (reviewIdsForCount.length > 0) {
       // See app/Helpers/reviewLikes.ts:hydrateLikeData for why
       // COUNT(*) is a plain string here, not a `sql` tagged template.
-      const countRows = await (db.selectFrom('judge_reviews_likes' as any) as any)
+      const countRows = await (db.selectFrom('judge_reviews_likes') as any)
         .select(['judge_review_id', 'COUNT(*) as c'])
-        .where('judge_review_id' as any, 'in', reviewIdsForCount as any)
-        .groupBy('judge_review_id' as any)
+        .where('judge_review_id', 'in', reviewIdsForCount as any)
+        .groupBy('judge_review_id')
         .execute() as Array<{ judge_review_id: number, c: number | string }>
       for (const row of countRows)
         likesByReview.set(Number(row.judge_review_id), Number(row.c))

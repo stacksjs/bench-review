@@ -36,20 +36,20 @@ export default new Action({
     const judgeId = Number((request as any).params?.id)
     const { perPage, page, offset } = resolvePaginatorArgs({ perPage: 25 })
 
-    const countRow = await (db.selectFrom('judge_opinions' as any) as any)
+    const countRow = await (db.selectFrom('judge_opinions') as any)
       .select(['COUNT(*) as c'])
-      .where('judge_id' as any, '=', judgeId)
+      .where('judge_id', '=', judgeId)
       .executeTakeFirst() as { c: number | string } | undefined
     const total = Number(countRow?.c ?? 0)
 
-    const rows = await (db.selectFrom('judge_opinions' as any) as any)
+    const rows = await (db.selectFrom('judge_opinions') as any)
       .select([
         'id', 'judge_id', 'case_name', 'citation', 'decision_date',
         'summary', 'outcome_label', 'source_url', 'source_provider',
         'created_at',
       ])
-      .where('judge_id' as any, '=', judgeId)
-      .orderBy('decision_date' as any, 'desc')
+      .where('judge_id', '=', judgeId)
+      .orderBy('decision_date', 'desc')
       .limit(perPage)
       .offset(offset)
       .execute()

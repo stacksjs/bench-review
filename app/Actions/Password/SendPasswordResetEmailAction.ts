@@ -56,9 +56,9 @@ export default new Action({
     if (!email)
       return response.json({ ok: true, message: 'If an account exists for that email, a reset link has been sent.' })
 
-    const user = await db.selectFrom('users' as any)
+    const user = await db.selectFrom('users')
       .select(['id'] as any)
-      .where('email' as any, '=', email)
+      .where('email', '=', email)
       .executeTakeFirst() as { id: number } | undefined
 
     // Anti-enumeration short-circuit. Return the success-shaped
@@ -78,13 +78,13 @@ export default new Action({
     // request invalidates older links. The framework's reset code
     // looks up by email and expects at most one row — without this,
     // an attacker who held a stale token could still use it.
-    await db.deleteFrom('password_resets' as any)
-      .where('email' as any, '=', email)
+    await db.deleteFrom('password_resets')
+      .where('email', '=', email)
       .execute()
       .catch(() => {})
 
     const now = new Date().toISOString()
-    await db.insertInto('password_resets' as any).values({
+    await db.insertInto('password_resets').values({
       email,
       token: hashedToken,
       created_at: now,

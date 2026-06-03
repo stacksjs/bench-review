@@ -19,15 +19,15 @@ export default new Action({
   description: 'List users with unverified credential claims',
   method: 'GET',
   async handle() {
-    const rows = await db.selectFrom('users' as any)
+    const rows = await db.selectFrom('users')
       .select([
         'id', 'name', 'email',
         'credential_type', 'credential_state',
         'credential_claimed_at', 'credential_rejection_note',
       ] as any)
-      .where('credential_claimed_at' as any, 'is not', null)
-      .where('credential_verified_at' as any, 'is', null)
-      .orderBy('credential_claimed_at' as any, 'asc')
+      .where('credential_claimed_at', 'is not', null)
+      .where('credential_verified_at', 'is', null)
+      .orderBy('credential_claimed_at', 'asc')
       .execute()
 
     return response.json({ claims: rows })

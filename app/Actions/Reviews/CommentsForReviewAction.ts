@@ -37,17 +37,17 @@ export default new Action({
     const reviewId = Number((request as any).params?.id)
     const { perPage, page, offset } = resolvePaginatorArgs({ perPage: 20 })
 
-    const countRow = await (db.selectFrom('review_comments' as any) as any)
+    const countRow = await (db.selectFrom('review_comments') as any)
       .select(['COUNT(*) as c'])
-      .where('judge_review_id' as any, '=', reviewId)
-      .where('status' as any, '=', 'published')
+      .where('judge_review_id', '=', reviewId)
+      .where('status', '=', 'published')
       .executeTakeFirst() as { c: number | string } | undefined
     const total = Number(countRow?.c ?? 0)
 
     // Pull the comment slice + author rows in two queries. JOIN to
     // users for name + role_label so the public-author hydration runs
     // without N+1.
-    const rows = await (db.selectFrom('review_comments' as any) as any)
+    const rows = await (db.selectFrom('review_comments') as any)
       .leftJoin('users' as any, 'users.id', '=', 'review_comments.user_id')
       .select([
         'review_comments.id as id',
@@ -60,9 +60,9 @@ export default new Action({
         'users.name as user_name',
         'users.role_label as user_role_label',
       ])
-      .where('review_comments.judge_review_id' as any, '=', reviewId)
-      .where('review_comments.status' as any, '=', 'published')
-      .orderBy('review_comments.created_at' as any, 'asc')
+      .where('review_comments.judge_review_id', '=', reviewId)
+      .where('review_comments.status', '=', 'published')
+      .orderBy('review_comments.created_at', 'asc')
       .limit(perPage)
       .offset(offset)
       .execute() as Array<Record<string, any>>

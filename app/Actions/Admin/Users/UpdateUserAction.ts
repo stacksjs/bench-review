@@ -49,31 +49,31 @@ export default new Action({
     if (Object.keys(patch).length === 0)
       return response.json({ ok: true, updated: 0 })
 
-    const target = await db.selectFrom('users' as any)
+    const target = await db.selectFrom('users')
       .select(['id', 'email'] as any)
-      .where('id' as any, '=', userId)
+      .where('id', '=', userId)
       .executeTakeFirst() as { id: number, email: string } | undefined
 
     if (!target)
       return response.json({ error: 'User not found.' }, 404)
 
     if (patch.email && patch.email !== target.email) {
-      const dupe = await db.selectFrom('users' as any)
+      const dupe = await db.selectFrom('users')
         .select(['id'] as any)
-        .where('email' as any, '=', patch.email)
+        .where('email', '=', patch.email)
         .executeTakeFirst()
       if (dupe)
         return response.json({ error: 'That email is already in use.' }, 422)
     }
 
-    await db.updateTable('users' as any)
+    await db.updateTable('users')
       .set({ ...patch, updated_at: new Date().toISOString() } as any)
-      .where('id' as any, '=', userId)
+      .where('id', '=', userId)
       .execute()
 
-    const updated = await db.selectFrom('users' as any)
+    const updated = await db.selectFrom('users')
       .select(['id', 'email', 'name', 'created_at', 'updated_at'] as any)
-      .where('id' as any, '=', userId)
+      .where('id', '=', userId)
       .executeTakeFirst()
 
     return response.json({ ok: true, updated: 1, user: updated })

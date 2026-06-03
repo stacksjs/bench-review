@@ -35,9 +35,9 @@ export default new Action({
 
     const photoId = Number((request as any).params?.id)
 
-    const existing = await db.selectFrom('review_photos' as any)
+    const existing = await db.selectFrom('review_photos')
       .select(['id', 'user_id', 'thumb_url', 'card_url', 'full_url'] as any)
-      .where('id' as any, '=', photoId)
+      .where('id', '=', photoId)
       .executeTakeFirst() as { id: number, user_id: number, thumb_url: string, card_url: string, full_url: string } | undefined
 
     if (!existing || Number(existing.user_id) !== Number(userId))
@@ -56,8 +56,8 @@ export default new Action({
       catch { /* file missing or unreachable; row delete still proceeds */ }
     }
 
-    await db.deleteFrom('review_photos' as any)
-      .where('id' as any, '=', photoId)
+    await db.deleteFrom('review_photos')
+      .where('id', '=', photoId)
       .execute()
 
     return response.json({ ok: true, deleted: photoId })

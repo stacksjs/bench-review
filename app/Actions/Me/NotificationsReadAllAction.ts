@@ -18,10 +18,10 @@ export default new Action({
     if (!userId)
       return response.json({ error: 'Not authenticated' }, 401)
 
-    await db.updateTable('user_notifications' as any)
+    await db.updateTable('user_notifications')
       .set({ read_at: new Date().toISOString() } as any)
-      .where('user_id' as any, '=', userId)
-      .where('read_at' as any, 'is', null)
+      .where('user_id', '=', userId)
+      .where('read_at', 'is', null)
       .execute()
 
     return response.json({ ok: true })

@@ -59,17 +59,33 @@ export default new Action({
     const anonRaw = (request as any).get?.('anonymized')
     const anonymized = anonRaw === true || anonRaw === 'true' || anonRaw === 1 || anonRaw === '1' ? 1 : 0
 
-    // Confirm the review exists. A comment against a missing review
-    // is noise — bail early so the moderator queue isn't littered.
-    const review = await db.selectFrom('judge_reviews' as any)
-      .select(['id', 'comments'] as any)
-      .where('id' as any, '=', reviewId)
-      .executeTakeFirst() as { id: number, comments: number | null } | undefined
+    // Confirm the review exists and is commentable. A comment against
+    // a missing review is noise — bail early so the moderator queue
+    // isn't littered.
+    const review = await db.selectFrom('judge_reviews')
+      .select(['id', 'comments', 'status', 'user_id'] as any)
+      .where('id', '=', reviewId)
+      .executeTakeFirst() as { id: number, comments: number | null, status: string, user_id: number | null } | undefined
     if (!review)
       return response.json({ error: 'Review not found' }, 404)
 
+    // Comments only belong on published reviews. Pending/rejected rows
+    // are author-private (ShowReviewAction gates them to the author),
+    // so commenting on one means either the row isn't yours and you
+    // shouldn't see it, or it is yours and you can't comment on it
+    // anyway. 404 keeps unpublished rows invisible to non-authors —
+    // same shape as a missing row, matching the read-side gate.
+    if (review.status !== 'published')
+      return response.json({ error: 'Review not found' }, 404)
+
+    // Authors can't comment on their own review (mirrors the hidden
+    // composer in the Comments UI and the self-like block in
+    // LikeReviewAction).
+    if (review.user_id != null && Number(review.user_id) === Number(userId))
+      return response.json({ error: 'You can\'t comment on your own review.' }, 403)
+
     const now = new Date().toISOString()
-    await db.insertInto('review_comments' as any).values({
+    await db.insertInto('review_comments').values({
       judge_review_id: reviewId,
       user_id: Number(userId),
       body,
@@ -83,18 +99,18 @@ export default new Action({
     // read the count without JOINing. Best-effort — if the update
     // fails, the comment still landed; the count just drifts by one
     // until the next refresh. Tolerable.
-    await db.updateTable('judge_reviews' as any)
+    await db.updateTable('judge_reviews')
       .set({ comments: Number(review.comments ?? 0) + 1 } as any)
-      .where('id' as any, '=', reviewId)
+      .where('id', '=', reviewId)
       .execute()
       .catch(() => {})
 
     // Return the inserted row so the client can append optimistically.
-    const inserted = await db.selectFrom('review_comments' as any)
+    const inserted = await db.selectFrom('review_comments')
       .selectAll()
-      .where('judge_review_id' as any, '=', reviewId)
-      .where('user_id' as any, '=', Number(userId))
-      .orderBy('id' as any, 'desc')
+      .where('judge_review_id', '=', reviewId)
+      .where('user_id', '=', Number(userId))
+      .orderBy('id', 'desc')
       .limit(1)
       .executeTakeFirst() as Record<string, any> | undefined
 

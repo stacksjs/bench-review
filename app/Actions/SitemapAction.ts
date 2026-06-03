@@ -51,15 +51,15 @@ export default new Action({
     // see; if Google indexes a URL that returns 404 to anonymous
     // visitors, it counts against crawl budget.
     const [judges, courts, reviews] = await Promise.all([
-      (db.selectFrom('judges' as any) as any)
+      (db.selectFrom('judges') as any)
         .select(['id', 'updated_at'])
         .execute() as Promise<Array<{ id: number, updated_at: string | null }>>,
-      (db.selectFrom('court_houses' as any) as any)
+      (db.selectFrom('court_houses') as any)
         .select(['id', 'updated_at'])
         .execute() as Promise<Array<{ id: number, updated_at: string | null }>>,
-      (db.selectFrom('judge_reviews' as any) as any)
+      (db.selectFrom('judge_reviews') as any)
         .select(['id', 'updated_at'])
-        .where('status' as any, '=', 'published')
+        .where('status', '=', 'published')
         .execute() as Promise<Array<{ id: number, updated_at: string | null }>>,
     ])
 

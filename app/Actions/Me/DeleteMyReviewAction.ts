@@ -33,9 +33,9 @@ export default new Action({
 
     const reviewId = Number((request as any).params?.id)
 
-    const existing = await db.selectFrom('judge_reviews' as any)
+    const existing = await db.selectFrom('judge_reviews')
       .select(['id', 'user_id'] as any)
-      .where('id' as any, '=', reviewId)
+      .where('id', '=', reviewId)
       .executeTakeFirst() as { id: number, user_id: number | null } | undefined
 
     if (!existing || existing.user_id == null || Number(existing.user_id) !== Number(userId))
@@ -44,9 +44,9 @@ export default new Action({
     // Cascade. Best-effort on the pivot deletes so a missing table on
     // a fresh checkout doesn't 500 the request — the actual review
     // delete is the only must-succeed step.
-    await db.deleteFrom('judge_reviews_likes' as any).where('judge_review_id' as any, '=', reviewId).execute().catch(() => {})
-    await db.deleteFrom('user_notifications' as any).where('review_id' as any, '=', reviewId).execute().catch(() => {})
-    await db.deleteFrom('judge_reviews' as any).where('id' as any, '=', reviewId).execute()
+    await db.deleteFrom('judge_reviews_likes').where('judge_review_id', '=', reviewId).execute().catch(() => {})
+    await db.deleteFrom('user_notifications').where('review_id', '=', reviewId).execute().catch(() => {})
+    await db.deleteFrom('judge_reviews').where('id', '=', reviewId).execute()
 
     return response.json({ ok: true, deleted: reviewId })
   },

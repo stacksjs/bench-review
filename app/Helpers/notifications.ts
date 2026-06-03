@@ -40,17 +40,17 @@ export async function notify(input: DispatchInput): Promise<void> {
       // Dedup: skip if an unread or recent-read like notification
       // already exists for this exact (recipient, actor, review).
       // Without this, like → unlike → like floods the feed.
-      const existing = await db.selectFrom('user_notifications' as any)
+      const existing = await db.selectFrom('user_notifications')
         .select(['id'] as any)
-        .where('user_id' as any, '=', userId)
-        .where('actor_user_id' as any, '=', actorUserId ?? null)
-        .where('type' as any, '=', 'like')
-        .where('review_id' as any, '=', reviewId ?? null)
+        .where('user_id', '=', userId)
+        .where('actor_user_id', '=', actorUserId ?? null)
+        .where('type', '=', 'like')
+        .where('review_id', '=', reviewId ?? null)
         .executeTakeFirst()
       if (existing) return
     }
 
-    await db.insertInto('user_notifications' as any).values({
+    await db.insertInto('user_notifications').values({
       user_id: userId,
       actor_user_id: actorUserId ?? null,
       type,

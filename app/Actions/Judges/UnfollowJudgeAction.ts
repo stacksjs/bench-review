@@ -28,9 +28,9 @@ export default new Action({
 
     const judgeId = Number((request as any).params?.id)
 
-    await db.deleteFrom('judge_follows' as any)
-      .where('user_id' as any, '=', userId)
-      .where('judge_id' as any, '=', judgeId)
+    await db.deleteFrom('judge_follows')
+      .where('user_id', '=', userId)
+      .where('judge_id', '=', judgeId)
       .execute()
 
     return response.json({ ok: true, following: false })

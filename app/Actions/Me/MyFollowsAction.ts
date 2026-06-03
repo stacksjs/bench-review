@@ -21,9 +21,9 @@ export default new Action({
     if (!userId)
       return response.json({ error: 'Not authenticated' }, 401)
 
-    const rows = await db.selectFrom('judge_follows' as any)
+    const rows = await db.selectFrom('judge_follows')
       .select(['judge_id'] as any)
-      .where('user_id' as any, '=', userId)
+      .where('user_id', '=', userId)
       .execute() as Array<{ judge_id: number }>
 
     return response.json(rows.map(r => r.judge_id))

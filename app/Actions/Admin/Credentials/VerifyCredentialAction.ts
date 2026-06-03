@@ -39,9 +39,9 @@ export default new Action({
     if (action !== 'approve' && action !== 'reject')
       return response.json({ error: 'action must be "approve" or "reject".' }, 422)
 
-    const target = await db.selectFrom('users' as any)
+    const target = await db.selectFrom('users')
       .select(['id', 'credential_claimed_at'] as any)
-      .where('id' as any, '=', targetUserId)
+      .where('id', '=', targetUserId)
       .executeTakeFirst() as { id: number, credential_claimed_at: string | null } | undefined
 
     if (!target)
@@ -53,14 +53,14 @@ export default new Action({
     const now = new Date().toISOString()
 
     if (action === 'approve') {
-      await db.updateTable('users' as any)
+      await db.updateTable('users')
         .set({
           credential_verified_at: now,
           credential_verified_by_user_id: Number(adminId),
           credential_rejection_note: null,
           updated_at: now,
         } as any)
-        .where('id' as any, '=', targetUserId)
+        .where('id', '=', targetUserId)
         .execute()
       return response.json({ ok: true, status: 'approved', verified_at: now })
     }
@@ -70,14 +70,14 @@ export default new Action({
     if (!note)
       return response.json({ error: 'Rejection requires a `note` explaining why.' }, 422)
 
-    await db.updateTable('users' as any)
+    await db.updateTable('users')
       .set({
         credential_verified_at: null,
         credential_verified_by_user_id: null,
         credential_rejection_note: note,
         updated_at: now,
       } as any)
-      .where('id' as any, '=', targetUserId)
+      .where('id', '=', targetUserId)
       .execute()
     return response.json({ ok: true, status: 'rejected', note })
   },

@@ -44,9 +44,9 @@ export default new Action({
     if (op !== 'assign' && op !== 'remove')
       return response.json({ error: 'Action must be "assign" or "remove".' }, 422)
 
-    const target = await db.selectFrom('users' as any)
+    const target = await db.selectFrom('users')
       .select(['id'] as any)
-      .where('id' as any, '=', targetUserId)
+      .where('id', '=', targetUserId)
       .executeTakeFirst()
     if (!target)
       return response.json({ error: 'User not found.' }, 404)

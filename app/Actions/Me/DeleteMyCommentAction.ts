@@ -37,28 +37,28 @@ export default new Action({
 
     const commentId = Number((request as any).params?.id)
 
-    const existing = await db.selectFrom('review_comments' as any)
+    const existing = await db.selectFrom('review_comments')
       .select(['id', 'user_id', 'judge_review_id'] as any)
-      .where('id' as any, '=', commentId)
+      .where('id', '=', commentId)
       .executeTakeFirst() as { id: number, user_id: number, judge_review_id: number } | undefined
 
     if (!existing || Number(existing.user_id) !== Number(userId))
       return response.json({ error: 'Comment not found' }, 404)
 
-    await db.deleteFrom('review_comments' as any)
-      .where('id' as any, '=', commentId)
+    await db.deleteFrom('review_comments')
+      .where('id', '=', commentId)
       .execute()
 
     // Counter sync. Decrement clamped at 0 in case the denormalised
     // value already drifted out of sync.
-    const reviewRow = await db.selectFrom('judge_reviews' as any)
+    const reviewRow = await db.selectFrom('judge_reviews')
       .select(['comments'] as any)
-      .where('id' as any, '=', existing.judge_review_id)
+      .where('id', '=', existing.judge_review_id)
       .executeTakeFirst() as { comments: number | null } | undefined
     if (reviewRow) {
-      await db.updateTable('judge_reviews' as any)
+      await db.updateTable('judge_reviews')
         .set({ comments: Math.max(0, Number(reviewRow.comments ?? 0) - 1) } as any)
-        .where('id' as any, '=', existing.judge_review_id)
+        .where('id', '=', existing.judge_review_id)
         .execute()
         .catch(() => {})
     }

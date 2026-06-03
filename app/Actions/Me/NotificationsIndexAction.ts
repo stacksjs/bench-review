@@ -32,14 +32,14 @@ export default new Action({
     const limitRaw = Number((request as any).get?.('limit') ?? 30)
     const limit = Math.min(100, Math.max(1, Number.isFinite(limitRaw) ? Math.floor(limitRaw) : 30))
 
-    let listQuery: any = db.selectFrom('user_notifications' as any)
+    let listQuery: any = db.selectFrom('user_notifications')
       .selectAll()
-      .where('user_id' as any, '=', userId)
+      .where('user_id', '=', userId)
 
     if (filter === 'unread')
-      listQuery = listQuery.where('read_at' as any, 'is', null)
+      listQuery = listQuery.where('read_at', 'is', null)
 
-    listQuery = listQuery.orderBy('created_at' as any, 'desc').limit(limit)
+    listQuery = listQuery.orderBy('created_at', 'desc').limit(limit)
 
     const rows = await listQuery.execute() as Array<{
       id: number
@@ -58,10 +58,10 @@ export default new Action({
     const [actors, reviews] = await Promise.all([
       actorIds.length === 0
         ? Promise.resolve([] as Array<{ id: number, name: string }>)
-        : db.selectFrom('users' as any).select(['id', 'name'] as any).where('id' as any, 'in', actorIds as any).execute() as Promise<Array<{ id: number, name: string }>>,
+        : db.selectFrom('users').select(['id', 'name'] as any).where('id', 'in', actorIds as any).execute() as Promise<Array<{ id: number, name: string }>>,
       reviewIds.length === 0
         ? Promise.resolve([] as Array<{ id: number, title: string }>)
-        : db.selectFrom('judge_reviews' as any).select(['id', 'title'] as any).where('id' as any, 'in', reviewIds as any).execute() as Promise<Array<{ id: number, title: string }>>,
+        : db.selectFrom('judge_reviews').select(['id', 'title'] as any).where('id', 'in', reviewIds as any).execute() as Promise<Array<{ id: number, title: string }>>,
     ])
 
     const actorById = new Map<number, { id: number, name: string }>()
@@ -81,10 +81,10 @@ export default new Action({
 
     // Unread count — independent of the filter so the bell badge
     // stays accurate even when the user is viewing only unread.
-    const unreadRow = await (db.selectFrom('user_notifications' as any) as any)
+    const unreadRow = await (db.selectFrom('user_notifications') as any)
       .select(['COUNT(*) as c'] as any)
-      .where('user_id' as any, '=', userId)
-      .where('read_at' as any, 'is', null)
+      .where('user_id', '=', userId)
+      .where('read_at', 'is', null)
       .executeTakeFirst() as { c: number | string } | undefined
     const unreadCount = Number(unreadRow?.c ?? 0)
 

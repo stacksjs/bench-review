@@ -47,9 +47,9 @@ export default new Action({
 
     const reviewId = Number((request as any).params?.id)
 
-    const existing = await db.selectFrom('judge_reviews' as any)
+    const existing = await db.selectFrom('judge_reviews')
       .select(['id', 'user_id', 'status'] as any)
-      .where('id' as any, '=', reviewId)
+      .where('id', '=', reviewId)
       .executeTakeFirst() as { id: number, user_id: number | null, status: string } | undefined
 
     if (!existing || existing.user_id == null || Number(existing.user_id) !== Number(userId))
@@ -117,14 +117,14 @@ export default new Action({
     patch.status = 'pending'
     patch.updated_at = new Date().toISOString()
 
-    await db.updateTable('judge_reviews' as any)
+    await db.updateTable('judge_reviews')
       .set(patch as any)
-      .where('id' as any, '=', reviewId)
+      .where('id', '=', reviewId)
       .execute()
 
-    const fresh = await db.selectFrom('judge_reviews' as any)
+    const fresh = await db.selectFrom('judge_reviews')
       .selectAll()
-      .where('id' as any, '=', reviewId)
+      .where('id', '=', reviewId)
       .executeTakeFirst()
 
     return response.json({ ok: true, review: fresh })

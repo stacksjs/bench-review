@@ -1,5 +1,6 @@
+import type { ReviewRequest } from '../../Middleware/ViewableReview'
 import { Action } from '@stacksjs/actions'
-import { Auth } from '@stacksjs/auth'
+import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { hydrateLikeData } from '../../Helpers/reviewLikes'
 import { publicReviewerFor } from '../../Helpers/reviewerLabel'
@@ -7,13 +8,11 @@ import { publicReviewerFor } from '../../Helpers/reviewerLabel'
 /**
  * GET /api/reviews/:id — one review with judge context.
  *
- * Visibility rules:
- *   - Published: everyone (public route).
- *   - Pending / rejected: ONLY the author. The notification dropdown
- *     deep-links the author into their own pending or rejected
- *     article — 404'ing them on their own content was misleading.
- *     For anyone else, the row stays invisible (still 404) so a
- *     guessed-id can't surface unmoderated content.
+ * Authorization (the published-OR-author 404 gate) and loading the row
+ * live in the `viewable-review` middleware (app/Middleware/ViewableReview.ts),
+ * which stashes the row and `_viewerIsAuthor` on the request. This action
+ * is pure presentation: hydrate likes, attach the judge + author payload,
+ * attach photos.
  *
  * Returns a flat row plus a nested `judge` object so the article view
  * can render header + body in a single response. `likes` and
@@ -26,35 +25,22 @@ export default new Action({
   description: 'One review with judge context (author can see their own pending/rejected)',
   method: 'GET',
   async handle() {
-    const raw = String((request as any).params?.id || '')
-    const id = Number(raw)
-    if (!Number.isFinite(id) || id <= 0)
-      return response.json({ error: 'Invalid review id' }, 400)
-
-    const review = await JudgeReview.where('id', id).first()
+    // The middleware proxies these markers onto the request; the proxy
+    // forwards them verbatim (router/src/request-context.ts), so there's
+    // no re-query and no re-resolution of the viewer here. The cast
+    // bridges the singleton's static `RequestInstance` type to the
+    // runtime `EnhancedRequest` that actually carries the markers.
+    const req = request as unknown as ReviewRequest
+    const review = req._review
+    const viewerIsAuthor = req._viewerIsAuthor === true
     if (!review)
       return response.json({ error: 'Not Found' }, 404)
 
-    const status = (review as any).status as string
-    const authorId = (review as any).user_id as number | null
+    const authorId = review.user_id
 
-    // Author-view exception: pending/rejected rows visible to the
-    // author only. Everyone else gets a 404 — same response shape as
-    // a missing row so non-existence and access-denial are
-    // indistinguishable from outside.
-    if (status !== 'published') {
-      let viewerId: number | null = null
-      try {
-        const me = await Auth.user()
-        viewerId = (me as any)?.id ?? null
-      }
-      catch { /* anonymous — viewerId stays null */ }
-
-      if (authorId == null || viewerId == null || Number(viewerId) !== Number(authorId))
-        return response.json({ error: 'Not Found' }, 404)
-    }
-
-    const [hydrated] = await hydrateLikeData([review as any])
+    const [hydrated] = await hydrateLikeData([review])
+    if (!hydrated)
+      return response.json({ error: 'Not Found' }, 404)
 
     let judge: any = null
     if (hydrated.judge_id) {
@@ -82,20 +68,14 @@ export default new Action({
       const u = await User.where('id', Number(authorId)).first()
       if (u) {
         const ur = (u as any).toJSON ? (u as any).toJSON() : u
-        const isViewerAuthor = false
-        // Viewer-is-author already short-circuited above for non-
-        // published reviews. For published rows, check explicitly so
-        // the author sees their own identity even on the public page.
-        const viewerIsAuthor = await Auth.user()
-          .then(me => me && Number((me as any).id) === Number(authorId))
-          .catch(() => false)
-
-        if (viewerIsAuthor) {
+        // `viewerIsAuthor` was resolved once in the middleware and
+        // stashed — no second Auth.user() round-trip. The author sees
+        // their real identity (even on a published, public page); for
+        // everyone else publicReviewerFor() applies the anonymity flag.
+        if (viewerIsAuthor)
           author = { id: ur.id, name: ur.name, role_label: ur.role_label ?? null }
-        }
-        else {
+        else
           author = publicReviewerFor(hydrated as any, ur)
-        }
       }
     }
 
@@ -103,10 +83,10 @@ export default new Action({
     // uploads exist; the article gallery hides itself in that case.
     // Ordered by `order_index` so author-specified gallery order is
     // honoured.
-    const photos = await db.selectFrom('review_photos' as any)
+    const photos = await db.selectFrom('review_photos')
       .select(['id', 'thumb_url', 'card_url', 'full_url', 'width', 'height', 'order_index'] as any)
-      .where('judge_review_id' as any, '=', id)
-      .orderBy('order_index' as any, 'asc')
+      .where('judge_review_id', '=', review.id)
+      .orderBy('order_index', 'asc')
       .execute() as Array<Record<string, any>>
 
     return response.json({ ...hydrated, judge, author, photos })

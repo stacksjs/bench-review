@@ -44,7 +44,7 @@ export default new Action({
       return response.json({ error: 'Judge not found' }, 404)
 
     try {
-      await db.insertInto('judge_follows' as any).values({
+      await db.insertInto('judge_follows').values({
         user_id: userId,
         judge_id: judgeId,
       } as any).execute()

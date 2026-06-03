@@ -30,17 +30,17 @@ export default new Action({
 
     const notificationId = Number((request as any).params?.id)
 
-    const row = await db.selectFrom('user_notifications' as any)
+    const row = await db.selectFrom('user_notifications')
       .select(['id', 'user_id', 'read_at'] as any)
-      .where('id' as any, '=', notificationId)
+      .where('id', '=', notificationId)
       .executeTakeFirst() as { id: number, user_id: number, read_at: string | null } | undefined
     if (!row || Number(row.user_id) !== Number(userId))
       return response.json({ error: 'Notification not found' }, 404)
 
     if (row.read_at == null) {
-      await db.updateTable('user_notifications' as any)
+      await db.updateTable('user_notifications')
         .set({ read_at: new Date().toISOString() } as any)
-        .where('id' as any, '=', notificationId)
+        .where('id', '=', notificationId)
         .execute()
     }
 

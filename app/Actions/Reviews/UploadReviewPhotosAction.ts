@@ -42,9 +42,9 @@ export default new Action({
     const reviewId = Number((request as any).params?.id)
 
     // Verify ownership + grab the review's uuid for the storage path.
-    const review = await db.selectFrom('judge_reviews' as any)
+    const review = await db.selectFrom('judge_reviews')
       .select(['id', 'user_id', 'uuid'] as any)
-      .where('id' as any, '=', reviewId)
+      .where('id', '=', reviewId)
       .executeTakeFirst() as { id: number, user_id: number | null, uuid: string | null } | undefined
 
     if (!review || review.user_id == null || Number(review.user_id) !== Number(userId))
@@ -52,9 +52,9 @@ export default new Action({
 
     // Per-review photo cap. Counts existing rows so a user who
     // already has 3 photos can only add 1 more in this batch.
-    const existing = await db.selectFrom('review_photos' as any)
+    const existing = await db.selectFrom('review_photos')
       .select(['COUNT(*) as c'])
-      .where('judge_review_id' as any, '=', reviewId)
+      .where('judge_review_id', '=', reviewId)
       .executeTakeFirst() as { c: number | string } | undefined
     const existingCount = Number(existing?.c ?? 0)
     const slotsRemaining = MAX_PHOTOS_PER_REVIEW - existingCount
@@ -82,7 +82,7 @@ export default new Action({
       const file = incoming[i]
       try {
         const result = await processAndPersistReviewPhoto(reviewUuid, file, file.type)
-        await db.insertInto('review_photos' as any).values({
+        await db.insertInto('review_photos').values({
           judge_review_id: reviewId,
           user_id: Number(userId),
           thumb_url: result.thumb_url,

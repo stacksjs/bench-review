@@ -60,7 +60,7 @@ export default new Action({
       return response.json({ error: 'State must be a 2-letter code (e.g. CA, NY) or "FEDERAL".' }, 422)
 
     const now = new Date().toISOString()
-    await db.updateTable('users' as any)
+    await db.updateTable('users')
       .set({
         credential_type: type,
         credential_state: stateRaw,
@@ -72,7 +72,7 @@ export default new Action({
         credential_rejection_note: null,
         updated_at: now,
       } as any)
-      .where('id' as any, '=', Number(userId))
+      .where('id', '=', Number(userId))
       .execute()
 
     return response.json({

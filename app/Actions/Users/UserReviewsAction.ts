@@ -35,9 +35,9 @@ export default new Action({
 
     // Confirm the user exists before paginating reviews. Saves a
     // wasted COUNT + SELECT on bogus ids and lets us 404 cleanly.
-    const exists = await db.selectFrom('users' as any)
+    const exists = await db.selectFrom('users')
       .select(['id'] as any)
-      .where('id' as any, '=', userId)
+      .where('id', '=', userId)
       .executeTakeFirst() as { id: number } | undefined
     if (!exists)
       return response.json({ error: 'User not found' }, 404)
@@ -48,17 +48,17 @@ export default new Action({
     // identity surface — but a third party visiting `/user/:id`
     // shouldn't be able to enumerate the author's anonymous reviews
     // by side-channel correlation.
-    const countRow = await (db.selectFrom('judge_reviews' as any) as any)
+    const countRow = await (db.selectFrom('judge_reviews') as any)
       .select(['COUNT(*) as c'])
-      .where('user_id' as any, '=', userId)
-      .where('status' as any, '=', 'published')
-      .where('anonymized' as any, '=', 0)
+      .where('user_id', '=', userId)
+      .where('status', '=', 'published')
+      .where('anonymized', '=', 0)
       .executeTakeFirst() as { c: number | string } | undefined
     const total = Number(countRow?.c ?? 0)
 
     // SELECT with the judge join so the card has name + image + court
     // without N+1 follow-up queries.
-    const rows = await (db.selectFrom('judge_reviews' as any) as any)
+    const rows = await (db.selectFrom('judge_reviews') as any)
       .leftJoin('judges' as any, 'judges.id', '=', 'judge_reviews.judge_id')
       .select([
         'judge_reviews.id as id',
@@ -72,10 +72,10 @@ export default new Action({
         'judges.name as judge_name',
         'judges.image_url as judge_image',
       ])
-      .where('judge_reviews.user_id' as any, '=', userId)
-      .where('judge_reviews.status' as any, '=', 'published')
-      .where('judge_reviews.anonymized' as any, '=', 0)
-      .orderBy('judge_reviews.created_at' as any, 'desc')
+      .where('judge_reviews.user_id', '=', userId)
+      .where('judge_reviews.status', '=', 'published')
+      .where('judge_reviews.anonymized', '=', 0)
+      .orderBy('judge_reviews.created_at', 'desc')
       .limit(perPage)
       .offset(offset)
       .execute() as Array<Record<string, any>>

@@ -36,9 +36,9 @@ export default new Action({
   async handle() {
     const userId = Number((request as any).params?.id)
 
-    const user = await db.selectFrom('users' as any)
+    const user = await db.selectFrom('users')
       .select(['id', 'name', 'created_at', 'credential_type', 'credential_state', 'credential_verified_at'] as any)
-      .where('id' as any, '=', userId)
+      .where('id', '=', userId)
       .executeTakeFirst() as {
         id: number
         name: string
@@ -74,31 +74,31 @@ export default new Action({
     // there earlier so the counter isn't a denormalized field that
     // drifts). Three small queries is fine at the scale we care
     // about; revisit if a user has 10k+ reviews.
-    const agg = await (db.selectFrom('judge_reviews' as any) as any)
+    const agg = await (db.selectFrom('judge_reviews') as any)
       .select([
         'COUNT(*) as review_count',
         'AVG(rating) as avg_rating',
       ])
-      .where('user_id' as any, '=', userId)
-      .where('status' as any, '=', 'published')
-      .where('anonymized' as any, '=', 0)
+      .where('user_id', '=', userId)
+      .where('status', '=', 'published')
+      .where('anonymized', '=', 0)
       .executeTakeFirst() as { review_count: number | string, avg_rating: number | string | null } | undefined
 
-    const distinctRows = await (db.selectFrom('judge_reviews' as any) as any)
+    const distinctRows = await (db.selectFrom('judge_reviews') as any)
       .select(['judge_id'])
-      .where('user_id' as any, '=', userId)
-      .where('status' as any, '=', 'published')
-      .where('anonymized' as any, '=', 0)
-      .groupBy('judge_id' as any)
+      .where('user_id', '=', userId)
+      .where('status', '=', 'published')
+      .where('anonymized', '=', 0)
+      .groupBy('judge_id')
       .execute() as Array<{ judge_id: number }>
 
     // Total likes — JOIN the pivot against the user's published reviews.
-    const likesRow = await (db.selectFrom('judge_reviews_likes' as any) as any)
+    const likesRow = await (db.selectFrom('judge_reviews_likes') as any)
       .innerJoin('judge_reviews' as any, 'judge_reviews.id', '=', 'judge_reviews_likes.judge_review_id')
       .select(['COUNT(*) as c'])
-      .where('judge_reviews.user_id' as any, '=', userId)
-      .where('judge_reviews.status' as any, '=', 'published')
-      .where('judge_reviews.anonymized' as any, '=', 0)
+      .where('judge_reviews.user_id', '=', userId)
+      .where('judge_reviews.status', '=', 'published')
+      .where('judge_reviews.anonymized', '=', 0)
       .executeTakeFirst() as { c: number | string } | undefined
 
     const reviewCount = Number(agg?.review_count ?? 0)

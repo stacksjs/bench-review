@@ -68,9 +68,9 @@ export default new Action({
     // Pull the stored hash directly off the users row. We don't trust
     // `authUser.password` to be present in every code path — some auth
     // providers strip it from the in-memory record.
-    const row = await db.selectFrom('users' as any)
+    const row = await db.selectFrom('users')
       .select(['id', 'password'] as any)
-      .where('id' as any, '=', Number(userId))
+      .where('id', '=', Number(userId))
       .executeTakeFirst() as { id: number, password: string } | undefined
 
     if (!row?.password)
@@ -82,9 +82,9 @@ export default new Action({
 
     const nextHash = await makeHash(newPassword, { algorithm: 'bcrypt' })
 
-    await db.updateTable('users' as any)
+    await db.updateTable('users')
       .set({ password: nextHash, updated_at: new Date().toISOString() } as any)
-      .where('id' as any, '=', Number(userId))
+      .where('id', '=', Number(userId))
       .execute()
 
     return response.json({ ok: true })

@@ -37,16 +37,16 @@ export default new Action({
     if (!ALLOWED_STATUSES.has(status))
       return response.json({ error: 'Status must be "published" or "rejected".' }, 422)
 
-    const existing = await db.selectFrom('judge_reviews' as any)
+    const existing = await db.selectFrom('judge_reviews')
       .select(['id', 'user_id', 'status'] as any)
-      .where('id' as any, '=', reviewId)
+      .where('id', '=', reviewId)
       .executeTakeFirst() as { id: number, user_id: number | null, status: string } | undefined
     if (!existing)
       return response.json({ error: 'Review not found.' }, 404)
 
-    await db.updateTable('judge_reviews' as any)
+    await db.updateTable('judge_reviews')
       .set({ status, updated_at: new Date().toISOString() } as any)
-      .where('id' as any, '=', reviewId)
+      .where('id', '=', reviewId)
       .execute()
 
     // Notify the review's author IFF status actually changed AND the
@@ -70,22 +70,22 @@ export default new Action({
       // author's email + the judge name from a couple of cheap
       // selects so the email body has real context.
       try {
-        const author = await db.selectFrom('users' as any)
+        const author = await db.selectFrom('users')
           .select(['id', 'email', 'name'] as any)
-          .where('id' as any, '=', Number(existing.user_id))
+          .where('id', '=', Number(existing.user_id))
           .executeTakeFirst() as { id: number, email: string, name: string | null } | undefined
 
         if (author?.email) {
-          const reviewRow = await db.selectFrom('judge_reviews' as any)
+          const reviewRow = await db.selectFrom('judge_reviews')
             .select(['title', 'judge_id'] as any)
-            .where('id' as any, '=', reviewId)
+            .where('id', '=', reviewId)
             .executeTakeFirst() as { title: string, judge_id: number } | undefined
 
           let judgeName = 'a judge'
           if (reviewRow?.judge_id) {
-            const judgeRow = await db.selectFrom('judges' as any)
+            const judgeRow = await db.selectFrom('judges')
               .select(['name'] as any)
-              .where('id' as any, '=', reviewRow.judge_id)
+              .where('id', '=', reviewRow.judge_id)
               .executeTakeFirst() as { name: string } | undefined
             if (judgeRow?.name) judgeName = judgeRow.name
           }

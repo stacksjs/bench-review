@@ -24,14 +24,14 @@ export default new Action({
   async handle() {
     const reviewId = Number((request as any).params?.id)
 
-    const existing = await db.selectFrom('judge_reviews' as any)
+    const existing = await db.selectFrom('judge_reviews')
       .select(['id'] as any)
-      .where('id' as any, '=', reviewId)
+      .where('id', '=', reviewId)
       .executeTakeFirst()
     if (!existing)
       return response.json({ error: 'Review not found.' }, 404)
 
-    await db.deleteFrom('judge_reviews' as any).where('id' as any, '=', reviewId).execute()
+    await db.deleteFrom('judge_reviews').where('id', '=', reviewId).execute()
 
     return response.json({ ok: true, deleted: reviewId })
   },

@@ -36,9 +36,9 @@ export default new Action({
     const method = String((request as any).method ?? 'GET').toUpperCase()
 
     if (method === 'GET') {
-      const row = await db.selectFrom('review_drafts' as any)
+      const row = await db.selectFrom('review_drafts')
         .selectAll()
-        .where('user_id' as any, '=', Number(userId))
+        .where('user_id', '=', Number(userId))
         .executeTakeFirst() as Record<string, any> | undefined
 
       // Empty-shape response when no draft exists — keeps the client
@@ -49,8 +49,8 @@ export default new Action({
     }
 
     if (method === 'DELETE') {
-      await db.deleteFrom('review_drafts' as any)
-        .where('user_id' as any, '=', Number(userId))
+      await db.deleteFrom('review_drafts')
+        .where('user_id', '=', Number(userId))
         .execute()
       return response.json({ ok: true, cleared: true })
     }
@@ -82,9 +82,9 @@ export default new Action({
       const type = ALLOWED_TYPES.has(typeRaw) ? typeRaw : null
       const anonymized = anonRaw === true || anonRaw === 'true' || anonRaw === 1 || anonRaw === '1' ? 1 : 0
 
-      const existing = await db.selectFrom('review_drafts' as any)
+      const existing = await db.selectFrom('review_drafts')
         .select(['id'] as any)
-        .where('user_id' as any, '=', Number(userId))
+        .where('user_id', '=', Number(userId))
         .executeTakeFirst() as { id: number } | undefined
 
       const now = new Date().toISOString()
@@ -100,14 +100,14 @@ export default new Action({
       }
 
       if (existing) {
-        await db.updateTable('review_drafts' as any)
+        await db.updateTable('review_drafts')
           .set(values as any)
-          .where('id' as any, '=', existing.id)
+          .where('id', '=', existing.id)
           .execute()
       }
       else {
         values.created_at = now
-        await db.insertInto('review_drafts' as any).values(values as any).execute()
+        await db.insertInto('review_drafts').values(values as any).execute()
       }
       return response.json({ ok: true })
     }

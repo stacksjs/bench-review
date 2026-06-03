@@ -36,14 +36,14 @@ export default new Action({
     // `... ORDER BY ... WHERE ...` which SQLite rejects with
     // `near "WHERE": syntax error`. Apply the search filter before
     // the ordering call so the chain matches the canonical layout.
-    let listQuery: any = db.selectFrom('users' as any)
+    let listQuery: any = db.selectFrom('users')
       .select(['id', 'email', 'name', 'created_at', 'updated_at'] as any)
 
     // Plain-string `'COUNT(*) as total'` rather than `db.fn.count(...)` —
     // the current bqb version exposes no `db.fn` namespace. The literal
     // carries no user input so it's safe to interpolate. Matches the
     // count pattern in `app/Helpers/reviewLikes.ts:hydrateLikeData`.
-    let countQuery: any = db.selectFrom('users' as any)
+    let countQuery: any = db.selectFrom('users')
       .select(['COUNT(*) as total'] as any)
 
     if (q.length > 0) {
@@ -54,7 +54,7 @@ export default new Action({
       countQuery = countQuery.where('email', 'like', like).orWhere('name', 'like', like)
     }
 
-    listQuery = listQuery.orderBy('id' as any, 'desc')
+    listQuery = listQuery.orderBy('id', 'desc')
 
     const [rows, totalRow] = await Promise.all([
       listQuery.limit(perPage).offset(offset).execute(),
@@ -76,7 +76,7 @@ export default new Action({
       // whole column list into a single call so all selections survive.
       // Same fix that landed upstream in rbac-store-bqb (see
       // stacksjs/stacks `fix(rbac): correct bqb API misuse`).
-      const roleRows = await (db.selectFrom('user_roles' as any) as any)
+      const roleRows = await (db.selectFrom('user_roles') as any)
         .innerJoin('roles', 'roles.id', '=', 'user_roles.role_id')
         .select([
           'user_roles.user_id as user_id',
@@ -84,7 +84,7 @@ export default new Action({
           'roles.name as name',
           'roles.guard_name as guard_name',
         ])
-        .where('user_roles.user_id' as any, 'in', userIds as any)
+        .where('user_roles.user_id', 'in', userIds as any)
         .execute() as Array<{ user_id: number, id: number, name: string, guard_name: string }>
 
       for (const r of roleRows) {
