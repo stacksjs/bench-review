@@ -43,7 +43,7 @@ export default new Action({
 
     // Verify ownership + grab the review's uuid for the storage path.
     const review = await db.selectFrom('judge_reviews')
-      .select(['id', 'user_id', 'uuid'] as any)
+      .select(['id', 'user_id', 'uuid'])
       .where('id', '=', reviewId)
       .executeTakeFirst() as { id: number, user_id: number | null, uuid: string | null } | undefined
 

@@ -63,7 +63,7 @@ export default new Action({
     // a missing review is noise — bail early so the moderator queue
     // isn't littered.
     const review = await db.selectFrom('judge_reviews')
-      .select(['id', 'comments', 'status', 'user_id'] as any)
+      .select(['id', 'comments', 'status', 'user_id'])
       .where('id', '=', reviewId)
       .executeTakeFirst() as { id: number, comments: number | null, status: string, user_id: number | null } | undefined
     if (!review)

@@ -48,7 +48,7 @@ export default new Action({
       return response.json({ error: 'You cannot delete your own account from the admin panel.' }, 422)
 
     const target = await db.selectFrom('users')
-      .select(['id'] as any)
+      .select(['id'])
       .where('id', '=', targetUserId)
       .executeTakeFirst()
     if (!target)

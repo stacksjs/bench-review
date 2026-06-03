@@ -46,7 +46,7 @@ export default new Action({
     let countQuery: any = db.selectFrom('judge_reviews')
       // Plain-string COUNT — `db.fn.count` is undefined in this bqb
       // version. See UserIndexAction for the same pattern.
-      .select(['COUNT(*) as total'] as any)
+      .select(['COUNT(*) as total'])
 
     if (status !== 'all') {
       listQuery = listQuery.where('status', '=', status)
@@ -75,10 +75,10 @@ export default new Action({
     const [judges, users] = await Promise.all([
       judgeIds.length === 0
         ? Promise.resolve([] as any[])
-        : db.selectFrom('judges').select(['id', 'name'] as any).where('id', 'in', judgeIds as any).execute(),
+        : db.selectFrom('judges').select(['id', 'name']).where('id', 'in', judgeIds as any).execute(),
       userIds.length === 0
         ? Promise.resolve([] as any[])
-        : db.selectFrom('users').select(['id', 'name', 'email'] as any).where('id', 'in', userIds as any).execute(),
+        : db.selectFrom('users').select(['id', 'name', 'email']).where('id', 'in', userIds as any).execute(),
     ])
 
     const judgeById = new Map<number, any>()

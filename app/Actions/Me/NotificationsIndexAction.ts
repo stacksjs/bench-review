@@ -58,10 +58,10 @@ export default new Action({
     const [actors, reviews] = await Promise.all([
       actorIds.length === 0
         ? Promise.resolve([] as Array<{ id: number, name: string }>)
-        : db.selectFrom('users').select(['id', 'name'] as any).where('id', 'in', actorIds as any).execute() as Promise<Array<{ id: number, name: string }>>,
+        : db.selectFrom('users').select(['id', 'name']).where('id', 'in', actorIds as any).execute() as Promise<Array<{ id: number, name: string }>>,
       reviewIds.length === 0
         ? Promise.resolve([] as Array<{ id: number, title: string }>)
-        : db.selectFrom('judge_reviews').select(['id', 'title'] as any).where('id', 'in', reviewIds as any).execute() as Promise<Array<{ id: number, title: string }>>,
+        : db.selectFrom('judge_reviews').select(['id', 'title']).where('id', 'in', reviewIds as any).execute() as Promise<Array<{ id: number, title: string }>>,
     ])
 
     const actorById = new Map<number, { id: number, name: string }>()
@@ -82,7 +82,7 @@ export default new Action({
     // Unread count — independent of the filter so the bell badge
     // stays accurate even when the user is viewing only unread.
     const unreadRow = await (db.selectFrom('user_notifications') as any)
-      .select(['COUNT(*) as c'] as any)
+      .select(['COUNT(*) as c'])
       .where('user_id', '=', userId)
       .where('read_at', 'is', null)
       .executeTakeFirst() as { c: number | string } | undefined

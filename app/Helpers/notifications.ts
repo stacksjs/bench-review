@@ -41,7 +41,7 @@ export async function notify(input: DispatchInput): Promise<void> {
       // already exists for this exact (recipient, actor, review).
       // Without this, like → unlike → like floods the feed.
       const existing = await db.selectFrom('user_notifications')
-        .select(['id'] as any)
+        .select(['id'])
         .where('user_id', '=', userId)
         .where('actor_user_id', '=', actorUserId ?? null)
         .where('type', '=', 'like')

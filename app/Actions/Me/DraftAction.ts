@@ -83,7 +83,7 @@ export default new Action({
       const anonymized = anonRaw === true || anonRaw === 'true' || anonRaw === 1 || anonRaw === '1' ? 1 : 0
 
       const existing = await db.selectFrom('review_drafts')
-        .select(['id'] as any)
+        .select(['id'])
         .where('user_id', '=', Number(userId))
         .executeTakeFirst() as { id: number } | undefined
 

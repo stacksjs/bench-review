@@ -48,7 +48,7 @@ export default new Action({
     const reviewId = Number((request as any).params?.id)
 
     const existing = await db.selectFrom('judge_reviews')
-      .select(['id', 'user_id', 'status'] as any)
+      .select(['id', 'user_id', 'status'])
       .where('id', '=', reviewId)
       .executeTakeFirst() as { id: number, user_id: number | null, status: string } | undefined
 

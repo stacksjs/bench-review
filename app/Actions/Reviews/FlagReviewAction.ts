@@ -56,7 +56,7 @@ export default new Action({
     // queue. Also prevent the trivial "is this id taken" probe by
     // returning 404 in the same shape as anywhere else.
     const review = await db.selectFrom('judge_reviews')
-      .select(['id'] as any)
+      .select(['id'])
       .where('id', '=', reviewId)
       .executeTakeFirst() as { id: number } | undefined
     if (!review)
@@ -78,7 +78,7 @@ export default new Action({
     // hostile and exposes whether the user previously flagged.
     if (userId != null) {
       const existing = await db.selectFrom('review_flags')
-        .select(['id'] as any)
+        .select(['id'])
         .where('judge_review_id', '=', reviewId)
         .where('user_id', '=', userId)
         .executeTakeFirst() as { id: number } | undefined

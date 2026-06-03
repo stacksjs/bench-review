@@ -25,7 +25,7 @@ export default new Action({
     const reviewId = Number((request as any).params?.id)
 
     const existing = await db.selectFrom('judge_reviews')
-      .select(['id'] as any)
+      .select(['id'])
       .where('id', '=', reviewId)
       .executeTakeFirst()
     if (!existing)

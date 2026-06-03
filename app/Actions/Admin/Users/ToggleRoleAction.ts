@@ -45,7 +45,7 @@ export default new Action({
       return response.json({ error: 'Action must be "assign" or "remove".' }, 422)
 
     const target = await db.selectFrom('users')
-      .select(['id'] as any)
+      .select(['id'])
       .where('id', '=', targetUserId)
       .executeTakeFirst()
     if (!target)

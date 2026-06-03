@@ -40,7 +40,7 @@ export default new Action({
     // Confirm the judge exists before inserting. An opinion against
     // a missing judge is noise.
     const judge = await db.selectFrom('judges')
-      .select(['id'] as any)
+      .select(['id'])
       .where('id', '=', judgeId)
       .executeTakeFirst() as { id: number } | undefined
     if (!judge)

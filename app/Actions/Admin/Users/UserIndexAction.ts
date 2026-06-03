@@ -37,14 +37,14 @@ export default new Action({
     // `near "WHERE": syntax error`. Apply the search filter before
     // the ordering call so the chain matches the canonical layout.
     let listQuery: any = db.selectFrom('users')
-      .select(['id', 'email', 'name', 'created_at', 'updated_at'] as any)
+      .select(['id', 'email', 'name', 'created_at', 'updated_at'])
 
     // Plain-string `'COUNT(*) as total'` rather than `db.fn.count(...)` —
     // the current bqb version exposes no `db.fn` namespace. The literal
     // carries no user input so it's safe to interpolate. Matches the
     // count pattern in `app/Helpers/reviewLikes.ts:hydrateLikeData`.
     let countQuery: any = db.selectFrom('users')
-      .select(['COUNT(*) as total'] as any)
+      .select(['COUNT(*) as total'])
 
     if (q.length > 0) {
       // bqb doesn't expose a Kysely-style callback `where(eb => eb.or([…]))` —

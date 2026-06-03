@@ -36,7 +36,7 @@ export default new Action({
     // Confirm the user exists before paginating reviews. Saves a
     // wasted COUNT + SELECT on bogus ids and lets us 404 cleanly.
     const exists = await db.selectFrom('users')
-      .select(['id'] as any)
+      .select(['id'])
       .where('id', '=', userId)
       .executeTakeFirst() as { id: number } | undefined
     if (!exists)

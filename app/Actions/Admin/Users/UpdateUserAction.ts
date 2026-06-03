@@ -50,7 +50,7 @@ export default new Action({
       return response.json({ ok: true, updated: 0 })
 
     const target = await db.selectFrom('users')
-      .select(['id', 'email'] as any)
+      .select(['id', 'email'])
       .where('id', '=', userId)
       .executeTakeFirst() as { id: number, email: string } | undefined
 
@@ -59,7 +59,7 @@ export default new Action({
 
     if (patch.email && patch.email !== target.email) {
       const dupe = await db.selectFrom('users')
-        .select(['id'] as any)
+        .select(['id'])
         .where('email', '=', patch.email)
         .executeTakeFirst()
       if (dupe)
@@ -72,7 +72,7 @@ export default new Action({
       .execute()
 
     const updated = await db.selectFrom('users')
-      .select(['id', 'email', 'name', 'created_at', 'updated_at'] as any)
+      .select(['id', 'email', 'name', 'created_at', 'updated_at'])
       .where('id', '=', userId)
       .executeTakeFirst()
 

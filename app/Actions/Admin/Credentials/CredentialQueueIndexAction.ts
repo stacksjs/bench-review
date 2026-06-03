@@ -24,7 +24,7 @@ export default new Action({
         'id', 'name', 'email',
         'credential_type', 'credential_state',
         'credential_claimed_at', 'credential_rejection_note',
-      ] as any)
+      ])
       .where('credential_claimed_at', 'is not', null)
       .where('credential_verified_at', 'is', null)
       .orderBy('credential_claimed_at', 'asc')

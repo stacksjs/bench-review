@@ -38,7 +38,7 @@ export default new Action({
       return response.json({ error: 'Status must be "published" or "rejected".' }, 422)
 
     const existing = await db.selectFrom('judge_reviews')
-      .select(['id', 'user_id', 'status'] as any)
+      .select(['id', 'user_id', 'status'])
       .where('id', '=', reviewId)
       .executeTakeFirst() as { id: number, user_id: number | null, status: string } | undefined
     if (!existing)
@@ -71,20 +71,20 @@ export default new Action({
       // selects so the email body has real context.
       try {
         const author = await db.selectFrom('users')
-          .select(['id', 'email', 'name'] as any)
+          .select(['id', 'email', 'name'])
           .where('id', '=', Number(existing.user_id))
           .executeTakeFirst() as { id: number, email: string, name: string | null } | undefined
 
         if (author?.email) {
           const reviewRow = await db.selectFrom('judge_reviews')
-            .select(['title', 'judge_id'] as any)
+            .select(['title', 'judge_id'])
             .where('id', '=', reviewId)
             .executeTakeFirst() as { title: string, judge_id: number } | undefined
 
           let judgeName = 'a judge'
           if (reviewRow?.judge_id) {
             const judgeRow = await db.selectFrom('judges')
-              .select(['name'] as any)
+              .select(['name'])
               .where('id', '=', reviewRow.judge_id)
               .executeTakeFirst() as { name: string } | undefined
             if (judgeRow?.name) judgeName = judgeRow.name

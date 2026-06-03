@@ -36,7 +36,7 @@ export default new Action({
     const photoId = Number((request as any).params?.id)
 
     const existing = await db.selectFrom('review_photos')
-      .select(['id', 'user_id', 'thumb_url', 'card_url', 'full_url'] as any)
+      .select(['id', 'user_id', 'thumb_url', 'card_url', 'full_url'])
       .where('id', '=', photoId)
       .executeTakeFirst() as { id: number, user_id: number, thumb_url: string, card_url: string, full_url: string } | undefined
 

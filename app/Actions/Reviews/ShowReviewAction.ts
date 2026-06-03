@@ -84,7 +84,7 @@ export default new Action({
     // Ordered by `order_index` so author-specified gallery order is
     // honoured.
     const photos = await db.selectFrom('review_photos')
-      .select(['id', 'thumb_url', 'card_url', 'full_url', 'width', 'height', 'order_index'] as any)
+      .select(['id', 'thumb_url', 'card_url', 'full_url', 'width', 'height', 'order_index'])
       .where('judge_review_id', '=', review.id)
       .orderBy('order_index', 'asc')
       .execute() as Array<Record<string, any>>

@@ -40,7 +40,7 @@ export default new Action({
       return response.json({ error: 'action must be "approve" or "reject".' }, 422)
 
     const target = await db.selectFrom('users')
-      .select(['id', 'credential_claimed_at'] as any)
+      .select(['id', 'credential_claimed_at'])
       .where('id', '=', targetUserId)
       .executeTakeFirst() as { id: number, credential_claimed_at: string | null } | undefined
 

@@ -1,4 +1,5 @@
 import type { ExtractParams, InferValidations, JobOptions, RequestInstance } from '@stacksjs/types'
+import type { Validator } from '@stacksjs/validation'
 
 /**
  * Shape of `validations:` on an action. Each entry pairs a
@@ -16,7 +17,15 @@ import type { ExtractParams, InferValidations, JobOptions, RequestInstance } fro
  */
 export interface ActionValidations {
   [key: string]: {
-    rule: { validate: (value: unknown) => { valid: boolean, errors?: Array<{ message: string }> } }
+    // The actual ts-validation validator (`schema.string()`, `schema.number()`,
+    // …). Previously a hand-rolled `{ validate: (value: unknown) => … }`
+    // structural approximation, which rejected every real validator: a
+    // validator's method is `(value: T) => ValidationResult`, and
+    // `(value: T)` isn't assignable to `(value: unknown)` (contravariance),
+    // nor is `ValidationResult.errors` (a `ValidationError[] | …Map` union)
+    // assignable to the old `errors?: Array<{ message }>`. `Validator<any>`
+    // is the type the doc above always described.
+    rule: Validator<any>
     message?: string | Record<string, string>
   }
 }

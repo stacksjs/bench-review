@@ -57,7 +57,7 @@ export default new Action({
       return response.json({ ok: true, message: 'If an account exists for that email, a reset link has been sent.' })
 
     const user = await db.selectFrom('users')
-      .select(['id'] as any)
+      .select(['id'])
       .where('email', '=', email)
       .executeTakeFirst() as { id: number } | undefined
 

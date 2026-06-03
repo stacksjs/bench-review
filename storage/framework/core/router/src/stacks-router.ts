@@ -7,6 +7,7 @@
 
 import type { Server } from 'bun'
 import type { ActionValidations, ValidationResult } from '@stacksjs/actions'
+import type { ValidationResult as RuleValidationResult } from '@stacksjs/validation'
 import type { ActionHandler, EnhancedRequest, Route, ServerOptions } from '@stacksjs/bun-router'
 import { Middleware } from './middleware'
 // Side-import the EnhancedRequest module augmentation so every `req._foo`
@@ -1475,7 +1476,7 @@ export async function validateActionInput(req: EnhancedRequest, validations: Act
 
   for (const [field, validation] of Object.entries(validations)) {
     const value = input[field]
-    let result: { valid: boolean, errors?: Array<{ message: string }> }
+    let result: RuleValidationResult
 
     try {
       result = validation.rule.validate(value)
@@ -1486,6 +1487,11 @@ export async function validateActionInput(req: EnhancedRequest, validations: Act
 
     if (!result.valid) {
       const fieldErrors: string[] = []
+      // `ValidationResult.errors` is a `ValidationError[] | ValidationErrorMap`
+      // union. Top-level field rules (what actions declare) always produce
+      // the flat array form; narrow to it and treat the map form (only
+      // emitted by nested object/shape validators) as empty here.
+      const ruleErrors = Array.isArray(result.errors) ? result.errors : []
       // Friendlier label: snake_case → "snake case", camelCase → "camel case",
       // capitalized so messages read naturally (`"Email is invalid"` rather
       // than the bare `"is invalid"` clients used to receive).
@@ -1497,15 +1503,15 @@ export async function validateActionInput(req: EnhancedRequest, validations: Act
         ? msg
         : `${label} ${msg}`
 
-      if (result.errors && result.errors.length > 0) {
+      if (ruleErrors.length > 0) {
         // Use custom message if provided, otherwise decorate the
         // validator's bare message with the field label.
         if (validation.message) {
-          const firstMessage = result.errors[0]?.message ?? ''
+          const firstMessage = ruleErrors[0]?.message ?? ''
           fieldErrors.push(typeof validation.message === 'string' ? validation.message : validation.message[field] || decorate(firstMessage))
         }
         else {
-          result.errors.forEach(err => fieldErrors.push(decorate(err.message)))
+          ruleErrors.forEach(err => fieldErrors.push(decorate(err.message)))
         }
       }
       else {

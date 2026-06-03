@@ -22,7 +22,7 @@ export default new Action({
       return response.json({ error: 'Not authenticated' }, 401)
 
     const rows = await db.selectFrom('judge_follows')
-      .select(['judge_id'] as any)
+      .select(['judge_id'])
       .where('user_id', '=', userId)
       .execute() as Array<{ judge_id: number }>
 

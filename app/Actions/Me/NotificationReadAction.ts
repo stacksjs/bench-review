@@ -31,7 +31,7 @@ export default new Action({
     const notificationId = Number((request as any).params?.id)
 
     const row = await db.selectFrom('user_notifications')
-      .select(['id', 'user_id', 'read_at'] as any)
+      .select(['id', 'user_id', 'read_at'])
       .where('id', '=', notificationId)
       .executeTakeFirst() as { id: number, user_id: number, read_at: string | null } | undefined
     if (!row || Number(row.user_id) !== Number(userId))

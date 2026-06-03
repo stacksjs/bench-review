@@ -38,7 +38,7 @@ export default new Action({
     const commentId = Number((request as any).params?.id)
 
     const existing = await db.selectFrom('review_comments')
-      .select(['id', 'user_id', 'judge_review_id'] as any)
+      .select(['id', 'user_id', 'judge_review_id'])
       .where('id', '=', commentId)
       .executeTakeFirst() as { id: number, user_id: number, judge_review_id: number } | undefined
 
@@ -52,7 +52,7 @@ export default new Action({
     // Counter sync. Decrement clamped at 0 in case the denormalised
     // value already drifted out of sync.
     const reviewRow = await db.selectFrom('judge_reviews')
-      .select(['comments'] as any)
+      .select(['comments'])
       .where('id', '=', existing.judge_review_id)
       .executeTakeFirst() as { comments: number | null } | undefined
     if (reviewRow) {

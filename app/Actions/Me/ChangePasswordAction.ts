@@ -69,7 +69,7 @@ export default new Action({
     // `authUser.password` to be present in every code path — some auth
     // providers strip it from the in-memory record.
     const row = await db.selectFrom('users')
-      .select(['id', 'password'] as any)
+      .select(['id', 'password'])
       .where('id', '=', Number(userId))
       .executeTakeFirst() as { id: number, password: string } | undefined
 

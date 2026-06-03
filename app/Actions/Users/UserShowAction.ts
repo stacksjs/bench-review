@@ -37,7 +37,7 @@ export default new Action({
     const userId = Number((request as any).params?.id)
 
     const user = await db.selectFrom('users')
-      .select(['id', 'name', 'created_at', 'credential_type', 'credential_state', 'credential_verified_at'] as any)
+      .select(['id', 'name', 'created_at', 'credential_type', 'credential_state', 'credential_verified_at'])
       .where('id', '=', userId)
       .executeTakeFirst() as {
         id: number
