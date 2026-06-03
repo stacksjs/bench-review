@@ -1,5 +1,6 @@
 import type { EmailAddress, EmailMessage, EmailResult } from '@stacksjs/types'
 import { Buffer } from 'node:buffer'
+import process from 'node:process'
 import * as tls from 'node:tls'
 import * as net from 'node:net'
 import { config } from '@stacksjs/config'
@@ -47,64 +48,42 @@ export class SMTPDriver extends BaseEmailDriver {
   public name = 'smtp'
 
   /**
-   * Resolve SMTP config on every send.
+   * Resolve SMTP settings fresh on every call (stacksjs/stacks#1925).
    *
-   * Two reasons we DON'T cache:
+   * The previous implementation cached the resolved config on the
+   * instance after the first read. If that first `mail.send()` landed
+   * inside the boot window — before `@stacksjs/config`'s async
+   * `overridesReady` finished importing `~/config/services` — then
+   * `config.services.smtp` read as `undefined`, the fallback snapped
+   * `127.0.0.1:587` into the cache, and *every* subsequent send hit
+   * port 587 forever (ECONNREFUSED against a Mailpit on 2525, with no
+   * way to recover short of a restart).
    *
-   *   1. Config-load race. `@stacksjs/config`'s project overrides
-   *      (`~/config/services.ts`) load asynchronously via
-   *      `overridesReady` — there's a window during boot where
-   *      `config.services.smtp` is still `undefined`. If the first
-   *      `send()` lands inside that window we used to cache the
-   *      fallback (`127.0.0.1:587` with no auth) and every
-   *      subsequent send went to a port the user's local catcher
-   *      almost certainly isn't listening on (Mailpit / Helo /
-   *      Mailtrap Desktop all default to `2525` or `1025`). The
-   *      .env value is set correctly the whole time, but the cache
-   *      pinned the wrong values.
+   * A property read is cheap next to a multi-RTT SMTP round-trip, so
+   * there was never a reason to cache. Reading every call also makes
+   * the driver correct under hot-reload / per-test config swaps.
    *
-   *   2. process.env tiebreaker. Even when `config.services.smtp`
-   *      isn't populated, the underlying `MAIL_*` env vars ARE —
-   *      Bun loads `.env` synchronously at process start. Reading
-   *      them as the LAST fallback lets the driver work in CLI
-   *      contexts (one-shot scripts, `bun -e`, jobs that boot
-   *      outside the framework's full config resolver) and during
-   *      the boot race described in (1).
-   *
-   * Cost of re-reading on every send: one property access + a few
-   * env lookups. Negligible against the actual SMTP round-trip.
+   * As belt-and-suspenders, fall back to `process.env.MAIL_*` so a
+   * correctly-populated `.env` works even if the config layer hasn't
+   * surfaced the override yet.
    */
-  private getConfig(): {
-    host: string
-    port: number
-    username: string
-    password: string
-    encryption: 'tls' | 'ssl' | 'starttls' | null
-  } {
-    const svc = (config as any)?.services?.smtp ?? {}
+  private getConfig() {
+    const smtp = config.services?.smtp
+    const env = process.env
 
-    // `MAIL_USERNAME=null` / `MAIL_PASSWORD=null` are the literal
-    // string "null" in our .env template (Laravel convention).
-    // Coerce those to empty strings so the driver treats them as
-    // no-auth instead of trying to AUTH LOGIN with username "null".
-    const envUser = process.env.MAIL_USERNAME && process.env.MAIL_USERNAME !== 'null' ? process.env.MAIL_USERNAME : ''
-    const envPass = process.env.MAIL_PASSWORD && process.env.MAIL_PASSWORD !== 'null' ? process.env.MAIL_PASSWORD : ''
-    const envEnc = process.env.MAIL_ENCRYPTION && process.env.MAIL_ENCRYPTION !== 'null' ? process.env.MAIL_ENCRYPTION : null
-    const envPort = process.env.MAIL_PORT ? Number(process.env.MAIL_PORT) : undefined
+    const host = smtp?.host || env.MAIL_HOST || '127.0.0.1'
+    const port = smtp?.port || (env.MAIL_PORT ? Number(env.MAIL_PORT) : undefined) || 587
+    const username = smtp?.username || env.MAIL_USERNAME || ''
+    const password = smtp?.password || env.MAIL_PASSWORD || ''
+    const rawEncryption = smtp?.encryption ?? env.MAIL_ENCRYPTION ?? null
 
-    const host = svc.host || process.env.MAIL_HOST || '127.0.0.1'
-    const port = svc.port || envPort || 587
-    const username = svc.username !== undefined ? (svc.username || '') : envUser
-    const password = svc.password !== undefined ? (svc.password || '') : envPass
-    const encryption = svc.encryption !== undefined ? svc.encryption : envEnc
-
-    // Map 'tls' to 'starttls' for port 587 (STARTTLS), 'ssl' for port 465 (implicit TLS)
     return {
       host,
       port,
       username,
       password,
-      encryption: (encryption === 'tls' ? 'starttls' : encryption || null) as 'tls' | 'ssl' | 'starttls' | null,
+      // Map 'tls' to 'starttls' for port 587 (STARTTLS), 'ssl' for port 465 (implicit TLS)
+      encryption: (rawEncryption === 'tls' ? 'starttls' : rawEncryption || null) as 'tls' | 'ssl' | 'starttls' | null,
     }
   }
 

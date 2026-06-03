@@ -15,6 +15,7 @@
   // anonymized comments and the link doesn't render here either.
 
   const authStore = useStore('auth')
+  const reviewsStore = useStore('reviews')
 
   interface CommentRow {
     id: number
@@ -136,6 +137,20 @@
   }
 
   const isAuthenticated = authStore.isAuthenticated
+
+  // The review's own author can't comment on their own review (same
+  // self-interaction rule as the self-like gate in ArticleView). Read
+  // the row from the shared reviews store — the article page already
+  // fetched it via reviewsStore.fetchById(), so reviewsStore.current()
+  // is the review this thread hangs off of. No @include scope
+  // forwarding needed (which stx doesn't reliably support anyway).
+  const isReviewAuthor = derived<boolean>(() => {
+    const me = authStore.user()
+    const row = reviewsStore.current()
+    return !!me && !!row && Number((row as any).user_id) === Number((me as any).id)
+  })
+  // Composer is for signed-in NON-authors only.
+  const canCompose = derived<boolean>(() => isAuthenticated() && !isReviewAuthor())
 </script>
 
 <section class="mt-12 pt-8 border-t border-gray-200">
@@ -143,10 +158,14 @@
     <h2 class="font-semibold text-gray-900 text-base" :text="`Comments (${comments().length})`"></h2>
   </header>
 
-  <!-- Composer. Signed-in users only; anonymous viewers see a "Sign
-       in to comment" CTA in the same slot so the surface isn't
-       blank for them. -->
-  <div :if="isAuthenticated()" class="mt-5 p-4 bg-white border border-gray-200 rounded-lg">
+  <!-- Composer slot — one if/else-if/else chain (mutually exclusive,
+       one effect drives it, so branches can't transiently co-render):
+         - signed-in non-author  → the composer
+         - signed-in author       → muted "can't comment on your own"
+         - anonymous              → sign-in CTA
+       The author can't comment on their own review (mirrors the
+       self-like gate in ArticleView). -->
+  <div :if="canCompose()" class="mt-5 p-4 bg-white border border-gray-200 rounded-lg">
     <textarea
       x-model="commentDraft"
       rows="3"
@@ -174,6 +193,10 @@
         :text="commentSubmitting() ? 'Posting…' : 'Post comment'"
       ></button>
     </div>
+  </div>
+
+  <div :else-if="isReviewAuthor()" class="mt-5 p-4 text-center bg-gray-50 border border-gray-200 rounded-lg">
+    <p class="text-gray-500 text-sm">You can't comment on your own review.</p>
   </div>
 
   <div :else class="mt-5 p-5 text-center bg-gray-50 border border-gray-200 rounded-lg">

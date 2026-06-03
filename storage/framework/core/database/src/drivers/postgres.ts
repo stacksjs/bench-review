@@ -320,69 +320,12 @@ async function createTableMigration(modelPath: string) {
   log.success(`Created migration: ${italic(migrationFileName)}`)
 }
 
-export async function createPostgresForeignKeyMigrations(modelPath: string): Promise<void> {
-  const model = (await import(modelPath)).default as Model
-  const modelName = getModelName(model, modelPath)
-  const tableName = getTableName(model, modelPath)
-  const otherModelRelations = await fetchOtherModelRelations(modelName)
-
-  const foreignKeyRelations = otherModelRelations.filter(relation => relation.foreignKey)
-
-  if (!foreignKeyRelations.length) {
-    return
-  }
-
-  let migrationContent = `import type { Database } from '@stacksjs/database'\n`
-  migrationContent += `import { sql } from '@stacksjs/database'\n\n`
-  migrationContent += `export async function up(_db: Database<any>) {\n`
-  migrationContent += `  await (_db as any).schema\n`
-  migrationContent += `    .alterTable('${tableName}')\n`
-
-  for (const modelRelation of foreignKeyRelations) {
-    migrationContent += `    .addColumn('${modelRelation.foreignKey}', 'integer', (col) =>
-      col.references('${modelRelation.relationTable}.id').onDelete('cascade')
-    ) \n`
-  }
-
-  migrationContent += `    .execute()\n`
-  migrationContent += await createCompositeIndexMigration(model, modelPath)
-  migrationContent += `}\n`
-
-  const timestamp = new Date().getTime().toString()
-  const migrationFileName = `${timestamp}-add-foreign-keys-to-${tableName}-table.ts`
-  const migrationFilePath = path.userMigrationsPath(migrationFileName)
-
-  await Bun.write(migrationFilePath, migrationContent)
-
-  log.success(`Created foreign key migration: ${italic(migrationFileName)}`)
-}
-
-async function createCompositeIndexMigration(model: Model, modelPath: string): Promise<string> {
-  const tableName = getTableName(model, modelPath)
-  const modelName = getModelName(model, modelPath)
-  const otherModelRelations = await fetchOtherModelRelations(modelName)
-
-  let migrationContent = ''
-
-  // Add composite indexes if defined
-  if (model.indexes?.length) {
-    migrationContent += '\n'
-    for (const index of model.indexes) {
-      migrationContent += generateIndexCreationSQL(tableName, index.name, index.columns)
-    }
-  }
-
-  if (otherModelRelations?.length) {
-    for (const modelRelation of otherModelRelations) {
-      if (!modelRelation.foreignKey)
-        continue
-
-      migrationContent += generateForeignKeyIndexSQL(tableName, modelRelation.foreignKey)
-    }
-  }
-
-  return migrationContent
-}
+// `createPostgresForeignKeyMigrations` + `createCompositeIndexMigration`
+// used to live here — both were never called from anywhere in the
+// codebase. The FK migrations they generated have been redundant
+// since stacksjs/bun-query-builder#1019 (and #1916) — bqb emits the
+// equivalent `ALTER TABLE … ADD CONSTRAINT FOREIGN KEY` statements
+// inside its own migration plan. Removed in #1916 Phase 2.
 
 async function createPivotTableMigration(model: Model, modelPath: string) {
   const pivotTables = await getPivotTables(model, modelPath)
@@ -413,7 +356,13 @@ async function createPivotTableMigration(model: Model, modelPath: string) {
     migrationContent += `    .addColumn('id', 'serial', (col) => col.primaryKey())\n`
     migrationContent += `    .addColumn('${pivotTable.firstForeignKey}', 'integer', (col) => col.notNull())\n`
     migrationContent += `    .addColumn('${pivotTable.secondForeignKey}', 'integer', (col) => col.notNull())\n`
-    migrationContent += `    .addColumn('created_at', 'timestamp', col => col.notNull().defaultTo(sql.raw('CURRENT_TIMESTAMP')))\n`
+    // Use timestamptz on PostgreSQL to match the parent table
+    // convention (see :275). Cross-table joins on created_at
+    // returned mismatched values when the pivot drifted to plain
+    // `timestamp` (no TZ) while the parent used `timestamptz`.
+    // Same D-5 fix that the upvote table got in #1876; this was the
+    // missed m2m sibling. See stacksjs/stacks#1915.
+    migrationContent += `    .addColumn('created_at', 'timestamptz', col => col.notNull().defaultTo(sql.raw('CURRENT_TIMESTAMP')))\n`
     migrationContent += `    .execute()\n\n`
 
     // Add foreign key constraints
@@ -547,9 +496,22 @@ async function createAlterTableMigration(modelPath: string) {
   }
 }
 
-function generateIndexCreationSQL(tableName: string, indexName: string, columns: string[]): string {
-  const columnsStr = columns.map(col => `'${snakeCase(col)}'`).join(', ')
-  return `  await (_db as any).schema.createIndex('${indexName}').on('${tableName}').columns([${columnsStr}]).execute()\n`
+export function generateIndexCreationSQL(
+  tableName: string,
+  index: { name: string, columns: string[], unique?: boolean, where?: string },
+): string {
+  // Partial / multi-column unique indexes (stacksjs/stacks#1943) — emit
+  // raw SQL via `db.unsafe(...)` for the UNIQUE / WHERE forms so we
+  // don't have to thread kysely's `sql` template tag into generated
+  // migration imports.
+  if (index.unique || index.where) {
+    const unique = index.unique ? 'UNIQUE ' : ''
+    const cols = index.columns.map(col => snakeCase(col)).join(', ')
+    const whereClause = index.where ? ` WHERE ${index.where}` : ''
+    return `  await db.unsafe(\`CREATE ${unique}INDEX IF NOT EXISTS "${index.name}" ON "${tableName}" (${cols})${whereClause}\`).execute()\n`
+  }
+  const columnsStr = index.columns.map(col => `'${snakeCase(col)}'`).join(', ')
+  return `  await (_db as any).schema.createIndex('${index.name}').on('${tableName}').columns([${columnsStr}]).execute()\n`
 }
 
 function generatePrimaryKeyIndexSQL(tableName: string): string {

@@ -173,7 +173,7 @@ export class Schedule implements UntimedSchedule {
 
   at(time: string): TimedSchedule {
     const parts = time.split(':')
-    if (parts.length !== 2) {
+    if (parts.length !== 2 || parts[0] === '' || parts[1] === '') {
       throw new Error(`Invalid time format "${time}". Expected "HH:MM" (e.g., "14:30")`)
     }
     const [hour, minute] = parts.map(Number) as [number | undefined, number | undefined]
@@ -798,6 +798,49 @@ export class Schedule implements UntimedSchedule {
     }
     instance = new Schedule(task)
     return instance.withName(`command-${cmd}`) as UntimedSchedule
+  }
+
+  /**
+   * Schedule a notification dispatch on a cron tick (stacksjs/stacks#930).
+   *
+   * Thin wrapper around `notify(...)` from `@stacksjs/notifications` —
+   * avoids the boilerplate of writing an Action just to send a daily
+   * digest or weekly report.
+   *
+   * `@stacksjs/notifications` is lazy-imported so the scheduler keeps a
+   * narrow dep graph at boot; only schedules that actually use this
+   * factory pull in the notifications module.
+   *
+   * @example
+   * ```ts
+   * schedule.notification(
+   *   { email: 'team@example.com' },
+   *   { subject: 'Daily report', text: '...' },
+   *   ['email'],
+   * ).dailyAt('08:00')
+   * ```
+   */
+  static notification(
+    recipient: unknown,
+    payload: unknown,
+    channels?: unknown,
+    options?: unknown,
+  ): UntimedSchedule {
+    return new Schedule(async () => {
+      try {
+        const mod = await import('@stacksjs/notifications').catch(() => null)
+        const notify = (mod as { notify?: (...args: unknown[]) => Promise<unknown> } | null)?.notify
+        if (!notify) {
+          log.error('schedule.notification: @stacksjs/notifications.notify is not available — install / wire the notifications package.')
+          return
+        }
+        await notify(recipient, payload, channels, options)
+      }
+      catch (error) {
+        log.error('Scheduled notification failed:', error)
+        throw error
+      }
+    }).withName('notification') as UntimedSchedule
   }
 
   /**

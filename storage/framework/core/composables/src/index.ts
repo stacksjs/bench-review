@@ -26,6 +26,27 @@ export { useToggle } from './useToggle'
 export { useFetch } from './useFetch'
 export { createFetch } from './createFetch'
 
+// Query / Mutation (stacksjs/stacks#1939)
+export { createQueryClient, queryClient, useMutation, useQuery } from './useQuery'
+export type {
+  QueryClient,
+  QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
+  UseQueryOptions,
+  UseQueryResult,
+} from './useQuery'
+
+// Form primitive (stacksjs/stacks#1940)
+export { useForm } from './useForm'
+export type {
+  FormFieldAccessor,
+  FormValidator,
+  UseFormOptions,
+  UseFormResult,
+  ValidationMode,
+} from './useForm'
+
 // Date / Time
 export { useDateFormat } from './useDateFormat'
 export { useNow } from './useNow'

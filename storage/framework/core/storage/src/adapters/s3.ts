@@ -1,15 +1,20 @@
 import { Buffer } from 'node:buffer'
 import { basename } from 'node:path'
-import { S3Client } from '@stacksjs/ts-cloud'
+import type { S3Client } from '@stacksjs/ts-cloud'
 import type {
   ChecksumOptions,
   DirectoryListing,
   FileContents,
+  GetStreamOptions,
   ListOptions,
   MimeTypeOptions,
+  PresignedUploadPolicy,
+  PresignedUploadPolicyOptions,
   PresignedUploadUrl,
   PresignedUploadUrlOptions,
   PublicUrlOptions,
+  PutResult,
+  PutStreamOptions,
   SignedUrlOptions,
   StatEntry,
   StorageAdapter,
@@ -19,25 +24,139 @@ import type {
 } from '../types'
 import { normalizeExpiryToMilliseconds } from '../types'
 import { sanitizePresignedDir, sanitizePresignedFilename } from '../path-sanitize'
+import { signS3PresignedPost } from '../s3-presigned-post'
+import process from 'node:process'
+
+const S3_MIN_PART_SIZE = 5 * 1024 * 1024
+const S3_MAX_PART_SIZE = 5 * 1024 * 1024 * 1024
+
+function clampPartSize(requested: number): number {
+  if (!Number.isFinite(requested)) return S3_MIN_PART_SIZE
+  return Math.max(S3_MIN_PART_SIZE, Math.min(Math.floor(requested), S3_MAX_PART_SIZE))
+}
+
+/**
+ * Append-and-take byte buffer used by the multipart pipeline
+ * (stacksjs/stacks#1886). Holds incoming chunks until they reach
+ * the configured part size, then yields them as a single Uint8Array
+ * via `take(n)` or `flush()`.
+ */
+class ChunkBuffer {
+  private chunks: Uint8Array[] = []
+  private total = 0
+  constructor(_partSize: number) { /* size is advisory; the buffer grows as needed */ }
+  get length(): number { return this.total }
+  push(c: Uint8Array): void { this.chunks.push(c); this.total += c.length }
+  take(n: number): Uint8Array {
+    const out = new Uint8Array(n)
+    let written = 0
+    while (written < n && this.chunks.length > 0) {
+      const head = this.chunks[0]!
+      const need = n - written
+      if (head.length <= need) {
+        out.set(head, written)
+        written += head.length
+        this.chunks.shift()
+      }
+      else {
+        out.set(head.subarray(0, need), written)
+        this.chunks[0] = head.subarray(need)
+        written += need
+      }
+    }
+    this.total -= n
+    return out
+  }
+  flush(): Uint8Array {
+    const out = new Uint8Array(this.total)
+    let off = 0
+    for (const c of this.chunks) { out.set(c, off); off += c.length }
+    this.chunks = []
+    this.total = 0
+    return out
+  }
+}
+
+/**
+ * Has the promise already settled (either resolved or rejected)?
+ * Used by the multipart pipeline to prune the `inflight` array
+ * after `Promise.race` so it doesn't grow unbounded across the
+ * upload's lifetime.
+ */
+async function isSettled(p: Promise<unknown>): Promise<boolean> {
+  const sentinel = Symbol('pending')
+  const result = await Promise.race([
+    p.then(() => 'settled' as const, () => 'settled' as const),
+    Promise.resolve(sentinel),
+  ])
+  return result !== sentinel
+}
 
 /**
  * AWS S3 storage adapter using ts-cloud S3Client
  */
 export class S3StorageAdapter implements StorageAdapter {
-  private client: S3Client
+  private _client: S3Client | null
+  private _clientPromise: Promise<S3Client> | null = null
   private bucket: string
   private prefix: string
   private region: string
+  /**
+   * Caller-supplied credentials, kept so we can issue presigned POST
+   * policies (which need access to the signing key — ts-cloud's
+   * S3Client doesn't expose its own credentials via a public method).
+   * When omitted at construction time, falls back to env vars at
+   * sign time. See stacksjs/stacks#1888 Phase B.
+   */
+  private credentials?: StorageAdapterConfig['credentials']
 
-  constructor(client: S3Client, config: StorageAdapterConfig) {
-    this.client = client
+  // Accepts a pre-built client (back-compat) or `null` to build one lazily
+  // from `config.region` on first use. The lazy path keeps `@stacksjs/ts-cloud`
+  // (and its AWS-shaped client) off the eager import graph of
+  // `@stacksjs/storage`, which sits on the dev-server boot critical path.
+  constructor(client: S3Client | null, config: StorageAdapterConfig) {
+    this._client = client
     this.bucket = config.bucket || ''
     this.prefix = config.prefix || ''
     this.region = config.region || 'us-east-1'
+    this.credentials = config.credentials
 
     if (!this.bucket) {
       throw new Error('S3 bucket name is required')
     }
+  }
+
+  private async getClient(): Promise<S3Client> {
+    if (this._client)
+      return this._client
+    if (!this._clientPromise) {
+      this._clientPromise = import('@stacksjs/ts-cloud').then((cloud) => {
+        this._client = new cloud.S3Client(this.region)
+        return this._client
+      })
+    }
+    return this._clientPromise
+  }
+
+  /**
+   * Resolve credentials for SigV4 signing in the same order ts-cloud
+   * does: explicit constructor config → env vars. Throws when neither
+   * source supplies a key (the alternative would be silently signing
+   * with an empty key and producing a URL S3 rejects).
+   */
+  private resolveCredentials(): NonNullable<StorageAdapterConfig['credentials']> {
+    if (this.credentials?.accessKeyId && this.credentials.secretAccessKey)
+      return this.credentials
+    const accessKeyId = process.env.AWS_ACCESS_KEY_ID
+    const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY
+    const sessionToken = process.env.AWS_SESSION_TOKEN
+    if (!accessKeyId || !secretAccessKey) {
+      throw new Error(
+        '[storage/s3] presignedUploadPolicy requires AWS credentials — '
+        + 'pass them via S3DiskConfig.credentials or set AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY.',
+      )
+    }
+    return { accessKeyId, secretAccessKey, sessionToken }
   }
 
   private prefixPath(path: string): string {
@@ -93,21 +212,34 @@ export class S3StorageAdapter implements StorageAdapter {
     }
   }
 
-  async write(path: string, contents: FileContents): Promise<void> {
+  async write(path: string, contents: FileContents): Promise<PutResult> {
     const key = this.prefixPath(path)
     const body = await this.contentsToBuffer(contents)
+    const contentType = this.detectMimeType(path)
 
-    await this.client.putObject({
+    // ts-cloud's putObject returns void today (the upstream SDK
+    // surface doesn't expose the PutObject response shape yet).
+    // We still report what we can compute locally — size + the
+    // contentType we sent — and synthesize lastModified from wall
+    // clock. ETag stays omitted until ts-cloud exposes the response.
+    await (await this.getClient()).putObject({
       bucket: this.bucket,
       key,
       body,
-      contentType: this.detectMimeType(path),
+      contentType,
     })
+
+    return {
+      path,
+      size: body.length,
+      contentType,
+      lastModified: Date.now(),
+    }
   }
 
   async read(path: string): Promise<FileContents> {
     const key = this.prefixPath(path)
-    const response = await this.client.getObject(this.bucket, key)
+    const response = await (await this.getClient()).getObject(this.bucket, key)
 
     if (!response) {
       throw new Error(`Failed to read file: ${path}`)
@@ -117,9 +249,162 @@ export class S3StorageAdapter implements StorageAdapter {
     return Buffer.from(response)
   }
 
+  /**
+   * Read an S3 object as a stream (stacksjs/stacks#1886).
+   *
+   * **Today**: ts-cloud's `getObjectBuffer` returns the full body
+   * as a single Buffer; we wrap that as a one-chunk
+   * `ReadableStream<Uint8Array>` so the interface is uniform
+   * across adapters. Memory budget is the full object size.
+   *
+   * **Tomorrow**: when ts-cloud exposes a true chunked-read API
+   * (or we direct-import the AWS SDK's GetObject stream), this
+   * implementation swaps to true chunked streaming without
+   * changing the caller signature.
+   */
+  async getStream(path: string, _options?: GetStreamOptions): Promise<ReadableStream<Uint8Array>> {
+    const key = this.prefixPath(path)
+    const buf = await (await this.getClient()).getObjectBuffer(this.bucket, key)
+    if (!buf) throw new Error(`Failed to read file: ${path}`)
+    const bytes = new Uint8Array(buf)
+    return new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes)
+        controller.close()
+      },
+    })
+  }
+
+  /**
+   * Stream an upload to S3 with automatic single-PUT vs multipart
+   * selection (stacksjs/stacks#1886). Small streams (≤ part size)
+   * are buffered + sent via `putObject`; larger streams go through
+   * the CreateMultipartUpload → UploadPart × N →
+   * CompleteMultipartUpload pipeline so files up to 5 TB work.
+   *
+   * Part size defaults to 5 MiB (S3's minimum part size); cap at
+   * 5 GiB. Concurrency defaults to 4 parts uploading in parallel.
+   * Failed parts retry up to 3 times before the whole upload
+   * aborts via `AbortMultipartUpload` so partial-upload
+   * artifacts don't accrue storage charges.
+   */
+  async putStream(path: string, stream: ReadableStream<Uint8Array>, options?: PutStreamOptions): Promise<PutResult> {
+    const key = this.prefixPath(path)
+    const contentType = options?.contentType ?? this.detectMimeType(path)
+    const partSize = clampPartSize(options?.partSize ?? 5 * 1024 * 1024)
+    const concurrency = Math.max(1, Math.min(options?.concurrency ?? 4, 100))
+    const maxRetries = Math.max(0, options?.maxRetries ?? 3)
+    const signal = options?.signal
+
+    // Read enough to decide: small body (single PUT) or large (multipart).
+    // We buffer up to one part's worth before committing — if the stream
+    // closes within that window we avoid the multipart overhead.
+    const reader = stream.getReader()
+    let firstChunk: Uint8Array | null = null
+    let firstDone = false
+    {
+      const buf = new ChunkBuffer(partSize)
+      while (!firstDone && buf.length < partSize) {
+        if (signal?.aborted) {
+          try { reader.releaseLock() } catch { /* ignore */ }
+          throw new Error('aborted')
+        }
+        const { value, done } = await reader.read()
+        if (done) { firstDone = true; break }
+        if (value) buf.push(value)
+      }
+      firstChunk = buf.flush()
+    }
+
+    // Single-PUT path: stream fit inside one part.
+    if (firstDone) {
+      try { reader.releaseLock() } catch { /* ignore */ }
+      await (await this.getClient()).putObject({
+        bucket: this.bucket,
+        key,
+        body: Buffer.from(firstChunk!),
+        contentType,
+      })
+      return { path, size: firstChunk!.length, contentType, lastModified: Date.now() }
+    }
+
+    // Multipart path. Initiate, upload-with-bounded-concurrency,
+    // complete. On any failure (including abort) we MUST issue
+    // AbortMultipartUpload so the partial parts don't accrue
+    // storage charges.
+    const { UploadId: uploadId } = await (await this.getClient()).createMultipartUpload(this.bucket, key, { contentType })
+    const completedParts: Array<{ PartNumber: number, ETag: string }> = []
+    let totalBytes = 0
+    let partNumber = 1
+    const inflight: Array<Promise<void>> = []
+
+    const uploadOne = async (body: Uint8Array, n: number): Promise<void> => {
+      let attempt = 0
+      while (true) {
+        if (signal?.aborted) throw new Error('aborted')
+        try {
+          const { ETag } = await (await this.getClient()).uploadPart(this.bucket, key, uploadId, n, Buffer.from(body))
+          completedParts.push({ PartNumber: n, ETag })
+          totalBytes += body.length
+          return
+        }
+        catch (err) {
+          if (attempt >= maxRetries) throw err
+          attempt += 1
+        }
+      }
+    }
+
+    try {
+      // Submit the first chunk (already buffered).
+      inflight.push(uploadOne(firstChunk!, partNumber++))
+      firstChunk = null
+
+      // Stream the rest, buffering to partSize before each upload.
+      const buf = new ChunkBuffer(partSize)
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        if (signal?.aborted) throw new Error('aborted')
+        const { value, done } = await reader.read()
+        if (done) break
+        if (value) buf.push(value)
+        while (buf.length >= partSize) {
+          const part = buf.take(partSize)
+          // Bound concurrency: wait for the oldest in-flight task
+          // when at capacity before queuing the next.
+          if (inflight.length >= concurrency) {
+            await Promise.race(inflight.map((p, i) => p.then(() => i)))
+            for (let i = inflight.length - 1; i >= 0; i--) {
+              if (await isSettled(inflight[i]!)) inflight.splice(i, 1)
+            }
+          }
+          inflight.push(uploadOne(part, partNumber++))
+        }
+      }
+      try { reader.releaseLock() } catch { /* ignore */ }
+
+      // Drain any trailing bytes < partSize as the final part.
+      const tail = buf.flush()
+      if (tail.length > 0) inflight.push(uploadOne(tail, partNumber++))
+
+      await Promise.all(inflight)
+      completedParts.sort((a, b) => a.PartNumber - b.PartNumber)
+      await (await this.getClient()).completeMultipartUpload(this.bucket, key, uploadId, completedParts)
+      return { path, size: totalBytes, contentType, lastModified: Date.now() }
+    }
+    catch (err) {
+      // Best-effort abort. The error from abortMultipartUpload is
+      // swallowed because the original error is more useful to
+      // the caller.
+      try { await (await this.getClient()).abortMultipartUpload(this.bucket, key, uploadId) }
+      catch { /* best-effort */ }
+      throw err
+    }
+  }
+
   async readToString(path: string): Promise<string> {
     const key = this.prefixPath(path)
-    const response = await this.client.getObject(this.bucket, key)
+    const response = await (await this.getClient()).getObject(this.bucket, key)
 
     if (!response) {
       throw new Error(`Failed to read file: ${path}`)
@@ -140,21 +425,21 @@ export class S3StorageAdapter implements StorageAdapter {
 
   async deleteFile(path: string): Promise<void> {
     const key = this.prefixPath(path)
-    await this.client.deleteObject(this.bucket, key)
+    await (await this.getClient()).deleteObject(this.bucket, key)
   }
 
   async deleteDirectory(path: string): Promise<void> {
     const prefix = this.prefixPath(path)
     const normalizedPrefix = prefix.endsWith('/') ? prefix : `${prefix}/`
 
-    const objects = await this.client.listAllObjects({ bucket: this.bucket, prefix: normalizedPrefix })
+    const objects = await (await this.getClient()).listAllObjects({ bucket: this.bucket, prefix: normalizedPrefix })
     const keys = (objects as Array<{ Key?: string }>).map(obj => obj.Key).filter((k): k is string => typeof k === 'string')
 
     if (keys.length === 0) {
       return
     }
 
-    await this.client.deleteObjects(this.bucket, keys)
+    await (await this.getClient()).deleteObjects(this.bucket, keys)
   }
 
   async createDirectory(_path: string): Promise<void> {
@@ -170,7 +455,7 @@ export class S3StorageAdapter implements StorageAdapter {
     const fromKey = this.prefixPath(from)
     const toKey = this.prefixPath(to)
 
-    await this.client.copyObject({
+    await (await this.getClient()).copyObject({
       sourceBucket: this.bucket,
       sourceKey: fromKey,
       destinationBucket: this.bucket,
@@ -181,7 +466,7 @@ export class S3StorageAdapter implements StorageAdapter {
   async stat(path: string): Promise<StatEntry> {
     const key = this.prefixPath(path)
 
-    const result = await this.client.headObject(this.bucket, key)
+    const result = await (await this.getClient()).headObject(this.bucket, key)
 
     if (!result) {
       throw new Error(`File not found: ${path}`)
@@ -206,7 +491,7 @@ export class S3StorageAdapter implements StorageAdapter {
     const normalizedPrefix = prefix ? `${prefix}/` : undefined
 
     if (deep) {
-      const objects = await this.client.listAllObjects({ bucket: this.bucket, prefix: normalizedPrefix })
+      const objects = await (await this.getClient()).listAllObjects({ bucket: this.bucket, prefix: normalizedPrefix })
       for (const obj of objects) {
         yield {
           path: this.stripPrefix(obj.Key),
@@ -218,7 +503,7 @@ export class S3StorageAdapter implements StorageAdapter {
       let continuationToken: string | undefined
 
       do {
-        const result = await this.client.listObjects({
+        const result = await (await this.getClient()).listObjects({
           bucket: this.bucket,
           prefix: normalizedPrefix,
           continuationToken,
@@ -256,7 +541,7 @@ export class S3StorageAdapter implements StorageAdapter {
   async changeVisibility(path: string, vis: Visibility): Promise<void> {
     const key = this.prefixPath(path)
     const acl = (vis === ('public' as Visibility)) ? 'public-read' : 'private'
-    await this.client.putObjectAcl(this.bucket, key, acl)
+    await (await this.getClient()).putObjectAcl(this.bucket, key, acl)
   }
 
   /**
@@ -268,7 +553,7 @@ export class S3StorageAdapter implements StorageAdapter {
    */
   async visibility(path: string): Promise<Visibility> {
     const key = this.prefixPath(path)
-    const acl = await this.client.getObjectAcl(this.bucket, key)
+    const acl = await (await this.getClient()).getObjectAcl(this.bucket, key)
     const grants = (acl as { Grants?: Array<{ Grantee?: { URI?: string }; Permission?: string }> })?.Grants ?? []
     const isPublic = grants.some(g =>
       g.Grantee?.URI === 'http://acs.amazonaws.com/groups/global/AllUsers'
@@ -280,7 +565,7 @@ export class S3StorageAdapter implements StorageAdapter {
   async fileExists(path: string): Promise<boolean> {
     const key = this.prefixPath(path)
     try {
-      const result = await this.client.headObject(this.bucket, key)
+      const result = await (await this.getClient()).headObject(this.bucket, key)
       return !!result
     }
     catch (error: any) {
@@ -294,7 +579,7 @@ export class S3StorageAdapter implements StorageAdapter {
 
   async directoryExists(path: string): Promise<boolean> {
     const prefix = this.prefixPath(path)
-    const result = await this.client.listObjects({
+    const result = await (await this.getClient()).listObjects({
       bucket: this.bucket,
       prefix: `${prefix}/`,
       maxKeys: 1,
@@ -323,7 +608,7 @@ export class S3StorageAdapter implements StorageAdapter {
       throw new RangeError(`[storage/s3] temporaryUrl expiresIn must be between 60s and 7 days (got ${expiresIn}s)`)
     }
 
-    return await this.client.getSignedUrl({
+    return await (await this.getClient()).getSignedUrl({
       bucket: this.bucket,
       key,
       expiresIn,
@@ -404,7 +689,7 @@ export class S3StorageAdapter implements StorageAdapter {
     const path = safeDir ? `${safeDir}/${safeFilename}` : safeFilename
     const key = this.prefixPath(path)
 
-    const url = await this.client.getSignedUrl({
+    const url = await (await this.getClient()).getSignedUrl({
       bucket: this.bucket,
       key,
       expiresIn,
@@ -418,6 +703,51 @@ export class S3StorageAdapter implements StorageAdapter {
       contentType: options.contentType,
       maxBytes: options.maxBytes,
     }
+  }
+
+  /**
+   * Mint an S3 presigned-POST policy with server-side enforced
+   * `Content-Length-Range` (stacksjs/stacks#1888 Phase B). The
+   * companion to {@link presignedUploadUrl} — use this when you
+   * genuinely need a max-size cap against an untrusted client,
+   * since the PUT-form URL can't carry that condition.
+   *
+   * Browser-side: submit a multipart form to `url` with every
+   * `fields` entry as a form field, then the file LAST under the
+   * field name `'file'`. S3 rejects anything that violates the
+   * embedded conditions before storing.
+   *
+   * @example
+   * ```ts
+   * const policy = await Storage.disk('s3').presignedUploadPolicy?.({
+   *   key: { startsWith: 'avatars/' },
+   *   contentType: { startsWith: 'image/' },
+   *   contentLengthRange: { min: 0, max: 5 * 1024 * 1024 },
+   *   expiresIn: 3600,
+   * })
+   * ```
+   */
+  async presignedUploadPolicy(options: PresignedUploadPolicyOptions): Promise<PresignedUploadPolicy> {
+    const credentials = this.resolveCredentials()
+
+    // Prefix the bucket prefix onto the policy's key so the upload
+    // lands in the same namespace `put()` writes to. Both exact-key
+    // and prefix forms get the same treatment.
+    const scopedKey = typeof options.key === 'string'
+      ? this.prefixPath(options.key)
+      : { startsWith: this.prefixPath(options.key.startsWith) }
+
+    return signS3PresignedPost({
+      bucket: this.bucket,
+      region: this.region,
+      credentials,
+      key: scopedKey,
+      contentType: options.contentType,
+      contentLengthRange: options.contentLengthRange,
+      acl: options.acl,
+      expiresIn: options.expiresIn,
+      fields: options.fields,
+    })
   }
 
   /**
@@ -501,6 +831,6 @@ export class S3StorageAdapter implements StorageAdapter {
 /**
  * Create an S3 storage adapter instance
  */
-export function createS3Storage(client: S3Client, config: StorageAdapterConfig): S3StorageAdapter {
+export function createS3Storage(client: S3Client | null, config: StorageAdapterConfig): S3StorageAdapter {
   return new S3StorageAdapter(client, config)
 }

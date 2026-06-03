@@ -16,7 +16,7 @@ import './request-augmentation'
 import process from 'node:process'
 import { Buffer } from 'node:buffer'
 import { timingSafeEqual } from 'node:crypto'
-import { log } from '@stacksjs/logging'
+import { log, report } from '@stacksjs/logging'
 import { path as p } from '@stacksjs/path'
 import { UploadedFile } from '@stacksjs/storage'
 import { applyRequestEnhancements, Router } from '@stacksjs/bun-router'
@@ -782,15 +782,23 @@ function createMiddlewareHandler(routeKey: string, handler: StacksHandler): Rout
   // Create the base handler with skipParsing=true since we'll do it ourselves
   const wrappedBase = wrapHandler(handler, true)
 
-  // Pre-resolve string handlers so action-level flags (skipCsrf, etc.)
-  // are populated in their respective caches before the middleware
-  // chain runs. Without this prefetch, the first request to a webhook
-  // would inject CSRF, fail, and only the SECOND request would see the
-  // populated cache and skip injection. Idempotent: subsequent
-  // resolutions are served from the import cache.
+  // Pre-resolve string handlers so action-level CSRF flags (skipCsrf) are
+  // cached before the middleware chain runs. Without this, the first
+  // request to a skipCsrf webhook would inject CSRF, fail, and only the
+  // SECOND request would see the populated cache and skip injection.
+  //
+  // This only matters for CSRF-protected methods — GET/HEAD/OPTIONS never
+  // get CSRF injected, so prefetching their actions would just front-load
+  // every action import (and its model graph) at registration time for no
+  // benefit. Measured ~90ms of dev-boot time across a route-heavy app;
+  // safe-method actions now resolve lazily on first request instead.
+  // Idempotent: subsequent resolutions are served from the import cache.
   let actionPrefetch: Promise<void> | null = null
   if (typeof handler === 'string') {
-    actionPrefetch = resolveStringHandler(handler).then(() => undefined).catch(() => undefined)
+    const method = routeKey.slice(0, routeKey.indexOf(':')).toUpperCase()
+    if (CSRF_PROTECTED_METHODS.has(method)) {
+      actionPrefetch = resolveStringHandler(handler).then(() => undefined).catch(() => undefined)
+    }
   }
 
   return async (req: EnhancedRequest) => {
@@ -942,16 +950,20 @@ function createMiddlewareHandler(routeKey: string, handler: StacksHandler): Rout
         // can show exactly which middleware spent how long. Cheap —
         // hrtime delta per layer.
         const mwStart = process.hrtime.bigint()
+        let mwTimer: ReturnType<typeof setTimeout> | undefined
           try {
             // 30s middleware budget. A misbehaving middleware that hangs
             // (e.g. waits forever on a deadlocked external service) used
             // to lock the entire request handler indefinitely; the
             // timeout surfaces it as a 500 instead, freeing the worker
-            // to keep serving other requests.
+            // to keep serving other requests. The timer is cleared in the
+            // `finally` below — otherwise a settled race leaves a dangling
+            // 30s timer per middleware per request, and they pile up under
+            // load (memory + needless event-loop wakeups).
             const MIDDLEWARE_TIMEOUT_MS = 30_000
-            const timeoutPromise = new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error(`Middleware '${middlewareName}' exceeded ${MIDDLEWARE_TIMEOUT_MS}ms`)), MIDDLEWARE_TIMEOUT_MS),
-            )
+            const timeoutPromise = new Promise<never>((_, reject) => {
+              mwTimer = setTimeout(() => reject(new Error(`Middleware '${middlewareName}' exceeded ${MIDDLEWARE_TIMEOUT_MS}ms`)), MIDDLEWARE_TIMEOUT_MS)
+            })
             await Promise.race([middleware.handle(enhancedReq), timeoutPromise])
             const elapsedMs = Number(process.hrtime.bigint() - mwStart) / 1_000_000
             middlewareTimings.push({ name: middlewareName, ms: elapsedMs })
@@ -1016,6 +1028,11 @@ function createMiddlewareHandler(routeKey: string, handler: StacksHandler): Rout
             }
             catch { /* immutable headers — leave the response alone */ }
             return await applyCorsIfConfigured(enhancedReq, errorResponse)
+          }
+          finally {
+            // Clear the budget timer so a resolved/rejected race doesn't
+            // leave a dangling 30s timer per middleware per request.
+            clearTimeout(mwTimer)
           }
       }
 
@@ -1417,15 +1434,13 @@ async function resolveStringHandler(handlerPath: string): Promise<RouteHandlerFn
         return formatResult(result, req)
       }
       catch (handleError) {
-        // Print the full stack so action failures are diagnosable.
-        // The previous form passed the error as the second arg, which
-        // log.error treated as `LogErrorOptions` and dropped — every
-        // 500 from an action looked like an empty `[Router] Error in
-        // action.handle() for 'X':` line with no detail.
-        const errMsg = handleError instanceof Error
-          ? (handleError.stack || handleError.message)
-          : String(handleError)
-        log.error(`[Router] Error in action.handle() for '${handlerPath}': ${errMsg}`)
+        // Single chokepoint (stacksjs/stacks#1933) — normalizes the
+        // error (stack + cause), keeps thrown 4xx HttpErrors out of the
+        // error stream, and folds in the full stack. Replaces the old
+        // hand-rolled stack-concat workaround that existed because the
+        // logger's `LogErrorOptions | any` typing silently dropped the
+        // error (stacksjs/stacks#1932, now fixed).
+        report(handleError, { label: `[Router] action.handle() for '${handlerPath}'` })
         throw handleError
       }
     }
@@ -2068,7 +2083,10 @@ function wrapHandler(handler: StacksHandler, skipParsing = false): RouteHandlerF
         return await resolvedHandler(req)
       }
       catch (error) {
-        log.error(`[Router] Error handling request for '${handlerPath}':`, error)
+        // Single chokepoint (stacksjs/stacks#1933): 5xx + non-HTTP
+        // throws log at error with full stack; thrown 4xx HttpErrors
+        // are kept out of the error stream.
+        report(error, { label: `[Router] ${handlerPath}` })
         // Return Ignition-style error page in development, JSON in production
         return await createErrorResponse(
           error instanceof Error ? error : new Error(String(error)),

@@ -20,14 +20,15 @@
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { filesystems, app as appConfig } from '@stacksjs/config'
-import { S3Client } from '@stacksjs/ts-cloud'
-import type { PresignedUploadUrl, PresignedUploadUrlOptions, SignedUrlOptions, StorageAdapter } from './types'
+import type { GetStreamOptions, PresignedUploadPolicy, PresignedUploadPolicyOptions, PresignedUploadUrl, PresignedUploadUrlOptions, PutResult, PutStreamOptions, SignedUrlOptions, StatEntry, StorageAdapter } from './types'
 import { createLocalStorage } from './adapters/local'
 import { S3StorageAdapter } from './adapters/s3'
+import { parseDiskPath } from './path-sanitize'
 import { putUploadedFile } from './put-file'
 import type { PutFileOptions, UploadedFileLike } from './put-file'
 import type {
   DiskConfig,
+  DiskName,
   FilesystemConfig,
   LocalDiskConfig,
   S3DiskConfig,
@@ -95,7 +96,6 @@ function buildConfig(): FilesystemConfig {
 class StorageManager {
   private _config: FilesystemConfig | null = null
   private disks: Map<string, StorageAdapter> = new Map()
-  private s3Clients: Map<string, S3Client> = new Map()
   private customConfig: Partial<FilesystemConfig> | null = null
 
   /**
@@ -122,14 +122,15 @@ class StorageManager {
     this.customConfig = config
     this._config = null // Reset so it rebuilds on next access
     this.disks.clear()
-    this.s3Clients.clear()
     return this
   }
 
   /**
-   * Get a disk instance by name
+   * Get a disk instance by name. The `name` autocompletes to the keys
+   * of an augmented `KnownDisks` interface (stacksjs/stacks#1924) while
+   * still accepting any string for unregistered disks.
    */
-  disk(name?: string): StorageAdapter {
+  disk(name?: DiskName): StorageAdapter {
     const diskName = name || this.config.default
 
     // Return cached disk
@@ -167,15 +168,11 @@ class StorageManager {
     return createLocalStorage({ root: config.root })
   }
 
-  private createS3Adapter(name: string, config: S3DiskConfig): StorageAdapter {
-    let client = this.s3Clients.get(name)
-
-    if (!client) {
-      client = new S3Client(config.region || 'us-east-1')
-      this.s3Clients.set(name, client)
-    }
-
-    return new S3StorageAdapter(client, {
+  private createS3Adapter(_name: string, config: S3DiskConfig): StorageAdapter {
+    // Pass `null` — the adapter builds its S3 client lazily from the region,
+    // so `@stacksjs/ts-cloud` is not loaded until an S3 disk is actually used.
+    // The constructed adapter is cached per disk name in `this.disks`.
+    return new S3StorageAdapter(null, {
       bucket: config.bucket,
       region: config.region,
       prefix: config.prefix,
@@ -191,7 +188,7 @@ class StorageManager {
    * low-level overload — `Storage.put('logs/today.txt', text)` — stays
    * as-is for code that already has a path + bytes.
    */
-  async put(path: string, contents: string | Uint8Array | Buffer): Promise<void>
+  async put(path: string, contents: string | Uint8Array | Buffer): Promise<PutResult>
   /**
    * Write an `UploadedFile` (typically `req.file('avatar')` or one entry
    * from `req.files`) to a disk and return both the storage path and the
@@ -202,20 +199,152 @@ class StorageManager {
    * @example
    * ```ts
    * const file = req.file('avatar')!
-   * const { path, url } = await Storage.put(file, { disk: 'public', dir: 'avatars' })
-   * await db.updateTable('users').set({ avatar: url }).where('id', '=', userId).execute()
+   * const { path, url, size, etag } = await Storage.put(file, { disk: 'public', dir: 'avatars' })
+   * await db.updateTable('users').set({ avatar: url, avatar_size: size }).where('id', '=', userId).execute()
    * ```
    */
-  async put(file: UploadedFileLike, opts?: PutFileOptions): Promise<{ path: string, url: string }>
+  async put(file: UploadedFileLike, opts?: PutFileOptions): Promise<PutResult & { url: string }>
   async put(
     pathOrFile: string | UploadedFileLike,
     contentsOrOpts?: string | Uint8Array | Buffer | PutFileOptions,
-  ): Promise<void | { path: string, url: string }> {
+  ): Promise<PutResult | (PutResult & { url: string })> {
     if (typeof pathOrFile === 'string') {
+      // `write()` now returns PutResult with size/lastModified/contentType
+      // captured at the adapter (stacksjs/stacks#1888 S-8) — callers
+      // that want to record metadata against a domain model no longer
+      // need a follow-up `stat()` round-trip.
       return this.disk().write(pathOrFile, contentsOrOpts as string | Uint8Array | Buffer)
     }
     const opts = (contentsOrOpts as PutFileOptions | undefined) ?? {}
     return putUploadedFile(this, pathOrFile, opts)
+  }
+
+  /**
+   * Return the full {@link StatEntry} for a file (size, mime,
+   * lastModified, visibility, etc.) — convenience wrapper around the
+   * existing per-adapter `stat()`. Use this for callers that need
+   * multiple pieces of metadata in one round-trip; the granular
+   * `size()` / `mimeType()` / `lastModified()` helpers stay for code
+   * that just wants one field.
+   *
+   * stacksjs/stacks#1888 S-8.
+   */
+  async stat(path: string): Promise<StatEntry> {
+    return this.disk().stat(path)
+  }
+
+  /**
+   * Read a file as a web-standard `ReadableStream<Uint8Array>`
+   * (stacksjs/stacks#1886). Use this when the file might be too
+   * large to fit in memory — local / bun adapters stream from disk
+   * chunk-by-chunk; S3 currently buffers (single chunk) pending
+   * upstream chunked-read support.
+   *
+   * @example
+   * ```ts
+   * const stream = await Storage.getStream('exports/big.csv')
+   * for await (const chunk of stream) {
+   *   // process bytes
+   * }
+   * ```
+   */
+  async getStream(path: string, options?: GetStreamOptions): Promise<ReadableStream<Uint8Array>> {
+    const adapter = this.disk()
+    if (typeof adapter.getStream !== 'function') {
+      throw new Error(`[storage] disk '${this.config.default}' does not support getStream — adapter is missing the optional method`)
+    }
+    return adapter.getStream(path, options)
+  }
+
+  /**
+   * Stream a `ReadableStream<Uint8Array>` into the configured
+   * disk (stacksjs/stacks#1886). S3 automatically uses multipart
+   * upload for streams larger than `options.partSize` (default 5
+   * MiB), so files up to 5 TB work without buffering the whole
+   * body in memory.
+   *
+   * @example
+   * ```ts
+   * // Pipe a fetch response straight to S3
+   * const res = await fetch(remoteUrl)
+   * if (res.body)
+   *   await Storage.putStream('imports/data.csv', res.body)
+   *
+   * // Cross-disk pipe (combines #1888 with this PR)
+   * const src = await Storage.disk('local').getStream('big.csv')
+   * await Storage.disk('s3').putStream('archive/big.csv', src, {
+   *   partSize: 10 * 1024 * 1024, // 10 MiB parts for big files
+   * })
+   * ```
+   */
+  async putStream(path: string, stream: ReadableStream<Uint8Array>, options?: PutStreamOptions): Promise<PutResult> {
+    const adapter = this.disk()
+    if (typeof adapter.putStream !== 'function') {
+      throw new Error(`[storage] disk '${this.config.default}' does not support putStream — adapter is missing the optional method`)
+    }
+    return adapter.putStream(path, stream, options)
+  }
+
+  /**
+   * Copy a file across disks using the `<disk>:<path>` reference form
+   * (stacksjs/stacks#1888 S-7). Same-disk copies use the adapter's
+   * native `copyFile()`. Cross-disk copies stream the contents from
+   * source to destination through a buffer.
+   *
+   * @example
+   * ```ts
+   * await Storage.copyAcross('s3:user-uploads/foo.jpg', 'local:processed/foo.jpg')
+   * await Storage.copyAcross('s3:src/bar.bin', 's3:dest/bar.bin') // native CopyObject path
+   * ```
+   *
+   * Future enhancement: same-bucket s3→s3 copies should issue
+   * CopyObject (no transit) — tracked alongside the streaming work
+   * in #1886.
+   */
+  async copyAcross(source: string, dest: string): Promise<PutResult> {
+    const src = parseDiskPath(source)
+    const dst = parseDiskPath(dest)
+
+    // Same-disk shortcut — use the adapter's native copy so the disk
+    // can pick the fastest path (S3 CopyObject, local fs.copyFile,
+    // etc.) without a read/write round-trip.
+    if (src.disk === dst.disk) {
+      const adapter = this.disk(src.disk)
+      await adapter.copyFile(src.path, dst.path)
+      return adapter.stat(dst.path).then(entry => ({
+        path: dst.path,
+        size: entry.size,
+        contentType: entry.mimeType,
+        lastModified: entry.lastModified,
+      }))
+    }
+
+    // Cross-disk: read from source then write to destination. The
+    // adapter's `read()` returns a Buffer / Uint8Array; we don't
+    // pre-stream because the streaming surface (#1886) doesn't exist
+    // yet. Once streaming lands, swap this for `getStream` +
+    // `putStream` so the whole file doesn't have to fit in memory.
+    const contents = await this.disk(src.disk).read(src.path)
+    return this.disk(dst.disk).write(dst.path, contents)
+  }
+
+  /**
+   * Move a file across disks. Equivalent to `copyAcross()` followed
+   * by deleting the source. Source delete is best-effort with a
+   * thrown error — the destination write is the commit point, so a
+   * dest-write failure aborts; a source-delete failure surfaces but
+   * the file has already been copied.
+   *
+   * @example
+   * ```ts
+   * await Storage.moveAcross('s3:user-uploads/foo.jpg', 'r2:archive/foo.jpg')
+   * ```
+   */
+  async moveAcross(source: string, dest: string): Promise<PutResult> {
+    const src = parseDiskPath(source)
+    const result = await this.copyAcross(source, dest)
+    await this.disk(src.disk).deleteFile(src.path)
+    return result
   }
 
   async get(path: string): Promise<string> {
@@ -304,6 +433,42 @@ class StorageManager {
     return adapter.presignedUploadUrl(options)
   }
 
+  /**
+   * Mint an S3 presigned-POST policy with server-side
+   * `Content-Length-Range` enforcement (stacksjs/stacks#1888
+   * Phase B). The browser POSTs a multipart form (not a PUT body),
+   * and S3 rejects anything that violates the embedded conditions
+   * before storing — the missing maxBytes-enforcement piece called
+   * out by the original S-12 doc-only fix.
+   *
+   * Currently S3-only; other adapters throw a clear error. Use
+   * `presignedUploadUrl()` for the PUT-form (no size enforcement)
+   * or `Storage.put(file, opts)` for server-proxied uploads.
+   *
+   * @example
+   * ```ts
+   * const policy = await Storage.presignedUploadPolicy({
+   *   key: { startsWith: 'avatars/' },
+   *   contentType: { startsWith: 'image/' },
+   *   contentLengthRange: { min: 0, max: 5 * 1024 * 1024 },
+   *   expiresIn: 3600,
+   * })
+   *
+   * // Frontend:
+   * const fd = new FormData()
+   * Object.entries(policy.fields).forEach(([k, v]) => fd.append(k, v))
+   * fd.append('file', file)   // MUST be last
+   * await fetch(policy.url, { method: 'POST', body: fd })
+   * ```
+   */
+  async presignedUploadPolicy(options: PresignedUploadPolicyOptions): Promise<PresignedUploadPolicy> {
+    const adapter = this.disk()
+    if (typeof adapter.presignedUploadPolicy !== 'function') {
+      throw new Error(`[storage] disk '${this.config.default}' does not support presignedUploadPolicy — S3-only. Use \`presignedUploadUrl\` for the PUT-form, or \`Storage.put(file, opts)\` for server-proxied uploads.`)
+    }
+    return adapter.presignedUploadPolicy(options)
+  }
+
   async size(path: string): Promise<number> {
     return this.disk().fileSize(path)
   }
@@ -344,8 +509,8 @@ class StorageManager {
     // Ensure config is loaded
     const currentConfig = this.config
     currentConfig.disks[name] = config
+    // Dropping the cached adapter also drops its lazily-built S3 client.
     this.disks.delete(name)
-    this.s3Clients.delete(name)
     return this
   }
 
@@ -376,7 +541,6 @@ class StorageManager {
     this._config = null
     this.customConfig = null
     this.disks.clear()
-    this.s3Clients.clear()
     return this
   }
 }

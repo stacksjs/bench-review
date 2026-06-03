@@ -523,6 +523,316 @@ async function uploadMailServerToS3(bucketName: string, region: string, mode: st
   }
 }
 
+/**
+ * Load the `tsCloud` configuration object exported from `config/cloud.ts`.
+ * Returns undefined if the project has no ts-cloud config (older projects /
+ * pure AWS setups that only export the legacy `CloudConfig`).
+ */
+async function loadTsCloudConfig(): Promise<any | undefined> {
+  try {
+    const mod = await import(p.projectPath('config/cloud.ts'))
+    return mod.tsCloud
+  }
+  catch (err) {
+    log.debug('Could not load config/cloud.ts tsCloud export:', err)
+    return undefined
+  }
+}
+
+/**
+ * Resolve the cloud provider from a ts-cloud config (defaults to aws).
+ */
+function resolveProvider(tsCloudConfig: any): string {
+  return tsCloudConfig?.cloud?.provider
+    || (process.env.CLOUD_PROVIDER as string | undefined)
+    || 'aws'
+}
+
+/**
+ * Wait until cloud-init finishes on the freshly provisioned host and the bun
+ * runtime is on PATH. Cloud-init runs asynchronously after the server reports
+ * "running", so deploying immediately would race the bun install and the
+ * systemd unit's ExecStart (`/usr/local/bin/bun …`) would not exist yet.
+ */
+async function waitForRemoteReady(ip: string, verbose: boolean): Promise<void> {
+  const { execSync } = await import('node:child_process')
+  const sshArgs = [
+    '-o', 'StrictHostKeyChecking=accept-new',
+    '-o', 'BatchMode=yes',
+    '-o', 'ConnectTimeout=10',
+    `root@${ip}`,
+  ]
+
+  const run = (remote: string): string =>
+    execSync(`ssh ${sshArgs.map(a => `'${a}'`).join(' ')} '${remote.replace(/'/g, `'\\''`)}'`, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', verbose ? 'inherit' : 'pipe'],
+    })
+
+  // 1) Wait for SSH to accept connections (server may still be booting).
+  log.info('Waiting for SSH to come up...')
+  const sshDeadline = Date.now() + 3 * 60_000
+  for (;;) {
+    try {
+      run('true')
+      break
+    }
+    catch {
+      if (Date.now() > sshDeadline)
+        throw new Error(`SSH did not become reachable on ${ip} within 3 minutes`)
+      await new Promise(r => setTimeout(r, 5000))
+    }
+  }
+  log.success('SSH is up')
+
+  // 2) Block on cloud-init, then confirm bun landed on PATH.
+  log.info('Waiting for cloud-init (installing bun + caddy)...')
+  try {
+    run('cloud-init status --wait || true')
+  }
+  catch (err) {
+    log.debug('cloud-init status --wait returned non-zero (continuing):', err)
+  }
+
+  const bunDeadline = Date.now() + 5 * 60_000
+  for (;;) {
+    try {
+      run('test -x /usr/local/bin/bun')
+      break
+    }
+    catch {
+      if (Date.now() > bunDeadline)
+        throw new Error('bun runtime did not appear at /usr/local/bin/bun within 5 minutes (cloud-init may have failed — check /var/log/cloud-init-output.log)')
+      await new Promise(r => setTimeout(r, 5000))
+    }
+  }
+  log.success('Server is ready (bun installed)')
+}
+
+/**
+ * Forge-style deploy to a Hetzner Cloud server via ts-cloud:
+ *   1. provision (or reuse) the compute server + firewall + SSH key,
+ *   2. wait for cloud-init to finish installing bun,
+ *   3. package each configured site and ship it over SSH as a systemd service.
+ *
+ * The app is served directly on the server's public IP (no domain required).
+ */
+async function deployToHetzner(tsCloudConfig: any, deployEnv: string, options: DeployOptions): Promise<void> {
+  const verbose = options.verbose === true
+  const environment = (deployEnv === 'prod' ? 'production' : deployEnv) as 'production' | 'staging' | 'development'
+
+  const apiToken = tsCloudConfig.hetzner?.apiToken || process.env.HCLOUD_TOKEN || process.env.HETZNER_API_TOKEN
+  if (!apiToken) {
+    log.error('No Hetzner API token found. Set HCLOUD_TOKEN in your .env (or hetzner.apiToken in config/cloud.ts).')
+    process.exit(ExitCode.FatalError)
+  }
+
+  // Confirm the local SSH public key the driver will register on the server.
+  const sshPubKey = join(homedir(), '.ssh', 'id_ed25519.pub')
+  if (!existsSync(sshPubKey)) {
+    log.error(`SSH public key not found at ${sshPubKey}.`)
+    log.info('ts-cloud deploys to Hetzner over SSH and registers this key on the server.')
+    log.info('Generate one with:  ssh-keygen -t ed25519')
+    process.exit(ExitCode.FatalError)
+  }
+
+  const { createCloudDriver, deployAllComputeSites } = await import('@stacksjs/ts-cloud')
+
+  try {
+    await runHetznerDeploy({ tsCloudConfig, environment, verbose, docker: (options as any).docker === true, createCloudDriver, deployAllComputeSites })
+  }
+  catch (err) {
+    log.error('Hetzner deploy failed:')
+    console.error(err instanceof Error ? (err.stack || err.message) : err)
+    process.exit(ExitCode.FatalError)
+  }
+}
+
+async function runHetznerDeploy(args: {
+  tsCloudConfig: any
+  environment: 'production' | 'staging' | 'development'
+  verbose: boolean
+  docker: boolean
+  createCloudDriver: any
+  deployAllComputeSites: any
+}): Promise<void> {
+  const { tsCloudConfig, environment, verbose, docker, createCloudDriver, deployAllComputeSites } = args
+
+  const startTime = performance.now()
+  console.log('')
+  console.log('🚀 Deploy → Hetzner Cloud')
+  console.log('')
+  log.info(`Project: ${tsCloudConfig.project?.slug}`)
+  log.info(`Environment: ${environment}`)
+  log.info(`Location: ${tsCloudConfig.hetzner?.location || process.env.HCLOUD_LOCATION || 'fsn1'}`)
+  log.info(`Size: ${tsCloudConfig.infrastructure?.compute?.size || 'small'}`)
+
+  const driver = createCloudDriver({ config: tsCloudConfig, provider: 'hetzner' })
+  if (!driver.provisionComputeInfrastructure) {
+    log.error('Hetzner driver does not support compute provisioning (update @stacksjs/ts-cloud).')
+    process.exit(ExitCode.FatalError)
+  }
+
+  log.info('Provisioning Hetzner compute infrastructure...')
+  const outputs = await driver.provisionComputeInfrastructure({ config: tsCloudConfig, environment })
+  const ip = outputs.appPublicIp
+  log.success('Hetzner compute infrastructure ready')
+  if (ip)
+    log.info(`Server IP: ${ip}`)
+  if (outputs.appInstanceId)
+    log.info(`Server ID: ${outputs.appInstanceId}`)
+
+  if (!ip) {
+    log.error('Provisioned server has no public IP — cannot deploy over SSH.')
+    process.exit(ExitCode.FatalError)
+  }
+
+  await waitForRemoteReady(ip, verbose)
+
+  // Package each site as source-only: dependencies are NOT shipped. They are
+  // installed on the server from the committed lockfile via the site's
+  // `preStart` hook (`bun install --frozen-lockfile`), which keeps the upload
+  // tiny (tens of MB instead of ~800MB of node_modules + pantry).
+  const { execSync } = await import('node:child_process')
+  const { tmpdir } = await import('node:os')
+  const sites = tsCloudConfig.sites || {}
+  const slug = tsCloudConfig.project?.slug || 'app'
+  let sha: string
+  try {
+    sha = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+  }
+  catch {
+    sha = Date.now().toString(36)
+  }
+
+  // Excluded from the release tarball. `node_modules`/`pantry` are reinstalled
+  // on the server; the rest is dev-only noise that production never needs.
+  // Patterns cover both top-level (`./x`) and nested (`*/x`) occurrences.
+  const tarExcludes = [
+    'node_modules',
+    'pantry',
+    '.git',
+    '.github',
+    '.cache',
+    'tmp',
+    'temp',
+    '.DS_Store',
+    '*.log',
+    '.env.local',
+    '.env.production.bak',
+  ].flatMap(p => [`--exclude='${p}'`, `--exclude='*/${p}'`])
+
+  const tarballs = new Map<string, string>()
+  for (const [siteName, site] of Object.entries<any>(sites)) {
+    if (!site?.start)
+      continue
+    const root = site.root || '.'
+    const tarballPath = join(tmpdir(), `${slug}-${siteName}-${sha}.tar.gz`)
+    log.info(`Packaging ${root} (source only, deps install on server) → ${tarballPath}...`)
+    execSync(
+      `tar czf "${tarballPath}" ${tarExcludes.join(' ')} -C "${root}" .`,
+      { stdio: verbose ? 'inherit' : 'pipe' },
+    )
+    const sizeMb = Math.max(1, Math.round((statSync(tarballPath).size) / 1048576))
+    log.info(`Release tarball: ~${sizeMb} MB`)
+    tarballs.set(siteName, tarballPath)
+  }
+
+  // `--docker` builds an OCI container image with pantry's native builder
+  // (no Docker daemon, no deps) from `storage/framework/Dockerfile`, and pushes
+  // it to the pantry registry when a token is present. The site itself still
+  // runs dep-free via bun + systemd below, so the box stays daemon-less.
+  if (docker)
+    await buildContainerImageWithPantry({ slug, sites, verbose })
+
+  log.info('Shipping release to the server...')
+  const ok = await deployAllComputeSites({
+    config: tsCloudConfig,
+    environment,
+    driver,
+    sha,
+    runtime: tsCloudConfig.infrastructure?.compute?.runtime || 'bun',
+    tarballForSite: (siteName: string) => {
+      const path = tarballs.get(siteName)
+      if (!path)
+        throw new Error(`Missing tarball for site '${siteName}'`)
+      return path
+    },
+    logger: {
+      info: (m: string) => log.info(m),
+      warn: (m: string) => log.warn(m),
+      error: (m: string) => log.error(m),
+      step: (m: string) => log.info(m),
+      success: (m: string) => log.success(m),
+    },
+  })
+
+  console.log('')
+  if (ok) {
+    await outro(`Deployed to Hetzner. Your site is live at http://${ip}:3000`, { startTime, useSeconds: true })
+    log.info(`Coming-soon page: http://${ip}:3000  (bypass with ?secret=…)`)
+  }
+  else {
+    await outro('Hetzner deploy reported a failure — see the per-instance output above.', { startTime, useSeconds: true })
+    process.exit(ExitCode.FatalError)
+  }
+}
+
+/**
+ * Build an OCI container image for each site using pantry's native, daemon-less
+ * builder — no Docker dependency. The image is built from the framework's
+ * generated `storage/framework/Dockerfile` and pushed to the pantry registry
+ * when `PANTRY_REGISTRY_TOKEN`/`PANTRY_TOKEN` is set, so the container can be
+ * consumed by registries, CDK, or ts-cloud. The site continues to run on the
+ * server via bun + systemd, keeping the box dependency-free.
+ */
+async function buildContainerImageWithPantry(args: {
+  slug: string
+  sites: Record<string, any>
+  verbose: boolean
+}): Promise<void> {
+  const { slug, sites, verbose } = args
+  const { execSync } = await import('node:child_process')
+
+  // Resolve the pantry CLI (system install preferred; falls back to ts-pantry).
+  let cli: string | undefined
+  for (const candidate of ['pantry', 'ts-pantry']) {
+    try {
+      execSync(`command -v ${candidate}`, { stdio: 'pipe' })
+      cli = candidate
+      break
+    }
+    catch { /* not on PATH */ }
+  }
+  if (!cli) {
+    log.warn('pantry CLI not found on PATH — skipping container image build. Install pantry to enable `--docker`.')
+    return
+  }
+
+  const dockerfile = 'storage/framework/Dockerfile'
+  const canPush = Boolean(process.env.PANTRY_REGISTRY_TOKEN || process.env.PANTRY_TOKEN)
+
+  for (const [siteName, site] of Object.entries(sites)) {
+    if (!site?.start)
+      continue
+    const tag = `${slug}-${siteName}:latest`
+    log.info(`[${siteName}] building image ${tag} with pantry (native, no Docker daemon)...`)
+    const flags = [
+      'build', '.',
+      '-t', tag,
+      '-f', dockerfile,
+      '--run-mode', 'skip', // build runs locally; deps install on the server
+    ]
+    if (canPush)
+      flags.push('--push')
+    execSync(`${cli} ${flags.map(f => (f.includes(' ') ? `'${f}'` : f)).join(' ')}`, {
+      stdio: verbose ? 'inherit' : 'pipe',
+      maxBuffer: 1024 * 1024 * 512,
+    })
+    log.success(`[${siteName}] image built${canPush ? ' + pushed to the pantry registry' : ''}`)
+  }
+}
+
 export function deploy(buddy: CLI): void {
   const descriptions = {
     deploy: 'Deploy your project',
@@ -543,13 +853,23 @@ export function deploy(buddy: CLI): void {
     .option('--dev', descriptions.development, { default: false })
     .option('--yes', descriptions.yes, { default: false })
     .option('--staging', descriptions.staging, { default: false })
+    .option('--docker', 'Also build an OCI image with pantry (native, no Docker daemon) and push it to the pantry registry', { default: false })
     .option('--verbose', descriptions.verbose, { default: false })
-    .action(async (envArg: string | undefined, options: DeployOptions) => {
+    .action(async (envArg: string | undefined, options: DeployOptions & { docker?: boolean }) => {
       log.debug('Running `buddy deploy` ...', options)
 
       await ensureDeployPrerequisites(options.verbose === true)
 
       const deployEnv = envArg || 'production'
+
+      // Non-AWS providers (currently Hetzner) provision + deploy over SSH via
+      // ts-cloud and have nothing to do with the AWS CloudFormation path below.
+      // Route them off early, before any AWS credential / domain checks run.
+      const tsCloudConfig = await loadTsCloudConfig()
+      if (tsCloudConfig && resolveProvider(tsCloudConfig) === 'hetzner') {
+        await deployToHetzner(tsCloudConfig, deployEnv, options)
+        return
+      }
 
       // Clear AWS_PROFILE to prevent credential conflicts when static credentials are provided
       // AWS SDK's defaultProvider prefers profile over static credentials, causing InvalidClientTokenId errors

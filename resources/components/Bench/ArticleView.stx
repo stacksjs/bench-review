@@ -184,6 +184,12 @@
     const s = status()
     return s === 'pending' || s === 'rejected'
   })
+  // Comments are public discussion, so the thread only belongs on a
+  // *published* review. Pending/rejected reviews are author-private
+  // (ShowReviewAction gates them to the author), so a comment section
+  // there would be a room of one — hide the whole section until the
+  // review goes live. Drives the Comments wrapper's visibility below.
+  const commentsVisible = derived<boolean>(() => !!reviewsStore.current() && status() === 'published')
   // Status-pill copy + colors. Computed once, reused by both the
   // top banner and the footer chip so the two surfaces stay aligned.
   const statusLabel = derived<string>(() => {
@@ -540,12 +546,6 @@
 
     <div class="article-body mt-10 text-gray-800" x-html="content"></div>
 
-    <!-- Comments thread (bench-review#44). Renders below the article
-         body so readers can react without scrolling past the chrome.
-         Self-contained component — owns its own data fetch + composer
-         state and reads the review id from the URL. -->
-    @include('Bench/Comments')
-
     <!-- Footer row: "people find this helpful" + status pill + back link.
          Helpful-button area hidden entirely for unpublished reviews —
          no readers can see them yet, so the count and the CTA don't
@@ -704,6 +704,25 @@
       </div>
     </div>
   </article>
+
+  <!-- Comments thread (bench-review#44). Lives OUTSIDE the `<article :if>`
+       wrapper deliberately. Nesting a scoped component (Comments has its
+       own `data-stx-scope`) inside a reactive `:if` trips stacksjs/stx#1737:
+       when the conditional element is initially detached (reviewsStore.current
+       is null until fetchById resolves), `bindIf`'s `disposeSubtreeScopes` walk
+       deletes the nested scope's entry from `window.stx._scopes` — and the
+       component's `<script data-stx-scoped>` IIFE only runs once at parse time,
+       so the scope never re-registers. Symptom: every `:if` / `:else-if` / `:else`
+       inside Comments would silently fail (all branches stay visible because
+       processElement is never called on them). x-class hide/show on this
+       wrapper keeps the element mounted, so the scope-walk dispatch reaches
+       Comments uninterrupted. -->
+  <div
+    class="mx-auto pt-12 px-4 sm:px-6 max-w-3xl"
+    x-class="commentsVisible ? '' : 'hidden'"
+  >
+    @include('Bench/Comments')
+  </div>
 </div>
 
 @push('styles')

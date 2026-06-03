@@ -441,11 +441,13 @@ export async function startDevelopmentServer(_options: DevOptions, _startTime?: 
   // a TCP connection so the "ready in N ms" line below reflects the time at
   // which the URLs above actually serve traffic — not just when the spawn
   // calls returned. Probes run in parallel with the servers themselves.
+  // Only the core app servers gate "ready" — the Docs (and Dashboard) servers
+  // still start by default, but they boot in the background and shouldn't hold
+  // up the readiness banner. This keeps `ready in` reporting when the app is
+  // actually usable; the auxiliary URLs come up moments later.
   const ports = [
     { name: 'Frontend', port: frontendPort },
     { name: 'API', port: apiPort },
-    { name: 'Docs', port: docsPort },
-    ...(includeDashboard ? [{ name: 'Dashboard', port: dashboardPort }] : []),
   ]
   const readinessTimeoutMs = 30000
   let readyAnnounced = false
@@ -905,7 +907,9 @@ async function waitForPort(port: number, timeoutMs: number): Promise<boolean> {
   while (Date.now() < deadline) {
     if (await probeDevServerHttp(port))
       return true
-    await new Promise(r => setTimeout(r, 250))
+    // Tight poll: a refused connection rejects instantly, so this is cheap and
+    // detects "just bound" within ~50ms instead of up to a quarter second.
+    await new Promise(r => setTimeout(r, 50))
   }
   return false
 }
@@ -1193,7 +1197,7 @@ function resolveRpxDaemonSpawnCwd(): string {
   if (existsSync(join(toolsPkg, 'package.json')))
     return toolsPkg
 
-  const bootstrap = join(dirname(fileURLToPath(import.meta.url)), '../scripts/rpx-daemon-bootstrap.ts')
+  const bootstrap = join(dirname(fileURLToPath(import.meta.url)), '../../scripts/rpx-daemon-bootstrap.ts')
   if (existsSync(bootstrap))
     return dirname(bootstrap)
 
@@ -1202,7 +1206,7 @@ function resolveRpxDaemonSpawnCwd(): string {
 
 async function resolveRpxDaemonSpawnCommand(): Promise<string[]> {
   // Bootstrap first — never loads the app's Bun preloader.
-  const bootstrap = join(dirname(fileURLToPath(import.meta.url)), '../scripts/rpx-daemon-bootstrap.ts')
+  const bootstrap = join(dirname(fileURLToPath(import.meta.url)), '../../scripts/rpx-daemon-bootstrap.ts')
   if (existsSync(bootstrap))
     return [process.execPath, bootstrap]
 

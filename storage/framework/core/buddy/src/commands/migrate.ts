@@ -123,6 +123,37 @@ function validateModelsExist(): { valid: boolean, error?: string } {
   return { valid: true }
 }
 
+/**
+ * Post-migrate FK integrity probe (stacksjs/stacks#1915 D-5).
+ *
+ * Catches the silent "you flipped DB_CONNECTION but the FKs didn't
+ * follow" failure mode while the user is still at the `migrate` step,
+ * which is the highest-context moment to surface it. Treats audit
+ * failure as a non-fatal warning so a misconfigured DB driver or a
+ * missing introspection permission doesn't break the migrate command —
+ * the user can always run `buddy doctor` for the structured view.
+ */
+async function reportMissingForeignKeys(): Promise<void> {
+  try {
+    const { auditForeignKeys } = await import('@stacksjs/database')
+    const result = await auditForeignKeys()
+    if (result.missing.length === 0) return
+
+    const sample = result.missing
+      .slice(0, 5)
+      .map(fk => `  • ${fk.fromTable}.${fk.fromColumn} → ${fk.toTable}.${fk.toColumn} (${fk.model})`)
+      .join('\n')
+    const more = result.missing.length > 5 ? `\n  + ${result.missing.length - 5} more — run \`./buddy doctor\` for the full list.` : ''
+    log.warn(
+      `${result.missing.length} of ${result.declared.length} declared foreign keys are missing from the live schema:\n${sample}${more}\n`
+      + `If you just flipped DB_CONNECTION, the FK ALTER migrations may be sitting on disk but unapplied — run \`./buddy migrate:fresh\` against the new database (will reset data) or replay the alter-*.sql files manually.`,
+    )
+  }
+  catch (err) {
+    log.debug(`[migrate] FK integrity check skipped: ${err instanceof Error ? err.message : String(err)}`)
+  }
+}
+
 export function migrate(buddy: CLI): void {
   const descriptions = {
     migrate: 'Migrates your database',
@@ -180,17 +211,39 @@ export function migrate(buddy: CLI): void {
         // every time. Errors still surface via log.error below.
         log.debug('Migrating auth tables...')
         try {
-          const { migrateAuthTables } = await import('@stacksjs/database')
+          const { migrateAuthTables, migrateNotificationTables, migrateRbacTables } = await import('@stacksjs/database')
           const authResult = await migrateAuthTables({ verbose: options.verbose })
 
           if (!authResult.success) {
             log.error(`Failed to migrate auth tables: ${authResult.error}`)
           }
+
+          // Notification tables (stacksjs/stacks#1937) — the `database`
+          // channel + preference layer need these; previously unshipped.
+          const notifResult = await migrateNotificationTables({ verbose: options.verbose })
+          if (!notifResult.success) {
+            log.error(`Failed to migrate notification tables: ${notifResult.error}`)
+          }
+
+          // RBAC tables (stacksjs/stacks#1941 Phase A) — roles,
+          // permissions, and the three pivot tables the RBAC store
+          // reads. Schema was documented in rbac-store-bqb.ts but the
+          // migration never shipped.
+          const rbacResult = await migrateRbacTables({ verbose: options.verbose })
+          if (!rbacResult.success) {
+            log.error(`Failed to migrate RBAC tables: ${rbacResult.error}`)
+          }
         }
         catch (error) {
-          log.error('Failed to migrate auth tables:', error)
+          log.error('Failed to migrate auth/notification/RBAC tables:', error)
         }
       }
+
+      // Post-migrate FK integrity check (stacksjs/stacks#1915 D-5).
+      // Surfaces the "you flipped DB_CONNECTION and the FKs didn't
+      // follow" failure mode while the user is still at the migrate
+      // command — the highest-context moment to warn.
+      await reportMissingForeignKeys()
 
       const APP_ENV = process.env.APP_ENV || 'local'
 
@@ -255,17 +308,36 @@ export function migrate(buddy: CLI): void {
         // every time. Errors still surface via log.error below.
         log.debug('Migrating auth tables...')
         try {
-          const { migrateAuthTables } = await import('@stacksjs/database')
+          const { migrateAuthTables, migrateNotificationTables, migrateRbacTables } = await import('@stacksjs/database')
           const authResult = await migrateAuthTables({ verbose: options.verbose })
 
           if (!authResult.success) {
             log.error(`Failed to migrate auth tables: ${authResult.error}`)
           }
+
+          // Notification tables (stacksjs/stacks#1937) — the `database`
+          // channel + preference layer need these; previously unshipped.
+          const notifResult = await migrateNotificationTables({ verbose: options.verbose })
+          if (!notifResult.success) {
+            log.error(`Failed to migrate notification tables: ${notifResult.error}`)
+          }
+
+          // RBAC tables (stacksjs/stacks#1941 Phase A) — roles,
+          // permissions, and the three pivot tables the RBAC store
+          // reads. Schema was documented in rbac-store-bqb.ts but the
+          // migration never shipped.
+          const rbacResult = await migrateRbacTables({ verbose: options.verbose })
+          if (!rbacResult.success) {
+            log.error(`Failed to migrate RBAC tables: ${rbacResult.error}`)
+          }
         }
         catch (error) {
-          log.error('Failed to migrate auth tables:', error)
+          log.error('Failed to migrate auth/notification/RBAC tables:', error)
         }
       }
+
+      // Post-migrate FK integrity check (stacksjs/stacks#1915 D-5).
+      await reportMissingForeignKeys()
 
       // Run seeders if --seed flag is provided.
       //
@@ -342,6 +414,112 @@ export function migrate(buddy: CLI): void {
       const APP_URL = process.env.APP_URL || 'undefined'
 
       await outro(`Migrated your ${APP_URL} DNS.`, {
+        startTime: perf,
+        useSeconds: true,
+      })
+      process.exit(ExitCode.Success)
+    })
+
+  // `buddy migrate:switch <driver>` — pre-flight + plan for flipping
+  // DB_CONNECTION between sqlite / mysql / postgres
+  // (stacksjs/stacks#1915 D-4).
+  //
+  // Intentionally does NOT mutate .env or auto-run migrations. The
+  // intent here is to surface the silent traps documented in #1915
+  // (timestamp TZ drift, auth-table boolean mismatch, FK migration
+  // files that need replaying on the new dialect) BEFORE the user
+  // commits to the switch. The output is a checklist they walk
+  // through manually — the actual migration is still `buddy migrate`
+  // (or `migrate:fresh`) once the env is updated.
+  buddy
+    .command('migrate:switch <driver>', 'Pre-flight check + plan for switching DB_CONNECTION between sqlite / mysql / postgres')
+    .action(async (driver: string) => {
+      log.debug(`Running \`buddy migrate:switch ${driver}\` ...`)
+      const perf = await intro('buddy migrate:switch')
+
+      const target = driver.toLowerCase()
+      const allowed = new Set(['sqlite', 'mysql', 'postgres'])
+      if (!allowed.has(target)) {
+        // eslint-disable-next-line no-console
+        console.log(`\n  Unknown target driver "${driver}". Allowed: sqlite, mysql, postgres.\n`)
+        await outro(`Aborted.`, { startTime: perf, useSeconds: true })
+        process.exit(ExitCode.FatalError)
+      }
+
+      const current = (process.env.DB_CONNECTION || 'sqlite').toLowerCase()
+      if (current === target) {
+        // eslint-disable-next-line no-console
+        console.log(`\n  DB_CONNECTION is already "${target}". Nothing to switch.\n`)
+        await outro(`No-op.`, { startTime: perf, useSeconds: true })
+        process.exit(ExitCode.Success)
+      }
+
+      // Pre-flight: the target driver's env vars must be present
+      // before the user kicks off `buddy migrate` against it.
+      const requiredEnv: Record<string, string[]> = {
+        sqlite: ['DB_DATABASE'],
+        mysql: ['DB_HOST', 'DB_PORT', 'DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE'],
+        postgres: ['DB_HOST', 'DB_PORT', 'DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE'],
+      }
+      const missingEnv = (requiredEnv[target] ?? []).filter(k => !process.env[k])
+
+      // Count migration files that exist on disk for replay. The
+      // FK ALTER / unique-index files that the SQLite preprocessing
+      // pass skipped (stacksjs/stacks#1916) are exactly the ones
+      // that will run when migrate is re-invoked against the new
+      // driver.
+      let alterCount = 0
+      let uniqueIdxCount = 0
+      try {
+        const migrationsDir = projectPath('database/migrations')
+        if (existsSync(migrationsDir)) {
+          const files = readdirSync(migrationsDir).filter(f => f.endsWith('.sql'))
+          for (const f of files) {
+            const content = readFileSync(`${migrationsDir}/${f}`, 'utf-8').toLowerCase()
+            if (/alter\s+table[\s\S]*add\s+constraint/.test(content)) alterCount++
+            if (/^\s*create\s+unique\s+index/m.test(content)) uniqueIdxCount++
+          }
+        }
+      }
+      catch { /* directory missing — fine */ }
+
+      // The plan is rendered with `console.log` (sync, flushes
+      // before `process.exit`) rather than `log.info` (async-
+      // buffered, can drop on early exit). The `log.*` helpers are
+      // great for the long-running migrate command but the wrong
+      // tool for this short-lived static report.
+      const sqliteFkNote = current === 'sqlite' && alterCount > 0
+        ? `\n    (These were skipped on SQLite per stacksjs/stacks#1916 and survive on disk for replay.)`
+        : ''
+      const boolNote = current === 'sqlite' && (target === 'postgres' || target === 'mysql')
+        ? `\n  • Booleans land as 0/1 on SQLite; ${target} stores them as ${target === 'postgres' ? 'true/false' : '0/1 (compatible)'}.`
+        : ''
+      const tzNote = target === 'postgres'
+        ? `\n  • PostgreSQL uses timestamptz (with TZ) where SQLite/MySQL store plain TIMESTAMP. Existing rows do NOT auto-upgrade — they ride the column's stored type.`
+        : ''
+      const envExtras = target !== 'sqlite' ? `, plus DB_HOST / DB_PORT / DB_USERNAME / DB_PASSWORD / DB_DATABASE` : ``
+      const missingNote = missingEnv.length > 0
+        ? `\n  ⚠ Missing env vars for ${target}: ${missingEnv.join(', ')}`
+        : ''
+
+      // eslint-disable-next-line no-console
+      console.log(`
+  Switch plan: ${current} → ${target}
+  ─────────────────────────────────────────────
+  • ${alterCount} ALTER TABLE ADD CONSTRAINT migration(s) will be applied against ${target}.${sqliteFkNote}
+  • ${uniqueIdxCount} CREATE UNIQUE INDEX migration(s) will be applied against ${target}.
+  • Auth tables (oauth_clients, oauth_access_tokens, oauth_refresh_tokens, password_resets) will be CREATE TABLE IF NOT EXISTS — they re-create cleanly under the new dialect.${boolNote}${tzNote}
+  • Existing row data does NOT auto-migrate. Use \`mysqldump\` / \`pg_dump\` (or your own export) to move it.${missingNote}
+  ─────────────────────────────────────────────
+
+  Next steps:
+    1. Update .env:  DB_CONNECTION=${target}${envExtras}
+    2. (Optional) Export data from the current ${current} database.
+    3. Run \`./buddy migrate\` (or \`migrate:fresh\` to start clean).
+    4. The post-migrate FK audit will report any constraints that didn't replay.
+`)
+
+      await outro(`Plan rendered. Re-run after updating .env to actually switch.`, {
         startTime: perf,
         useSeconds: true,
       })

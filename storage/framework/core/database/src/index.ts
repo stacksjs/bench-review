@@ -106,6 +106,12 @@ export * from './custom'
 // Auth tables migration
 export * from './auth-tables'
 
+// Notification tables migration (stacksjs/stacks#1937)
+export { migrateNotificationTables } from './notification-tables'
+
+// RBAC tables migration (stacksjs/stacks#1941 Phase A)
+export { migrateRbacTables } from './rbac-tables'
+
 // SQL dialect helpers & connection defaults
 export * from './sql-helpers'
 export * from './defaults'
