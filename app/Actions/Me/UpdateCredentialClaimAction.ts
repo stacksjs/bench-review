@@ -50,8 +50,8 @@ export default new Action({
     if (!userId)
       return response.json({ error: 'Not authenticated' }, 401)
 
-    const type = String((request as any).get?.('credential_type') ?? '').trim().toLowerCase()
-    const stateRaw = String((request as any).get?.('credential_state') ?? '').trim().toUpperCase()
+    const type = String(request.get?.('credential_type') ?? '').trim().toLowerCase()
+    const stateRaw = String(request.get?.('credential_state') ?? '').trim().toUpperCase()
 
     if (!ALLOWED_TYPES.has(type))
       return response.json({ error: 'Pick one of: bar_admission, clerk_position, court_staff, judicial_appointment.' }, 422)

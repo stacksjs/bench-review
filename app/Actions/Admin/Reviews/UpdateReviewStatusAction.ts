@@ -31,8 +31,8 @@ export default new Action({
   },
 
   async handle() {
-    const reviewId = Number((request as any).params?.id)
-    const status = String((request as any).get?.('status') ?? '').trim().toLowerCase()
+    const reviewId = Number(request.params?.id)
+    const status = String(request.get?.('status') ?? '').trim().toLowerCase()
 
     if (!ALLOWED_STATUSES.has(status))
       return response.json({ error: 'Status must be "published" or "rejected".' }, 422)

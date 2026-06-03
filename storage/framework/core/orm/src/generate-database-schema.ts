@@ -24,6 +24,12 @@ export interface GenerateSchemaOptions {
   modelsDir?: string
   defaultsDir?: string
   outFile?: string
+  /**
+   * Where to write the ambient model-globals file (typed model accessors
+   * like `JudgeReview.first()` keyed to their DatabaseSchema row). Defaults
+   * to `resources/types/user-models.d.ts`. Set null to skip emitting it.
+   */
+  modelGlobalsFile?: string | null
   /** Print the would-be file content instead of writing. */
   dryRun?: boolean
 }
@@ -33,6 +39,9 @@ export interface GenerateSchemaResult {
   tables: Array<{ table: string, model: string, columns: Record<string, string> }>
   errors: Array<{ file: string, error: string }>
   content: string
+  /** Rendered model-globals file content (see `modelGlobalsFile`). */
+  modelGlobalsFile?: string
+  modelGlobalsContent?: string
 }
 
 function snakeCase(str: string): string {
@@ -49,9 +58,17 @@ function snakeCase(str: string): string {
  * a silently-wrong column type. Nullable columns get `| null`.
  */
 function attributeToTsType(attr: Attribute): string {
-  // `type` is the most common discriminator; some attributes carry the
-  // type info inside a validation rule instead. Cover both.
-  const declared = typeof attr.type === 'string' ? attr.type.toLowerCase() : ''
+  // `type` is the most common discriminator; many attributes carry the
+  // type ONLY inside their validation rule (`validation: { rule: schema.string() }`
+  // with no top-level `type`). Cover both: prefer an explicit `type`, else
+  // read the validator instance's `name` (ts-validation sets it per kind —
+  // 'string' / 'number' / 'boolean' / …). Without this fallback every
+  // validation-only column landed as `unknown`.
+  const ruleName = (() => {
+    const rule = (attr as { validation?: { rule?: { name?: unknown } } }).validation?.rule
+    return rule && typeof rule.name === 'string' ? rule.name.toLowerCase() : ''
+  })()
+  const declared = (typeof attr.type === 'string' && attr.type ? attr.type : ruleName).toLowerCase()
   const base = (() => {
     switch (declared) {
       case 'string':
@@ -63,6 +80,7 @@ function attributeToTsType(attr: Attribute): string {
       case 'varchar':
       case 'enum':
       case 'uuid':
+      case 'password':
       case 'date':
       case 'datetime':
       case 'timestamp':
@@ -70,11 +88,13 @@ function attributeToTsType(attr: Attribute): string {
       case 'time':
       case 'year':
         return 'string'
+      case 'number':
       case 'integer':
       case 'int':
       case 'tinyint':
       case 'smallint':
       case 'mediumint':
+      case 'unix':
       case 'float':
       case 'double':
       case 'decimal':

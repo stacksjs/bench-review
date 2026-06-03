@@ -35,9 +35,9 @@ export default new Action({
   async handle() {
     bootRbac()
 
-    const targetUserId = Number((request as any).params?.id)
-    const role = String((request as any).get?.('role') ?? '').trim()
-    const op = String((request as any).get?.('action') ?? '').trim()
+    const targetUserId = Number(request.params?.id)
+    const role = String(request.get?.('role') ?? '').trim()
+    const op = String(request.get?.('action') ?? '').trim()
 
     if (!role)
       return response.json({ error: 'Role is required.' }, 422)

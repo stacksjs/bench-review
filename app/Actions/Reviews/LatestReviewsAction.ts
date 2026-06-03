@@ -21,7 +21,7 @@ export default new Action({
   description: 'Latest published reviews across all judges',
   method: 'GET',
   async handle() {
-    const raw = (request as any).query?.limit ?? (request as any).get?.('limit')
+    const raw = request.query?.limit ?? request.get?.('limit')
     const parsed = Number(raw)
     const limit = Number.isFinite(parsed) && parsed > 0
       ? Math.min(parsed, MAX_LIMIT)

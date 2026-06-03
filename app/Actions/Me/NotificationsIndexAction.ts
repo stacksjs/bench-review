@@ -28,8 +28,8 @@ export default new Action({
     if (!userId)
       return response.json({ error: 'Not authenticated' }, 401)
 
-    const filter = String((request as any).get?.('filter') ?? 'all').toLowerCase()
-    const limitRaw = Number((request as any).get?.('limit') ?? 30)
+    const filter = String(request.get?.('filter') ?? 'all').toLowerCase()
+    const limitRaw = Number(request.get?.('limit') ?? 30)
     const limit = Math.min(100, Math.max(1, Number.isFinite(limitRaw) ? Math.floor(limitRaw) : 30))
 
     let listQuery: any = db.selectFrom('user_notifications')

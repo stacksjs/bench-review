@@ -26,7 +26,7 @@ export default new Action({
     if (!userId)
       return response.json({ error: 'Not authenticated' }, 401)
 
-    const judgeId = Number((request as any).params?.id)
+    const judgeId = Number(request.params?.id)
 
     await db.deleteFrom('judge_follows')
       .where('user_id', '=', userId)

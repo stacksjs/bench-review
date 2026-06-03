@@ -28,10 +28,10 @@ export default new Action({
   },
 
   async handle() {
-    const userId = Number((request as any).params?.id)
+    const userId = Number(request.params?.id)
 
-    const nameInput = (request as any).get?.('name')
-    const emailInput = (request as any).get?.('email')
+    const nameInput = request.get?.('name')
+    const emailInput = request.get?.('email')
 
     const patch: Record<string, unknown> = {}
     if (typeof nameInput === 'string' && nameInput.trim().length > 0)

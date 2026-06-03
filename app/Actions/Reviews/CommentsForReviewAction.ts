@@ -34,7 +34,7 @@ export default new Action({
   },
 
   async handle() {
-    const reviewId = Number((request as any).params?.id)
+    const reviewId = Number(request.params?.id)
     const { perPage, page, offset } = resolvePaginatorArgs({ perPage: 20 })
 
     const countRow = await (db.selectFrom('review_comments') as any)

@@ -41,7 +41,7 @@ export default new Action({
   },
 
   async handle() {
-    const targetUserId = Number((request as any).params?.id)
+    const targetUserId = Number(request.params?.id)
 
     const me = await Auth.user()
     if ((me as any)?.id === targetUserId)

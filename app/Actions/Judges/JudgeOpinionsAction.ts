@@ -33,7 +33,7 @@ export default new Action({
   },
 
   async handle() {
-    const judgeId = Number((request as any).params?.id)
+    const judgeId = Number(request.params?.id)
     const { perPage, page, offset } = resolvePaginatorArgs({ perPage: 25 })
 
     const countRow = await (db.selectFrom('judge_opinions') as any)

@@ -33,7 +33,7 @@ export default new Action({
     if (!userId)
       return response.json({ error: 'Not authenticated' }, 401)
 
-    const photoId = Number((request as any).params?.id)
+    const photoId = Number(request.params?.id)
 
     const existing = await db.selectFrom('review_photos')
       .select(['id', 'user_id', 'thumb_url', 'card_url', 'full_url'])

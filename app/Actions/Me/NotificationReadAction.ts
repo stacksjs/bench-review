@@ -28,7 +28,7 @@ export default new Action({
     if (!userId)
       return response.json({ error: 'Not authenticated' }, 401)
 
-    const notificationId = Number((request as any).params?.id)
+    const notificationId = Number(request.params?.id)
 
     const row = await db.selectFrom('user_notifications')
       .select(['id', 'user_id', 'read_at'])

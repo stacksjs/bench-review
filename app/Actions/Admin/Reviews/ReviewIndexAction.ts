@@ -25,13 +25,13 @@ export default new Action({
   description: 'Paginated review list for moderation',
   method: 'GET',
   async handle() {
-    const statusInput = String((request as any).get?.('status') ?? 'all').toLowerCase()
+    const statusInput = String(request.get?.('status') ?? 'all').toLowerCase()
     const status = VALID_STATUS.has(statusInput) ? statusInput : 'all'
 
-    const q = String((request as any).get?.('q') ?? '').trim()
+    const q = String(request.get?.('q') ?? '').trim()
 
-    const pageRaw = Number((request as any).get?.('page') ?? 1)
-    const perPageRaw = Number((request as any).get?.('perPage') ?? 25)
+    const pageRaw = Number(request.get?.('page') ?? 1)
+    const perPageRaw = Number(request.get?.('perPage') ?? 25)
     const page = Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1
     const perPage = Math.min(100, Math.max(1, Number.isFinite(perPageRaw) ? Math.floor(perPageRaw) : 25))
     const offset = (page - 1) * perPage

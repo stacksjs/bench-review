@@ -26,13 +26,13 @@ export default new Action({
     if (!user)
       return response.json({ error: 'Not authenticated' }, 401)
 
-    const userId = (user as any).id
+    const userId = user.id
     const roles = await getUserRoles(userId)
 
     return response.json({
       id: userId,
-      email: (user as any).email,
-      name: (user as any).name,
+      email: user.email,
+      name: user.name,
       roles: roles.map(r => r.name),
     })
   },

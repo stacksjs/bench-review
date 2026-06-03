@@ -66,9 +66,7 @@ export default new Action({
     },
   },
   async handle() {
-    const body: SubmitPayload = typeof (request as any).all === 'function'
-      ? (request as any).all()
-      : {}
+    const body: SubmitPayload = request.all()
 
     const judgeId = Number(body.judge_id)
     const rating = Number(body.rating)
@@ -150,7 +148,7 @@ export default new Action({
         const { mail } = await import('@stacksjs/email')
         const judgeName = (judge as any)?.name ?? 'this judge'
         const reviewerName = (authUser as any)?.name || 'there'
-        const articleUrl = `${process.env.APP_URL || 'http://localhost:4000'}/article/${(inserted as any).id}`
+        const articleUrl = `${process.env.APP_URL || 'http://localhost:4000'}/article/${inserted.id}`
         const safeJudge = escapeHtml(judgeName)
         await mail.send({
           to: recipient,

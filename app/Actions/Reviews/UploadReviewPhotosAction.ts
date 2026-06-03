@@ -39,7 +39,7 @@ export default new Action({
     if (!userId)
       return response.json({ error: 'Not authenticated' }, 401)
 
-    const reviewId = Number((request as any).params?.id)
+    const reviewId = Number(request.params?.id)
 
     // Verify ownership + grab the review's uuid for the storage path.
     const review = await db.selectFrom('judge_reviews')

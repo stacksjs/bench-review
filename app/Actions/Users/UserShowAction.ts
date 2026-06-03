@@ -34,7 +34,7 @@ export default new Action({
   },
 
   async handle() {
-    const userId = Number((request as any).params?.id)
+    const userId = Number(request.params?.id)
 
     const user = await db.selectFrom('users')
       .select(['id', 'name', 'created_at', 'credential_type', 'credential_state', 'credential_verified_at'])

@@ -43,12 +43,12 @@ export default new Action({
     if (!userId)
       return response.json({ error: 'Not authenticated' }, 401)
 
-    const reviewId = Number((request as any).params?.id)
+    const reviewId = Number(request.params?.id)
 
     // Body validation. Use the same sanitiser as reviews so a
     // pasted-from-Word comment doesn't bring its layout-style noise
     // to the page.
-    const bodyInput = String((request as any).get?.('body') ?? '')
+    const bodyInput = String(request.get?.('body') ?? '')
     const body = (await sanitizeReviewHtml(bodyInput)).trim()
     if (body.length < 5)
       return response.json({ error: 'Comment must be at least 5 characters.' }, 422)
@@ -56,7 +56,7 @@ export default new Action({
       return response.json({ error: 'Comment must be at most 2000 characters.' }, 422)
 
     // Anonymity flag (bench-review#36).
-    const anonRaw = (request as any).get?.('anonymized')
+    const anonRaw = request.get?.('anonymized')
     const anonymized = anonRaw === true || anonRaw === 'true' || anonRaw === 1 || anonRaw === '1' ? 1 : 0
 
     // Confirm the review exists and is commentable. A comment against

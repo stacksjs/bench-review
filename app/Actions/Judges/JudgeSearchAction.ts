@@ -28,7 +28,7 @@ export default new Action({
   description: 'Server-side judge typeahead',
   method: 'GET',
   async handle() {
-    const raw = String(((request as any).query?.q ?? (request as any).get?.('q') ?? '')).trim()
+    const raw = String((request.query?.q ?? request.get?.('q') ?? '')).trim()
     if (raw.length < MIN_LEN)
       return response.json([])
 

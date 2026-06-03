@@ -40,8 +40,8 @@ export default new Action({
   async handle() {
     bootRbac()
 
-    const email = String((request as any).get?.('email') ?? '')
-    const password = String((request as any).get?.('password') ?? '')
+    const email = String(request.get?.('email') ?? '')
+    const password = String(request.get?.('password') ?? '')
 
     const result = await Auth.login({ email, password })
     if (!result)

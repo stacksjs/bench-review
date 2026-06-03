@@ -45,7 +45,7 @@ export default new Action({
     if (!userId)
       return response.json({ error: 'Not authenticated' }, 401)
 
-    const reviewId = Number((request as any).params?.id)
+    const reviewId = Number(request.params?.id)
 
     const existing = await db.selectFrom('judge_reviews')
       .select(['id', 'user_id', 'status'])
@@ -59,10 +59,10 @@ export default new Action({
     // patches so the client can send only what changed. Validations
     // are inline rather than declarative-on-Action because the
     // declarative `validations:` block only covers path params here.
-    const titleInput = (request as any).get?.('title')
-    const contentInput = (request as any).get?.('content')
-    const ratingInput = (request as any).get?.('rating')
-    const typeInput = (request as any).get?.('type')
+    const titleInput = request.get?.('title')
+    const contentInput = request.get?.('content')
+    const ratingInput = request.get?.('rating')
+    const typeInput = request.get?.('type')
 
     const patch: Record<string, unknown> = {}
 
@@ -104,7 +104,7 @@ export default new Action({
     // not a one-shot at submit. Every edit kicks the review back to
     // pending anyway, so the public surfaces re-render with the new
     // flag after re-approval.
-    const anonInput = (request as any).get?.('anonymized')
+    const anonInput = request.get?.('anonymized')
     if (anonInput !== undefined && anonInput !== null) {
       patch.anonymized = anonInput === true || anonInput === 'true' || anonInput === 1 || anonInput === '1' ? 1 : 0
     }

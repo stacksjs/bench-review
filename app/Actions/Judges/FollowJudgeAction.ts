@@ -33,11 +33,11 @@ export default new Action({
     if (!userId)
       return response.json({ error: 'Not authenticated' }, 401)
 
-    // Route params come through `(request as any).params` in this
+    // Route params come through `request.params` in this
     // framework — mirrors ShowReviewAction / ReviewsByJudgeAction. The
     // declarative `validations` above already proved the value is a
     // positive number; this just casts it.
-    const judgeId = Number((request as any).params?.id)
+    const judgeId = Number(request.params?.id)
 
     const judge = await Judge.find(judgeId)
     if (!judge)

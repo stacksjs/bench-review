@@ -42,7 +42,7 @@ export default new Action({
     if (!userId)
       return response.json({ error: 'Not authenticated' }, 401)
 
-    const reviewId = Number((request as any).params?.id)
+    const reviewId = Number(request.params?.id)
 
     // Verify the review actually exists (and is published — anonymous
     // POSTs to /api/reviews/9999/like should 404, not silently insert
@@ -58,7 +58,7 @@ export default new Action({
     // be able to inflate the counter. 422 (semantic conflict) rather
     // than 403 — the request is well-formed and authenticated, it
     // just can't be honored.
-    const authorId = (review as any).user_id
+    const authorId = review.user_id
     if (authorId != null && Number(authorId) === Number(userId))
       return response.json({ error: 'You cannot mark your own review as helpful.' }, 422)
 

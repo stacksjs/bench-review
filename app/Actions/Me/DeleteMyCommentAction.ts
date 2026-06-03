@@ -35,7 +35,7 @@ export default new Action({
     if (!userId)
       return response.json({ error: 'Not authenticated' }, 401)
 
-    const commentId = Number((request as any).params?.id)
+    const commentId = Number(request.params?.id)
 
     const existing = await db.selectFrom('review_comments')
       .select(['id', 'user_id', 'judge_review_id'])

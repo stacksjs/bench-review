@@ -32,7 +32,7 @@ export default new Action({
   description: 'Paginated published reviews for a single judge',
   method: 'GET',
   async handle() {
-    const raw = String((request as any).params?.id || '')
+    const raw = String(request.params?.id || '')
     const judgeId = Number(raw)
     if (!Number.isFinite(judgeId) || judgeId <= 0)
       return response.json({ error: 'Invalid judge id' }, 400)

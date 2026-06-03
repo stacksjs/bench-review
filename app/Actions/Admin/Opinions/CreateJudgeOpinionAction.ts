@@ -35,7 +35,7 @@ export default new Action({
   },
 
   async handle() {
-    const judgeId = Number((request as any).params?.id)
+    const judgeId = Number(request.params?.id)
 
     // Confirm the judge exists before inserting. An opinion against
     // a missing judge is noise.
@@ -46,16 +46,16 @@ export default new Action({
     if (!judge)
       return response.json({ error: 'Judge not found.' }, 404)
 
-    const caseName = String((request as any).get?.('case_name') ?? '').trim()
+    const caseName = String(request.get?.('case_name') ?? '').trim()
     if (caseName.length < 3 || caseName.length > 500)
       return response.json({ error: 'Case name must be between 3 and 500 characters.' }, 422)
 
-    const citation = String((request as any).get?.('citation') ?? '').trim().slice(0, 200) || null
-    const decisionDate = String((request as any).get?.('decision_date') ?? '').trim() || null
-    const summary = String((request as any).get?.('summary') ?? '').trim().slice(0, 5000) || null
-    const sourceUrl = String((request as any).get?.('source_url') ?? '').trim().slice(0, 500) || null
+    const citation = String(request.get?.('citation') ?? '').trim().slice(0, 200) || null
+    const decisionDate = String(request.get?.('decision_date') ?? '').trim() || null
+    const summary = String(request.get?.('summary') ?? '').trim().slice(0, 5000) || null
+    const sourceUrl = String(request.get?.('source_url') ?? '').trim().slice(0, 500) || null
 
-    const outcomeRaw = String((request as any).get?.('outcome_label') ?? '').trim().toLowerCase()
+    const outcomeRaw = String(request.get?.('outcome_label') ?? '').trim().toLowerCase()
     const outcomeLabel = ALLOWED_OUTCOMES.has(outcomeRaw) ? outcomeRaw : null
 
     if (sourceUrl && !/^https?:\/\//i.test(sourceUrl))

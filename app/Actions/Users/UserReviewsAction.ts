@@ -30,7 +30,7 @@ export default new Action({
   },
 
   async handle() {
-    const userId = Number((request as any).params?.id)
+    const userId = Number(request.params?.id)
     const { perPage, page, offset } = resolvePaginatorArgs()
 
     // Confirm the user exists before paginating reviews. Saves a

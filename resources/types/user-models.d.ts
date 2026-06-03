@@ -13,102 +13,111 @@
 // File upstream when bandwidth allows: have defineModel return the
 // bqb createModel result instead of Record<string, unknown>.
 
-interface BenchModelStatic {
-  all: () => Promise<any[]>
-  first: () => Promise<any | null>
-  find: (id: number | string) => Promise<any | null>
-  findOrFail: (id: number | string) => Promise<any>
-  where: (...args: any[]) => BenchModelQuery
-  whereIn: (col: string, values: any[]) => BenchModelQuery
-  whereNotIn: (col: string, values: any[]) => BenchModelQuery
-  whereNull: (col: string) => BenchModelQuery
-  whereNotNull: (col: string) => BenchModelQuery
-  orderBy: (col: string, dir?: 'asc' | 'desc') => BenchModelQuery
-  limit: (n: number) => BenchModelQuery
-  offset: (n: number) => BenchModelQuery
-  with: (...rels: string[]) => BenchModelQuery
-  query: () => BenchModelQuery
+// `R` is the result-row shape. Models keyed to a generated DatabaseSchema
+// table (below) return real per-column rows from .first()/.all()/.get();
+// unkeyed models fall back to `Record<string, any>` (unchanged behaviour).
+// Column values that the schema codegen couldn't type land as `unknown`
+// (better than `any` — forces a narrow), while id / FK / timestamp columns
+// come through concretely. Full per-attribute typing needs the upstream
+// defineModel work (stacksjs/stacks#1938).
+import type { DatabaseSchema } from '@stacksjs/database'
+
+interface BenchModelStatic<R = Record<string, any>> {
+  all: () => Promise<R[]>
+  first: () => Promise<R | null>
+  find: (id: number | string) => Promise<R | null>
+  findOrFail: (id: number | string) => Promise<R>
+  where: (...args: any[]) => BenchModelQuery<R>
+  whereIn: (col: string, values: any[]) => BenchModelQuery<R>
+  whereNotIn: (col: string, values: any[]) => BenchModelQuery<R>
+  whereNull: (col: string) => BenchModelQuery<R>
+  whereNotNull: (col: string) => BenchModelQuery<R>
+  orderBy: (col: string, dir?: 'asc' | 'desc') => BenchModelQuery<R>
+  limit: (n: number) => BenchModelQuery<R>
+  offset: (n: number) => BenchModelQuery<R>
+  with: (...rels: string[]) => BenchModelQuery<R>
+  query: () => BenchModelQuery<R>
   count: () => Promise<number>
   exists: (...args: any[]) => Promise<boolean>
-  create: (data: Record<string, any>) => Promise<any>
-  firstOrCreate: (lookup: Record<string, any>, attrs?: Record<string, any>) => Promise<any>
-  updateOrCreate: (lookup: Record<string, any>, attrs: Record<string, any>) => Promise<any>
-  update: (id: number | string, data: Record<string, any>) => Promise<any>
+  create: (data: Record<string, any>) => Promise<R>
+  firstOrCreate: (lookup: Record<string, any>, attrs?: Record<string, any>) => Promise<R>
+  updateOrCreate: (lookup: Record<string, any>, attrs: Record<string, any>) => Promise<R>
+  update: (id: number | string, data: Record<string, any>) => Promise<R>
   delete: (id?: number | string) => Promise<any>
   withoutEvents: <T>(fn: () => Promise<T> | T) => Promise<T>
 }
-interface BenchModelQuery extends BenchModelStatic {
-  get: () => Promise<any[]>
-  execute: () => Promise<any[]>
+interface BenchModelQuery<R = Record<string, any>> extends BenchModelStatic<R> {
+  get: () => Promise<R[]>
+  execute: () => Promise<R[]>
   toSQL: () => string
 }
 
 declare global {
-  const Activity: BenchModelStatic
-  const Campaign: BenchModelStatic
-  const CampaignSend: BenchModelStatic
-  const Comment: BenchModelStatic
-  const Author: BenchModelStatic
-  const Page: BenchModelStatic
-  const Post: BenchModelStatic
-  const CourtHouse: BenchModelStatic
-  const Deployment: BenchModelStatic
-  const EmailList: BenchModelStatic
-  const EmailListSubscriber: BenchModelStatic
-  const EmailSubscription: BenchModelStatic
-  const Error: BenchModelStatic
-  const FailedJob: BenchModelStatic
-  const Job: BenchModelStatic
-  const Judge: BenchModelStatic
-  const JudgeReview: BenchModelStatic
-  const Log: BenchModelStatic
-  const Notification: BenchModelStatic
-  const OauthAccessToken: BenchModelStatic
-  const OauthClient: BenchModelStatic
-  const PaymentMethod: BenchModelStatic
-  const PaymentProduct: BenchModelStatic
-  const PaymentTransaction: BenchModelStatic
-  const Permission: BenchModelStatic
-  const PersonalAccessToken: BenchModelStatic
-  const Release: BenchModelStatic
-  const Request: BenchModelStatic
-  const Role: BenchModelStatic
-  const SocialPost: BenchModelStatic
-  const Subscriber: BenchModelStatic
-  const Subscription: BenchModelStatic
-  const Tag: BenchModelStatic
-  const Team: BenchModelStatic
-  const User: BenchModelStatic
-  const Cart: BenchModelStatic
-  const CartItem: BenchModelStatic
-  const Category: BenchModelStatic
-  const Coupon: BenchModelStatic
-  const Customer: BenchModelStatic
-  const DeliveryRoute: BenchModelStatic
-  const DigitalDelivery: BenchModelStatic
-  const Driver: BenchModelStatic
-  const GiftCard: BenchModelStatic
-  const LicenseKey: BenchModelStatic
-  const LoyaltyPoint: BenchModelStatic
-  const LoyaltyReward: BenchModelStatic
-  const Manufacturer: BenchModelStatic
-  const Order: BenchModelStatic
-  const OrderItem: BenchModelStatic
-  const Payment: BenchModelStatic
-  const PrintDevice: BenchModelStatic
-  const Product: BenchModelStatic
-  const ProductUnit: BenchModelStatic
-  const ProductVariant: BenchModelStatic
-  const Receipt: BenchModelStatic
-  const Review: BenchModelStatic
-  const ShippingMethod: BenchModelStatic
-  const ShippingRate: BenchModelStatic
-  const ShippingZone: BenchModelStatic
-  const TaxRate: BenchModelStatic
-  const Transaction: BenchModelStatic
-  const WaitlistProduct: BenchModelStatic
-  const WaitlistRestaurant: BenchModelStatic
-  const Websocket: BenchModelStatic
+  const Activity: BenchModelStatic<DatabaseSchema['activities']>
+  const Campaign: BenchModelStatic<DatabaseSchema['campaigns']>
+  const CampaignSend: BenchModelStatic<DatabaseSchema['campaign_sends']>
+  const Comment: BenchModelStatic<DatabaseSchema['comments']>
+  const Author: BenchModelStatic<DatabaseSchema['authors']>
+  const Page: BenchModelStatic<DatabaseSchema['pages']>
+  const Post: BenchModelStatic<DatabaseSchema['posts']>
+  const CourtHouse: BenchModelStatic<DatabaseSchema['court_houses']>
+  const Deployment: BenchModelStatic<DatabaseSchema['deployments']>
+  const EmailList: BenchModelStatic<DatabaseSchema['email_lists']>
+  const EmailListSubscriber: BenchModelStatic<DatabaseSchema['email_list_subscribers']>
+  const EmailSubscription: BenchModelStatic<DatabaseSchema['email_subscriptions']>
+  const Error: BenchModelStatic<DatabaseSchema['errors']>
+  const FailedJob: BenchModelStatic<DatabaseSchema['failed_jobs']>
+  const Job: BenchModelStatic<DatabaseSchema['jobs']>
+  const Judge: BenchModelStatic<DatabaseSchema['judges']>
+  const JudgeReview: BenchModelStatic<DatabaseSchema['judge_reviews']>
+  const Log: BenchModelStatic<DatabaseSchema['logs']>
+  const Notification: BenchModelStatic<DatabaseSchema['notifications']>
+  const OauthAccessToken: BenchModelStatic<DatabaseSchema['oauth_access_tokens']>
+  const OauthClient: BenchModelStatic<DatabaseSchema['oauth_clients']>
+  const PaymentMethod: BenchModelStatic<DatabaseSchema['payment_methods']>
+  const PaymentProduct: BenchModelStatic<DatabaseSchema['payment_products']>
+  const PaymentTransaction: BenchModelStatic<DatabaseSchema['payment_transactions']>
+  const Permission: BenchModelStatic<DatabaseSchema['permissions']>
+  const PersonalAccessToken: BenchModelStatic<DatabaseSchema['personal_access_tokens']>
+  const Release: BenchModelStatic<DatabaseSchema['releases']>
+  const Request: BenchModelStatic<DatabaseSchema['requests']>
+  const Role: BenchModelStatic<DatabaseSchema['roles']>
+  const SocialPost: BenchModelStatic<DatabaseSchema['social_posts']>
+  const Subscriber: BenchModelStatic<DatabaseSchema['subscribers']>
+  const Subscription: BenchModelStatic<DatabaseSchema['subscriptions']>
+  const Tag: BenchModelStatic<DatabaseSchema['tags']>
+  const Team: BenchModelStatic<DatabaseSchema['teams']>
+  const User: BenchModelStatic<DatabaseSchema['users']>
+  const Cart: BenchModelStatic<DatabaseSchema['carts']>
+  const CartItem: BenchModelStatic<DatabaseSchema['cart_items']>
+  const Category: BenchModelStatic<DatabaseSchema['categories']>
+  const Coupon: BenchModelStatic<DatabaseSchema['coupons']>
+  const Customer: BenchModelStatic<DatabaseSchema['customers']>
+  const DeliveryRoute: BenchModelStatic<DatabaseSchema['delivery_routes']>
+  const DigitalDelivery: BenchModelStatic<DatabaseSchema['digital_deliveries']>
+  const Driver: BenchModelStatic<DatabaseSchema['drivers']>
+  const GiftCard: BenchModelStatic<DatabaseSchema['gift_cards']>
+  const LicenseKey: BenchModelStatic<DatabaseSchema['license_keys']>
+  const LoyaltyPoint: BenchModelStatic<DatabaseSchema['loyalty_points']>
+  const LoyaltyReward: BenchModelStatic<DatabaseSchema['loyalty_rewards']>
+  const Manufacturer: BenchModelStatic<DatabaseSchema['manufacturers']>
+  const Order: BenchModelStatic<DatabaseSchema['orders']>
+  const OrderItem: BenchModelStatic<DatabaseSchema['order_items']>
+  const Payment: BenchModelStatic<DatabaseSchema['payments']>
+  const PrintDevice: BenchModelStatic<DatabaseSchema['print_devices']>
+  const Product: BenchModelStatic<DatabaseSchema['products']>
+  const ProductUnit: BenchModelStatic<DatabaseSchema['product_units']>
+  const ProductVariant: BenchModelStatic<DatabaseSchema['product_variants']>
+  const Receipt: BenchModelStatic<DatabaseSchema['receipts']>
+  const Review: BenchModelStatic<DatabaseSchema['reviews']>
+  const ShippingMethod: BenchModelStatic<DatabaseSchema['shipping_methods']>
+  const ShippingRate: BenchModelStatic<DatabaseSchema['shipping_rates']>
+  const ShippingZone: BenchModelStatic<DatabaseSchema['shipping_zones']>
+  const TaxRate: BenchModelStatic<DatabaseSchema['tax_rates']>
+  const Transaction: BenchModelStatic<DatabaseSchema['transactions']>
+  const WaitlistProduct: BenchModelStatic<DatabaseSchema['waitlist_products']>
+  const WaitlistRestaurant: BenchModelStatic<DatabaseSchema['waitlist_restaurants']>
+  const Websocket: BenchModelStatic<DatabaseSchema['websockets']>
 }
 
 export {}

@@ -33,8 +33,8 @@ export default new Action({
     if (!adminId)
       return response.json({ error: 'Not authenticated' }, 401)
 
-    const targetUserId = Number((request as any).params?.id)
-    const action = String((request as any).get?.('action') ?? '').trim().toLowerCase()
+    const targetUserId = Number(request.params?.id)
+    const action = String(request.get?.('action') ?? '').trim().toLowerCase()
 
     if (action !== 'approve' && action !== 'reject')
       return response.json({ error: 'action must be "approve" or "reject".' }, 422)
@@ -66,7 +66,7 @@ export default new Action({
     }
 
     // reject branch
-    const note = String((request as any).get?.('note') ?? '').trim().slice(0, 1000)
+    const note = String(request.get?.('note') ?? '').trim().slice(0, 1000)
     if (!note)
       return response.json({ error: 'Rejection requires a `note` explaining why.' }, 422)
 

@@ -42,13 +42,13 @@ export default new Action({
   },
 
   async handle() {
-    const reviewId = Number((request as any).params?.id)
+    const reviewId = Number(request.params?.id)
 
-    const reason = String((request as any).get?.('reason') ?? '').trim().toLowerCase()
+    const reason = String(request.get?.('reason') ?? '').trim().toLowerCase()
     if (!ALLOWED_REASONS.has(reason))
       return response.json({ error: 'Pick one of: off_topic, harassment, spam, privacy, inaccurate, other.' }, 422)
 
-    const detailsRaw = (request as any).get?.('details')
+    const detailsRaw = request.get?.('details')
     const details = typeof detailsRaw === 'string' ? detailsRaw.trim().slice(0, 2000) : null
 
     // Verify the review exists before recording the flag — flags

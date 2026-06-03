@@ -55,9 +55,9 @@ export default new Action({
     if (!userId)
       return response.json({ error: 'Not authenticated' }, 401)
 
-    const currentPassword = String((request as any).get?.('current_password') ?? '')
-    const newPassword = String((request as any).get?.('new_password') ?? '')
-    const newPasswordConfirmation = String((request as any).get?.('new_password_confirmation') ?? '')
+    const currentPassword = String(request.get?.('current_password') ?? '')
+    const newPassword = String(request.get?.('new_password') ?? '')
+    const newPasswordConfirmation = String(request.get?.('new_password_confirmation') ?? '')
 
     if (newPassword !== newPasswordConfirmation)
       return response.json({ error: 'New password and confirmation do not match.' }, 422)

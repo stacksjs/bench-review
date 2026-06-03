@@ -51,7 +51,7 @@ export default new Action({
   },
 
   async handle() {
-    const raw = (request as any).get?.('email')
+    const raw = request.get?.('email')
     const email = typeof raw === 'string' ? raw.trim().toLowerCase() : ''
     if (!email)
       return response.json({ ok: true, message: 'If an account exists for that email, a reset link has been sent.' })
@@ -94,7 +94,7 @@ export default new Action({
     // request when possible (so a request to a non-localhost host —
     // e.g. a deployed staging — still gets a working link), with a
     // dev-default fallback.
-    const reqUrl = (request as any).url
+    const reqUrl = request.url
     let baseUrl = process.env.APP_URL || ''
     if (!baseUrl && typeof reqUrl === 'string') {
       try { baseUrl = new URL(reqUrl).origin }

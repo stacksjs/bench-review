@@ -33,7 +33,7 @@ export default new Action({
     if (!userId)
       return response.json({ error: 'Not authenticated' }, 401)
 
-    const method = String((request as any).method ?? 'GET').toUpperCase()
+    const method = String(request.method ?? 'GET').toUpperCase()
 
     if (method === 'GET') {
       const row = await db.selectFrom('review_drafts')
@@ -58,8 +58,8 @@ export default new Action({
     // PUT (upsert). Body fields are all optional — the draft accepts
     // partial state at any point during composition.
     if (method === 'PUT' || method === 'PATCH') {
-      const judgeIdRaw = (request as any).get?.('judge_id')
-      const ratingRaw = (request as any).get?.('rating')
+      const judgeIdRaw = request.get?.('judge_id')
+      const ratingRaw = request.get?.('rating')
       const judgeId = judgeIdRaw === null || judgeIdRaw === '' || judgeIdRaw === undefined
         ? null
         : Number(judgeIdRaw)
@@ -67,10 +67,10 @@ export default new Action({
         ? null
         : Math.max(1, Math.min(5, Math.floor(Number(ratingRaw))))
 
-      const titleRaw = (request as any).get?.('title')
-      const contentRaw = (request as any).get?.('content')
-      const typeRaw = String((request as any).get?.('type') ?? '').trim().toLowerCase()
-      const anonRaw = (request as any).get?.('anonymized')
+      const titleRaw = request.get?.('title')
+      const contentRaw = request.get?.('content')
+      const typeRaw = String(request.get?.('type') ?? '').trim().toLowerCase()
+      const anonRaw = request.get?.('anonymized')
 
       const title = typeof titleRaw === 'string' ? titleRaw.slice(0, 500) : null
       // Don't sanitise here — content is the user's in-progress
@@ -107,7 +107,7 @@ export default new Action({
       }
       else {
         values.created_at = now
-        await db.insertInto('review_drafts').values(values as any).execute()
+        await db.insertInto('review_drafts').valuesvalues.execute()
       }
       return response.json({ ok: true })
     }

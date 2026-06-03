@@ -1,5 +1,4 @@
 import type { ExtractParams, InferValidations, JobOptions, RequestInstance } from '@stacksjs/types'
-import type { Validator } from '@stacksjs/validation'
 
 /**
  * Shape of `validations:` on an action. Each entry pairs a
@@ -17,15 +16,17 @@ import type { Validator } from '@stacksjs/validation'
  */
 export interface ActionValidations {
   [key: string]: {
-    // The actual ts-validation validator (`schema.string()`, `schema.number()`,
-    // …). Previously a hand-rolled `{ validate: (value: unknown) => … }`
-    // structural approximation, which rejected every real validator: a
-    // validator's method is `(value: T) => ValidationResult`, and
-    // `(value: T)` isn't assignable to `(value: unknown)` (contravariance),
-    // nor is `ValidationResult.errors` (a `ValidationError[] | …Map` union)
-    // assignable to the old `errors?: Array<{ message }>`. `Validator<any>`
-    // is the type the doc above always described.
-    rule: Validator<any>
+    // Accepts any ts-validation validator (`schema.string()`, `schema.number()`,
+    // …). The param is `any` (not `unknown`) because a validator's method is
+    // `(value: T) => …` and `(value: T)` isn't assignable to `(value: unknown)`
+    // by contravariance; `errors` is loose because the real return is
+    // `{ valid, errors: ValidationError[] | ValidationErrorMap }` and the
+    // consumer (validateActionInput) narrows to the array form. Keeping the
+    // shape structural (rather than `Validator<any>`) avoids rippling into the
+    // Action class's InferValidations/ResolveBody generics. The clean fix —
+    // `rule: Validator<any>` + a ValidationResult-aware consumer — belongs
+    // upstream; see stacksjs/stacks (filed).
+    rule: { validate: (value: any) => { valid: boolean, errors?: any } }
     message?: string | Record<string, string>
   }
 }
@@ -222,7 +223,7 @@ export class Action<
   enabled?: ActionOptions['enabled']
   path?: ActionOptions<TModel, TValidations, TPath>['path']
   method?: ActionOptions['method']
-  validations?: ActionOptions['validations']
+  validations?: ActionOptions<TModel, TValidations, TPath>['validations']
   requestFile?: string
   /** @see {@link ActionOptions.skipCsrf} */
   skipCsrf?: boolean

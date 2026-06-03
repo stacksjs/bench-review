@@ -62,7 +62,7 @@ export async function processAndPersistReviewPhoto(
 
   // Lazy-import sharp so the module isn't loaded for non-upload code
   // paths. Stacks's @stacksjs/storage uses the same lazy pattern.
-  const sharpMod = await import('sharp').then(m => (m as any).default ?? m)
+  const sharpMod = await import('sharp').then(m => m.default ?? m)
   const sharp = sharpMod as (input: Uint8Array) => any
 
   // Strip metadata BEFORE the resize chain. Each .toBuffer() forks

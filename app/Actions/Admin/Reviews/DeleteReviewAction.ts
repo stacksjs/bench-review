@@ -22,7 +22,7 @@ export default new Action({
   },
 
   async handle() {
-    const reviewId = Number((request as any).params?.id)
+    const reviewId = Number(request.params?.id)
 
     const existing = await db.selectFrom('judge_reviews')
       .select(['id'])
