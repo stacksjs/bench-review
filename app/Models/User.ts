@@ -204,6 +204,21 @@ export default defineModel({
         rule: schema.string().max(2000),
       },
     },
+
+    // Email verification (launch trust gate). NULL = unverified; set to
+    // an ISO timestamp once the user clicks the verification link. The
+    // framework's email-verification flow (@stacksjs/auth) writes this
+    // column; review submission is gated on it (SubmitReviewAction).
+    // Nullable so existing rows aren't force-migrated — the backfill
+    // seeder marks pre-launch accounts verified so only new signups
+    // must verify.
+    emailVerifiedAt: {
+      required: false,
+      fillable: true,
+      validation: {
+        rule: schema.string(),
+      },
+    },
   },
   get: {
     salutationName: (attributes: Attributes) => {

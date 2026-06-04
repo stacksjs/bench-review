@@ -66,10 +66,12 @@ route.post('/subscribe', 'Actions/SubscriberEmailAction')
 route.post('/auth/login', 'Actions/Auth/LoginAction')
   .name('bench.auth.login')
   .skipCsrf()
+  .middleware('throttle:10,1m') // brute-force guard: 10 attempts/min/IP
 
 route.post('/auth/register', 'Actions/Auth/RegisterAction')
   .name('bench.auth.register')
   .skipCsrf()
+  .middleware('throttle:5,10m') // bot-signup guard: 5 registrations/10min/IP
 
 route.post('/auth/logout', 'Actions/Auth/LogoutAction')
   .name('bench.auth.logout')
@@ -81,10 +83,27 @@ route.post('/auth/logout', 'Actions/Auth/LogoutAction')
 route.post('/auth/password/forgot', 'Actions/Password/SendPasswordResetEmailAction')
   .name('bench.password.email')
   .skipCsrf()
+  .middleware('throttle:3,10m') // email-bomb guard: 3 reset emails/10min/IP
 
 route.post('/auth/password/reset', 'Actions/Password/PasswordResetAction')
   .name('bench.password.reset')
   .skipCsrf()
+  .middleware('throttle:5,10m')
+
+// Email verification. `verify-email` is unauthenticated — the HMAC token
+// from the emailed link is the proof, and the link is often opened in a
+// fresh browser with no session. `resend` is auth-gated so it can only
+// re-mail the signed-in user (no arbitrary-inbox spam). Both throttled.
+route.post('/auth/verify-email', 'Actions/Auth/VerifyEmailAction')
+  .name('bench.auth.verify-email')
+  .skipCsrf()
+  .middleware('throttle:10,10m')
+
+route.post('/auth/resend-verification', 'Actions/Auth/ResendVerificationAction')
+  .name('bench.auth.resend-verification')
+  .middleware('auth')
+  .skipCsrf()
+  .middleware('throttle:3,10m') // email-bomb guard on resend
 
 // Judge + courthouse read endpoints. Public (no auth gate) because the
 // directory pages are public surface area. Mutating routes will live
@@ -137,6 +156,7 @@ route.post('/admin/judges/{id}/opinions', 'Actions/Admin/Opinions/CreateJudgeOpi
 route.post('/reviews', 'Actions/Reviews/SubmitReviewAction')
   .name('bench.reviews.submit')
   .middleware('auth')
+  .middleware('throttle:10,10m') // review-spam guard
   .skipCsrf()
 
 // Review photos (bench-review#31). Author-only upload + delete.
@@ -162,6 +182,7 @@ route.get('/reviews/{id}/comments', 'Actions/Reviews/CommentsForReviewAction')
 route.post('/reviews/{id}/comments', 'Actions/Reviews/CommentSubmitAction')
   .name('bench.reviews.comments.submit')
   .middleware('auth')
+  .middleware('throttle:20,5m') // comment-spam guard
   .skipCsrf()
 
 route.delete('/me/comments/{id}', 'Actions/Me/DeleteMyCommentAction')
@@ -175,6 +196,7 @@ route.delete('/me/comments/{id}', 'Actions/Me/DeleteMyCommentAction')
 // the rate-limit / abuse notes. Resolves bench-review#27.
 route.post('/reviews/{id}/flag', 'Actions/Reviews/FlagReviewAction')
   .name('bench.reviews.flag')
+  .middleware('throttle:10,10m') // anonymous flagging → IP-throttle abuse guard
   .skipCsrf()
 
 // Toggle "people find this helpful" on a review. POST is idempotent on
@@ -290,6 +312,7 @@ route.delete('/judges/{id}/follow', 'Actions/Judges/UnfollowJudgeAction')
 route.post('/admin/auth/login', 'Actions/Admin/Auth/AdminLoginAction')
   .name('bench.admin.auth.login')
   .skipCsrf()
+  .middleware('throttle:5,1m') // admin brute-force guard: tighter than public login
 
 // Admin user management — all auth + admin gated. `admin` middleware
 // resolves the current user via Auth.user() and checks the role itself,

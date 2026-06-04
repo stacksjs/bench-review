@@ -4,10 +4,9 @@ import { HttpError } from '@stacksjs/error-handling'
 import { Middleware } from '@stacksjs/router'
 
 /**
- * Shape of the row stashed on the request for ShowReviewAction. The
- * `JudgeReview` model currently types every row as `any` (see the note
- * in resources/types/user-models.d.ts), so we narrow to the columns the
- * gate + action actually read and let the rest flow through the index
+ * Shape of the row stashed on the request for ShowReviewAction. We
+ * narrow to the columns the gate + action actually read and let the rest
+ * flow through the index
  * signature — honest typing without leaking `any` to the read site.
  */
 export interface StashedReview {
@@ -49,8 +48,8 @@ export type ReviewRequest = EnhancedRequest & {
  * second query and no second `Auth.user()` call. Authorization lives
  * here; the action is left with pure presentation.
  *
- * `JudgeReview` is a runtime global (resources/types/user-models.d.ts),
- * so it needs no import.
+ * `JudgeReview` is a runtime global (typed in
+ * storage/framework/types/user-models.d.ts), so it needs no import.
  */
 export default new Middleware({
   name: 'viewable-review',

@@ -1,0 +1,10 @@
+@extends('layouts/default')
+
+@section('title', 'Verify Email - Bench Review')
+
+@section('content')
+{{-- Target of the emailed verification link: /verify-email/{id}/{token}.
+     Thin shell — the Bench/VerifyEmail component reads id+token from the
+     pathname and auto-verifies on mount. --}}
+@include('Bench/VerifyEmail')
+@endsection

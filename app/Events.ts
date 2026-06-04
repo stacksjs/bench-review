@@ -9,6 +9,6 @@ import type { Events } from '@stacksjs/types'
  */
 export default {
   // eventName: ['Listener1', 'Listener2'] -> listeners default to ./app/actions/*
-  'user:registered': ['SendWelcomeEmail'],
+  'user:registered': ['SendWelcomeEmail', 'SendEmailVerification'],
   'user:created': ['NotifyUser'],
 } satisfies Events

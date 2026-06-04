@@ -53,6 +53,7 @@ export const routes = [
   { pattern: '/judges/:id/reviews', filePath: 'resources/views/judges/[id]/reviews/index.stx', isDynamic: true, params: ["id"] },
   { pattern: '/judges/:id/rulings', filePath: 'resources/views/judges/[id]/rulings/index.stx', isDynamic: true, params: ["id"] },
   { pattern: '/judges/review/:id', filePath: 'resources/views/judges/review/[id].stx', isDynamic: true, params: ["id"] },
+  { pattern: '/verify-email/:id/:token', filePath: 'resources/views/verify-email/[id]/[token].stx', isDynamic: true, params: ["id","token"] },
   { pattern: '/article/:id', filePath: 'resources/views/article/[id].stx', isDynamic: true, params: ["id"] },
   { pattern: '/blog/:id', filePath: 'resources/views/blog/[id].stx', isDynamic: true, params: ["id"] },
   { pattern: '/court-houses/:id', filePath: 'resources/views/court-houses/[id].stx', isDynamic: true, params: ["id"] },

@@ -1,4 +1,5 @@
 import { Action } from '@stacksjs/actions'
+import { isEmailVerified } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
@@ -107,6 +108,13 @@ export default new Action({
     // id here so /api/me/reviews can filter by author later.
     const authUser = await Auth.user()
     const userId = (authUser as any)?.id ?? null
+
+    // Email-verification gate (launch trust). Reviews name real judges,
+    // so a throwaway, unverified account shouldn't be able to publish one.
+    // Pre-launch accounts are backfilled verified (BackfillEmailVerifiedSeeder),
+    // so only new signups who haven't clicked the link hit this 403.
+    if (!isEmailVerified(authUser as any))
+      return response.json({ error: 'Please verify your email address before posting a review — check your inbox for the verification link.' }, 403)
 
     // Raw `db.insertInto` instead of `JudgeReview.create()`. The ORM's
     // `create()` path has a snake_case → camelCase mapping gap that

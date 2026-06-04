@@ -52,6 +52,7 @@ declare module "stx/routes" {
     '/judges/:id/reviews': { id: string }
     '/judges/:id/rulings': { id: string }
     '/judges/review/:id': { id: string }
+    '/verify-email/:id/:token': { id: string; token: string }
     '/article/:id': { id: string }
     '/blog/:id': { id: string }
     '/court-houses/:id': { id: string }
