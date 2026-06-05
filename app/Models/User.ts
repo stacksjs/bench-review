@@ -221,7 +221,7 @@ export default defineModel({
     },
 
     // Judge right-of-reply (self-serve). When a user claims a judge
-    // profile via /judge/signup, this points at the Judge they claim to
+    // profile via /judges/signup, this points at the Judge they claim to
     // be. The claim rides the existing credential rails — credentialType
     // is set to 'judge' and credential_claimed_at / credential_verified_at
     // track pending → verified through the same admin queue. A user is a

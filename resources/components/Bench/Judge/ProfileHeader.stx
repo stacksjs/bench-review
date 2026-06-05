@@ -33,7 +33,16 @@
   }
   fetchOnce()
   onMount(() => {
-    judgeId.set(resolveJudgeId())
+    const resolved = resolveJudgeId()
+    // Non-numeric / missing id (e.g. someone hits /judges/<garbage> — a
+    // segment the dynamic [id] route catches but that isn't a real judge
+    // id, and isn't a named static route like /judges/signup). Send them
+    // to the directory instead of rendering a stuck "Judge #0".
+    if (resolved <= 0) {
+      navigate('/judges', true)
+      return
+    }
+    judgeId.set(resolved)
     fetchOnce()
   })
 

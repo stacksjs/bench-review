@@ -1,9 +1,0 @@
-@extends('layouts/default')
-
-@section('title', 'Claim your profile - Bench Review')
-
-@section('content')
-{{-- Thin shell — logic lives in the Bench/JudgeSignup component
-     (view-level <script client> is dropped). --}}
-@include('Bench/JudgeSignup')
-@endsection

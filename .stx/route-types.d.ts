@@ -12,8 +12,8 @@ declare module "stx/routes" {
     '/checkout/shipping': {  }
     '/dashboard/custom-page': {  }
     '/emails/welcome': {  }
-    '/judge/signup': {  }
     '/judges/review': {  }
+    '/judges/signup': {  }
     '/judges/submit': {  }
     '/': {  }
     '/about': {  }

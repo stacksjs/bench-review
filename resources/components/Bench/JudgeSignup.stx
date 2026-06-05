@@ -1,5 +1,5 @@
 <script client>
-  // "Claim your profile" flow for judges (/judge/signup). Logic lives in
+  // "Claim your profile" flow for judges (/judges/signup). Logic lives in
   // this component (view-level <script client> is dropped). Three states:
   //   - not signed in  → prompt to create an account / log in (next=back here)
   //   - signed in       → search your judge profile, select, submit claim
@@ -102,8 +102,8 @@
   <div x-class="!isAuthed() ? '' : 'hidden'" class="mt-8 p-6 text-center bg-white border border-gray-200 rounded-2xl shadow-sm">
     <p class="text-gray-700 text-sm">First, create an account or sign in — then you can claim your profile.</p>
     <div class="flex justify-center gap-x-3 mt-5">
-      <StxLink to="/register?next=/judge/signup" class="px-4 py-2 font-semibold text-white text-sm bg-gray-900 hover:bg-gray-800 rounded-md">Create account</StxLink>
-      <StxLink to="/login?next=/judge/signup" class="px-4 py-2 font-semibold text-gray-800 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50">Sign in</StxLink>
+      <StxLink to="/register?next=/judges/signup" class="px-4 py-2 font-semibold text-white text-sm bg-gray-900 hover:bg-gray-800 rounded-md">Create account</StxLink>
+      <StxLink to="/login?next=/judges/signup" class="px-4 py-2 font-semibold text-gray-800 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50">Sign in</StxLink>
     </div>
   </div>
 

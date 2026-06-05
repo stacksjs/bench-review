@@ -1,0 +1,11 @@
+@extends('layouts/default')
+
+@section('title', 'Claim your profile - Bench Review')
+
+@section('content')
+{{-- Static route: /judges/signup. A named segment under judges/, so it
+     takes precedence over the dynamic judges/[id].stx (same as judges/submit).
+     Logic lives in the Bench/JudgeSignup component (view-level <script client>
+     is dropped). --}}
+@include('Bench/JudgeSignup')
+@endsection

@@ -6,7 +6,7 @@ import { schema } from '@stacksjs/validation'
 
 /**
  * POST /api/me/judge-claim — a signed-in user claims a judge profile
- * (the /judge/signup flow).
+ * (the /judges/signup flow).
  *
  * Rides the existing credential rails so it reuses the admin verification
  * queue: sets `credential_type = 'judge'` + `claimed_judge_id` and stamps
