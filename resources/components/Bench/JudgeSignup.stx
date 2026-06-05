@@ -1,0 +1,176 @@
+<script client>
+  // "Claim your profile" flow for judges (/judge/signup). Logic lives in
+  // this component (view-level <script client> is dropped). Three states:
+  //   - not signed in  → prompt to create an account / log in (next=back here)
+  //   - signed in       → search your judge profile, select, submit claim
+  //   - claimed         → pending-verification confirmation
+  // The claim rides the credential rails (POST /api/me/judge-claim) and an
+  // admin verifies identity before the judge can respond to reviews.
+
+  const authStore = useStore('auth')
+  const isAuthed = authStore.isAuthenticated
+
+  const query = state('')
+  const results = state([])
+  const searching = state(false)
+  const selected = state(null)
+  const submitting = state(false)
+  const phase = state('idle') // 'idle' | 'claimed' | 'error'
+  const errorMsg = state('')
+  const claimedName = state('')
+
+  let searchTimer = 0
+  function onSearch(e) {
+    const value = (e.target).value
+    query.set(value)
+    selected.set(null)
+    if (typeof window !== 'undefined')
+      window.clearTimeout(searchTimer)
+    if (value.trim().length < 1) {
+      results.set([])
+      return
+    }
+    searchTimer = window.setTimeout(runSearch, 220)
+  }
+
+  async function runSearch() {
+    const q = query().trim()
+    if (!q)
+      return
+    searching.set(true)
+    try {
+      const res = await fetch(`/api/judges/search?q=${encodeURIComponent(q)}`)
+      const data = await res.json().catch(() => [])
+      results.set(Array.isArray(data) ? data : [])
+    }
+    catch {
+      results.set([])
+    }
+    finally {
+      searching.set(false)
+    }
+  }
+
+  function pick(judge) {
+    selected.set(judge)
+    results.set([])
+    query.set(judge.name)
+  }
+
+  async function submitClaim() {
+    const judge = selected()
+    if (!judge || submitting())
+      return
+    submitting.set(true)
+    errorMsg.set('')
+    try {
+      const res = await authStore.authFetch('/api/me/judge-claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ judgeId: judge.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) {
+        errorMsg.set(data.error || 'Could not submit your claim — please try again.')
+        phase.set('error')
+        return
+      }
+      claimedName.set(judge.name)
+      phase.set('claimed')
+    }
+    catch {
+      errorMsg.set('Could not reach the server — please try again.')
+      phase.set('error')
+    }
+    finally {
+      submitting.set(false)
+    }
+  }
+
+  const hasResults = derived(() => results().length > 0)
+  const hasSelection = derived(() => !!selected())
+</script>
+
+<div class="mx-auto max-w-xl px-4 py-16">
+  <p class="font-medium text-amber-600 text-center text-xs tracking-widest uppercase">For judges</p>
+  <h1 class="mt-3 font-serif font-bold text-center text-4xl text-gray-900 tracking-tight">Claim your profile</h1>
+  <p class="mt-3 text-center text-gray-600 text-sm leading-relaxed">
+    Reviews on Bench Review are about real, named judges. If a profile is yours, claim it — once we verify your identity you can post an official response to any review of you.
+  </p>
+
+  <!-- Not signed in -->
+  <div x-class="!isAuthed() ? '' : 'hidden'" class="mt-8 p-6 text-center bg-white border border-gray-200 rounded-2xl shadow-sm">
+    <p class="text-gray-700 text-sm">First, create an account or sign in — then you can claim your profile.</p>
+    <div class="flex justify-center gap-x-3 mt-5">
+      <StxLink to="/register?next=/judge/signup" class="px-4 py-2 font-semibold text-white text-sm bg-gray-900 hover:bg-gray-800 rounded-md">Create account</StxLink>
+      <StxLink to="/login?next=/judge/signup" class="px-4 py-2 font-semibold text-gray-800 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50">Sign in</StxLink>
+    </div>
+  </div>
+
+  <!-- Signed in: claimed confirmation -->
+  <div x-class="isAuthed() && phase() === 'claimed' ? '' : 'hidden'" class="mt-8 p-6 text-center bg-white border border-amber-200 rounded-2xl shadow-sm">
+    <h2 class="font-serif font-bold text-2xl text-emerald-700">Claim submitted ✓</h2>
+    <p class="mt-2 text-gray-700 text-sm">
+      Thanks — we've recorded your claim for <span class="font-semibold" :text="claimedName()"></span>. An admin will verify your identity before you can respond to reviews. We'll be in touch.
+    </p>
+    <StxLink to="/" class="inline-block mt-5 font-semibold text-gray-900 text-sm hover:underline underline-offset-4">← Back home</StxLink>
+  </div>
+
+  <!-- Signed in: search + claim -->
+  <div x-class="isAuthed() && phase() !== 'claimed' ? '' : 'hidden'" class="mt-8 p-6 bg-white border border-gray-200 rounded-2xl shadow-sm">
+    <label for="judge-claim-search" class="block font-semibold text-gray-900 text-sm">Find your profile</label>
+    <input
+      id="judge-claim-search"
+      type="text"
+      x-model="query"
+      @input="onSearch($event)"
+      placeholder="Search by your name, court, or city…"
+      autocomplete="off"
+      class="block mt-2 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
+    >
+
+    <p x-class="searching() ? '' : 'hidden'" class="mt-2 text-gray-400 text-xs">Searching…</p>
+
+    <!-- Results -->
+    <ul x-class="hasResults() ? 'mt-2 divide-y divide-gray-100 border border-gray-100 rounded-md' : 'hidden'">
+      <li :for="j in results">
+        <button
+          type="button"
+          @click="pick(j)"
+          class="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-gray-50"
+        >
+          <span class="inline-flex flex-none items-center justify-center h-8 w-8 font-semibold text-amber-700 text-xs bg-amber-50 ring-1 ring-amber-200/60 rounded-full" :text="(j.name || '?').charAt(0)"></span>
+          <span class="min-w-0">
+            <span class="block font-medium text-gray-900 text-sm" :text="j.name"></span>
+            <span class="block text-gray-500 text-xs" :text="j.location || (j.court ? j.court.name : '')"></span>
+          </span>
+        </button>
+      </li>
+    </ul>
+
+    <!-- Selected confirmation + submit -->
+    <div x-class="hasSelection() ? '' : 'hidden'" class="mt-4 p-3 bg-amber-50/60 border border-amber-200 rounded-md">
+      <p class="text-gray-700 text-sm">
+        Claiming: <span class="font-semibold" :text="selected() ? selected().name : ''"></span>
+      </p>
+      <button
+        type="button"
+        @click="submitClaim()"
+        x-disabled="submitting"
+        class="mt-3 inline-flex items-center px-4 py-2 font-semibold text-white text-sm bg-gray-900 hover:bg-gray-800 rounded-md disabled:opacity-50"
+        :text="submitting() ? 'Submitting…' : 'Submit claim for verification'"
+      ></button>
+    </div>
+
+    <div
+      role="alert"
+      x-class="errorMsg() ? '' : 'hidden'"
+      class="mt-3 px-3 py-2 text-red-800 text-xs bg-red-50 border border-red-200 rounded-md"
+      :text="errorMsg()"
+    ></div>
+
+    <p class="mt-4 text-gray-400 text-xs leading-relaxed">
+      Can't find your profile? It may not be in our directory yet. Contact us and we'll add it.
+    </p>
+  </div>
+</div>

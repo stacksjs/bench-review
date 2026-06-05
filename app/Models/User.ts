@@ -219,6 +219,22 @@ export default defineModel({
         rule: schema.string(),
       },
     },
+
+    // Judge right-of-reply (self-serve). When a user claims a judge
+    // profile via /judge/signup, this points at the Judge they claim to
+    // be. The claim rides the existing credential rails — credentialType
+    // is set to 'judge' and credential_claimed_at / credential_verified_at
+    // track pending → verified through the same admin queue. A user is a
+    // "verified judge" when credentialType === 'judge', credential is
+    // verified, and claimedJudgeId matches the review's judge_id. NULL for
+    // everyone who hasn't claimed a profile.
+    claimedJudgeId: {
+      required: false,
+      fillable: true,
+      validation: {
+        rule: schema.number().positive(),
+      },
+    },
   },
   get: {
     salutationName: (attributes: Attributes) => {

@@ -236,6 +236,24 @@ route.patch('/me/credentials', 'Actions/Me/UpdateCredentialClaimAction')
   .middleware('auth')
   .skipCsrf()
 
+// Judge self-serve: claim a judge profile (the /judge/signup flow). Rides
+// the credential rails — lands in the admin verification queue. Verified
+// judges can then respond to reviews of their profile.
+route.post('/me/judge-claim', 'Actions/Me/ClaimJudgeProfileAction')
+  .name('bench.me.judge-claim')
+  .middleware('auth')
+  .middleware('throttle:5,10m')
+  .skipCsrf()
+
+// Verified judge posts their official response to a review of them.
+// The action enforces the verified-judge gate (claimed_judge_id === the
+// review's judge_id); the admin-mediated path still lives under /admin.
+route.post('/me/reviews/{id}/response', 'Actions/Me/SubmitJudgeResponseAction')
+  .name('bench.me.reviews.response')
+  .middleware('auth')
+  .middleware('throttle:20,10m')
+  .skipCsrf()
+
 // Admin credential review queue + approve/reject endpoint.
 route.get('/admin/credentials', 'Actions/Admin/Credentials/CredentialQueueIndexAction')
   .name('bench.admin.credentials.index')
@@ -355,6 +373,21 @@ route.patch('/admin/reviews/{id}/status', 'Actions/Admin/Reviews/UpdateReviewSta
 
 route.delete('/admin/reviews/{id}', 'Actions/Admin/Reviews/DeleteReviewAction')
   .name('bench.admin.reviews.destroy')
+  .middleware('auth')
+  .middleware('admin')
+  .skipCsrf()
+
+// Judge right-of-reply. Admin posts/retracts the judge's official response
+// to a review on the judge's behalf (judges have no accounts yet). The
+// response renders publicly under the review via ShowReviewAction.
+route.post('/admin/reviews/{id}/response', 'Actions/Admin/Reviews/CreateReviewResponseAction')
+  .name('bench.admin.reviews.response.create')
+  .middleware('auth')
+  .middleware('admin')
+  .skipCsrf()
+
+route.delete('/admin/reviews/{id}/response', 'Actions/Admin/Reviews/DeleteReviewResponseAction')
+  .name('bench.admin.reviews.response.destroy')
   .middleware('auth')
   .middleware('admin')
   .skipCsrf()

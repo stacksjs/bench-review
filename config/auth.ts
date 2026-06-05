@@ -83,5 +83,13 @@ export default {
      * @default 60
      */
     throttle: env.AUTH_PASSWORD_RESET_THROTTLE ||60,
+
+    /**
+     * Our reset page reads `token` + `email` as query params off
+     * `/reset-password`. Pointing the framework's `passwordResets().sendEmail()`
+     * at it lets the action stay a thin wrapper instead of hand-rolling
+     * the whole token + mail flow.
+     */
+    url: '/reset-password?token={token}&email={email}',
   },
 } satisfies AuthConfig

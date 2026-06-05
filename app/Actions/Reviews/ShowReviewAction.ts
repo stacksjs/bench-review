@@ -1,5 +1,6 @@
 import type { ReviewRequest } from '../../Middleware/ViewableReview'
 import { Action } from '@stacksjs/actions'
+import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { hydrateLikeData } from '../../Helpers/reviewLikes'
@@ -89,6 +90,53 @@ export default new Action({
       .orderBy('order_index', 'asc')
       .execute() as Array<Record<string, any>>
 
-    return response.json({ ...hydrated, judge, author, photos })
+    // Judge right-of-reply. The judge's official response to this review
+    // (admin-posted on their behalf), rendered prominently under the body.
+    // Null when the judge hasn't responded. Defensive try/catch so a
+    // pre-migrate environment (judge_responses table not yet created)
+    // degrades to "no response" instead of 500-ing the whole article.
+    let judgeResponse: { body: string, judge_name: string | null, responded_at: string | null } | null = null
+    try {
+      const responseRow = await db.selectFrom('judge_responses')
+        .select(['body', 'created_at', 'updated_at'])
+        .where('judge_review_id', '=', review.id)
+        .executeTakeFirst() as { body: string, created_at: string | null, updated_at: string | null } | undefined
+      if (responseRow) {
+        judgeResponse = {
+          body: responseRow.body,
+          judge_name: judge?.name ?? null,
+          responded_at: responseRow.updated_at ?? responseRow.created_at,
+        }
+      }
+    }
+    catch {
+      // judge_responses not migrated yet — no response to show.
+    }
+
+    // Can the current viewer respond AS the judge? True only for a verified
+    // judge whose claimed profile matches this review's judge — drives the
+    // inline "Respond as the judge" composer on the article. Defensive +
+    // anonymous-tolerant (no viewer → false).
+    let canRespondAsJudge = false
+    try {
+      const me = await Auth.user().catch(() => null)
+      const meId = (me as any)?.id
+      if (meId && review.judge_id != null) {
+        const u = await db.selectFrom('users')
+          .select(['credential_type', 'credential_verified_at', 'claimed_judge_id'])
+          .where('id', '=', Number(meId))
+          .executeTakeFirst() as { credential_type: string | null, credential_verified_at: string | null, claimed_judge_id: number | null } | undefined
+        canRespondAsJudge = !!u
+          && u.credential_type === 'judge'
+          && u.credential_verified_at != null
+          && u.claimed_judge_id != null
+          && Number(u.claimed_judge_id) === Number(review.judge_id)
+      }
+    }
+    catch {
+      // anonymous or claim columns not migrated — no judge composer.
+    }
+
+    return response.json({ ...hydrated, judge, author, photos, response: judgeResponse, can_respond_as_judge: canRespondAsJudge })
   },
 })

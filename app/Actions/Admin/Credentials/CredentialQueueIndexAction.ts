@@ -24,12 +24,33 @@ export default new Action({
         'id', 'name', 'email',
         'credential_type', 'credential_state',
         'credential_claimed_at', 'credential_rejection_note',
+        'claimed_judge_id',
       ])
       .where('credential_claimed_at', 'is not', null)
       .where('credential_verified_at', 'is', null)
       .orderBy('credential_claimed_at', 'asc')
-      .execute()
+      .execute() as Array<Record<string, any>>
 
-    return response.json({ claims: rows })
+    // Judge-profile claims (credential_type='judge') ride this same queue.
+    // Resolve the claimed judge's name so the admin can see who is claiming
+    // to be which judge before approving via VerifyCredentialAction.
+    const judgeIds = Array.from(new Set(rows.map(r => r.claimed_judge_id).filter((id: any) => id != null))) as number[]
+    const judgeById = new Map<number, string>()
+    if (judgeIds.length > 0) {
+      const judges = await db.selectFrom('judges')
+        .select(['id', 'name'])
+        .where('id', 'in', judgeIds as any)
+        .execute() as Array<{ id: number, name: string }>
+      for (const j of judges) judgeById.set(Number(j.id), j.name)
+    }
+
+    const claims = rows.map(r => ({
+      ...r,
+      claimed_judge: r.claimed_judge_id != null
+        ? { id: r.claimed_judge_id, name: judgeById.get(Number(r.claimed_judge_id)) ?? '(unknown judge)' }
+        : null,
+    }))
+
+    return response.json({ claims })
   },
 })

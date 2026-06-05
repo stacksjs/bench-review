@@ -104,6 +104,24 @@ export default new Action({
         likesByReview.set(Number(row.judge_review_id), Number(row.c))
     }
 
+    // Judge right-of-reply: bulk-fetch the official response per visible
+    // review so each moderation row can show + edit it. Defensive try/catch
+    // so a pre-migrate environment (no judge_responses table) just shows none.
+    const responseByReview = new Map<number, string>()
+    if (reviewIdsForCount.length > 0) {
+      try {
+        const respRows = await db.selectFrom('judge_responses')
+          .select(['judge_review_id', 'body'])
+          .where('judge_review_id', 'in', reviewIdsForCount as any)
+          .execute() as Array<{ judge_review_id: number, body: string }>
+        for (const row of respRows)
+          responseByReview.set(Number(row.judge_review_id), row.body)
+      }
+      catch {
+        // judge_responses not migrated yet — no responses to surface.
+      }
+    }
+
     const hydrated = reviewRows.map((r) => {
       const j = r.judge_id != null ? judgeById.get(r.judge_id) : null
       const u = r.user_id != null ? userById.get(r.user_id) : null
@@ -120,6 +138,7 @@ export default new Action({
         updated_at: r.updated_at,
         judge: j ? { id: j.id, name: j.name } : { id: r.judge_id, name: '(unknown judge)' },
         user: u ? { id: u.id, name: u.name, email: u.email } : null,
+        response: responseByReview.get(Number(r.id)) ?? null,
       }
     })
 

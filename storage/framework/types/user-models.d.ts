@@ -67,6 +67,7 @@ declare global {
   const Job: BenchModelStatic<DatabaseSchema['jobs']>
   const Judge: BenchModelStatic<DatabaseSchema['judges']>
   const JudgeOpinion: BenchModelStatic<DatabaseSchema['judge_opinions']>
+  const JudgeResponse: BenchModelStatic<DatabaseSchema['judge_responses']>
   const JudgeReview: BenchModelStatic<DatabaseSchema['judge_reviews']>
   const Label: BenchModelStatic<DatabaseSchema['labels']>
   const LicenseKey: BenchModelStatic<DatabaseSchema['license_keys']>

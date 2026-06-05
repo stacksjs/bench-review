@@ -13,6 +13,7 @@ export const routes = [
   { pattern: '/checkout/shipping', filePath: 'storage/framework/defaults/resources/views/checkout/shipping.stx', isDynamic: false, params: [] },
   { pattern: '/dashboard/custom-page', filePath: 'storage/framework/defaults/resources/views/dashboard/custom-page.stx', isDynamic: false, params: [] },
   { pattern: '/emails/welcome', filePath: 'storage/framework/defaults/resources/views/emails/welcome.stx', isDynamic: false, params: [] },
+  { pattern: '/judge/signup', filePath: 'resources/views/judge/signup.stx', isDynamic: false, params: [] },
   { pattern: '/judges/review', filePath: 'resources/views/judges/review/index.stx', isDynamic: false, params: [] },
   { pattern: '/judges/submit', filePath: 'resources/views/judges/submit.stx', isDynamic: false, params: [] },
   { pattern: '/', filePath: 'resources/views/index.stx', isDynamic: false, params: [] },

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS "judge_responses_judge_responses_uuid_unique" ON "judge_responses" ("uuid");

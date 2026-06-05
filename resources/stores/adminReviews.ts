@@ -15,6 +15,8 @@ export interface AdminReviewRow {
   updated_at?: string | null
   judge: { id: number | null, name: string }
   user: { id: number, name: string, email: string } | null
+  // Judge right-of-reply: the official response body, or null if none.
+  response?: string | null
 }
 
 defineStore('adminReviews', () => {
@@ -127,6 +129,49 @@ defineStore('adminReviews', () => {
     }
   }
 
+  // Judge right-of-reply: post/replace the judge's official response to a
+  // review (admin-mediated). Updates the row's `response` in place so the
+  // composer reflects the saved text without a refetch.
+  async function postResponse(id: number, body: string): Promise<boolean> {
+    try {
+      const res = await useStore('auth').authFetch(`/api/admin/reviews/${id}/response`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body }),
+      })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean, error?: string, body?: string }
+      if (!res.ok || !data.ok) {
+        actionError.set(data.error || 'Could not save the response')
+        return false
+      }
+      reviews.set(reviews().map(r => r.id === id ? { ...r, response: data.body ?? body } : r))
+      actionError.set('')
+      return true
+    }
+    catch (err) {
+      actionError.set(err instanceof Error ? err.message : 'Network error')
+      return false
+    }
+  }
+
+  async function deleteResponse(id: number): Promise<boolean> {
+    try {
+      const res = await useStore('auth').authFetch(`/api/admin/reviews/${id}/response`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean, error?: string }
+      if (!res.ok || !data.ok) {
+        actionError.set(data.error || 'Could not remove the response')
+        return false
+      }
+      reviews.set(reviews().map(r => r.id === id ? { ...r, response: null } : r))
+      actionError.set('')
+      return true
+    }
+    catch (err) {
+      actionError.set(err instanceof Error ? err.message : 'Network error')
+      return false
+    }
+  }
+
   return {
     reviews,
     total,
@@ -143,5 +188,7 @@ defineStore('adminReviews', () => {
     setPage,
     setReviewStatus,
     deleteReview,
+    postResponse,
+    deleteResponse,
   }
 })

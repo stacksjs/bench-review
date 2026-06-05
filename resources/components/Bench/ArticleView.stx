@@ -327,6 +327,58 @@
   interface ArticlePhoto { id: number, thumb_url: string, card_url: string, full_url: string, width: number, height: number }
   const photos = derived<ArticlePhoto[]>(() => (reviewsStore.current() as any)?.photos ?? [])
   const hasPhotos = derived<boolean>(() => photos().length > 0)
+
+  // Judge right-of-reply. ShowReviewAction returns `response` (the judge's
+  // official reply, admin-posted on their behalf) or null. Rendered as a
+  // prominent callout under the review body so a named judge always has a
+  // visible, fair right of reply. Body is server-sanitised HTML.
+  const judgeResponseBody = derived<string>(() => (reviewsStore.current() as any)?.response?.body ?? '')
+  const judgeResponseName = derived<string>(() => (reviewsStore.current() as any)?.response?.judge_name || 'the judge')
+  const hasJudgeResponse = derived<boolean>(() => judgeResponseBody().length > 0)
+
+  // Self-serve judge response. ShowReviewAction sets `can_respond_as_judge`
+  // true only for the verified judge whose claim matches this review's
+  // judge — they get an inline composer (prefilled with any existing
+  // response) that POSTs to /api/me/reviews/{id}/response.
+  const canRespondAsJudge = derived<boolean>(() => !!(reviewsStore.current() as any)?.can_respond_as_judge)
+  const judgeResponseDraft = state<string>('')
+  const judgeResponding = state<boolean>(false)
+  const judgeRespondError = state<string>('')
+  let judgeDraftSeeded = false
+  effect(() => {
+    // Seed the composer once with the existing response so the judge edits
+    // rather than retypes; the flag stops a refetch from clobbering edits.
+    const body = judgeResponseBody()
+    if (canRespondAsJudge() && !judgeDraftSeeded) {
+      judgeResponseDraft.set(body)
+      judgeDraftSeeded = true
+    }
+  })
+  async function postJudgeResponse(): Promise<void> {
+    if (judgeResponding()) return
+    judgeResponding.set(true)
+    judgeRespondError.set('')
+    try {
+      const res = await authStore.authFetch(`/api/me/reviews/${reviewId}/response`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: judgeResponseDraft() }),
+      })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean, error?: string }
+      if (!res.ok || !data.ok) {
+        judgeRespondError.set(data.error || 'Could not post your response.')
+        return
+      }
+      // Refetch so the public callout reflects the saved response.
+      reviewsStore.fetchById(reviewId)
+    }
+    catch {
+      judgeRespondError.set('Could not reach the server — try again.')
+    }
+    finally {
+      judgeResponding.set(false)
+    }
+  }
   // Single-photo gallery is just one large card; 2+ go in a 2-col
   // grid that flows to 3-col on wider screens. The cap is enforced
   // server-side at 4 per review (see UploadReviewPhotosAction).
@@ -545,6 +597,46 @@
     </div>
 
     <div class="article-body mt-10 text-gray-800" x-html="content"></div>
+
+    <!-- Judge right-of-reply. Prominent callout under the review body when
+         the judge has an official response on record. Hidden (not removed)
+         via x-class so the inner x-html binding stays subscribed across
+         load/SPA-nav — same pattern as the other conditional sections. -->
+    <div
+      class="mt-12 p-6 border-l-4 border-amber-500 rounded-r-lg bg-amber-50/60"
+      x-class="hasJudgeResponse() ? '' : 'hidden'"
+    >
+      <p class="font-semibold text-amber-800 text-xs tracking-widest uppercase">Official response</p>
+      <p class="mt-1 font-semibold text-gray-900 text-sm" :text="`From ${judgeResponseName()}`"></p>
+      <div class="article-body mt-3 text-base text-gray-800" x-html="judgeResponseBody"></div>
+    </div>
+
+    <!-- Self-serve composer — only the verified judge for this review sees
+         this (server-set can_respond_as_judge). Lets them post/edit their
+         official response inline. Hidden via x-class to keep bindings live. -->
+    <div
+      class="mt-6 p-4 border border-gray-300 rounded-lg bg-white"
+      x-class="canRespondAsJudge() ? '' : 'hidden'"
+    >
+      <p class="font-semibold text-gray-900 text-sm">Respond as the judge</p>
+      <p class="mt-0.5 text-gray-500 text-xs">Your verified official response — shown publicly under this review.</p>
+      <textarea
+        x-model="judgeResponseDraft"
+        rows="4"
+        placeholder="Write your official response…"
+        class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
+      ></textarea>
+      <div class="flex items-center gap-x-3 mt-2">
+        <button
+          type="button"
+          @click="postJudgeResponse()"
+          x-disabled="judgeResponding"
+          class="px-4 py-2 font-semibold text-white text-sm bg-gray-900 hover:bg-gray-800 rounded-md disabled:opacity-50"
+          :text="judgeResponding() ? 'Posting…' : 'Post response'"
+        ></button>
+        <span class="text-red-700 text-xs" x-class="judgeRespondError() ? '' : 'hidden'" :text="judgeRespondError()"></span>
+      </div>
+    </div>
 
     <!-- Footer row: "people find this helpful" + status pill + back link.
          Helpful-button area hidden entirely for unpublished reviews —
