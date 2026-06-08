@@ -5,6 +5,15 @@
   useHead({ title: 'Court House - Bench Review' })
 
   const court = derived<CourtHouse>(() => courtHouses.find(c => c.id === params.id) || courtHouses[0])
+
+  // Bare /court-houses/{id} (no tab) → default to the profile tab so the
+  // content slot is filled instead of rendering empty. Tab routes
+  // (/profile, /bench, /reviews) keep their path and don't redirect.
+  onMount(() => {
+    if (typeof window === 'undefined') return
+    const m = window.location.pathname.match(/^\/court-houses\/(\d+)\/?$/)
+    if (m) navigate(`/court-houses/${m[1]}/profile`, true)
+  })
 </script>
 
 @extends('layouts/default')

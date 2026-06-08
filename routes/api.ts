@@ -266,6 +266,12 @@ route.post('/admin/credentials/{id}/verify', 'Actions/Admin/Credentials/VerifyCr
   .middleware('admin')
   .skipCsrf()
 
+// Moderation audit trail — read-only record of who moderated what.
+route.get('/admin/moderation-log', 'Actions/Admin/ModerationLogIndexAction')
+  .name('bench.admin.moderation-log')
+  .middleware('auth')
+  .middleware('admin')
+
 // Authenticated password change. Settings form (SettingsView.stx)
 // posts here; the action verifies the current password against the
 // stored bcrypt hash before updating. See app/Actions/Me/ChangePasswordAction.ts
@@ -273,6 +279,17 @@ route.post('/admin/credentials/{id}/verify', 'Actions/Admin/Credentials/VerifyCr
 route.patch('/me/password', 'Actions/Me/ChangePasswordAction')
   .name('bench.me.password.change')
   .middleware('auth')
+  .skipCsrf()
+
+// Privacy / data rights: export everything we hold about the user, and
+// permanent self-serve account deletion (password-confirmed, full cascade).
+route.get('/me/export', 'Actions/Me/ExportDataAction')
+  .name('bench.me.export')
+  .middleware('auth')
+route.delete('/me', 'Actions/Me/DeleteAccountAction')
+  .name('bench.me.delete')
+  .middleware('auth')
+  .middleware('throttle:5,1h')
   .skipCsrf()
 
 // Server-side compose-draft autosave (bench-review#26). One action

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS "moderation_logs_moderation_logs_uuid_unique" ON "moderation_logs" ("uuid");

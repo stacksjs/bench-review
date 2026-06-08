@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "moderation_logs_moderation_logs_actor_idx" ON "moderation_logs" ("actor_user_id");

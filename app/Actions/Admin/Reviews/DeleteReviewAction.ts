@@ -1,7 +1,9 @@
 import { Action } from '@stacksjs/actions'
+import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { logModeration } from '../../../Helpers/auditLog'
 
 /**
  * DELETE /api/admin/reviews/{id} — hard-delete a review.
@@ -32,6 +34,15 @@ export default new Action({
       return response.json({ error: 'Review not found.' }, 404)
 
     await db.deleteFrom('judge_reviews').where('id', '=', reviewId).execute()
+
+    const admin = await Auth.user().catch(() => null)
+    if ((admin as any)?.id)
+      await logModeration({
+        actorUserId: Number((admin as any).id),
+        action: 'review.delete',
+        targetType: 'review',
+        targetId: reviewId,
+      })
 
     return response.json({ ok: true, deleted: reviewId })
   },

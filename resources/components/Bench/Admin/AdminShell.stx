@@ -82,7 +82,7 @@
           <StxLink
             to="/admin"
             class="inline-flex items-center px-3 py-2 font-medium text-sm rounded-md"
-            x-class="isActive('/admin') && !isActive('/admin/users') && !isActive('/admin/reviews') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'"
+            x-class="isActive('/admin') && !isActive('/admin/users') && !isActive('/admin/reviews') && !isActive('/admin/credentials') && !isActive('/admin/moderation') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'"
           >Dashboard</StxLink>
           <StxLink
             to="/admin/users"
@@ -94,6 +94,16 @@
             class="inline-flex items-center px-3 py-2 font-medium text-sm rounded-md"
             x-class="isActive('/admin/reviews') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'"
           >Reviews</StxLink>
+          <StxLink
+            to="/admin/credentials"
+            class="inline-flex items-center px-3 py-2 font-medium text-sm rounded-md"
+            x-class="isActive('/admin/credentials') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'"
+          >Claims</StxLink>
+          <StxLink
+            to="/admin/moderation"
+            class="inline-flex items-center px-3 py-2 font-medium text-sm rounded-md"
+            x-class="isActive('/admin/moderation') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'"
+          >Audit</StxLink>
         </nav>
       </div>
       <div class="flex gap-x-4 items-center">

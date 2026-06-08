@@ -75,6 +75,7 @@ declare global {
   const LoyaltyPoint: BenchModelStatic<DatabaseSchema['loyalty_points']>
   const LoyaltyReward: BenchModelStatic<DatabaseSchema['loyalty_rewards']>
   const Manufacturer: BenchModelStatic<DatabaseSchema['manufacturers']>
+  const ModerationLog: BenchModelStatic<DatabaseSchema['moderation_logs']>
   const Notification: BenchModelStatic<DatabaseSchema['notifications']>
   const OauthAccessToken: BenchModelStatic<DatabaseSchema['oauth_access_tokens']>
   const OauthClient: BenchModelStatic<DatabaseSchema['oauth_clients']>

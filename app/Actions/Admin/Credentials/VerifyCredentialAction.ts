@@ -3,6 +3,7 @@ import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { logModeration } from '../../../Helpers/auditLog'
 
 /**
  * POST /api/admin/credentials/{userId}/verify — admin approves a
@@ -62,6 +63,12 @@ export default new Action({
         } as any)
         .where('id', '=', targetUserId)
         .execute()
+      await logModeration({
+        actorUserId: Number(adminId),
+        action: 'credential.approve',
+        targetType: 'credential',
+        targetId: targetUserId,
+      })
       return response.json({ ok: true, status: 'approved', verified_at: now })
     }
 
@@ -79,6 +86,13 @@ export default new Action({
       } as any)
       .where('id', '=', targetUserId)
       .execute()
+    await logModeration({
+      actorUserId: Number(adminId),
+      action: 'credential.reject',
+      targetType: 'credential',
+      targetId: targetUserId,
+      note,
+    })
     return response.json({ ok: true, status: 'rejected', note })
   },
 })

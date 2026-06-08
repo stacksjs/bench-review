@@ -3,6 +3,7 @@ import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { logModeration } from '../../../Helpers/auditLog'
 
 /**
  * DELETE /api/admin/users/{id} — hard-delete a user and their owned
@@ -48,9 +49,9 @@ export default new Action({
       return response.json({ error: 'You cannot delete your own account from the admin panel.' }, 422)
 
     const target = await db.selectFrom('users')
-      .select(['id'])
+      .select(['id', 'email'])
       .where('id', '=', targetUserId)
-      .executeTakeFirst()
+      .executeTakeFirst() as { id: number, email: string | null } | undefined
     if (!target)
       return response.json({ error: 'User not found.' }, 404)
 
@@ -80,6 +81,15 @@ export default new Action({
     await db.deleteFrom('user_permissions').where('user_id', '=', targetUserId).execute().catch(() => {})
 
     await db.deleteFrom('users').where('id', '=', targetUserId).execute()
+
+    if ((me as any)?.id)
+      await logModeration({
+        actorUserId: Number((me as any).id),
+        action: 'user.delete',
+        targetType: 'user',
+        targetId: targetUserId,
+        note: target.email ? `Deleted account: ${target.email}` : null,
+      })
 
     return response.json({ ok: true, deleted: targetUserId })
   },

@@ -2,6 +2,7 @@
 // Source: resources/views/
 
 export const routes = [
+  { pattern: '/admin/credentials', filePath: 'resources/views/admin/credentials.stx', isDynamic: false, params: [] },
   { pattern: '/admin/login', filePath: 'resources/views/admin/login.stx', isDynamic: false, params: [] },
   { pattern: '/admin/reviews', filePath: 'resources/views/admin/reviews.stx', isDynamic: false, params: [] },
   { pattern: '/admin/users', filePath: 'resources/views/admin/users.stx', isDynamic: false, params: [] },

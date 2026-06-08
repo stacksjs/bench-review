@@ -1,0 +1,7 @@
+@extends('layouts/admin')
+
+@section('title', 'Audit Log - Bench Review')
+
+@section('content')
+@include('Bench/Admin/ModerationLog')
+@endsection

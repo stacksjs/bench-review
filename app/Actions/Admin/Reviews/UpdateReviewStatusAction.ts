@@ -3,6 +3,7 @@ import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { logModeration } from '../../../Helpers/auditLog'
 import { notify } from '../../../Helpers/notifications'
 import { escapeHtml, renderReviewEmail } from '../../../Helpers/reviewEmailTemplate'
 
@@ -48,6 +49,20 @@ export default new Action({
       .set({ status, updated_at: new Date().toISOString() } as any)
       .where('id', '=', reviewId)
       .execute()
+
+    // Audit trail — record who moderated, and to what. Logged on every
+    // status change (independent of whether the author gets notified).
+    if (existing.status !== status) {
+      const admin = await Auth.user().catch(() => null)
+      const adminId = (admin as any)?.id
+      if (adminId)
+        await logModeration({
+          actorUserId: Number(adminId),
+          action: status === 'published' ? 'review.publish' : 'review.reject',
+          targetType: 'review',
+          targetId: reviewId,
+        })
+    }
 
     // Notify the review's author IFF status actually changed AND the
     // review has a real author (seeded reviews have user_id=null).

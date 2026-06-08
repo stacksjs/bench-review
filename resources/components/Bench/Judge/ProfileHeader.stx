@@ -42,6 +42,13 @@
       navigate('/judges', true)
       return
     }
+    // Bare /judges/{id} (no tab) → default to the profile tab, so the
+    // parent layout's content slot is filled instead of rendering empty
+    // (the tabs render their content into [id].stx's @slot('content')).
+    if (/^\/judges\/\d+\/?$/.test(window.location.pathname)) {
+      navigate(`/judges/${resolved}/profile`, true)
+      return
+    }
     judgeId.set(resolved)
     fetchOnce()
   })

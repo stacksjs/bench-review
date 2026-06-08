@@ -3,6 +3,7 @@ import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { notifyModeratorsOfFlag } from '../../Helpers/notifyModerators'
 
 /**
  * POST /api/reviews/{id}/flag — community report for a review.
@@ -86,6 +87,20 @@ export default new Action({
         return response.json({ ok: true, duplicate: true })
     }
 
+    // Alert moderators on the FIRST open flag for a review (not every flag —
+    // anonymous flagging is frictionless and would spam otherwise). Count
+    // BEFORE inserting: 0 existing open flags → this is the first.
+    let isFirstOpenFlag = false
+    try {
+      const openRows = await db.selectFrom('review_flags')
+        .select(['id'])
+        .where('judge_review_id', '=', reviewId)
+        .where('status', '=', 'open')
+        .execute() as Array<{ id: number }>
+      isFirstOpenFlag = openRows.length === 0
+    }
+    catch { /* non-fatal */ }
+
     const now = new Date().toISOString()
     await db.insertInto('review_flags').values({
       judge_review_id: reviewId,
@@ -96,6 +111,11 @@ export default new Action({
       created_at: now,
       updated_at: now,
     } as any).execute()
+
+    // Best-effort moderator alert (non-fatal — a mail failure must never
+    // fail the flag itself).
+    if (isFirstOpenFlag)
+      void notifyModeratorsOfFlag(reviewId, reason)
 
     return response.json({ ok: true })
   },

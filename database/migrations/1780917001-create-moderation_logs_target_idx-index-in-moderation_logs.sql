@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "moderation_logs_moderation_logs_target_idx" ON "moderation_logs" ("target_type", "target_id");

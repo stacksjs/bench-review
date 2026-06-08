@@ -152,6 +152,66 @@
       pwError.set(err instanceof Error ? err.message : 'Network error')
     }
   }
+
+  // Data export (privacy/portability) — fetch everything we hold and save
+  // it as a JSON file. authFetch carries the bearer token, so this can't be
+  // a plain link; we build the download client-side.
+  const exporting = state<boolean>(false)
+  async function exportData(): Promise<void> {
+    if (exporting()) return
+    exporting.set(true)
+    try {
+      const res = await authStore.authFetch('/api/me/export')
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data) return
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'bench-review-data.json'
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+    finally {
+      exporting.set(false)
+    }
+  }
+
+  // Account deletion — irreversible, password-confirmed. Two-step: reveal a
+  // confirm panel, then require the password before the destructive call.
+  const confirmingDelete = state<boolean>(false)
+  const deletePassword = state<string>('')
+  const deleting = state<boolean>(false)
+  const deleteError = state<string>('')
+  async function deleteAccount(): Promise<void> {
+    if (deleting()) return
+    if (!deletePassword()) {
+      deleteError.set('Enter your password to confirm.')
+      return
+    }
+    deleting.set(true)
+    deleteError.set('')
+    try {
+      const res = await authStore.authFetch('/api/me', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: deletePassword() }),
+      })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean, error?: string }
+      if (!res.ok || !data.ok) {
+        deleteError.set(data.error || 'Could not delete your account.')
+        return
+      }
+      // Account gone — clear the session and leave.
+      authStore.logout()
+    }
+    catch (err) {
+      deleteError.set(err instanceof Error ? err.message : 'Network error')
+    }
+    finally {
+      deleting.set(false)
+    }
+  }
 </script>
 
 <div class="min-h-screen bg-gray-50">
@@ -352,6 +412,64 @@
           @click="authStore.logout()"
           class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-md transition-colors"
         >Sign out</button>
+      </div>
+
+      <!-- Export my data -->
+      <div class="px-6 py-5 sm:px-8 flex flex-wrap gap-3 items-center justify-between border-t border-gray-100">
+        <div>
+          <p class="font-medium text-gray-900 text-sm">Export my data</p>
+          <p class="mt-0.5 text-gray-500 text-xs">Download everything we hold about you as a JSON file.</p>
+        </div>
+        <button
+          type="button"
+          @click="exportData()"
+          x-disabled="exporting"
+          class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-md transition-colors disabled:opacity-50"
+          :text="exporting() ? 'Preparing…' : 'Export data'"
+        ></button>
+      </div>
+
+      <!-- Delete account -->
+      <div class="px-6 py-5 sm:px-8 border-t border-gray-100">
+        <div class="flex flex-wrap gap-3 items-center justify-between">
+          <div>
+            <p class="font-medium text-red-700 text-sm">Delete account</p>
+            <p class="mt-0.5 text-gray-500 text-xs">Permanently remove your account, reviews, comments, and all associated data. This can't be undone.</p>
+          </div>
+          <button
+            type="button"
+            @click="confirmingDelete.set(true)"
+            x-class="confirmingDelete() ? 'hidden' : ''"
+            class="px-3 py-1.5 font-medium text-red-700 text-sm bg-white hover:bg-red-50 border border-red-200 hover:border-red-300 rounded-md transition-colors"
+          >Delete account</button>
+        </div>
+
+        <!-- Password-confirmed final step -->
+        <div x-class="confirmingDelete() ? 'mt-4 p-4 bg-red-50/60 border border-red-200 rounded-md' : 'hidden'">
+          <label for="delete-pw" class="block font-medium text-gray-900 text-sm">Confirm your password to delete</label>
+          <input
+            id="delete-pw"
+            type="password"
+            x-model="deletePassword"
+            autocomplete="current-password"
+            class="block mt-2 px-3 py-2 w-full max-w-sm text-gray-900 text-sm bg-white border border-gray-300 rounded-md focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+          >
+          <p role="alert" class="mt-2 text-red-700 text-xs" x-class="deleteError() ? '' : 'hidden'" :text="deleteError()"></p>
+          <div class="flex gap-x-3 mt-3">
+            <button
+              type="button"
+              @click="deleteAccount()"
+              x-disabled="deleting"
+              class="px-4 py-2 font-semibold text-white text-sm bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50"
+              :text="deleting() ? 'Deleting…' : 'Permanently delete'"
+            ></button>
+            <button
+              type="button"
+              @click="confirmingDelete.set(false)"
+              class="px-4 py-2 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >Cancel</button>
+          </div>
+        </div>
       </div>
     </section>
   </div>
