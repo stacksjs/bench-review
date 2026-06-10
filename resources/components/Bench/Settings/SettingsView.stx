@@ -51,12 +51,27 @@
   async function saveProfile(): Promise<void> {
     saveStatus.set('saving')
     saveError.set('')
+    const name = fullName().trim()
+    if (!name) {
+      saveStatus.set('error')
+      saveError.set('Name is required.')
+      return
+    }
     try {
-      // No /api/me PATCH endpoint yet — mirror the change to the cached
-      // user so the navbar/profile pick it up. The auth store exposes
-      // `setUser` for exactly this pre-API-roundtrip case.
+      // Persist via PATCH /api/me (name only — email change needs a
+      // re-verification flow that doesn't exist yet). On success, mirror
+      // the server's record into the cached user so the navbar/profile
+      // pick it up without a refetch.
+      const res = await authStore.authFetch('/api/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean, user?: any, error?: string }
+      if (!res.ok || !data.ok)
+        throw new Error(data.error || 'Failed to save')
       const u = authStore.user() || {}
-      const next = { ...u, name: fullName().trim(), email: userEmail().trim() }
+      const next = { ...u, name: data.user?.name ?? name }
       if (typeof (authStore as any).setUser === 'function')
         (authStore as any).setUser(next)
       saveStatus.set('saved')
@@ -251,8 +266,10 @@
               id="email"
               x-model="userEmail"
               autocomplete="email"
-              class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
+              readonly
+              class="block mt-2 px-3 py-2 w-full text-gray-500 text-sm placeholder:text-gray-400 bg-gray-50 border border-gray-300 rounded-md cursor-not-allowed focus:outline-none"
             >
+            <p class="mt-1 text-gray-400 text-xs">Email can't be changed yet.</p>
           </div>
         </div>
 
