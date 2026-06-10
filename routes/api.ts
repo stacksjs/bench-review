@@ -109,8 +109,13 @@ route.post('/auth/resend-verification', 'Actions/Auth/ResendVerificationAction')
 // directory pages are public surface area. Mutating routes will live
 // under `/api/judges` (POST/PATCH/DELETE) when review submission lands
 // — keep those guarded by `auth` middleware then.
+// These three each materialize whole tables in memory per request
+// (Judge.all() + CourtHouse.all()), so they're unauthenticated DoS
+// amplifiers and unmetered scraping surface. Throttle per-IP until the
+// queries are bounded with SQL LIKE + LIMIT.
 route.get('/judges', 'Actions/Judges/JudgeIndexAction')
   .name('bench.judges.index')
+  .middleware('throttle:60,1m')
 
 // Server-side typeahead — drives the search input in the review form.
 // MUST come BEFORE the `/api/judges/{id}/reviews` route below: bun-router
@@ -118,9 +123,11 @@ route.get('/judges', 'Actions/Judges/JudgeIndexAction')
 // captured as `:id = 'search'`.
 route.get('/judges/search', 'Actions/Judges/JudgeSearchAction')
   .name('bench.judges.search')
+  .middleware('throttle:60,1m')
 
 route.get('/court-houses', 'Actions/CourtHouses/CourtHouseIndexAction')
   .name('bench.courtHouses.index')
+  .middleware('throttle:60,1m')
 
 // Reviews — split into lazy reads + auth-gated writes.
 // - GET /api/reviews                 : latest across all judges (home feed)
