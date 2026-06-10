@@ -116,6 +116,22 @@ export default new Action({
     if (!isEmailVerified(authUser as any))
       return response.json({ error: 'Please verify your email address before posting a review — check your inbox for the verification link.' }, 403)
 
+    // One live review per user per judge. A partial unique index
+    // (migration 1780917024) is the real guard; this explicit lookup
+    // turns a would-be raw constraint 500 into a friendly 409 and a
+    // clear message. Rejected reviews don't count, so a user whose
+    // review was declined can post a fresh one.
+    if (userId != null) {
+      const existing = await db.selectFrom('judge_reviews')
+        .select(['id'])
+        .where('user_id', '=', userId)
+        .where('judge_id', '=', judgeId)
+        .where('status', 'in', ['pending', 'published'] as any)
+        .executeTakeFirst()
+      if (existing)
+        return response.json({ error: 'You have already reviewed this judge. Edit your existing review instead of posting a new one.' }, 409)
+    }
+
     // Raw `db.insertInto` instead of `JudgeReview.create()`. The ORM's
     // `create()` path has a snake_case → camelCase mapping gap that
     // silently drops fields like `judge_id` and `user_id` — every

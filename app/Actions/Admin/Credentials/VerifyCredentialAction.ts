@@ -41,9 +41,9 @@ export default new Action({
       return response.json({ error: 'action must be "approve" or "reject".' }, 422)
 
     const target = await db.selectFrom('users')
-      .select(['id', 'credential_claimed_at'])
+      .select(['id', 'credential_claimed_at', 'credential_type', 'claimed_judge_id'])
       .where('id', '=', targetUserId)
-      .executeTakeFirst() as { id: number, credential_claimed_at: string | null } | undefined
+      .executeTakeFirst() as { id: number, credential_claimed_at: string | null, credential_type: string | null, claimed_judge_id: number | null } | undefined
 
     if (!target)
       return response.json({ error: 'User not found.' }, 404)
@@ -54,6 +54,25 @@ export default new Action({
     const now = new Date().toISOString()
 
     if (action === 'approve') {
+      // A judge profile can only have one verified holder. The partial
+      // unique index (migration 1780917026) enforces it at the DB; this
+      // re-check at approval time turns a constraint 500 into a clear
+      // 409 and names the conflict. The claim-time check in
+      // ClaimJudgeProfileAction can't cover the case where two users
+      // claim the same judge and an admin approves the second one.
+      if (target.credential_type === 'judge' && target.claimed_judge_id != null) {
+        const holders = await db.selectFrom('users')
+          .select(['id'])
+          .where('claimed_judge_id', '=', target.claimed_judge_id)
+          .where('credential_type', '=', 'judge')
+          .where('credential_verified_at', 'is not', null)
+          .execute() as Array<{ id: number }>
+        // `!=` isn't a supported bqb operator here, so exclude the
+        // target in JS rather than in the query.
+        const conflict = holders.find(h => Number(h.id) !== targetUserId)
+        if (conflict)
+          return response.json({ error: 'Another verified user already holds this judge profile. Reject one of the claims first.' }, 409)
+      }
       await db.updateTable('users')
         .set({
           credential_verified_at: now,
