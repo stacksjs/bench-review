@@ -34,18 +34,25 @@ const AUTH_COOKIE = 'auth-token'
 const USER_COOKIE = 'auth-user'
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30 // 30 days
 
+// Append `; Secure` whenever the page is served over https, so the
+// auth/user cookies never travel in cleartext in production. Omitted on
+// http (dev/localhost) because browsers drop Secure cookies on http,
+// which would silently break the session locally.
+function secureAttr(): string {
+  return (typeof window !== 'undefined' && window.location?.protocol === 'https:') ? '; Secure' : ''
+}
+
 function setAuthCookie(token: string): void {
   if (typeof document === 'undefined') return
   // SameSite=Lax so navigations from external referrers still send it
   // (so the server-side auth gate can see the session on a deep-link
-  // back into /profile). Not Secure-flagged because dev runs on http;
-  // production should layer `; Secure` on top via APP_URL detection.
-  document.cookie = `${AUTH_COOKIE}=${encodeURIComponent(token)}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax`
+  // back into /profile).
+  document.cookie = `${AUTH_COOKIE}=${encodeURIComponent(token)}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax${secureAttr()}`
 }
 
 function setUserCookie(user: UserProfile): void {
   if (typeof document === 'undefined') return
-  document.cookie = `${USER_COOKIE}=${encodeURIComponent(JSON.stringify(user))}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax`
+  document.cookie = `${USER_COOKIE}=${encodeURIComponent(JSON.stringify(user))}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax${secureAttr()}`
 }
 
 function clearAuthCookies(): void {
