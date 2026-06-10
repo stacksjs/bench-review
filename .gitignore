@@ -15,6 +15,16 @@ data.ms
 !.gitkeep
 database/stacks_testing.sqlite
 database/stacks.sqlite
+# SQLite database files + write-ahead-log/shared-memory sidecars must never be
+# committed — the WAL holds live row pages (users, tokens, reviews). See #55.
+database/*.sqlite
+database/*.sqlite-wal
+database/*.sqlite-shm
+storage/*.sqlite
+storage/*.sqlite-wal
+storage/*.sqlite-shm
+# Uploaded review photos are user content, not source.
+storage/uploads
 custom-cli
 *bun-build
 
