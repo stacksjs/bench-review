@@ -25,6 +25,7 @@ import { notifyModeratorsOfFlag } from '../../Helpers/notifyModerators'
 const ALLOWED_REASONS = new Set([
   'off_topic',
   'harassment',
+  'threat',
   'spam',
   'privacy',
   'inaccurate',

@@ -423,6 +423,18 @@ route.post('/admin/judge-submissions/{id}/review', 'Actions/Admin/JudgeSubmissio
   .middleware('admin')
   .skipCsrf()
 
+// Review-flag queue — list community flags and close them out. The
+// review takedown itself stays on the review-status / delete endpoints.
+route.get('/admin/flags', 'Actions/Admin/Flags/FlagQueueIndexAction')
+  .name('bench.admin.flags.index')
+  .middleware('auth')
+  .middleware('admin')
+route.post('/admin/flags/{id}/resolve', 'Actions/Admin/Flags/ResolveFlagAction')
+  .name('bench.admin.flags.resolve')
+  .middleware('auth')
+  .middleware('admin')
+  .skipCsrf()
+
 // Admin review moderation.
 route.get('/admin/reviews', 'Actions/Admin/Reviews/ReviewIndexAction')
   .name('bench.admin.reviews.index')
