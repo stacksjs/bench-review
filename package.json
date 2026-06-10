@@ -5,11 +5,11 @@
   "private": true,
   "description": "A judge review application powered by Stacks",
   "scripts": {
-    "dev": "bun --watch serve.ts",
+    "dev": "./buddy dev",
     "build": "bun build.ts",
     "build:stacks": "./buddy build",
     "preview": "bun preview.ts",
-    "start": "bun serve.ts",
+    "start": "bun preview.ts",
     "lint": "bunx --bun pickier .",
     "lint:fix": "bunx --bun pickier . --fix",
     "typecheck": "bun tsc --noEmit"

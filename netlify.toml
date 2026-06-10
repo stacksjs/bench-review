@@ -1,10 +1,28 @@
+# NOTE: deploy target is not finalized — this is the existing Netlify
+# config, corrected so it at least produces a servable site. Whichever
+# host is chosen needs the same three things: publish the real build
+# output, proxy /api/* to the deployed API origin, and accept that
+# dynamic judge/article pages have no static output yet (see #46).
+
 [build]
 base = "/"
 command = "bun install && touch .env && cd storage/framework/core && bun run build && cd ../../.. && ./buddy build views"
-publish = "storage/framework/views/web/dist"
+# build.ts / `./buddy build views` writes to ./dist (NOT
+# storage/framework/views/web/dist, which is empty).
+publish = "dist"
 
 [build.environment]
 NODE_VERSION = "20"
+
+# The static site calls its API at same-origin /api/* (resources/stores/*
+# use relative URLs). In dev the views server proxies this; in production
+# nothing does, so every /api call 404s without this proxy. Set the API
+# origin (the Bun server) before deploying — replace YOUR-API-HOST.
+[[redirects]]
+  from = "/api/*"
+  to = "https://YOUR-API-HOST/api/:splat"
+  status = 200
+  force = true
 
 [[plugins]]
 package = "@netlify/plugin-lighthouse"
