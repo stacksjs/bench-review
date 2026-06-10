@@ -24,7 +24,7 @@
     },
     {
       q: 'Where does the judge data come from?',
-      a: 'Judge profiles are sourced from publicly available court records, bar associations, and judicial directories. Reviews are user-contributed. Judges (or their chambers) may contact us to post an official response to any review of them — it appears prominently alongside the review. Self-serve profile claims are on the way.'
+      a: 'Judge profiles are sourced from publicly available court records, bar associations, and judicial directories. Reviews are user-contributed. Judges (or their chambers) can claim their profile at /judges/signup to post official responses to reviews — once verified, responses appear prominently alongside the review.'
     },
     {
       q: 'Can a judge get a review removed?',

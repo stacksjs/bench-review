@@ -25,6 +25,7 @@
         <ul class="mt-4 space-y-3 text-sm">
           <li><StxLink to="/review" class="text-gray-600 hover:text-gray-900">Write a Review</StxLink></li>
           <li><StxLink to="/judges/submit" class="text-gray-600 hover:text-gray-900">Submit a Judge</StxLink></li>
+          <li><StxLink to="/judges/signup" class="text-gray-600 hover:text-gray-900">Are you a judge? Claim your profile</StxLink></li>
           <li><StxLink to="/register" class="text-gray-600 hover:text-gray-900">Create Account</StxLink></li>
         </ul>
       </div>
