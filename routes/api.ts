@@ -129,6 +129,14 @@ route.get('/court-houses', 'Actions/CourtHouses/CourtHouseIndexAction')
   .name('bench.courtHouses.index')
   .middleware('throttle:60,1m')
 
+// Public "suggest a judge" intake (resources/views/judges/submit.stx).
+// No auth — anyone can suggest — so throttle hard. Lands as pending for
+// admin review in the submissions queue.
+route.post('/judges/submit', 'Actions/Judges/SubmitJudgeSubmissionAction')
+  .name('bench.judges.submit')
+  .middleware('throttle:5,10m')
+  .skipCsrf()
+
 // Reviews — split into lazy reads + auth-gated writes.
 // - GET /api/reviews                 : latest across all judges (home feed)
 // - GET /api/judges/:id/reviews      : reviews for a single judge (detail page)

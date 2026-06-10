@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS "judge_submissions" (
+  "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "judge_name" TEXT NOT NULL,
+  "court" TEXT,
+  "department" TEXT,
+  "city" TEXT,
+  "state" TEXT,
+  "appointed" TEXT,
+  "case_types" TEXT,
+  "bio" TEXT,
+  "source_url" TEXT,
+  "submitter_role" TEXT,
+  "submitter_email" TEXT,
+  "user_id" INTEGER,
+  "status" TEXT NOT NULL DEFAULT 'pending',
+  "review_note" TEXT,
+  "reviewed_by_user_id" INTEGER,
+  "reviewed_at" TEXT,
+  "created_at" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TEXT,
+  "uuid" TEXT
+);
