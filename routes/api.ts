@@ -395,6 +395,14 @@ route.delete('/admin/users/{id}', 'Actions/Admin/Users/DeleteUserAction')
   .middleware('admin')
   .skipCsrf()
 
+// Reversible suspension — the alternative to hard delete. Sets/clears
+// banned_at; the Auth middleware then rejects the suspended account.
+route.post('/admin/users/{id}/suspend', 'Actions/Admin/Users/SuspendUserAction')
+  .name('bench.admin.users.suspend')
+  .middleware('auth')
+  .middleware('admin')
+  .skipCsrf()
+
 // Admin review moderation.
 route.get('/admin/reviews', 'Actions/Admin/Reviews/ReviewIndexAction')
   .name('bench.admin.reviews.index')
