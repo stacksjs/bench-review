@@ -1,6 +1,16 @@
 import { db, Seeder } from '@stacksjs/database'
 
 /**
+ * Deterministic initials-avatar placeholder for judges we don't have a
+ * verified portrait URL for. Always renders (no broken-image risk) and
+ * reads clearly as a placeholder rather than a misattributed photo.
+ */
+function avatar(name: string): string {
+  const clean = name.replace(/^Hon\.\s*/, '').replace(/\s+(?:Jr\.|Sr\.|III|II)$/, '')
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(clean)}&size=256&background=1f2937&color=ffffff&bold=true`
+}
+
+/**
  * Fixed-data seeder for `judges`.
  *
  * Runs alphabetically after CourtHouseSeeder so the FK lookups
@@ -99,6 +109,34 @@ export default class JudgeSeeder extends Seeder {
         courtHouse: 'E. Barrett Prettyman United States Courthouse',
         practice_area: 'criminal',
       },
+
+      // Supreme Court of the United States — remaining sitting justices.
+      // (Roberts/Sotomayor/Kagan are seeded above; this completes the
+      // current nine-member bench.)
+      { name: 'Hon. Clarence Thomas', image_url: avatar('Clarence Thomas'), courtHouse: 'Supreme Court of the United States', practice_area: 'appellate' },
+      { name: 'Hon. Samuel A. Alito Jr.', image_url: avatar('Samuel Alito'), courtHouse: 'Supreme Court of the United States', practice_area: 'appellate' },
+      { name: 'Hon. Neil M. Gorsuch', image_url: avatar('Neil Gorsuch'), courtHouse: 'Supreme Court of the United States', practice_area: 'appellate' },
+      { name: 'Hon. Brett M. Kavanaugh', image_url: avatar('Brett Kavanaugh'), courtHouse: 'Supreme Court of the United States', practice_area: 'appellate' },
+      { name: 'Hon. Amy Coney Barrett', image_url: avatar('Amy Coney Barrett'), courtHouse: 'Supreme Court of the United States', practice_area: 'appellate' },
+      { name: 'Hon. Ketanji Brown Jackson', image_url: avatar('Ketanji Brown Jackson'), courtHouse: 'Supreme Court of the United States', practice_area: 'appellate' },
+
+      // US Court of Appeals for the Ninth Circuit — additional judges.
+      { name: 'Hon. Kim McLane Wardlaw', image_url: avatar('Kim Wardlaw'), courtHouse: 'US Court of Appeals for the Ninth Circuit', practice_area: 'appellate' },
+      { name: 'Hon. Jacqueline H. Nguyen', image_url: avatar('Jacqueline Nguyen'), courtHouse: 'US Court of Appeals for the Ninth Circuit', practice_area: 'appellate' },
+      { name: 'Hon. Milan D. Smith Jr.', image_url: avatar('Milan Smith'), courtHouse: 'US Court of Appeals for the Ninth Circuit', practice_area: 'appellate' },
+
+      // SDNY (Daniel Patrick Moynihan US Courthouse) — district judges.
+      { name: 'Hon. Loretta A. Preska', image_url: avatar('Loretta Preska'), courtHouse: 'Daniel Patrick Moynihan US Courthouse', practice_area: 'civil' },
+      { name: 'Hon. Jesse M. Furman', image_url: avatar('Jesse Furman'), courtHouse: 'Daniel Patrick Moynihan US Courthouse', practice_area: 'civil' },
+      { name: 'Hon. Analisa Torres', image_url: avatar('Analisa Torres'), courtHouse: 'Daniel Patrick Moynihan US Courthouse', practice_area: 'civil' },
+
+      // DDC (E. Barrett Prettyman) — district judges.
+      { name: 'Hon. James E. Boasberg', image_url: avatar('James Boasberg'), courtHouse: 'E. Barrett Prettyman United States Courthouse', practice_area: 'civil' },
+      { name: 'Hon. Amit P. Mehta', image_url: avatar('Amit Mehta'), courtHouse: 'E. Barrett Prettyman United States Courthouse', practice_area: 'civil' },
+      { name: 'Hon. Beryl A. Howell', image_url: avatar('Beryl Howell'), courtHouse: 'E. Barrett Prettyman United States Courthouse', practice_area: 'criminal' },
+
+      // New York County Supreme Court — additional justice.
+      { name: 'Hon. Juan M. Merchan', image_url: avatar('Juan Merchan'), courtHouse: 'New York County Supreme Court', practice_area: 'criminal' },
     ]
 
     for (const judge of judges) {
