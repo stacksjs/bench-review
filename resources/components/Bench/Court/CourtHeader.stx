@@ -46,11 +46,11 @@
     ogTitle: 'Courthouse profile — Bench Review',
     ogDescription: 'Judges, reviews, and contact info for this courthouse.',
     ogType: 'place',
-    ogImage: '/images/og-default.jpg',
+    ogImage: '/images/og-image.png',
     twitterCard: 'summary_large_image',
     twitterTitle: 'Courthouse profile — Bench Review',
     twitterDescription: 'Judges, reviews, and contact info for this courthouse.',
-    twitterImage: '/images/og-default.jpg',
+    twitterImage: '/images/og-image.png',
   })
 
   const courtName = derived<string>(() => (currentCourt() as any)?.name || 'Loading…')

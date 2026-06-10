@@ -29,11 +29,11 @@
     ogTitle: 'A judge review — Bench Review',
     ogDescription: 'Read what clerks, attorneys, and court staff have said about appearing before this judge.',
     ogType: 'article',
-    ogImage: '/images/og-default.jpg',
+    ogImage: '/images/og-image.png',
     twitterCard: 'summary_large_image',
     twitterTitle: 'A judge review — Bench Review',
     twitterDescription: 'Read what clerks, attorneys, and court staff have said about appearing before this judge.',
-    twitterImage: '/images/og-default.jpg',
+    twitterImage: '/images/og-image.png',
   })
   const readingProgress = state<number>(0)
   // `liked` is derived from the store rather than held locally so a

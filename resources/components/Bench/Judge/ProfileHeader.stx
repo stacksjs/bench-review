@@ -70,11 +70,11 @@
     ogTitle: 'Judge profile — Bench Review',
     ogDescription: 'Reviews of this judge from clerks, attorneys, and court staff.',
     ogType: 'profile',
-    ogImage: '/images/og-default.jpg',
+    ogImage: '/images/og-image.png',
     twitterCard: 'summary_large_image',
     twitterTitle: 'Judge profile — Bench Review',
     twitterDescription: 'Reviews of this judge from clerks, attorneys, and court staff.',
-    twitterImage: '/images/og-default.jpg',
+    twitterImage: '/images/og-image.png',
   })
 
   const judgeName = derived<string>(() => currentJudge()?.name || 'Loading…')

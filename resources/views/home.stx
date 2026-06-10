@@ -18,11 +18,11 @@
     ogTitle: 'Bench Review — find and review judges',
     ogDescription: 'A directory of judges and courthouses, with reviews from the people who appear before them. Anonymous reviews welcome for clerks, court staff, and attorneys under retaliation risk.',
     ogType: 'website',
-    ogImage: '/images/og-default.jpg',
+    ogImage: '/images/og-image.png',
     twitterCard: 'summary_large_image',
     twitterTitle: 'Bench Review — find and review judges',
     twitterDescription: 'A directory of judges and courthouses, with reviews from the people who appear before them.',
-    twitterImage: '/images/og-default.jpg',
+    twitterImage: '/images/og-image.png',
   })
 
   const search = useStore('search')

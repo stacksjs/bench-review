@@ -20,11 +20,11 @@
     ogTitle: 'Reviewer profile — Bench Review',
     ogDescription: 'A Bench Review contributor and the reviews they\'ve published about judges.',
     ogType: 'profile',
-    ogImage: '/images/og-default.jpg',
+    ogImage: '/images/og-image.png',
     twitterCard: 'summary',
     twitterTitle: 'Reviewer profile — Bench Review',
     twitterDescription: 'A Bench Review contributor and the reviews they\'ve published about judges.',
-    twitterImage: '/images/og-default.jpg',
+    twitterImage: '/images/og-image.png',
   })
 
   interface VerifiedCredential {
