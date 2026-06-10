@@ -12,9 +12,11 @@ export default {
 
   app: {
     head: {
-      title: 'Bench Review — The Chamber of Secrets',
+      // Fallback title/description for pages that don't set their own via
+      // @section('title') / useHead (hoisted into the static <head>, stx#1756).
+      title: 'Bench Review — Read & Write Reviews of Judges',
       meta: [
-        { name: 'description', content: 'Judge review and court directory platform' },
+        { name: 'description', content: 'Bench Review is a public directory of judges where attorneys, clerks, and court staff share first-hand reviews. Search judges by name and court.' },
       ],
       bodyClass: 'min-h-screen bg-off-white font-sans antialiased',
     },
