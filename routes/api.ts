@@ -281,6 +281,14 @@ route.patch('/me/password', 'Actions/Me/ChangePasswordAction')
   .middleware('auth')
   .skipCsrf()
 
+// "Sign out everywhere" — revokes every session for the user, including
+// the current one. Throttled: it's a deliberate, infrequent action.
+route.post('/me/logout-all', 'Actions/Me/LogoutEverywhereAction')
+  .name('bench.me.logout-all')
+  .middleware('auth')
+  .middleware('throttle:10,1h')
+  .skipCsrf()
+
 // Privacy / data rights: export everything we hold about the user, and
 // permanent self-serve account deletion (password-confirmed, full cascade).
 route.get('/me/export', 'Actions/Me/ExportDataAction')

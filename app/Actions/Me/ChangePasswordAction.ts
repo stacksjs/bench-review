@@ -1,5 +1,5 @@
 import { Action } from '@stacksjs/actions'
-import { Auth } from '@stacksjs/auth'
+import { Auth, revokeOtherTokens } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { makeHash, verifyHash } from '@stacksjs/security'
@@ -24,11 +24,13 @@ import { schema } from '@stacksjs/validation'
  *     shape uniform across the password endpoints).
  *   - `verifyHash` is constant-time-by-spec under bcrypt; no
  *     hand-rolled compare.
- *   - We do NOT revoke other personal-access tokens by default.
- *     Some users (mobile clients, IDE plugins, multi-device) would be
- *     bricked by a silent revoke. A future "Sign me out everywhere"
- *     toggle on the settings UI can opt into the broader revoke; for
- *     now this endpoint only mutates the password column.
+ *   - On a successful change we revoke every OTHER session
+ *     (`revokeOtherTokens`) — the current device stays signed in, but
+ *     any other access/refresh token is killed. This is the standard
+ *     post-change behavior: if the change was triggered because an
+ *     attacker had access, the change itself now evicts them. A
+ *     dedicated "Sign me out everywhere" endpoint (`/api/me/logout-all`)
+ *     revokes the current session too.
  */
 export default new Action({
   name: 'Change My Password',
@@ -86,6 +88,16 @@ export default new Action({
       .set({ password: nextHash, updated_at: new Date().toISOString() } as any)
       .where('id', '=', Number(userId))
       .execute()
+
+    // Evict every other session now that the password has changed. Best
+    // effort — the password is already updated, so a revoke hiccup must
+    // not fail the request.
+    try {
+      await revokeOtherTokens(Number(userId))
+    }
+    catch (err) {
+      console.warn('[change-password] revokeOtherTokens failed — password still changed.', err instanceof Error ? err.message : err)
+    }
 
     return response.json({ ok: true })
   },
