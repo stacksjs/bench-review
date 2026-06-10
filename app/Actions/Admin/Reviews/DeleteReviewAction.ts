@@ -26,10 +26,14 @@ export default new Action({
   async handle() {
     const reviewId = Number(request.params?.id)
 
+    // Pull the full row BEFORE deleting so the moderation log can keep a
+    // snapshot. A hard delete otherwise destroys the only record of what
+    // was published — exactly what a later defamation suit or a law-
+    // enforcement inquiry about a removed threatening review needs.
     const existing = await db.selectFrom('judge_reviews')
-      .select(['id'])
+      .select(['id', 'title', 'content', 'rating', 'type', 'status', 'judge_id', 'user_id', 'anonymized', 'created_at'])
       .where('id', '=', reviewId)
-      .executeTakeFirst()
+      .executeTakeFirst() as Record<string, unknown> | undefined
     if (!existing)
       return response.json({ error: 'Review not found.' }, 404)
 
@@ -42,6 +46,7 @@ export default new Action({
         action: 'review.delete',
         targetType: 'review',
         targetId: reviewId,
+        metadata: { snapshot: existing },
       })
 
     return response.json({ ok: true, deleted: reviewId })
