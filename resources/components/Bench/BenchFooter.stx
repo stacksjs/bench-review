@@ -36,6 +36,7 @@
           <li><StxLink to="/about" class="text-gray-600 hover:text-gray-900">About</StxLink></li>
           <li><StxLink to="/faq" class="text-gray-600 hover:text-gray-900">FAQ</StxLink></li>
           <li><StxLink to="/contact" class="text-gray-600 hover:text-gray-900">Contact</StxLink></li>
+          <li><StxLink to="/guidelines" class="text-gray-600 hover:text-gray-900">Guidelines</StxLink></li>
           <li><StxLink to="/privacy" class="text-gray-600 hover:text-gray-900">Privacy</StxLink></li>
           <li><StxLink to="/terms" class="text-gray-600 hover:text-gray-900">Terms</StxLink></li>
         </ul>

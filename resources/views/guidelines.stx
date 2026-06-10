@@ -1,0 +1,69 @@
+@extends('layouts/default')
+
+@section('title', 'Community & Content Guidelines - Bench Review')
+
+@section('content')
+<div class="min-h-screen">
+  <div class="mx-auto px-6 py-24 lg:px-8 max-w-3xl">
+    <div>
+      <h1 class="font-bold text-4xl text-gray-900 tracking-tight sm:text-5xl">Community &amp; content guidelines</h1>
+      <p class="mt-4 text-gray-500 text-sm">How to write a review that helps others and stays within our rules.</p>
+    </div>
+
+    <div class="mt-12 space-y-10 leading-7 text-base text-gray-700">
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Reviews are opinions, not findings of fact</h2>
+        <p class="mt-4">
+          Reviews on Bench Review reflect the personal experiences and opinions of individual users. They are not verified statements of fact, not legal advice, and not endorsed by Bench Review. Write about what you experienced, and be clear when something is your interpretation rather than a documented event.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Do</h2>
+        <ul class="mt-4 pl-6 space-y-2 list-disc">
+          <li>Describe your honest, first-hand experience.</li>
+          <li>Focus on conduct in the courtroom — punctuality, temperament, clarity, fairness of process.</li>
+          <li>Be specific and constructive so the review is useful to others.</li>
+          <li>Keep it civil, even when your experience was negative.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Don't</h2>
+        <ul class="mt-4 pl-6 space-y-2 list-disc">
+          <li>Post personal attacks, threats, or anything that could be read as intimidation.</li>
+          <li>Publish anyone's home address, personal phone number, or other private contact information.</li>
+          <li>Disclose sealed records, juvenile or family-court details, or information identifying minors, victims, or jurors.</li>
+          <li>Make statements you know to be false, or present rumor as fact.</li>
+          <li>Impersonate a judge, court official, or another person.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Judicial privacy</h2>
+        <p class="mt-4">
+          Judges are a protected class under federal and several state laws covering the removal of personal information (home address, personal contact details, and similar). Do not post this information. If a review about you contains covered personal information, contact us and we will act on removal requests promptly.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">What happens when content breaks the rules</h2>
+        <p class="mt-4">
+          Anyone can flag a review for moderator attention. We may edit out personal information, remove content that violates these guidelines, and suspend or terminate accounts for repeated or serious violations. Credible threats are preserved and may be reported to law enforcement.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">If you're a judge</h2>
+        <p class="mt-4">
+          You can <StxLink to="/judges/signup" class="font-medium text-gray-900 underline">claim your profile</StxLink> to post official responses to reviews, and you can <StxLink to="/contact" class="font-medium text-gray-900 underline">contact us</StxLink> to report content or request removal of personal information.
+        </p>
+      </section>
+
+      <p class="text-gray-500 text-sm">
+        These guidelines supplement our <StxLink to="/terms" class="underline">Terms of Service</StxLink>.
+      </p>
+    </div>
+  </div>
+</div>
+@endsection
