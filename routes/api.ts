@@ -411,6 +411,18 @@ route.post('/admin/users/{id}/suspend', 'Actions/Admin/Users/SuspendUserAction')
   .middleware('admin')
   .skipCsrf()
 
+// Judge-submission moderation queue — review public /judges/submit
+// suggestions; approve creates a judge, reject records a note.
+route.get('/admin/judge-submissions', 'Actions/Admin/JudgeSubmissions/JudgeSubmissionIndexAction')
+  .name('bench.admin.judgeSubmissions.index')
+  .middleware('auth')
+  .middleware('admin')
+route.post('/admin/judge-submissions/{id}/review', 'Actions/Admin/JudgeSubmissions/ReviewJudgeSubmissionAction')
+  .name('bench.admin.judgeSubmissions.review')
+  .middleware('auth')
+  .middleware('admin')
+  .skipCsrf()
+
 // Admin review moderation.
 route.get('/admin/reviews', 'Actions/Admin/Reviews/ReviewIndexAction')
   .name('bench.admin.reviews.index')
