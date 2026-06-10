@@ -1,6 +1,6 @@
 @extends('layouts/default')
 
-@section('title', 'Review - The Chamber of Secrets')
+@section('title', 'Review - Bench Review')
 
 @section('content')
 <script server>

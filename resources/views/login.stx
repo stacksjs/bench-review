@@ -1,6 +1,6 @@
 @extends('layouts/default')
 
-@section('title', 'Login - The Chamber of Secrets')
+@section('title', 'Login - Bench Review')
 
 @section('content')
 <script server>
@@ -10,7 +10,7 @@
   definePageMeta({ middleware: ['guest'] })
 </script>
 <script client>
-  useHead({ title: 'Login - The Chamber of Secrets' })
+  useHead({ title: 'Login - Bench Review' })
 
   const auth = useStore('auth')
   const email = state<string>('')

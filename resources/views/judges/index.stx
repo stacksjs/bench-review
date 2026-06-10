@@ -1,6 +1,6 @@
 @extends('layouts/default')
 
-@section('title', 'Judges - The Chamber of Secrets')
+@section('title', 'Find & Review Judges - Bench Review')
 
 @section('content')
 <div>

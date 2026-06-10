@@ -4,7 +4,7 @@
 
 @extends('layouts/default')
 
-@section('title', 'Notifications - The Chamber of Secrets')
+@section('title', 'Notifications - Bench Review')
 
 @section('content')
 @include('Bench/NotificationsView')

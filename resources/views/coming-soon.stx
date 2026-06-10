@@ -1,6 +1,6 @@
 @extends('layouts/soon')
 
-@section('title', 'Coming Soon - The Chamber of Secrets')
+@section('title', 'Coming Soon - Bench Review')
 
 @section('content')
   @include('Bench/BenchComingSoon')

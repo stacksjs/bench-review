@@ -2,13 +2,13 @@
   import type { BlogPost } from '~/resources/types'
   import { blogPosts } from '~/resources/functions/sample'
 
-  useHead({ title: 'Blog - The Chamber of Secrets' })
+  useHead({ title: 'Blog - Bench Review' })
 
   const posts = derived<BlogPost[]>(() => blogPosts)
 </script>
 
 @extends('layouts/default')
-@section('title', 'Blog - The Chamber of Secrets')
+@section('title', 'Blog - Bench Review')
 @section('content')
   <div class="min-h-screen">
     <div class="mx-auto pb-32 px-4 py-8 sm:px-6 lg:px-8 max-w-7xl">
