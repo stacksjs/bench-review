@@ -1,0 +1,43 @@
+{
+  // App-scoped typecheck config. The shared base maps `@stacksjs/*` to the
+  // framework SOURCE (`./*/src`) and globs the whole workspace, so a plain
+  // `tsc` pulls vendored framework + generated migrations into the program
+  // and reports ~1400 errors that say nothing about app health. Here we:
+  //   - resolve `@stacksjs/*` / `stacks/*` via node_modules (their `.d.ts`,
+  //     which `skipLibCheck` then ignores) instead of raw `src`,
+  //   - include only app code + the ambient auto-import declarations the
+  //     actions rely on (Auth, models, …),
+  //   - exclude the vendored framework source, generated migrations, and
+  //     the dead CMS/Logs scaffolds that import ORM request types the
+  //     generator never emits.
+  "extends": "./storage/framework/core/tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "Actions/*": ["./app/Actions/*"],
+      "Commands/*": ["./app/Commands/*"],
+      "Jobs/*": ["./app/Jobs/*"],
+      "Middleware/*": ["./app/Middleware/*"],
+      "Models/*": ["./app/Models/*"],
+      "Notifications/*": ["./app/Notifications/*"],
+      "~/*": ["./*"],
+      "@/*": ["./resources/*"]
+    }
+  },
+  "include": [
+    "app",
+    "routes",
+    "build.ts",
+    "preview.ts",
+    "types/**/*.d.ts",
+    "storage/framework/types/*.d.ts",
+    "storage/framework/auto-imports/globals.d.ts"
+  ],
+  "exclude": [
+    "pantry",
+    "dist",
+    "**/node_modules",
+    "database/migrations",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
+}

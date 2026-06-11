@@ -12,7 +12,8 @@
     "start": "bun preview.ts",
     "lint": "bunx --bun pickier .",
     "lint:fix": "bunx --bun pickier . --fix",
-    "typecheck": "bun tsc --noEmit"
+    "typecheck": "bun tsc --noEmit",
+    "typecheck:app": "bun tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
     "@stacksjs/components": "^0.2.35",
