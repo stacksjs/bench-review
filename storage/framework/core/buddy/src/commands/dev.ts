@@ -36,7 +36,7 @@ async function importDevelopmentRpx(): Promise<DevelopmentRpx> {
 }
 
 // rpx registry ids written by this `./buddy dev` session — cleared on shutdown.
-let activeRpxRegistryIds: string[] = []
+const activeRpxRegistryIds: string[] = []
 
 // Lazy-load @stacksjs/actions to avoid triggering bun-router config warnings at CLI startup
 let _actions: typeof import('@stacksjs/actions') | undefined
