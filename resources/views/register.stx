@@ -10,27 +10,39 @@
   useHead({ title: 'Create your account - Bench Review' })
 
   const auth = useStore('auth')
+  const toast = useStore('toast')
   const name = state<string>('')
   const email = state<string>('')
   const password = state<string>('')
   const confirmPwd = state<string>('')
   const loading = state<boolean>(false)
   const submitError = state<string>('')
+  const passwordError = state<boolean>(false)
+  const confirmError = state<boolean>(false)
 
   async function submit(): Promise<void> {
     loading.set(true)
     submitError.set('')
+    passwordError.set(false)
+    confirmError.set(false)
 
     // Quick client-side check before round-tripping. The server enforces
     // the full rule (min length, uppercase, lowercase, numbers) — these
     // two checks just save users a network trip on obvious typos.
     if (password() !== confirmPwd()) {
       submitError.set('Passwords do not match.')
+      passwordError.set(true)
+      confirmError.set(true)
+      toast.error('Password', 'Passwords do not match.')
+      document.getElementById('password')?.focus()
       loading.set(false)
       return
     }
     if (password().length < 8) {
       submitError.set('Password must be at least 8 characters.')
+      passwordError.set(true)
+      toast.error('Password', 'Password must be at least 8 characters.')
+      document.getElementById('password')?.focus()
       loading.set(false)
       return
     }
@@ -99,7 +111,9 @@
               autocomplete="new-password"
               required
               x-disabled="loading"
-              class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border border-gray-400 rounded-md focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-600 disabled:opacity-50 shadow-sm"
+              @focus="passwordError.set(false)"
+              x-class="passwordError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-400'"
+              class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border rounded-md focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-600 disabled:opacity-50 shadow-sm"
             >
           </div>
           <p class="mt-1 text-gray-500 text-xs">At least 8 characters with upper, lower, and a number.</p>
@@ -116,19 +130,21 @@
               autocomplete="off"
               required
               x-disabled="loading"
+              @focus="confirmError.set(false)"
+              x-class="confirmError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-400'"
               style="-webkit-text-security: disc; text-security: disc;"
-              class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border border-gray-400 rounded-md focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-600 disabled:opacity-50 shadow-sm"
+              class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border rounded-md focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-600 disabled:opacity-50 shadow-sm"
             >
           </div>
         </div>
 
-        <p
-          :if="submitError()"
+        <div
           role="alert"
           aria-live="polite"
-          class="text-red-600 text-sm"
+          class="px-4 py-3 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
+          x-class="submitError() ? '' : 'hidden'"
           :text="submitError()"
-        ></p>
+        ></div>
 
         <button
           type="submit"
