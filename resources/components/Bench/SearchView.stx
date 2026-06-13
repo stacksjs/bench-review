@@ -97,10 +97,26 @@
     </div>
 
     <div class="mt-8">
-      <div :if="search.tab === 'all' || search.tab === 'judges'">
+      <div :if="search.tab === 'all' && totalResults === 0" class="mt-2 p-12 text-center bg-gray-50 border border-gray-200 border-dashed rounded-2xl">
+        <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+        </svg>
+        <p class="mt-4 font-medium text-gray-900" :text="`No results for &quot;${search.query}&quot;`"></p>
+        <p class="mt-1 text-gray-500 text-sm">Try a different name, court, or location.</p>
+        <div class="flex gap-3 items-center justify-center mt-5">
+          <StxLink to="/judges" class="inline-flex items-center px-4 py-2 font-medium text-white text-sm bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors">Browse judges</StxLink>
+          <StxLink to="/court-houses" class="inline-flex items-center px-4 py-2 font-medium text-gray-700 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">Browse court houses</StxLink>
+        </div>
+      </div>
+
+      <div :if="(search.tab === 'all' && totalResults > 0) || search.tab === 'judges'">
         <h2 :if="search.tab === 'all'" class="font-semibold text-gray-900 text-lg">Judges</h2>
-        <div :if="filteredJudges.length === 0" class="py-12 text-center">
-          <p class="text-gray-500 text-sm">No judges match your search.</p>
+        <div :if="filteredJudges.length === 0" class="mt-2 p-12 text-center bg-gray-50 border border-gray-200 border-dashed rounded-2xl">
+          <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+          </svg>
+          <p class="mt-4 font-medium text-gray-900">No judges match your search.</p>
+          <p class="mt-1 text-gray-500 text-sm">Try a different name, court, or location.</p>
         </div>
         <ul role="list" :if="filteredJudges.length > 0" class="mt-4 divide-gray-100 divide-y">
           <li :for="judge in filteredJudges" class="flex items-center justify-between py-5">
@@ -119,10 +135,14 @@
         </ul>
       </div>
 
-      <div :if="search.tab === 'all' || search.tab === 'courts'" x-class="search.tab === 'all' ? 'mt-12' : ''">
+      <div :if="(search.tab === 'all' && totalResults > 0) || search.tab === 'courts'" x-class="search.tab === 'all' ? 'mt-12' : ''">
         <h2 :if="search.tab === 'all'" class="font-semibold text-gray-900 text-lg">Court Houses</h2>
-        <div :if="filteredCourts.length === 0" class="py-12 text-center">
-          <p class="text-gray-500 text-sm">No courts match your search.</p>
+        <div :if="filteredCourts.length === 0" class="mt-2 p-12 text-center bg-gray-50 border border-gray-200 border-dashed rounded-2xl">
+          <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+          </svg>
+          <p class="mt-4 font-medium text-gray-900">No courts match your search.</p>
+          <p class="mt-1 text-gray-500 text-sm">Try a different name, court, or location.</p>
         </div>
         <div :if="filteredCourts.length > 0" class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-4">
           <StxLink
