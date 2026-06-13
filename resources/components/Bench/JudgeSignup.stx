@@ -9,6 +9,7 @@
 
   const authStore = useStore('auth')
   const isAuthed = authStore.isAuthenticated
+  const toast = useStore('toast')
 
   const query = state('')
   const results = state([])
@@ -71,16 +72,20 @@
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.ok) {
-        errorMsg.set(data.error || 'Could not submit your claim — please try again.')
+        const msg = data.error || 'Could not submit your claim — please try again.'
+        errorMsg.set(msg)
         phase.set('error')
+        toast.error('Cannot submit', msg)
         return
       }
       claimedName.set(judge.name)
       phase.set('claimed')
     }
     catch {
-      errorMsg.set('Could not reach the server — please try again.')
+      const msg = 'Could not reach the server — please try again.'
+      errorMsg.set(msg)
       phase.set('error')
+      toast.error('Cannot submit', msg)
     }
     finally {
       submitting.set(false)
