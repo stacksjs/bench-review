@@ -3,6 +3,7 @@ declare module "stx/routes" {
   interface RouteMap {
     '/admin/credentials': {  }
     '/admin/login': {  }
+    '/admin/moderation': {  }
     '/admin/reviews': {  }
     '/admin/users': {  }
     '/blog/categories': {  }
@@ -17,6 +18,7 @@ declare module "stx/routes" {
     '/judges/signup': {  }
     '/judges/submit': {  }
     '/': {  }
+    '/500': {  }
     '/about': {  }
     '/admin': {  }
     '/blog': {  }
@@ -27,6 +29,7 @@ declare module "stx/routes" {
     '/dashboard': {  }
     '/faq': {  }
     '/forgot-password': {  }
+    '/guidelines': {  }
     '/home': {  }
     '/jtest': {  }
     '/judges': {  }
@@ -41,7 +44,6 @@ declare module "stx/routes" {
     '/review': {  }
     '/reviews': {  }
     '/search': {  }
-    '/secret-marketing': {  }
     '/settings': {  }
     '/terms': {  }
     '/verify-email': {  }
