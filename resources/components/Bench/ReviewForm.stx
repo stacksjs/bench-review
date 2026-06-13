@@ -198,7 +198,7 @@
       const j = judge()
       if (!j) {
         submitError.set('Pick a judge first.')
-        toast.error('Cannot submit review', 'Pick a judge first.')
+        toast.error('Validation error', 'Pick a judge first.')
         return
       }
 
@@ -206,7 +206,7 @@
       if (!title) {
         submitError.set('Add a review title.')
         titleError.set(true)
-        toast.error('Cannot submit review', 'Add a review title.')
+        toast.error('Validation error', 'Add a review title.')
         document.getElementById('title')?.focus()
         return
       }
@@ -218,12 +218,22 @@
       // ground truth.
       const editable = document.querySelector('[data-richtext-host] .medium-editor-element') as HTMLElement | null
       let content = (editable?.innerHTML || '').trim()
-      if (content === '<p><br></p>') content = ''  // MediumEditor empty sentinel
-      if (!content) content = reviewContent().trim()
-      if (!content) {
+      // Fall back to the signal only when the editor node isn't mounted.
+      if (!editable && !content) content = reviewContent().trim()
+      // EMPTINESS IS DECIDED BY VISIBLE TEXT, not the HTML string. An
+      // "empty" rich-text editor still carries wrapper markup (<p></p>,
+      // <p><br></p>, &nbsp;) that is a non-empty string — the old
+      // `content === '<p><br></p>'` check only caught one shape, so a
+      // blank body slipped through and submitted. Strip tags + nbsp and
+      // check the actual text.
+      const visibleText = (editable?.textContent ?? content.replace(/<[^>]*>/g, ' '))
+        .replace(/[ \s]+/g, ' ')
+        .trim()
+      if (!visibleText) {
+        content = ''
         submitError.set('Write a review before submitting.')
         contentError.set(true)
-        toast.error('Cannot submit review', 'Write a review before submitting.')
+        toast.error('Validation error', 'Your review body is empty — write something before submitting.')
         return
       }
       reviewContent.set(content)
@@ -232,7 +242,7 @@
       if (!overall || overall < 1) {
         submitError.set('Give the judge an overall rating.')
         ratingError.set(true)
-        toast.error('Cannot submit review', 'Give the judge an overall rating.')
+        toast.error('Validation error', 'Give the judge an overall rating.')
         return
       }
 
