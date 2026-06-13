@@ -86,14 +86,20 @@ export default new Action({
     // `x-html` binding. See app/Helpers/sanitizeReviewHtml.ts for
     // the whitelist + rationale.
     const content = (await sanitizeReviewHtml(String(body.content ?? ''))).trim()
-    // Re-validate length AFTER sanitisation. The declarative
-    // `validations` check bounds the raw input (10–10000 chars),
-    // but sanitisation only strips — never adds — so a 200-char
-    // raw blob that's 100% inline-style wrappers could collapse to
-    // an empty string. Without this guard the user would land a
-    // visibly-empty review past the moderation queue.
-    if (content.length < 10)
-      return response.json({ error: 'Review must be at least 10 characters once formatting is cleaned up.' }, 422)
+    // Re-validate length AFTER sanitisation, measured by VISIBLE TEXT
+    // — NOT the HTML-string length. An "empty" rich-text body is still
+    // wrapper markup (<p></p>, <p><br></p>, &nbsp;) whose string length
+    // sails past a naive `content.length < 10` check while its visible
+    // text is empty — that's how a title-only, blank-body review got
+    // through. Strip tags + nbsp + collapse whitespace, then bound the
+    // actual text.
+    const visibleText = content
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (visibleText.length < 10)
+      return response.json({ error: 'Review must be at least 10 characters of actual text.' }, 422)
     const type = body.type ?? 'neutral'
 
     // Cross-field check that declarative validations can't express:
