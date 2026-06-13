@@ -273,6 +273,7 @@
         judgeName: j.name,
         reviewId: result.review?.id ?? null,
       })
+      toast.success('Review submitted', 'Thanks — your review is pending moderation and will appear once it\'s approved.')
     }
     finally {
       submitInFlight = false
