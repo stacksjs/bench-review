@@ -492,9 +492,11 @@
             type="button"
             @click="handleDelete()"
             x-disabled="deleting"
-            class="px-3 py-1.5 font-semibold text-red-700 text-xs bg-white border border-red-200 rounded-md hover:bg-red-50 disabled:opacity-50"
-            :text="deleting() ? 'Deleting…' : 'Delete'"
-          ></button>
+            class="inline-flex items-center justify-center px-3 py-1.5 font-semibold text-red-700 text-xs bg-white border border-red-200 rounded-md hover:bg-red-50 disabled:opacity-50"
+          >
+            <svg :if="deleting()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
+            <span :text="deleting() ? 'Deleting…' : 'Delete'"></span>
+          </button>
         </div>
       </div>
     </div>
