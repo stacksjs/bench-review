@@ -175,6 +175,7 @@
       toast.error('Save failed', result.error || 'Could not save changes.')
       return
     }
+    toast.success('Review updated', 'Your changes were saved.')
     navigate(`/article/${reviewId}`, true)
   }
 </script>
