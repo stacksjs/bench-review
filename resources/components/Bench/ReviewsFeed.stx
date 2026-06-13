@@ -230,11 +230,21 @@
   <!-- Two empty states: filter-narrowed vs genuinely empty. The
        judgesStore.activeCategory signal drives the distinction so the
        message matches what the user just clicked. -->
-  <div :if="!reviewsStore.loadingLatest && reviews.length === 0 && judgesStore.activeCategory()" class="py-12 text-center text-gray-500 text-sm">
-    No reviews in this category yet.
+  <div :if="!reviewsStore.loadingLatest && reviews.length === 0 && judgesStore.activeCategory()" class="mt-2 p-10 text-center bg-gray-50 border border-gray-200 border-dashed rounded-xl">
+    <svg class="mx-auto h-10 w-10 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/>
+    </svg>
+    <p class="mt-3 font-medium text-gray-900 text-sm">No reviews in this category yet</p>
+    <p class="mt-1 text-gray-500 text-sm">Be the first to share your courtroom experience here.</p>
+    <StxLink to="/review" class="inline-flex items-center mt-5 px-4 py-2 font-medium text-white text-sm bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors">Write a review</StxLink>
   </div>
-  <div :if="!reviewsStore.loadingLatest && reviews.length === 0 && !judgesStore.activeCategory()" class="py-12 text-center text-gray-500 text-sm">
-    No reviews yet. Be the first to write one.
+  <div :if="!reviewsStore.loadingLatest && reviews.length === 0 && !judgesStore.activeCategory()" class="mt-2 p-10 text-center bg-gray-50 border border-gray-200 border-dashed rounded-xl">
+    <svg class="mx-auto h-10 w-10 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/>
+    </svg>
+    <p class="mt-3 font-medium text-gray-900 text-sm">No reviews yet</p>
+    <p class="mt-1 text-gray-500 text-sm">Be the first to write one.</p>
+    <StxLink to="/review" class="inline-flex items-center mt-5 px-4 py-2 font-medium text-white text-sm bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors">Write a review</StxLink>
   </div>
   <div :if="reviews.length > 0" class="space-y-6">
     <div :for="review in reviews" class="py-6 border-b border-gray-200">
