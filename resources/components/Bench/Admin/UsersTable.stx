@@ -25,6 +25,7 @@
   const editingName = state<string>('')
   const editingEmail = state<string>('')
   const editError = state<string>('')
+  const saving = state<boolean>(false)
 
   function startEdit(user: AdminUserRow): void {
     editingId.set(user.id)
@@ -39,14 +40,21 @@
   }
 
   async function saveEdit(): Promise<void> {
+    if (saving()) return
     const id = editingId()
     if (!id) return
-    const ok = await store.updateUser(id, { name: editingName(), email: editingEmail() })
-    if (!ok) {
-      editError.set(store.actionError() || 'Update failed')
-      return
+    saving.set(true)
+    try {
+      const ok = await store.updateUser(id, { name: editingName(), email: editingEmail() })
+      if (!ok) {
+        editError.set(store.actionError() || 'Update failed')
+        return
+      }
+      cancelEdit()
     }
-    cancelEdit()
+    finally {
+      saving.set(false)
+    }
   }
 
   // Promote / demote — single-click. `userHasAdmin` decides which call.
@@ -254,8 +262,8 @@
           :text="editError()"
         ></div>
         <div class="flex justify-end gap-x-2">
-          <button type="button" @click="cancelEdit()" class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
-          <button type="button" @click="saveEdit()" class="px-3 py-1.5 font-medium text-white text-sm bg-gray-900 hover:bg-gray-800 rounded">Save</button>
+          <button type="button" @click="cancelEdit()" x-disabled="saving" class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Cancel</button>
+          <button type="button" @click="saveEdit()" x-disabled="saving" class="px-3 py-1.5 font-medium text-white text-sm bg-gray-900 hover:bg-gray-800 rounded disabled:opacity-50 disabled:cursor-not-allowed" :text="saving() ? 'Saving…' : 'Save'"></button>
         </div>
       </div>
     </div>
