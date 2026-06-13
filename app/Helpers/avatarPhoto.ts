@@ -1,13 +1,10 @@
 /**
  * Server-side avatar pipeline — backs the Settings "Change photo" button.
  *
- * Mirrors reviewPhotos.ts: take a raw uploaded image, strip metadata,
- * square-crop + resize to a single 256×256 WebP, write to local storage,
- * return the persisted public URL. Centralised here so the action stays
- * thin and — per the "local now, S3 later" decision — the disk write is
- * isolated to ONE place: swapping to S3 means routing `out.data` through
- * `@stacksjs/storage` (`put`/`putUploadedFile`) against the `s3` disk and
- * returning the CDN URL, with nothing else in the feature touched.
+ * Strip EXIF, square-crop + resize to a single 256×256 WebP, then persist
+ * through the storage facade (app/Storage/disk.ts). Which disk the bytes
+ * land on — local by default, S3 when `FILESYSTEM_DISK=s3` — is a config/env
+ * decision, so this file never changes when the storage backend does.
  *
  * EXIF stripping is non-negotiable: the audience is legal professionals
  * whose location-history-via-GPS-EXIF is a real retaliation risk. Every
@@ -16,15 +13,11 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { disk } from '../Storage/disk'
 
 const MAX_BYTES = 5 * 1024 * 1024 // 5MB raw upload cap
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 const AVATAR_SIZE = 256
-
-const STORAGE_ROOT = join(process.cwd(), 'storage', 'uploads', 'avatars')
-const PUBLIC_PREFIX = '/storage/uploads/avatars'
 
 export interface PersistedAvatar {
   url: string
@@ -34,11 +27,10 @@ export interface PersistedAvatar {
 }
 
 /**
- * Process + persist one avatar image. Returns the public URL of the
- * square WebP. Caller persists the URL onto `users.avatar`. A new UUID
- * filename per upload sidesteps browser caching; the previous file is
- * left on disk (a harmless orphan under the local driver — the future
- * S3 adapter can prune by prefix).
+ * Process + persist one avatar image. Returns the public URL of the square
+ * WebP. Caller persists the URL onto `users.avatar`. A new UUID filename per
+ * upload sidesteps browser caching; the previous object is left in place (a
+ * harmless orphan — prune by `uploads/avatars/<id>/` prefix if it matters).
  */
 export async function processAndPersistAvatar(
   userId: number | string,
@@ -65,13 +57,11 @@ export async function processAndPersistAvatar(
     .webp({ quality: 82 })
     .toBuffer({ resolveWithObject: true })
 
-  const dir = join(STORAGE_ROOT, String(userId))
-  mkdirSync(dir, { recursive: true })
-  const filename = `${randomUUID()}.webp`
-  writeFileSync(join(dir, filename), out.data)
+  const key = `uploads/avatars/${userId}/${randomUUID()}.webp`
+  const { url } = await disk().put(key, out.data, { contentType: 'image/webp' })
 
   return {
-    url: `${PUBLIC_PREFIX}/${userId}/${filename}`,
+    url,
     mime: 'image/webp',
     width: Number(out.info?.width ?? AVATAR_SIZE),
     height: Number(out.info?.height ?? AVATAR_SIZE),
