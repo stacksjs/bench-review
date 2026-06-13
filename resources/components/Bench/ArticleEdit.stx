@@ -258,9 +258,7 @@
         <div
           role="alert"
           class="px-3 py-2 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
-          x-class="editError() ? '' : 'hidden'"
-          :text="editError()"
-        ></div>
+          x-class="editError() ? '' : 'hidden'">{{ editError() }}</div>
 
         <div class="flex justify-end gap-x-2 pt-2">
           <button
@@ -276,7 +274,7 @@
             class="inline-flex items-center justify-center px-4 py-2 font-semibold text-white text-sm bg-gray-900 hover:bg-gray-800 rounded-md disabled:opacity-50"
           >
             <svg :if="editSaving()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
-            <span :text="editSaving() ? 'Saving…' : 'Save & resubmit'"></span>
+            <span>{{ editSaving() ? 'Saving…' : 'Save & resubmit' }}</span>
           </button>
         </div>
       </div>

@@ -174,7 +174,7 @@
 
 <section class="mt-12 pt-8 border-t border-gray-200">
   <header class="flex items-end justify-between">
-    <h2 class="font-semibold text-gray-900 text-base" :text="`Comments (${comments().length})`"></h2>
+    <h2 class="font-semibold text-gray-900 text-base">{{ `Comments (${comments().length})` }}</h2>
   </header>
 
   <!-- Composer slot — one if/else-if/else chain (mutually exclusive,
@@ -199,9 +199,7 @@
     <div
       role="alert"
       class="mt-2 px-3 py-2 text-red-800 text-xs bg-red-50 border border-red-200 rounded-md"
-      x-class="commentError() ? '' : 'hidden'"
-      :text="commentError()"
-    ></div>
+      x-class="commentError() ? '' : 'hidden'">{{ commentError() }}</div>
 
     <div class="flex flex-wrap items-center justify-between gap-2 mt-3">
       <label class="flex gap-2 items-center text-gray-600 text-xs cursor-pointer">
@@ -215,7 +213,7 @@
         class="inline-flex items-center justify-center px-4 py-2 font-semibold text-white text-sm bg-gray-900 hover:bg-gray-800 rounded-md disabled:opacity-50"
       >
         <svg :if="commentSubmitting()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
-        <span :text="commentSubmitting() ? 'Posting…' : 'Post comment'"></span>
+        <span>{{ commentSubmitting() ? 'Posting…' : 'Post comment' }}</span>
       </button>
     </div>
   </div>
@@ -257,15 +255,15 @@
   <ul :else class="space-y-4 mt-6">
     <li :for="c in comments" class="p-4 bg-white border border-gray-100 rounded-lg">
       <div class="flex items-start gap-3">
-        <span class="inline-flex flex-none items-center justify-center h-8 w-8 font-semibold text-amber-700 text-xs bg-amber-50 ring-1 ring-amber-200/60 rounded-full" :text="initialFor(c.author && c.author.name)"></span>
+        <span class="inline-flex flex-none items-center justify-center h-8 w-8 font-semibold text-amber-700 text-xs bg-amber-50 ring-1 ring-amber-200/60 rounded-full">{{ initialFor(c.author && c.author.name) }}</span>
         <div class="flex-1 min-w-0">
           <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <!-- Linked when we have a real reviewer id (non-anonymous); plain text otherwise. -->
-            <StxLink :if="c.author && c.author.id" x-to="`/user/${c.author.id}`" class="font-medium text-gray-900 text-sm hover:underline underline-offset-2" :text="c.author.name"></StxLink>
-            <span :if="!(c.author && c.author.id)" class="font-medium text-gray-700 text-sm" :text="c.author && c.author.name || 'Anonymous reviewer'"></span>
-            <span class="text-gray-400 text-xs" :text="formatDate(c.created_at)"></span>
+            <StxLink :if="c.author && c.author.id" x-to="`/user/${c.author.id}`" class="font-medium text-gray-900 text-sm hover:underline underline-offset-2">{{ c.author.name }}</StxLink>
+            <span :if="!(c.author && c.author.id)" class="font-medium text-gray-700 text-sm">{{ c.author && c.author.name || 'Anonymous reviewer' }}</span>
+            <span class="text-gray-400 text-xs">{{ formatDate(c.created_at) }}</span>
           </div>
-          <p class="mt-1 leading-relaxed text-gray-700 text-sm" :text="c.body"></p>
+          <p class="mt-1 leading-relaxed text-gray-700 text-sm">{{ c.body }}</p>
           <button
             :if="isMyComment(c)"
             type="button"

@@ -375,7 +375,7 @@
     </div>
     <h2 class="mt-5 font-semibold text-xl text-gray-900">Thanks — your review is in.</h2>
     <p class="mt-2 leading-7 text-gray-600 text-sm max-w-md mx-auto">
-      Your review of <span class="font-medium text-gray-900" :text="submitted().judgeName"></span>
+      Your review of <span class="font-medium text-gray-900">{{ submitted().judgeName }}</span>
       is pending moderation. We typically publish within a day. You can see your reviews any time
       from your profile.
     </p>
@@ -393,7 +393,7 @@
     <div :if="submitted().reviewId" class="mt-8 pt-6 border-t border-gray-100 text-left max-w-md mx-auto">
       <div class="flex items-baseline justify-between mb-3">
         <h3 class="font-semibold text-gray-900 text-sm">Attach photos (optional)</h3>
-        <span class="text-gray-500 text-xs" :text="`${photoCount} / 4 attached`"></span>
+        <span class="text-gray-500 text-xs">{{ `${photoCount} / 4 attached` }}</span>
       </div>
       <p class="mb-3 text-gray-500 text-xs leading-relaxed">JPEG, PNG, or WebP up to 8MB each. Camera metadata (including GPS) is stripped at upload — your photos won't reveal where you were when you took them.</p>
 
@@ -418,12 +418,10 @@
       <div
         role="alert"
         class="mt-3 px-3 py-2 text-red-800 text-xs bg-red-50 border border-red-200 rounded-md"
-        x-class="photoError() ? '' : 'hidden'"
-        :text="photoError()"
-      ></div>
+        x-class="photoError() ? '' : 'hidden'">{{ photoError() }}</div>
 
       <p :if="photoUploading" class="mt-3 text-gray-500 text-xs">Uploading and resizing — this can take a few seconds per photo.</p>
-      <p :if="!photoUploading() && photoCount() > 0" class="mt-3 text-emerald-700 text-xs" :text="`${photoCount} ${photoCount() === 1 ? 'photo' : 'photos'} attached. You can add more or close this page — they'll appear on your review once moderation publishes it.`"></p>
+      <p :if="!photoUploading() && photoCount() > 0" class="mt-3 text-emerald-700 text-xs">{{ `${photoCount} ${photoCount() === 1 ? 'photo' : 'photos'} attached. You can add more or close this page — they'll appear on your review once moderation publishes it.` }}</p>
     </div>
   </div>
 
@@ -441,9 +439,9 @@
       <div class="flex gap-4 items-center">
         <img class="object-cover h-16 w-16 ring-2 ring-gray-100 rounded-full grayscale filter" x-src="judge().photo" x-alt="judge().name" />
         <div class="min-w-0">
-          <h3 class="font-semibold text-gray-900 text-lg" :text="judge().name"></h3>
-          <p class="text-gray-500 text-sm" :text="judge().court"></p>
-          <p :if="judge().department" class="text-gray-400 text-xs" :text="judge().department"></p>
+          <h3 class="font-semibold text-gray-900 text-lg">{{ judge().name }}</h3>
+          <p class="text-gray-500 text-sm">{{ judge().court }}</p>
+          <p :if="judge().department" class="text-gray-400 text-xs">{{ judge().department }}</p>
         </div>
       </div>
       <button
@@ -500,7 +498,7 @@
                 <Icon name="star" size="24" />
               </button>
             </div>
-            <span class="ml-2 w-24 text-gray-500 text-sm" :text="fairness() ? getRatingText(fairness()) : ''"></span>
+            <span class="ml-2 w-24 text-gray-500 text-sm">{{ fairness() ? getRatingText(fairness()) : '' }}</span>
           </div>
         </div>
 
@@ -521,7 +519,7 @@
                 <Icon name="star" size="24" />
               </button>
             </div>
-            <span class="ml-2 w-24 text-gray-500 text-sm" :text="knowledge() ? getRatingText(knowledge()) : ''"></span>
+            <span class="ml-2 w-24 text-gray-500 text-sm">{{ knowledge() ? getRatingText(knowledge()) : '' }}</span>
           </div>
         </div>
 
@@ -542,7 +540,7 @@
                 <Icon name="star" size="24" />
               </button>
             </div>
-            <span class="ml-2 w-24 text-gray-500 text-sm" :text="demeanor() ? getRatingText(demeanor()) : ''"></span>
+            <span class="ml-2 w-24 text-gray-500 text-sm">{{ demeanor() ? getRatingText(demeanor()) : '' }}</span>
           </div>
         </div>
       </div>
@@ -582,7 +580,7 @@
               <Icon name="star" size="32" />
             </button>
           </div>
-          <span class="ml-3 font-medium text-gray-700 text-sm" :text="ratingText()"></span>
+          <span class="ml-3 font-medium text-gray-700 text-sm">{{ ratingText() }}</span>
         </div>
       </div>
 
@@ -616,9 +614,7 @@
       role="alert"
       aria-live="polite"
       class="mb-4 p-3 text-red-700 text-sm bg-red-50 border border-red-200 rounded-md"
-      x-class="submitError() ? '' : 'hidden'"
-      :text="submitError()"
-    ></div>
+      x-class="submitError() ? '' : 'hidden'">{{ submitError() }}</div>
 
     <!-- Anonymity toggle (bench-review#36). Default OFF — anonymity
          is an explicit opt-in. Surfaces above the action bar so the
@@ -663,7 +659,7 @@
             ? 'bg-gray-900 hover:bg-gray-700'
             : 'bg-gray-300 cursor-not-allowed'
         ]"
-      ><svg :if="reviewsStore.submitting()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg><span :text="reviewsStore.submitting() ? 'Submitting…' : 'Submit Review'"></span></button>
+      ><svg :if="reviewsStore.submitting()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg><span>{{ reviewsStore.submitting() ? 'Submitting…' : 'Submit Review' }}</span></button>
     </div>
   </div>
 

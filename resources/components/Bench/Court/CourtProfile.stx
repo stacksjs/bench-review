@@ -173,7 +173,7 @@
 
 <div class="lg:col-span-2 lg:row-end-2 lg:row-span-2 -mx-4 px-4 py-8 sm:mx-0 sm:pb-14 sm:px-8 xl:pb-20 xl:pt-16 xl:px-16 bg-white ring-1 ring-gray-900/5 sm:rounded-lg shadow-sm">
   <h2 class="font-semibold text-base text-gray-800">About this court</h2>
-  <p class="mt-4 leading-7 text-gray-600" :text="aboutText"></p>
+  <p class="mt-4 leading-7 text-gray-600">{{ aboutText }}</p>
 
   <dl class="grid grid-cols-1 sm:grid-cols-2 mt-8 text-sm/6">
     <div class="sm:pr-4">
@@ -204,22 +204,22 @@
     <dl class="grid gap-4 grid-cols-1 sm:grid-cols-3 mt-4">
       <div class="px-4 py-3 bg-off-gray rounded-lg">
         <dt class="text-gray-500 text-xs">Active Judges</dt>
-        <dd class="mt-1 font-semibold text-2xl text-gray-900" :text="activeJudges"></dd>
+        <dd class="mt-1 font-semibold text-2xl text-gray-900">{{ activeJudges }}</dd>
       </div>
       <div class="px-4 py-3 bg-off-gray rounded-lg">
         <dt class="text-gray-500 text-xs">Published Reviews</dt>
-        <dd class="mt-1 font-semibold text-2xl text-gray-900" :text="totalReviews"></dd>
+        <dd class="mt-1 font-semibold text-2xl text-gray-900">{{ totalReviews }}</dd>
       </div>
       <div class="px-4 py-3 bg-off-gray rounded-lg">
         <dt class="text-gray-500 text-xs">Avg Rating</dt>
-        <dd class="mt-1 font-semibold text-2xl text-gray-900" :text="avgRating"></dd>
+        <dd class="mt-1 font-semibold text-2xl text-gray-900">{{ avgRating }}</dd>
       </div>
     </dl>
   </div>
 
   <div class="mt-12">
     <h3 class="font-semibold text-base text-gray-800">Visit this court</h3>
-    <p class="mt-1 text-gray-500 text-xs" :text="courtAddress"></p>
+    <p class="mt-1 text-gray-500 text-xs">{{ courtAddress }}</p>
 
     <!-- Map host. Leaflet measures the element at construction time,
          so the explicit h-64 (256px) on the host is required — without

@@ -31,8 +31,8 @@
             <div class="flex gap-x-6 items-center">
               <img x-src="court.image" x-alt="court.name" class="object-cover flex-none h-16 w-16 ring-1 ring-gray-900/10 rounded-lg">
               <h1>
-                <div class="text-gray-500 text-sm/6">Court House <span class="text-gray-700" :text="`#${court.id}`"></span></div>
-                <div class="mt-1 font-semibold text-base text-gray-900" :text="court.name"></div>
+                <div class="text-gray-500 text-sm/6">Court House <span class="text-gray-700">{{ `#${court.id}` }}</span></div>
+                <div class="mt-1 font-semibold text-base text-gray-900">{{ court.name }}</div>
               </h1>
             </div>
             <div class="flex gap-x-4 items-center sm:gap-x-6">
@@ -91,15 +91,15 @@
               <div class="p-4">
                 <dl class="flex flex-wrap">
                   <div class="flex-auto">
-                    <dt class="font-semibold text-gray-900 text-sm/6" :text="court.name"></dt>
-                    <dd class="mt-1 text-gray-700 text-sm" :text="`${court.city}, ${court.state}`"></dd>
+                    <dt class="font-semibold text-gray-900 text-sm/6">{{ court.name }}</dt>
+                    <dd class="mt-1 text-gray-700 text-sm">{{ `${court.city}, ${court.state}` }}</dd>
                   </div>
                   <div class="flex flex-none gap-x-4 mt-6 pt-6 px-2 w-full border-gray-900/5 border-t">
                     <dt class="flex-none">
                       <span class="sr-only">Address</span>
                       <Icon name="map-pin" size="20" class="text-gray-400" />
                     </dt>
-                    <dd class="text-gray-700 text-sm/6" :text="`${court.address} ${court.city}, ${court.state} ${court.zipCode}`"></dd>
+                    <dd class="text-gray-700 text-sm/6">{{ `${court.address} ${court.city}, ${court.state} ${court.zipCode}` }}</dd>
                   </div>
                   <div class="flex flex-none gap-x-4 mt-4 px-2 w-full">
                     <dt class="flex-none">

@@ -100,9 +100,9 @@
           <div class="flex gap-4 items-center">
             <img class="object-cover h-24 w-24 ring-2 ring-white/20 rounded-full" x-src="avatarUrl" x-alt="displayName" />
             <div>
-              <h1 class="font-bold text-2xl text-white" :text="displayName"></h1>
-              <p class="text-gray-400 text-sm" :text="userEmail"></p>
-              <p class="mt-1 text-gray-400 text-xs" :text="memberSince"></p>
+              <h1 class="font-bold text-2xl text-white">{{ displayName }}</h1>
+              <p class="text-gray-400 text-sm">{{ userEmail }}</p>
+              <p class="mt-1 text-gray-400 text-xs">{{ memberSince }}</p>
             </div>
           </div>
           <div class="flex flex-wrap gap-2">
@@ -117,19 +117,19 @@
     <div class="grid gap-4 grid-cols-2 mt-8 lg:grid-cols-4">
       <div class="p-6 bg-white border border-gray-200 rounded-xl">
         <p class="text-gray-500 text-sm">Total Reviews</p>
-        <p class="mt-1 font-semibold text-3xl text-gray-900" :text="profileStore.totalReviews"></p>
+        <p class="mt-1 font-semibold text-3xl text-gray-900">{{ profileStore.totalReviews }}</p>
       </div>
       <div class="p-6 bg-white border border-gray-200 rounded-xl">
         <p class="text-gray-500 text-sm">Judges Reviewed</p>
-        <p class="mt-1 font-semibold text-3xl text-gray-900" :text="profileStore.judgesReviewed"></p>
+        <p class="mt-1 font-semibold text-3xl text-gray-900">{{ profileStore.judgesReviewed }}</p>
       </div>
       <div class="p-6 bg-white border border-gray-200 rounded-xl">
         <p class="text-gray-500 text-sm">Average Rating</p>
-        <p class="mt-1 font-semibold text-3xl text-gray-900" :text="profileStore.averageRating || '—'"></p>
+        <p class="mt-1 font-semibold text-3xl text-gray-900">{{ profileStore.averageRating || '—' }}</p>
       </div>
       <div class="p-6 bg-white border border-gray-200 rounded-xl">
         <p class="text-gray-500 text-sm">Total Likes</p>
-        <p class="mt-1 font-semibold text-3xl text-gray-900" :text="profileStore.totalLikes"></p>
+        <p class="mt-1 font-semibold text-3xl text-gray-900">{{ profileStore.totalLikes }}</p>
       </div>
     </div>
 
@@ -163,15 +163,15 @@
             <div class="flex-none h-2 w-2 mt-2 bg-gray-900 rounded-full"></div>
             <div class="flex-1 min-w-0">
               <div class="flex flex-wrap items-baseline gap-x-2">
-                <StxLink x-to="`/article/${review.id}`" class="font-medium text-gray-900 text-sm hover:underline" :text="review.title"></StxLink>
+                <StxLink x-to="`/article/${review.id}`" class="font-medium text-gray-900 text-sm hover:underline">{{ review.title }}</StxLink>
                 <span :if="review.judge" class="text-gray-500 text-xs">
                   on
-                  <StxLink x-to="`/judges/${review.judge.id}/profile`" class="hover:underline" :text="review.judge.name"></StxLink>
+                  <StxLink x-to="`/judges/${review.judge.id}/profile`" class="hover:underline">{{ review.judge.name }}</StxLink>
                 </span>
               </div>
-              <p class="mt-0.5 text-gray-500 text-sm" :text="snippet(review.content)"></p>
+              <p class="mt-0.5 text-gray-500 text-sm">{{ snippet(review.content) }}</p>
               <div class="flex items-center gap-3 mt-1">
-                <span class="text-gray-400 text-xs" :text="relativeTime(review.created_at)"></span>
+                <span class="text-gray-400 text-xs">{{ relativeTime(review.created_at) }}</span>
                 <span :if="review.status === 'pending'" class="px-1.5 py-0.5 font-medium text-yellow-700 text-xs bg-yellow-50 ring-1 ring-yellow-200 rounded">Pending review</span>
               </div>
             </div>
@@ -186,8 +186,8 @@
           <li :for="j in suggestedJudges" class="flex gap-3 items-center">
             <img class="object-cover flex-none h-10 w-10 rounded-full grayscale filter" x-src="j.image_url || j.photo" x-alt="j.name" />
             <div class="flex-1 min-w-0">
-              <p class="font-medium text-gray-900 text-sm truncate" :text="j.name"></p>
-              <p class="text-gray-500 text-xs truncate" :text="(j.court && j.court.name) || j.court || ''"></p>
+              <p class="font-medium text-gray-900 text-sm truncate">{{ j.name }}</p>
+              <p class="text-gray-500 text-xs truncate">{{ (j.court && j.court.name) || j.court || '' }}</p>
             </div>
             <StxLink x-to="`/review/${j.id}`" class="flex-none px-2.5 py-1 font-medium text-gray-900 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">Review</StxLink>
           </li>

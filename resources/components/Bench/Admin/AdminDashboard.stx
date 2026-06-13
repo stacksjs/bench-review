@@ -38,12 +38,12 @@
   <div class="gap-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
     <StxLink to="/admin/reviews" class="block p-6 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
       <p class="font-medium text-gray-500 text-sm">Pending reviews</p>
-      <p class="mt-2 font-bold text-3xl text-gray-900" :text="pendingCount()"></p>
+      <p class="mt-2 font-bold text-3xl text-gray-900">{{ pendingCount() }}</p>
       <p class="mt-2 font-semibold text-gray-600 text-sm">Open moderation queue &rarr;</p>
     </StxLink>
     <StxLink to="/admin/users" class="block p-6 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
       <p class="font-medium text-gray-500 text-sm">Total users</p>
-      <p class="mt-2 font-bold text-3xl text-gray-900" :text="userCount()"></p>
+      <p class="mt-2 font-bold text-3xl text-gray-900">{{ userCount() }}</p>
       <p class="mt-2 font-semibold text-gray-600 text-sm">Manage users &rarr;</p>
     </StxLink>
     <div class="block p-6 bg-white border border-gray-200 rounded-lg">

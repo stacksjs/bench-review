@@ -168,7 +168,7 @@
         </div>
       </div>
 
-      <p :show="submitError" class="text-red-600 text-sm" x-text="submitError"></p>
+      <p :show="submitError" class="text-red-600 text-sm">{{ submitError }}</p>
 
       <div class="flex gap-x-4 items-center justify-end">
         <StxLink to="/judges" class="font-semibold text-gray-700 text-sm">Cancel</StxLink>

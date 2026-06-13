@@ -109,21 +109,19 @@
           </div>
           <button type="submit" x-disabled="loading"
             class="flex-none px-3.5 py-2.5 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm"
-            :text="loading() ? 'Subscribing...' : 'Notify me'">
-            Notify me
-          </button>
+          >{{ loading() ? 'Subscribing...' : 'Notify me' }}</button>
         </form>
       </div>
       <div :if="successVisible()" @close="successVisible.set(false)">
         <Notification type="success" position="top-right" :show="true" :duration="0">
-          <p class="text-sm font-medium" :text="toastTitle()"></p>
-          <p class="mt-1 text-sm opacity-90" :text="toastMessage()"></p>
+          <p class="text-sm font-medium">{{ toastTitle() }}</p>
+          <p class="mt-1 text-sm opacity-90">{{ toastMessage() }}</p>
         </Notification>
       </div>
       <div :if="errorVisible()" @close="errorVisible.set(false)">
         <Notification type="error" position="top-right" :show="true" :duration="0">
-          <p class="text-sm font-medium" :text="toastTitle()"></p>
-          <p class="mt-1 text-sm opacity-90" :text="toastMessage()"></p>
+          <p class="text-sm font-medium">{{ toastTitle() }}</p>
+          <p class="mt-1 text-sm opacity-90">{{ toastMessage() }}</p>
         </Notification>
       </div>
     </div>

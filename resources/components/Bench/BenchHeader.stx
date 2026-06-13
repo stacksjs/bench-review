@@ -335,8 +335,8 @@
           >
             <img class="h-8 w-8 rounded-full object-cover" x-src="judge.photo" x-alt="judge.name">
             <div class="flex-1 min-w-0">
-              <p class="font-medium text-gray-900 text-sm truncate" :text="judge.name"></p>
-              <p class="text-gray-500 text-xs truncate" :text="(judge.court && judge.court.name) ? judge.court.name : (judge.location || '')"></p>
+              <p class="font-medium text-gray-900 text-sm truncate">{{ judge.name }}</p>
+              <p class="text-gray-500 text-xs truncate">{{ (judge.court && judge.court.name) ? judge.court.name : (judge.location || '') }}</p>
             </div>
           </button>
         </div>
@@ -352,8 +352,8 @@
               <svg class="h-4 w-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3A1 1 0 003 7v11a1 1 0 001 1h12a1 1 0 001-1V7a1 1 0 00-.606-.92l-7-3zM5 9h2v6H5V9zm6 0h2v6h-2V9z"/></svg>
             </div>
             <div class="flex-1 min-w-0">
-              <p class="font-medium text-gray-900 text-sm truncate" :text="court.name"></p>
-              <p class="text-gray-500 text-xs truncate" :text="(court.city || '') + (court.state ? ', ' + court.state : '')"></p>
+              <p class="font-medium text-gray-900 text-sm truncate">{{ court.name }}</p>
+              <p class="text-gray-500 text-xs truncate">{{ (court.city || '') + (court.state ? ', ' + court.state : '') }}</p>
             </div>
           </button>
         </div>
@@ -408,9 +408,7 @@
                  would render even with zero unread. -->
             <span
               x-if="notifications.unreadCount()"
-              class="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 font-semibold text-[10px] text-white bg-red-500 rounded-full ring-2 ring-white"
-              :text="notifications.unreadCount() > 99 ? '99+' : notifications.unreadCount()"
-            ></span>
+              class="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 font-semibold text-[10px] text-white bg-red-500 rounded-full ring-2 ring-white">{{ notifications.unreadCount() > 99 ? '99+' : notifications.unreadCount() }}</span>
           </button>
 
           <!-- Dropdown panel. Same x-class-hidden treatment as the
@@ -449,8 +447,8 @@
                          unread; keeps the row scannable. -->
                     <span class="mt-1 inline-flex h-2 w-2 flex-shrink-0 rounded-full" x-class="n.unread ? 'bg-blue-500' : 'bg-transparent'"></span>
                     <div class="flex-1 min-w-0">
-                      <p class="text-gray-900 text-sm" :text="notificationLabel(n)"></p>
-                      <p class="mt-0.5 text-gray-400 text-xs" :text="relativeTime(n.created_at)"></p>
+                      <p class="text-gray-900 text-sm">{{ notificationLabel(n) }}</p>
+                      <p class="mt-0.5 text-gray-400 text-xs">{{ relativeTime(n.created_at) }}</p>
                     </div>
                   </button>
                 </li>
@@ -476,10 +474,8 @@
             x-aria-expanded="userMenuOpen() ? 'true' : 'false'"
           >
             <span
-              class="inline-flex items-center justify-center h-8 w-8 font-semibold text-amber-700 text-xs bg-amber-50 ring-1 ring-amber-200/60 rounded-full"
-              :text="userInitials"
-            ></span>
-            <span class="hidden sm:inline font-semibold text-gray-900 text-sm/6 max-w-[10rem] truncate" :text="userName"></span>
+              class="inline-flex items-center justify-center h-8 w-8 font-semibold text-amber-700 text-xs bg-amber-50 ring-1 ring-amber-200/60 rounded-full">{{ userInitials }}</span>
+            <span class="hidden sm:inline font-semibold text-gray-900 text-sm/6 max-w-[10rem] truncate">{{ userName }}</span>
             <svg
               class="hidden sm:block text-gray-400 transition-transform"
               x-class="userMenuOpen() ? 'rotate-180' : ''"
@@ -498,10 +494,10 @@
                  toggling between accounts don't fire an action against
                  the wrong session. -->
             <div class="flex gap-3 items-center px-4 py-3 border-b border-gray-100">
-              <span class="inline-flex items-center justify-center h-9 w-9 flex-shrink-0 font-semibold text-amber-700 text-xs bg-amber-50 ring-1 ring-amber-200/60 rounded-full" :text="userInitials"></span>
+              <span class="inline-flex items-center justify-center h-9 w-9 flex-shrink-0 font-semibold text-amber-700 text-xs bg-amber-50 ring-1 ring-amber-200/60 rounded-full">{{ userInitials }}</span>
               <div class="flex-1 min-w-0">
-                <p class="font-semibold text-gray-900 text-sm truncate" :text="userName"></p>
-                <p class="text-gray-500 text-xs truncate" :text="userEmail"></p>
+                <p class="font-semibold text-gray-900 text-sm truncate">{{ userName }}</p>
+                <p class="text-gray-500 text-xs truncate">{{ userEmail }}</p>
               </div>
             </div>
 

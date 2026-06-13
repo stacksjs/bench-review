@@ -105,23 +105,21 @@
     <li :for="o in opinions" class="p-5 bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0 flex-1">
-          <h3 class="font-semibold text-gray-900 text-base" :text="o.case_name"></h3>
+          <h3 class="font-semibold text-gray-900 text-base">{{ o.case_name }}</h3>
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-gray-500 text-xs">
-            <span :if="o.decision_date" :text="formatDate(o.decision_date)"></span>
+            <span :if="o.decision_date">{{ formatDate(o.decision_date) }}</span>
             <span :if="o.decision_date && o.citation" class="text-gray-300">·</span>
-            <span :if="o.citation" class="font-mono text-gray-600" :text="o.citation"></span>
+            <span :if="o.citation" class="font-mono text-gray-600">{{ o.citation }}</span>
             <span :if="(o.decision_date || o.citation) && o.source_provider !== 'manual'" class="text-gray-300">·</span>
-            <span :if="o.source_provider !== 'manual'" class="text-gray-500" :text="`via ${o.source_provider}`"></span>
+            <span :if="o.source_provider !== 'manual'" class="text-gray-500">{{ `via ${o.source_provider}` }}</span>
           </div>
         </div>
         <span
           :if="o.outcome_label"
           class="inline-flex items-center px-2.5 py-0.5 font-medium text-xs ring-1 rounded-full capitalize whitespace-nowrap"
-          x-class="outcomeBadgeClasses(o.outcome_label)"
-          :text="o.outcome_label"
-        ></span>
+          x-class="outcomeBadgeClasses(o.outcome_label)">{{ o.outcome_label }}</span>
       </div>
-      <p :if="o.summary" class="mt-3 leading-relaxed text-gray-700 text-sm" :text="o.summary"></p>
+      <p :if="o.summary" class="mt-3 leading-relaxed text-gray-700 text-sm">{{ o.summary }}</p>
       <a
         :if="o.source_url"
         x-href="o.source_url"

@@ -68,8 +68,8 @@
       class="flex items-center px-3 py-2 font-medium text-sm rounded-md group"
       x-class="activeCategory === category.key ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
     >
-      <span :text="category.label"></span>
-      <span class="inline-block ml-auto px-2 py-0.5 font-medium text-gray-600 text-xs bg-gray-100 rounded-full" :text="category.count"></span>
+      <span>{{ category.label }}</span>
+      <span class="inline-block ml-auto px-2 py-0.5 font-medium text-gray-600 text-xs bg-gray-100 rounded-full">{{ category.count }}</span>
     </a>
   </nav>
 </div>

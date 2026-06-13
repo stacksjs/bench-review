@@ -19,7 +19,7 @@
   <div class="flex items-center justify-between">
     <div>
       <h2 class="font-semibold text-2xl text-gray-900">Judges at this Court</h2>
-      <p class="mt-1 text-gray-500 text-sm" :text="`Active judges currently sitting at ${court.name}`"></p>
+      <p class="mt-1 text-gray-500 text-sm">{{ `Active judges currently sitting at ${court.name}` }}</p>
     </div>
     <div class="hidden sm:block">
       <select class="pl-3 pr-10 py-2 text-gray-900 sm:text-sm bg-white ring-1 ring-gray-300 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset">
@@ -37,14 +37,14 @@
         <StxLink x-to="`/judges/${judge.id}/profile`" class="flex flex-1 gap-x-4 items-center min-w-0">
           <img class="object-cover flex-none h-12 w-12 rounded-full grayscale filter" x-src="judge.photo" x-alt="judge.name">
           <div class="flex-auto min-w-0">
-            <p class="font-semibold text-gray-900 text-sm hover:underline" :text="judge.name"></p>
-            <p class="mt-0.5 text-gray-500 text-xs truncate" :text="judge.department"></p>
+            <p class="font-semibold text-gray-900 text-sm hover:underline">{{ judge.name }}</p>
+            <p class="mt-0.5 text-gray-500 text-xs truncate">{{ judge.department }}</p>
           </div>
         </StxLink>
         <div class="flex gap-x-4 items-center sm:gap-x-6">
           <div class="hidden sm:flex sm:items-center">
             <Icon :for="star in stars" name="star" size="16" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" />
-            <span class="ml-2 text-gray-500 text-xs" :text="judge.reviewCount"></span>
+            <span class="ml-2 text-gray-500 text-xs">{{ judge.reviewCount }}</span>
           </div>
           <StxLink x-to="`/judges/${judge.id}/profile`" class="font-semibold text-gray-700 text-sm hover:text-gray-900">
             View<span aria-hidden="true"> →</span>

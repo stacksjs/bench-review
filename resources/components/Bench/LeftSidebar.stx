@@ -15,8 +15,8 @@
         <div :for="judge in trendingJudges" class="flex items-center space-x-3">
             <img class="h-8 w-8 rounded-full grayscale filter" x-src="judge.photo" x-alt="judge.name" />
             <div class="flex-1 min-w-0">
-              <p class="font-medium text-gray-900 text-sm" :text="judge.name"></p>
-              <p class="text-gray-500 text-sm" :text="judge.court"></p>
+              <p class="font-medium text-gray-900 text-sm">{{ judge.name }}</p>
+              <p class="text-gray-500 text-sm">{{ judge.court }}</p>
             </div>
             <button type="button" class="font-semibold text-gray-900 text-xs hover:underline">Follow</button>
         </div>
@@ -36,15 +36,15 @@
                 <div class="flex relative space-x-3">
                   <div>
                     <span class="flex items-center justify-center h-8 w-8 bg-gray-400 ring-8 ring-white rounded-full">
-                      <span class="h-5 w-5 text-white" aria-hidden="true" :text="activity.icon"></span>
+                      <span class="h-5 w-5 text-white" aria-hidden="true">{{ activity.icon }}</span>
                     </span>
                   </div>
                   <div class="flex flex-1 justify-between pt-1.5 space-x-4 min-w-0">
                     <div>
-                      <p class="text-gray-500 text-sm" :text="activity.content"></p>
+                      <p class="text-gray-500 text-sm">{{ activity.content }}</p>
                     </div>
                     <div class="text-gray-500 text-right text-sm whitespace-nowrap">
-                      <time :datetime="activity.dateTime" :text="activity.date"></time>
+                      <time :datetime="activity.dateTime">{{ activity.date }}</time>
                     </div>
                   </div>
                 </div>

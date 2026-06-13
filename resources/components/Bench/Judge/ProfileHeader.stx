@@ -125,8 +125,8 @@
       <div class="flex gap-x-6 items-center">
         <img x-src="judgeImage" x-alt="judgeName" class="object-cover flex-none size-16 ring-1 ring-gray-900/10 rounded-full grayscale filter">
         <h1>
-          <div class="text-gray-500 text-sm/6">Judge <span class="text-gray-700" :text="`#${judgeId}`"></span></div>
-          <div class="mt-1 font-semibold text-base text-gray-900" :text="judgeName"></div>
+          <div class="text-gray-500 text-sm/6">Judge <span class="text-gray-700">{{ `#${judgeId}` }}</span></div>
+          <div class="mt-1 font-semibold text-base text-gray-900">{{ judgeName }}</div>
         </h1>
       </div>
       <div class="flex gap-x-4 items-center sm:gap-x-6">
@@ -149,8 +149,7 @@
               ? 'bg-white text-gray-900 ring-1 ring-gray-300 hover:bg-gray-50 focus-visible:outline-gray-300'
               : 'bg-gray-900 text-white hover:bg-gray-700 focus-visible:outline-gray-900'
           ]"
-          :text="followPending ? '…' : (isFollowing ? 'Following' : 'Follow')"
-        >Follow</button>
+        >{{ followPending ? '…' : (isFollowing ? 'Following' : 'Follow') }}</button>
 
         <div class="sm:hidden relative">
           <button type="button" class="block -m-3 p-3" @click="menuOpen.set(!menuOpen())" id="more-menu-button" aria-expanded="false" aria-haspopup="true">

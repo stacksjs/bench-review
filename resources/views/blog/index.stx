@@ -32,16 +32,16 @@
               </div>
               <div class="flex-1">
                 <div class="flex gap-x-4 items-center text-xs">
-                  <time :datetime="post.dateTime" class="text-gray-500" :text="post.date"></time>
+                  <time :datetime="post.dateTime" class="text-gray-500">{{ post.date }}</time>
                 </div>
                 <div class="relative max-w-xl group">
-                  <h3 class="mt-3 font-semibold leading-6 text-gray-900 text-lg group-hover:text-softBrown duration-200 transition-colors" :text="post.title"></h3>
+                  <h3 class="mt-3 font-semibold leading-6 text-gray-900 text-lg group-hover:text-softBrown duration-200 transition-colors">{{ post.title }}</h3>
                   <div class="flex gap-x-4 items-center mt-5">
                     <div class="leading-6 text-sm">
-                      <p class="font-semibold text-gray-900" :text="post.author.name"></p>
+                      <p class="font-semibold text-gray-900">{{ post.author.name }}</p>
                     </div>
                   </div>
-                  <p class="mt-5 leading-6 line-clamp-3 text-gray-600 text-sm" :text="post.content"></p>
+                  <p class="mt-5 leading-6 line-clamp-3 text-gray-600 text-sm">{{ post.content }}</p>
                 </div>
               </div>
             </article>

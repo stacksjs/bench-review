@@ -1,7 +1,7 @@
 <header class="relative">
   <div class="mx-auto pb-8 pt-16 px-4 sm:px-6 lg:px-8 max-w-5xl">
     <div class="text-center">
-      <h1 class="font-bold text-4xl text-gray-900 tracking-tight sm:text-5xl" :text="review.title"></h1>
+      <h1 class="font-bold text-4xl text-gray-900 tracking-tight sm:text-5xl">{{ review.title }}</h1>
     </div>
 
     <!-- Author and Judge info -->
@@ -10,23 +10,23 @@
         <img class="h-12 w-12 rounded-full" x-src="review.author.imageUrl" x-alt="review.author.name">
         <div class="ml-3">
           <p class="font-medium text-gray-900 text-sm">
-            <a href="#" class="hover:underline" :text="review.author.name"></a>
+            <a href="#" class="hover:underline">{{ review.author.name }}</a>
           </p>
           <div class="flex space-x-1 text-gray-500 text-sm">
-            <time :datetime="review.dateTime" :text="review.date"></time>
+            <time :datetime="review.dateTime">{{ review.date }}</time>
             <span aria-hidden="true">&middot;</span>
           </div>
         </div>
       </div>
       <div class="text-right">
         <div class="flex flex-col items-end">
-          <span class="inline-flex items-center mb-2 px-2 py-1 font-medium text-green-700 text-xs bg-green-50 ring-1 ring-green-600/20 ring-inset rounded-full" :text="review.type"></span>
+          <span class="inline-flex items-center mb-2 px-2 py-1 font-medium text-green-700 text-xs bg-green-50 ring-1 ring-green-600/20 ring-inset rounded-full">{{ review.type }}</span>
           <h2 class="font-semibold text-gray-900 text-lg">Reviewing</h2>
           <div class="flex items-center justify-end mt-1">
             <img class="h-10 w-10 rounded-full" x-src="review.judge.photo" x-alt="review.judge.name">
             <div class="ml-3">
-              <p class="font-medium text-gray-900 text-sm" :text="review.judge.name"></p>
-              <p class="text-gray-500 text-sm" :text="review.judge.court"></p>
+              <p class="font-medium text-gray-900 text-sm">{{ review.judge.name }}</p>
+              <p class="text-gray-500 text-sm">{{ review.judge.court }}</p>
             </div>
           </div>
         </div>

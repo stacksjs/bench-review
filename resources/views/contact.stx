@@ -148,7 +148,7 @@
               </div>
             </div>
 
-            <p x-class="submitError() ? 'text-red-600 text-sm' : 'hidden'" :text="submitError()"></p>
+            <p x-class="submitError() ? 'text-red-600 text-sm' : 'hidden'">{{ submitError() }}</p>
 
             <button
               type="submit"
