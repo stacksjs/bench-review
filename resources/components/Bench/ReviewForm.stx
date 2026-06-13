@@ -38,6 +38,7 @@
   // evaluate cleanly.
   const reviewsStore = useStore('reviews')
   const judgesStore = useStore('judges')
+  const toast = useStore('toast')
 
   // ── URL-driven judge preload ──────────────────────────────────────
   //
@@ -93,6 +94,12 @@
   })
 
   const submitError = state<string | null>(null)
+  // Per-field validation flags → red borders on the offending input,
+  // cleared when the user starts fixing that field. The toast is the
+  // in-viewport feedback; these put the affordance ON the field.
+  const titleError = state<boolean>(false)
+  const contentError = state<boolean>(false)
+  const ratingError = state<boolean>(false)
   // Sticky success state. Reviews land as `status=pending` and won't
   // show up on the judge's reviews page until a moderator publishes,
   // so a plain navigate-on-success looks like the form silently
@@ -180,29 +187,29 @@
   }
 
   async function handleSubmit(): Promise<void> {
-    // Diagnostic — left in deliberately. The submit chain had a few
-    // silent-failure modes during stabilization; this one log line
-    // lets the user verify in DevTools whether the click is firing
-    // at all vs. the handler running and hitting a guard.
-    console.log('[ReviewForm] Submit clicked', {
-      judge: judge(),
-      title: reviewTitle(),
-      contentLen: reviewContent().length,
-      rating: rating(),
-      submitInFlight,
-      submitting: reviewsStore.submitting(),
-    })
-
     if (submitInFlight) return
     submitInFlight = true
     submitError.set(null)
+    titleError.set(false)
+    contentError.set(false)
+    ratingError.set(false)
 
     try {
       const j = judge()
-      if (!j) { submitError.set('Pick a judge first.'); return }
+      if (!j) {
+        submitError.set('Pick a judge first.')
+        toast.error('Cannot submit review', 'Pick a judge first.')
+        return
+      }
 
       const title = reviewTitle().trim()
-      if (!title) { submitError.set('Add a review title.'); return }
+      if (!title) {
+        submitError.set('Add a review title.')
+        titleError.set(true)
+        toast.error('Cannot submit review', 'Add a review title.')
+        document.getElementById('title')?.focus()
+        return
+      }
 
       // Read editor content from the DOM, not the signal. `ts-medium-
       // editor`'s `editor.subscribe('editableInput', …)` doesn't fire
@@ -213,11 +220,21 @@
       let content = (editable?.innerHTML || '').trim()
       if (content === '<p><br></p>') content = ''  // MediumEditor empty sentinel
       if (!content) content = reviewContent().trim()
-      if (!content) { submitError.set('Write a review before submitting.'); return }
+      if (!content) {
+        submitError.set('Write a review before submitting.')
+        contentError.set(true)
+        toast.error('Cannot submit review', 'Write a review before submitting.')
+        return
+      }
       reviewContent.set(content)
 
       const overall = rating()
-      if (!overall || overall < 1) { submitError.set('Give the judge an overall rating.'); return }
+      if (!overall || overall < 1) {
+        submitError.set('Give the judge an overall rating.')
+        ratingError.set(true)
+        toast.error('Cannot submit review', 'Give the judge an overall rating.')
+        return
+      }
 
       const result = await reviewsStore.submit({
         judge_id: Number(j.id),
@@ -228,7 +245,11 @@
         anonymized: anonymized(),
       })
 
-      if (!result.ok) { submitError.set(result.error || 'Failed to submit review.'); return }
+      if (!result.ok) {
+        submitError.set(result.error || 'Failed to submit review.')
+        toast.error('Submission failed', result.error || 'Failed to submit review.')
+        return
+      }
 
       composeDraft.set('')
       // Clear the server-side draft so coming back to /review on a
@@ -441,8 +462,10 @@
             id="title"
             x-model="reviewTitle"
             x-disabled="!judge"
+            @focus="titleError.set(false)"
             placeholder="Brief summary of your experience"
-            class="block px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            class="block px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            x-class="titleError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-300'"
           >
         </div>
       </div>
@@ -535,14 +558,14 @@
       <div>
         <label for="rating" class="block font-medium text-gray-900 text-sm">Overall Rating</label>
         <div class="mt-2 flex items-center space-x-2">
-          <div class="flex items-center space-x-1">
+          <div class="flex items-center space-x-1 rounded-md" x-class="ratingError() ? 'ring-2 ring-red-300 ring-offset-2' : ''">
             <button
               :for="star in stars"
               type="button"
               x-disabled="!judge"
               class="hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               x-class="(hoverRating || rating) >= star ? 'text-yellow-400' : 'text-gray-300'"
-              @click="rating.set(star)"
+              @click="rating.set(star); ratingError.set(false)"
               @mouseenter="hoverRating.set(star)"
               @mouseleave="hoverRating.set(0)"
             >
@@ -556,9 +579,10 @@
       <div>
         <label for="review" class="block font-medium text-gray-900 text-sm">Your Review</label>
         <div
-          class="mt-2 border border-gray-200 focus-within:border-gray-900 focus-within:ring-2 focus-within:ring-gray-200 shadow-sm transition-colors"
-          @richtext-change="reviewContent.set($event.detail.html)"
-          @input="reviewContent.set($event.target.innerHTML || '')"
+          class="mt-2 border focus-within:border-gray-900 focus-within:ring-2 focus-within:ring-gray-200 shadow-sm transition-colors"
+          x-class="contentError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-200'"
+          @richtext-change="reviewContent.set($event.detail.html); contentError.set(false)"
+          @input="reviewContent.set($event.target.innerHTML || ''); contentError.set(false)"
         >
           @include('Bench/RichTextEditor')
         </div>
