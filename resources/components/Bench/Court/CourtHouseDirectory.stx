@@ -104,6 +104,16 @@
     }
     return rows
   })
+
+  // Local derived flags for the empty-state panel, computed in JS so the
+  // signal calls are unambiguous. Consumed via x-class (CSS toggle) — NOT
+  // :if — because bindIf drops the binding of an :if branch that was false
+  // at first render (data present on load, so "empty" is false), so
+  // filtering/searching down to an empty result never re-showed the panel
+  // (it stayed blank). x-class keeps the panel in the DOM with a live,
+  // reactive binding. Mirrors ReviewsFeed.stx's showFilteredEmpty/showGenuineEmpty.
+  const showEmpty = derived<boolean>(() => filteredCourtHouses().length === 0 && !judgesStore.loading())
+  const hasActiveFilters = derived<boolean>(() => stateFilter() !== 'all' || hasReviewsFilter() !== 'all' || searchQuery() !== '')
 </script>
 
 <div class="min-h-screen">
@@ -222,14 +232,14 @@
          initial fetch; copy + Clear-filters CTA branch on whether any
          filter is active. (Replaced a hardcoded fake pagination bar that
          rendered dead 1/2/3 links unconditionally, implying more results.) -->
-    <div :if="filteredCourtHouses.length === 0 && !judgesStore.loading()" class="mt-2 p-12 text-center bg-gray-50 border border-gray-200 border-dashed rounded-2xl">
+    <div x-class="showEmpty() ? '' : 'hidden'" class="mt-2 p-12 text-center bg-gray-50 border border-gray-200 border-dashed rounded-2xl">
       <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
       </svg>
       <p class="mt-4 font-medium text-gray-900" :text="(stateFilter() !== 'all' || hasReviewsFilter() !== 'all' || searchQuery() !== '') ? 'No courthouses match these filters' : 'No courthouses yet'"></p>
-      <p :if="stateFilter() !== 'all' || hasReviewsFilter() !== 'all' || searchQuery() !== ''" class="mt-1 text-gray-500 text-sm">Try a different state, or clear the filters to see all courthouses.</p>
+      <p x-class="hasActiveFilters() ? '' : 'hidden'" class="mt-1 text-gray-500 text-sm">Try a different state, or clear the filters to see all courthouses.</p>
       <button
-        :if="stateFilter() !== 'all' || hasReviewsFilter() !== 'all' || searchQuery() !== ''"
+        x-class="hasActiveFilters() ? '' : 'hidden'"
         type="button"
         @click="clearFilters()"
         class="inline-flex items-center mt-5 px-4 py-2 font-medium text-white text-sm bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
