@@ -28,6 +28,12 @@
   const expandedId = state<number>(0)
   const responseDraft = state<string>('')
   const savingResponse = state<boolean>(false)
+  // In-flight guard for the per-row Approve/Reject/Delete mutations.
+  // The buttons live inside the :for, where signal call-syntax in
+  // x-disabled/:text is the forbidden footgun (silently breaks the
+  // loop), so this is used purely as a JS re-entry guard to stop
+  // rapid double-clicks double-firing. No per-row visual binding.
+  const mutatingId = state<number | null>(null)
   function toggleExpand(review: AdminReviewRow): void {
     const opening = expandedId() !== review.id
     expandedId.set(opening ? review.id : 0)
@@ -59,16 +65,37 @@
   }
 
   async function approve(review: AdminReviewRow): Promise<void> {
-    await store.setReviewStatus(review.id, 'published')
+    if (mutatingId()) return
+    mutatingId.set(review.id)
+    try {
+      await store.setReviewStatus(review.id, 'published')
+    }
+    finally {
+      mutatingId.set(null)
+    }
   }
   async function reject(review: AdminReviewRow): Promise<void> {
-    await store.setReviewStatus(review.id, 'rejected')
+    if (mutatingId()) return
+    mutatingId.set(review.id)
+    try {
+      await store.setReviewStatus(review.id, 'rejected')
+    }
+    finally {
+      mutatingId.set(null)
+    }
   }
   async function confirmDelete(review: AdminReviewRow): Promise<void> {
     if (typeof window === 'undefined') return
+    if (mutatingId()) return
     const ok = window.confirm(`Delete review "${review.title}"? This cannot be undone.`)
     if (!ok) return
-    await store.deleteReview(review.id)
+    mutatingId.set(review.id)
+    try {
+      await store.deleteReview(review.id)
+    }
+    finally {
+      mutatingId.set(null)
+    }
   }
 
   function onSearchInput(e: Event): void {
