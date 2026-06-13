@@ -2,6 +2,8 @@
   import type { AdminReviewRow, ReviewStatusFilter } from '~/resources/stores/adminReviews'
 
   const store = useStore('adminReviews')
+  const confirmStore = useStore('confirm')
+  const toast = useStore('toast')
 
   let hasFetched = false
   function bootstrap(): void {
@@ -49,11 +51,12 @@
     savingResponse.set(true)
     await store.postResponse(review.id, responseDraft())
     savingResponse.set(false)
+    toast.success('Response saved', "The judge's official response is now live under this review.")
   }
   async function removeResponse(review: AdminReviewRow): Promise<void> {
     if (typeof window === 'undefined')
       return
-    if (!window.confirm('Remove the judge\'s official response to this review?'))
+    if (!(await confirmStore.ask({ title: 'Remove response', message: 'Remove the judge\'s official response to this review?', confirmLabel: 'Remove', danger: true })))
       return
     if (await store.deleteResponse(review.id))
       responseDraft.set('')
@@ -69,6 +72,7 @@
     mutatingId.set(review.id)
     try {
       await store.setReviewStatus(review.id, 'published')
+      toast.success('Review published', 'The review is now visible to the public.')
     }
     finally {
       mutatingId.set(null)
@@ -79,6 +83,7 @@
     mutatingId.set(review.id)
     try {
       await store.setReviewStatus(review.id, 'rejected')
+      toast.success('Review rejected', 'The review has been declined and hidden from the public.')
     }
     finally {
       mutatingId.set(null)
@@ -87,11 +92,12 @@
   async function confirmDelete(review: AdminReviewRow): Promise<void> {
     if (typeof window === 'undefined') return
     if (mutatingId()) return
-    const ok = window.confirm(`Delete review "${review.title}"? This cannot be undone.`)
+    const ok = await confirmStore.ask({ title: 'Delete review', message: `Delete review "${review.title}"? This cannot be undone.`, confirmLabel: 'Delete', danger: true })
     if (!ok) return
     mutatingId.set(review.id)
     try {
       await store.deleteReview(review.id)
+      toast.success('Review deleted', 'The review has been permanently removed.')
     }
     finally {
       mutatingId.set(null)
