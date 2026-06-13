@@ -1,15 +1,28 @@
 <script client>
   // Global confirmation modal. Mounted once per layout. Renders whenever
   // the confirm store is open; the buttons settle the promise that the
-  // calling `confirmStore.ask(...)` is awaiting. x-class toggle (not :if)
-  // so the modal stays in the DOM with live bindings — see the bindIf-drop
-  // footgun. Backdrop click + Cancel = dismiss (false); Confirm = accept (true).
+  // calling `confirmStore.ask(...)` is awaiting.
+  //
+  // Visibility: ALL overlay/positioning classes live in the x-class TRUE
+  // branch (not the static class) — mirrors the working Admin/UsersTable
+  // modal. If the overlay classes were static, the modal would paint as a
+  // full-screen overlay before the client x-class binding hides it (a
+  // visible empty-modal flash on every page load). With them in x-class,
+  // the closed state collapses to a bare empty <div>. The backdrop is the
+  // root's own bg; clicking it dismisses, clicking the panel does not.
   const confirmStore = useStore('confirm')
 </script>
 
-<div x-class="confirmStore.open() ? '' : 'hidden'" class="fixed inset-0 z-[1100] flex items-center justify-center p-4">
-  <div class="absolute inset-0 bg-black/40" @click="confirmStore.dismiss()"></div>
-  <div role="dialog" aria-modal="true" class="relative w-full max-w-md p-6 bg-white border border-gray-200 rounded-2xl shadow-xl">
+<div
+  x-class="confirmStore.open() ? 'fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/40' : 'hidden'"
+  @click="confirmStore.dismiss()"
+>
+  <div
+    role="dialog"
+    aria-modal="true"
+    @click="$event.stopPropagation()"
+    class="w-full max-w-md p-6 bg-white border border-gray-200 rounded-2xl shadow-xl"
+  >
     <h2 class="font-semibold text-lg text-gray-900" :text="confirmStore.title()"></h2>
     <p class="mt-2 text-gray-600 text-sm" :text="confirmStore.message()"></p>
     <div class="flex justify-end gap-3 mt-6">
