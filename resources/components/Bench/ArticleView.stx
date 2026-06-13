@@ -290,6 +290,7 @@
   // it's a single confirm()-guarded round-trip.
 
   const editError = state<string>('')
+  const deleting = state<boolean>(false)
 
   function goToEdit(): void {
     if (typeof window === 'undefined') return
@@ -299,18 +300,25 @@
 
   async function handleDelete(): Promise<void> {
     if (typeof window === 'undefined') return
+    if (deleting()) return
     const ok = window.confirm('Delete this review? This cannot be undone.')
     if (!ok) return
     const id = reviewId
     if (!id) return
-    const result = await reviewsStore.deleteOwn(id)
-    if (!result.ok) {
-      editError.set(result.error || 'Could not delete review.')
-      return
+    deleting.set(true)
+    try {
+      const result = await reviewsStore.deleteOwn(id)
+      if (!result.ok) {
+        editError.set(result.error || 'Could not delete review.')
+        return
+      }
+      // Bounce out — the row is gone; staying on the page would render
+      // the not-found state, but a fresh page elsewhere is friendlier.
+      navigate('/reviews', true)
     }
-    // Bounce out — the row is gone; staying on the page would render
-    // the not-found state, but a fresh page elsewhere is friendlier.
-    navigate('/reviews', true)
+    finally {
+      deleting.set(false)
+    }
   }
   const reviewType = derived<string>(() => reviewsStore.current()?.type ?? '')
   const likes = derived<number>(() => Number(reviewsStore.current()?.likes ?? 0))
@@ -483,8 +491,10 @@
           <button
             type="button"
             @click="handleDelete()"
-            class="px-3 py-1.5 font-semibold text-red-700 text-xs bg-white border border-red-200 rounded-md hover:bg-red-50"
-          >Delete</button>
+            x-disabled="deleting"
+            class="px-3 py-1.5 font-semibold text-red-700 text-xs bg-white border border-red-200 rounded-md hover:bg-red-50 disabled:opacity-50"
+            :text="deleting() ? 'Deleting…' : 'Delete'"
+          ></button>
         </div>
       </div>
     </div>
