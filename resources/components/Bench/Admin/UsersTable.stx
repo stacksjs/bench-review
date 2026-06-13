@@ -263,7 +263,7 @@
         ></div>
         <div class="flex justify-end gap-x-2">
           <button type="button" @click="cancelEdit()" x-disabled="saving" class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Cancel</button>
-          <button type="button" @click="saveEdit()" x-disabled="saving" class="px-3 py-1.5 font-medium text-white text-sm bg-gray-900 hover:bg-gray-800 rounded disabled:opacity-50 disabled:cursor-not-allowed" :text="saving() ? 'Saving…' : 'Save'"></button>
+          <button type="button" @click="saveEdit()" x-disabled="saving" class="inline-flex items-center justify-center px-3 py-1.5 font-medium text-white text-sm bg-gray-900 hover:bg-gray-800 rounded disabled:opacity-50 disabled:cursor-not-allowed"><svg :if="saving()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg><span :text="saving() ? 'Saving…' : 'Save'"></span></button>
         </div>
       </div>
     </div>
