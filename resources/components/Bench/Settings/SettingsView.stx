@@ -50,7 +50,13 @@
     const u = authStore.user()
     if (u?.avatar) return u.avatar
     const name = (u?.name || 'User').trim() || 'User'
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=256&background=1f2937&color=ffffff&bold=true`
+    // Single-quoted concatenation, NOT a backtick template literal: a
+    // `https://...${...}` template literal inside an stx <script client>
+    // gets mangled by the client-script processor (the `//` is treated as
+    // a line comment, breaking the literal → "Unexpected token ':'" at
+    // runtime). Every other https URL in the codebase's stx scripts is a
+    // single-quoted string for this reason.
+    return 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&size=256&background=1f2937&color=ffffff&bold=true'
   })
 
   // "Change photo" upload state.
