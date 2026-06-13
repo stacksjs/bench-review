@@ -22,17 +22,17 @@
     "ofetch": "^1.5.1",
     "perfect-debounce": "^2.1.0",
     "pretty-bytes": "^7.1.0",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.1",
     "stacks": "workspace:*",
-    "ts-broadcasting": "^0.0.4",
+    "ts-broadcasting": "^0.0.5",
     "ts-medium-editor": "^0.1.0"
   },
   "devDependencies": {
     "@stacksjs/stx": "^0.2.72",
     "bun-plugin-stx": "^0.2.72",
-    "@stacksjs/ts-i18n": "0.1.8",
+    "@stacksjs/ts-i18n": "0.1.11",
     "@types/leaflet": "^1.9.21",
-    "bun-git-hooks": "^0.3.1"
+    "bun-git-hooks": "^0.3.2"
   },
   "workspaces": [
     "storage/framework/**",
