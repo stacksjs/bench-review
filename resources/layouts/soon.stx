@@ -4,4 +4,6 @@
   @slot('content')
 
   @include('Bench/BenchFooter')
+
+  @include('Bench/ToastHost')
 </main>

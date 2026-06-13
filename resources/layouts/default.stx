@@ -5,3 +5,5 @@
 </main>
 
 @include('Bench/BenchFooter')
+
+@include('Bench/ToastHost')

@@ -5,3 +5,5 @@
     @slot('content')
   </div>
 </main>
+
+@include('Bench/ToastHost')

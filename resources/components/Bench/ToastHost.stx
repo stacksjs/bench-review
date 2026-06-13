@@ -1,0 +1,25 @@
+<script client>
+  // Global toast renderer. Mounted once per layout (default / soon / admin).
+  // Reads the shared toast store; each item auto-dismisses after 5s (store
+  // side) or on click. Local derived mirrors the proven ReviewsFeed `:for`
+  // pattern (iterate a local const, not a called store signal inline).
+  const toast = useStore('toast')
+  const items = derived(() => toast.items())
+</script>
+
+<div class="fixed top-4 right-4 z-[1000] flex flex-col gap-2 w-80 max-w-[calc(100vw-2rem)] pointer-events-none">
+  <div
+    :for="t in items"
+    @click="toast.dismiss(t.id)"
+    role="alert"
+    aria-live="polite"
+    class="flex items-start gap-3 px-4 py-3 border rounded-lg shadow-lg cursor-pointer pointer-events-auto"
+    x-class="t.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' : t.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : t.type === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-white border-gray-200 text-gray-800'"
+  >
+    <div class="flex-1 min-w-0">
+      <p :if="t.title" class="font-semibold text-sm" :text="t.title"></p>
+      <p class="text-sm break-words" :text="t.message"></p>
+    </div>
+    <span class="flex-shrink-0 text-lg leading-none opacity-40" aria-hidden="true">&times;</span>
+  </div>
+</div>
