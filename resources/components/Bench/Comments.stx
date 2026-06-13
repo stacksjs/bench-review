@@ -17,6 +17,7 @@
   const authStore = useStore('auth')
   const reviewsStore = useStore('reviews')
   const toast = useStore('toast')
+  const confirmStore = useStore('confirm')
 
   interface CommentRow {
     id: number
@@ -92,6 +93,7 @@
       }
       commentDraft.set('')
       commentAnon.set(false)
+      toast.success('Comment posted', 'Your comment was added.')
       // Refetch the full list so we see the canonical server-side
       // ordering + the new comment's gated-author shape (in case the
       // client guessed wrong on what the public sees).
@@ -110,13 +112,14 @@
   async function deleteComment(commentId: number): Promise<void> {
     if (typeof window === 'undefined') return
     if (deletingId()) return
-    const ok = window.confirm('Delete this comment? This cannot be undone.')
+    const ok = await confirmStore.ask({ title: 'Delete comment', message: 'Delete this comment? This cannot be undone.', confirmLabel: 'Delete', danger: true })
     if (!ok) return
     deletingId.set(commentId)
     try {
       const res = await authStore.authFetch(`/api/me/comments/${commentId}`, { method: 'DELETE' })
       if (!res.ok) return
       comments.set(comments().filter(c => c.id !== commentId))
+      toast.success('Comment deleted', 'Your comment was removed.')
     }
     catch (err) {
       console.error('[comments] delete failed:', err)
