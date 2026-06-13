@@ -9,6 +9,7 @@
   // edit; persistence to the backend lands when the endpoint does.
 
   const authStore = useStore('auth')
+  const toast = useStore('toast')
 
   // Local form state — initialise from the cached user (cookie). The
   // server-side `auth` middleware guarantees the user is signed in by
@@ -31,6 +32,14 @@
   const saveError = state<string>('')
   const pwStatus = state<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const pwError = state<string>('')
+
+  // Per-field error flags for the red-border validation pattern.
+  const nameError = state<boolean>(false)
+  const currentPasswordError = state<boolean>(false)
+  const newPasswordError = state<boolean>(false)
+  const confirmPasswordError = state<boolean>(false)
+  const credTypeError = state<boolean>(false)
+  const credStateError = state<boolean>(false)
 
   function syncFromAuth(): void {
     const u = authStore.user()
@@ -87,10 +96,14 @@
   async function saveProfile(): Promise<void> {
     saveStatus.set('saving')
     saveError.set('')
+    nameError.set(false)
     const name = fullName().trim()
     if (!name) {
       saveStatus.set('error')
       saveError.set('Name is required.')
+      nameError.set(true)
+      toast.error('Profile', 'Name is required.')
+      document.getElementById('full-name')?.focus()
       return
     }
     try {
@@ -122,14 +135,22 @@
   async function saveCredentialClaim(): Promise<void> {
     credentialStatus.set('idle')
     credentialError.set('')
+    credTypeError.set(false)
+    credStateError.set(false)
     if (!credentialType()) {
       credentialStatus.set('error')
       credentialError.set('Pick a credential type.')
+      credTypeError.set(true)
+      toast.error('Verified credentials', 'Pick a credential type.')
+      document.getElementById('cred-type')?.focus()
       return
     }
     if (!credentialState()) {
       credentialStatus.set('error')
       credentialError.set('Pick a state (or FEDERAL).')
+      credStateError.set(true)
+      toast.error('Verified credentials', 'Pick a state (or FEDERAL).')
+      document.getElementById('cred-state')?.focus()
       return
     }
     credentialStatus.set('saving')
@@ -160,19 +181,32 @@
   async function savePassword(): Promise<void> {
     pwStatus.set('idle')
     pwError.set('')
+    currentPasswordError.set(false)
+    newPasswordError.set(false)
+    confirmPasswordError.set(false)
     if (!currentPassword()) {
       pwStatus.set('error')
       pwError.set('Enter your current password.')
+      currentPasswordError.set(true)
+      toast.error('Password', 'Enter your current password.')
+      document.getElementById('current-password')?.focus()
       return
     }
     if (newPassword().length < 8) {
       pwStatus.set('error')
       pwError.set('Password must be at least 8 characters.')
+      newPasswordError.set(true)
+      toast.error('Password', 'Password must be at least 8 characters.')
+      document.getElementById('new-password')?.focus()
       return
     }
     if (newPassword() !== confirmPassword()) {
       pwStatus.set('error')
       pwError.set('Passwords do not match.')
+      newPasswordError.set(true)
+      confirmPasswordError.set(true)
+      toast.error('Password', 'Passwords do not match.')
+      document.getElementById('confirm-password')?.focus()
       return
     }
     pwStatus.set('saving')
@@ -311,7 +345,9 @@
               id="full-name"
               x-model="fullName"
               autocomplete="name"
-              class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
+              @focus="nameError.set(false)"
+              class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
+              x-class="nameError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-300'"
             >
           </div>
 
@@ -358,7 +394,9 @@
             id="current-password"
             x-model="currentPassword"
             autocomplete="current-password"
-            class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
+            @focus="currentPasswordError.set(false)"
+            class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
+            x-class="currentPasswordError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-300'"
           >
         </div>
 
@@ -370,7 +408,9 @@
               id="new-password"
               x-model="newPassword"
               autocomplete="new-password"
-              class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
+              @focus="newPasswordError.set(false)"
+              class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
+              x-class="newPasswordError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-300'"
             >
             <p class="mt-1.5 text-gray-500 text-xs">Use at least 8 characters.</p>
           </div>
@@ -382,7 +422,9 @@
               id="confirm-password"
               x-model="confirmPassword"
               autocomplete="new-password"
-              class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
+              @focus="confirmPasswordError.set(false)"
+              class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
+              x-class="confirmPasswordError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-300'"
             >
           </div>
         </div>
@@ -421,7 +463,9 @@
               id="cred-type"
               x-model="credentialType"
               x-disabled="credentialStatus === 'saving'"
-              class="block mt-1 px-3 py-2 w-full text-sm bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
+              @focus="credTypeError.set(false)"
+              class="block mt-1 px-3 py-2 w-full text-sm bg-white border rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
+              x-class="credTypeError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-300'"
             >
               <option value="">— Select —</option>
               <option value="bar_admission">Attorney (bar admission)</option>
@@ -437,8 +481,10 @@
               type="text"
               x-model="credentialState"
               x-disabled="credentialStatus === 'saving'"
+              @focus="credStateError.set(false)"
               placeholder="CA, NY, FEDERAL"
-              class="block mt-1 px-3 py-2 w-full text-sm bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
+              class="block mt-1 px-3 py-2 w-full text-sm bg-white border rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
+              x-class="credStateError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-300'"
               maxlength="7"
             >
             <p class="mt-1 text-gray-500 text-xs">Two-letter state code, or FEDERAL for federal-level credentials.</p>
