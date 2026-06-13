@@ -162,9 +162,11 @@
         type="button"
         @click="submitClaim()"
         x-disabled="submitting"
-        class="mt-3 inline-flex items-center px-4 py-2 font-semibold text-white text-sm bg-gray-900 hover:bg-gray-800 rounded-md disabled:opacity-50"
-        :text="submitting() ? 'Submitting…' : 'Submit claim for verification'"
-      ></button>
+        class="mt-3 inline-flex items-center justify-center px-4 py-2 font-semibold text-white text-sm bg-gray-900 hover:bg-gray-800 rounded-md disabled:opacity-50"
+      >
+        <svg :if="submitting()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
+        <span :text="submitting() ? 'Submitting…' : 'Submit claim for verification'"></span>
+      </button>
     </div>
 
     <div
