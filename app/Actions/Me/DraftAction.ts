@@ -107,7 +107,7 @@ export default new Action({
       }
       else {
         values.created_at = now
-        await db.insertInto('review_drafts').valuesvalues.execute()
+        await db.insertInto('review_drafts').values(values as any).execute()
       }
       return response.json({ ok: true })
     }
