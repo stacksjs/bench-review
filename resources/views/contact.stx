@@ -4,6 +4,7 @@
 
 @section('content')
 <script client>
+  const toast = useStore('toast')
   const contactName = state<string>('')
   const contactEmail = state<string>('')
   const topic = state<string>('general')
@@ -11,10 +12,20 @@
   const loading = state<boolean>(false)
   const sent = state<boolean>(false)
   const submitError = state<string>('')
+  const submitAttempted = state<boolean>(false)
 
   async function submit(): Promise<void> {
-    loading.set(true)
+    if (loading()) return
+    submitAttempted.set(true)
     submitError.set('')
+    if (!contactName().trim() || !contactEmail().trim() || !contactMessage().trim()) {
+      const msg = 'Please fill in your name, email, and message.'
+      submitError.set(msg)
+      toast.error('Message not sent', msg)
+      document.getElementById(!contactName().trim() ? 'name' : !contactEmail().trim() ? 'contact-email' : 'message')?.focus()
+      return
+    }
+    loading.set(true)
     try {
       const res = await fetch('/api/contact', {
         method: 'POST',
@@ -25,7 +36,9 @@
       sent.set(true)
     }
     catch (e) {
-      submitError.set(e instanceof Error ? e.message : String(e))
+      const msg = e instanceof Error ? e.message : String(e)
+      submitError.set(msg)
+      toast.error('Message not sent', msg)
     }
     finally {
       loading.set(false)
@@ -71,7 +84,7 @@
       <!-- Right: form -->
       <div>
         <div :show="!sent" class="p-8 bg-white border border-gray-100 rounded-2xl shadow-sm">
-          <form @submit.prevent="submit" class="space-y-6">
+          <form @submit.prevent="submit()" class="space-y-6">
             <div>
               <label for="name" class="block font-medium text-gray-900 text-sm">Name</label>
               <div class="mt-2">
@@ -80,7 +93,9 @@
                   type="text"
                   id="name"
                   required
-                  class="block px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2"
+                  @focus="submitAttempted.set(false)"
+                  class="block px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2"
+                  x-class="submitAttempted() && !contactName().trim() ? 'outline-red-500 ring-1 ring-red-300' : 'outline-gray-300'"
                 >
               </div>
             </div>
@@ -93,7 +108,9 @@
                   type="email"
                   id="contact-email"
                   required
-                  class="block px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2"
+                  @focus="submitAttempted.set(false)"
+                  class="block px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2"
+                  x-class="submitAttempted() && !contactEmail().trim() ? 'outline-red-500 ring-1 ring-red-300' : 'outline-gray-300'"
                 >
               </div>
             </div>
@@ -124,12 +141,14 @@
                   id="message"
                   rows="5"
                   required
-                  class="block px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2"
+                  @focus="submitAttempted.set(false)"
+                  class="block px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2"
+                  x-class="submitAttempted() && !contactMessage().trim() ? 'outline-red-500 ring-1 ring-red-300' : 'outline-gray-300'"
                 ></textarea>
               </div>
             </div>
 
-            <p :show="submitError" class="text-red-600 text-sm" x-text="submitError"></p>
+            <p x-class="submitError() ? 'text-red-600 text-sm' : 'hidden'" :text="submitError()"></p>
 
             <button
               type="submit"
