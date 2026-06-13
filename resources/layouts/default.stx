@@ -7,3 +7,4 @@
 @include('Bench/BenchFooter')
 
 @include('Bench/ToastHost')
+@include('Bench/ConfirmHost')

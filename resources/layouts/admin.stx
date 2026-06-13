@@ -7,3 +7,4 @@
 </main>
 
 @include('Bench/ToastHost')
+@include('Bench/ConfirmHost')
