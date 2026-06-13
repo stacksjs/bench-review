@@ -16,6 +16,7 @@
 
   const authStore = useStore('auth')
   const reviewsStore = useStore('reviews')
+  const toast = useStore('toast')
 
   interface CommentRow {
     id: number
@@ -39,6 +40,10 @@
   const commentAnon = state<boolean>(false)
   const commentSubmitting = state<boolean>(false)
   const commentError = state<string>('')
+  const commentFieldError = state<boolean>(false)
+  // Re-entry guard for per-row Delete (these buttons live in a :for, so a
+  // signal-call-driven per-row visual would break the loop — guard in JS).
+  const deletingId = state<number | null>(null)
 
   async function loadComments(): Promise<void> {
     if (!reviewIdForComments) return
@@ -60,9 +65,13 @@
 
   async function submitComment(): Promise<void> {
     if (commentSubmitting()) return
+    commentFieldError.set(false)
     const body = commentDraft().trim()
     if (body.length < 5) {
+      commentFieldError.set(true)
       commentError.set('Comment must be at least 5 characters.')
+      toast.error('Comment', 'Comment must be at least 5 characters.')
+      document.getElementById('comment-body')?.focus()
       return
     }
     commentSubmitting.set(true)
@@ -75,7 +84,10 @@
       })
       const data = await res.json().catch(() => ({})) as { ok?: boolean, error?: string, comment?: any }
       if (!res.ok || !data.ok) {
-        commentError.set(data.error || 'Could not post comment.')
+        const message = data.error || 'Could not post comment.'
+        commentFieldError.set(true)
+        commentError.set(message)
+        toast.error('Comment', message)
         return
       }
       commentDraft.set('')
@@ -86,7 +98,9 @@
       await loadComments()
     }
     catch (err) {
-      commentError.set(err instanceof Error ? err.message : 'Network error')
+      const message = err instanceof Error ? err.message : 'Network error'
+      commentError.set(message)
+      toast.error('Comment', message)
     }
     finally {
       commentSubmitting.set(false)
@@ -95,8 +109,10 @@
 
   async function deleteComment(commentId: number): Promise<void> {
     if (typeof window === 'undefined') return
+    if (deletingId()) return
     const ok = window.confirm('Delete this comment? This cannot be undone.')
     if (!ok) return
+    deletingId.set(commentId)
     try {
       const res = await authStore.authFetch(`/api/me/comments/${commentId}`, { method: 'DELETE' })
       if (!res.ok) return
@@ -104,6 +120,9 @@
     }
     catch (err) {
       console.error('[comments] delete failed:', err)
+    }
+    finally {
+      deletingId.set(null)
     }
   }
 
@@ -167,10 +186,14 @@
        self-like gate in ArticleView). -->
   <div :if="canCompose()" class="mt-5 p-4 bg-white border border-gray-200 rounded-lg">
     <textarea
+      id="comment-body"
       x-model="commentDraft"
       rows="3"
       placeholder="Add a comment — context, clarification, or a respectful pushback."
-      class="block w-full px-3 py-2 text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
+      @input="commentFieldError.set(false)"
+      @focus="commentFieldError.set(false)"
+      class="block w-full px-3 py-2 text-gray-900 sm:text-sm bg-white border rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
+      x-class="commentFieldError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-300'"
     ></textarea>
 
     <div
