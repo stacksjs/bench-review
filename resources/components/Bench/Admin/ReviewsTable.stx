@@ -282,9 +282,11 @@
                 type="button"
                 @click="saveResponse(review)"
                 x-disabled="savingResponse"
-                class="px-3 py-1.5 font-semibold text-white text-xs bg-gray-900 hover:bg-gray-800 rounded disabled:opacity-50"
-                :text="savingResponse() ? 'Saving…' : 'Save response'"
-              ></button>
+                class="inline-flex items-center justify-center px-3 py-1.5 font-semibold text-white text-xs bg-gray-900 hover:bg-gray-800 rounded disabled:opacity-50"
+              >
+                <svg :if="savingResponse()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
+                <span :text="savingResponse() ? 'Saving…' : 'Save response'"></span>
+              </button>
               <button
                 type="button"
                 @click="removeResponse(review)"
