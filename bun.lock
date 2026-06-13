@@ -985,7 +985,7 @@
       "devDependencies": {
         "@stacksjs/validation": "workspace:*",
         "@types/bun": "^1.3.11",
-        "typescript": "^5.9.3",
+        "typescript": "^6.0.3",
       },
     },
     "storage/framework/core/ui": {
@@ -2359,8 +2359,6 @@
     "@stacksjs/ts-faker/@stacksjs/clapp": ["@stacksjs/clapp@0.2.9", "", {}, "sha512-tY/Cl7ANduISwYA2flAthZMBh7VnLho1op2wjbGDwugl995+s4sfEvkTMoBgwdniKmG9HBQmNE1dRwVH+9l55g=="],
 
     "@stacksjs/ts-i18n/@stacksjs/clapp": ["@stacksjs/clapp@0.2.9", "", {}, "sha512-tY/Cl7ANduISwYA2flAthZMBh7VnLho1op2wjbGDwugl995+s4sfEvkTMoBgwdniKmG9HBQmNE1dRwVH+9l55g=="],
-
-    "@stacksjs/types/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "@stacksjs/ui/@stacksjs/stx": ["@stacksjs/stx@0.2.66", "", { "dependencies": { "@cwcss/crosswind": "^0.2.0", "@stacksjs/clapp": "^0.2.0", "@stacksjs/desktop": "0.2.57", "@stacksjs/sanitizer": "0.2.35", "@stacksjs/ts-craft": "^0.0.2", "bun-plugin-stx": "0.2.66", "bunfig": "^0.15.6", "stx-router": "0.2.66", "ts-broadcasting": "^0.0.4", "ts-images": "^0.1.8", "ts-syntax-highlighter": "^0.2.1" }, "bin": { "stx": "./dist/cli.js" } }, "sha512-6oYgJHRZvAytp5PxgMFHcDYTkSCGPWq/ZVbBpEM6euUH5KOY3MwvjgyFs4zTe4pN4upvHQZD3QSJkDJH8calKg=="],
 
