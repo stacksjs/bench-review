@@ -56,9 +56,7 @@
   <div
     role="alert"
     class="px-4 py-3 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
-    x-class="store.error() ? '' : 'hidden'"
-    :text="store.error()"
-  ></div>
+    x-class="store.error() ? '' : 'hidden'">{{ store.error() }}</div>
 
   <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
     <div :if="store.loading() && store.logs().length === 0" class="px-4 py-12 text-center text-gray-500 text-sm">
@@ -76,14 +74,14 @@
     <ul x-class="hasLogs() ? 'divide-gray-100 divide-y' : 'hidden'">
       <li :for="entry in store.logs" class="px-4 py-3">
         <div class="flex flex-wrap gap-2 items-center">
-          <span class="inline-block px-2 py-0.5 font-medium text-xs rounded-full" x-class="actionTone(entry)" :text="actionLabel(entry)"></span>
-          <span class="font-medium text-gray-900 text-sm" :text="targetLabel(entry)"></span>
+          <span class="inline-block px-2 py-0.5 font-medium text-xs rounded-full" x-class="actionTone(entry)">{{ actionLabel(entry) }}</span>
+          <span class="font-medium text-gray-900 text-sm">{{ targetLabel(entry) }}</span>
           <span class="text-gray-400 text-xs">·</span>
-          <span class="text-gray-600 text-xs">by <span :text="entry.actor_name"></span></span>
+          <span class="text-gray-600 text-xs">by <span>{{ entry.actor_name }}</span></span>
           <span class="text-gray-400 text-xs">·</span>
-          <span class="text-gray-500 text-xs" :text="formatDate(entry.created_at)"></span>
+          <span class="text-gray-500 text-xs">{{ formatDate(entry.created_at) }}</span>
         </div>
-        <p class="mt-1 text-gray-600 text-xs" x-class="hasNote(entry) ? '' : 'hidden'" :text="entry.note"></p>
+        <p class="mt-1 text-gray-600 text-xs" x-class="hasNote(entry) ? '' : 'hidden'">{{ entry.note }}</p>
       </li>
     </ul>
   </div>

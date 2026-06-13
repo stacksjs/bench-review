@@ -107,21 +107,19 @@
             </thead>
             <tbody class="divide-gray-200 divide-y">
               <tr :for="case_ in cases">
-                  <td class="pl-4 pr-3 py-4 sm:pl-0 font-medium text-gray-900 text-sm whitespace-nowrap" :text="case_.number"></td>
-                  <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap" :text="case_.title"></td>
+                  <td class="pl-4 pr-3 py-4 sm:pl-0 font-medium text-gray-900 text-sm whitespace-nowrap">{{ case_.number }}</td>
+                  <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap">{{ case_.title }}</td>
                   <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap">
-                    <span class="inline-flex items-center px-2 py-1 font-medium text-blue-700 text-xs bg-blue-50 ring-1 ring-blue-700/10 ring-inset rounded-md" :text="case_.type"></span>
+                    <span class="inline-flex items-center px-2 py-1 font-medium text-blue-700 text-xs bg-blue-50 ring-1 ring-blue-700/10 ring-inset rounded-md">{{ case_.type }}</span>
                   </td>
                   <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap">
                     <span
                       class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset"
-                      x-class="statusClass(case_.status)"
-                      :text="case_.status"
-                    ></span>
+                      x-class="statusClass(case_.status)">{{ case_.status }}</span>
                   </td>
-                  <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap" :text="case_.filedDate"></td>
+                  <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap">{{ case_.filedDate }}</td>
                   <td class="relative pl-3 pr-4 py-4 sm:pr-0 font-medium text-right text-sm whitespace-nowrap">
-                    <a href="#" class="text-gray-600 hover:text-gray-900">View<span class="sr-only" :text="`, ${case_.number}`"></span></a>
+                    <a href="#" class="text-gray-600 hover:text-gray-900">View<span class="sr-only">{{ `, ${case_.number}` }}</span></a>
                   </td>
               </tr>
             </tbody>

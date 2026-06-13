@@ -151,7 +151,7 @@
         x-class="statusFilter === 'all' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >
         All
-        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="statusFilter === 'all' ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-600'" :text="counts.all"></span>
+        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="statusFilter === 'all' ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-600'">{{ counts.all }}</span>
       </button>
       <button
         type="button"
@@ -161,7 +161,7 @@
         x-class="statusFilter === 'pending' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >
         Pending
-        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="statusFilter === 'pending' ? 'bg-white/15 text-white' : 'bg-amber-50 text-amber-700'" :text="counts.pending"></span>
+        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="statusFilter === 'pending' ? 'bg-white/15 text-white' : 'bg-amber-50 text-amber-700'">{{ counts.pending }}</span>
       </button>
       <button
         type="button"
@@ -171,7 +171,7 @@
         x-class="statusFilter === 'published' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >
         Published
-        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="statusFilter === 'published' ? 'bg-white/15 text-white' : 'bg-emerald-50 text-emerald-700'" :text="counts.published"></span>
+        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="statusFilter === 'published' ? 'bg-white/15 text-white' : 'bg-emerald-50 text-emerald-700'">{{ counts.published }}</span>
       </button>
       <button
         type="button"
@@ -181,7 +181,7 @@
         x-class="statusFilter === 'rejected' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >
         Declined
-        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="statusFilter === 'rejected' ? 'bg-white/15 text-white' : 'bg-red-50 text-red-700'" :text="counts.rejected"></span>
+        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="statusFilter === 'rejected' ? 'bg-white/15 text-white' : 'bg-red-50 text-red-700'">{{ counts.rejected }}</span>
       </button>
     </div>
 
@@ -215,8 +215,8 @@
          initial load to avoid the "no reviews" flash before the
          first fetch returns. -->
     <div :if="profileStore.loaded && filtered.length === 0" class="mt-10 p-10 text-center bg-white border border-gray-200 rounded-lg">
-      <p class="font-semibold text-gray-900 text-base" :text="emptyTitle"></p>
-      <p class="mt-2 mx-auto max-w-md text-gray-500 text-sm" :text="emptyHint"></p>
+      <p class="font-semibold text-gray-900 text-base">{{ emptyTitle }}</p>
+      <p class="mt-2 mx-auto max-w-md text-gray-500 text-sm">{{ emptyHint }}</p>
       <StxLink to="/review" class="inline-flex items-center mt-6 px-4 py-2 font-medium text-white text-sm bg-gray-900 rounded-md hover:bg-gray-800">
         Write a review
       </StxLink>
@@ -231,14 +231,10 @@
         <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <StxLink
             x-to="`/article/${r.id}`"
-            class="font-semibold text-gray-900 text-base hover:underline underline-offset-2 decoration-gray-300"
-            :text="r.title"
-          ></StxLink>
+            class="font-semibold text-gray-900 text-base hover:underline underline-offset-2 decoration-gray-300">{{ r.title }}</StxLink>
           <span
             class="inline-flex items-center px-2 py-0.5 font-medium text-xs ring-1 rounded-full"
-            x-class="statusBadgeClasses(r.status)"
-            :text="statusLabel(r.status)"
-          ></span>
+            x-class="statusBadgeClasses(r.status)">{{ statusLabel(r.status) }}</span>
         </div>
 
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-gray-500 text-xs">
@@ -246,19 +242,17 @@
             Review of
             <StxLink
               x-to="`/judges/${r.judge.id}/profile`"
-              class="text-gray-700 hover:underline underline-offset-2"
-              :text="r.judge.name"
-            ></StxLink>
+              class="text-gray-700 hover:underline underline-offset-2">{{ r.judge.name }}</StxLink>
           </span>
           <span class="text-gray-300">·</span>
-          <span :text="formatDate(r.created_at)"></span>
+          <span>{{ formatDate(r.created_at) }}</span>
           <span class="text-gray-300">·</span>
-          <span class="inline-flex items-center gap-1 tabular-nums" :text="`${r.rating}/5`"></span>
+          <span class="inline-flex items-center gap-1 tabular-nums">{{ `${r.rating}/5` }}</span>
           <span :if="r.likes && r.likes > 0" class="text-gray-300">·</span>
-          <span :if="r.likes && r.likes > 0" class="inline-flex items-center gap-1" :text="`${r.likes} ${r.likes === 1 ? 'reaction' : 'reactions'}`"></span>
+          <span :if="r.likes && r.likes > 0" class="inline-flex items-center gap-1">{{ `${r.likes} ${r.likes === 1 ? 'reaction' : 'reactions'}` }}</span>
         </div>
 
-        <p class="mt-3 text-gray-600 text-sm line-clamp-2" :text="snippet(r.content)"></p>
+        <p class="mt-3 text-gray-600 text-sm line-clamp-2">{{ snippet(r.content) }}</p>
 
         <div class="flex flex-wrap items-center gap-x-4 mt-4 pt-3 border-t border-gray-100 text-sm">
           <StxLink x-to="`/article/${r.id}`" class="font-medium text-gray-900 hover:underline underline-offset-2">

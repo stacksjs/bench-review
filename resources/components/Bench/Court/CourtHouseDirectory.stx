@@ -136,7 +136,7 @@
         x-class="stateFilter === 'all' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >
         All states
-        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="stateFilter === 'all' ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-600'" :text="courtCounts.byState.all"></span>
+        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="stateFilter === 'all' ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-600'">{{ courtCounts.byState.all }}</span>
       </button>
       <button :for="s in availableStates"
         type="button"
@@ -145,8 +145,8 @@
         class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
         x-class="stateFilter === s ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >
-        <span :text="s"></span>
-        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="stateFilter === s ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-600'" :text="courtCounts.byState[s] || 0"></span>
+        <span>{{ s }}</span>
+        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="stateFilter === s ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-600'">{{ courtCounts.byState[s] || 0 }}</span>
       </button>
     </div>
 
@@ -168,7 +168,7 @@
         x-class="hasReviewsFilter === 'with' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >
         With reviews
-        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="hasReviewsFilter === 'with' ? 'bg-white/15 text-white' : 'bg-emerald-50 text-emerald-700'" :text="courtCounts.withReviews"></span>
+        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="hasReviewsFilter === 'with' ? 'bg-white/15 text-white' : 'bg-emerald-50 text-emerald-700'">{{ courtCounts.withReviews }}</span>
       </button>
       <button
         type="button"
@@ -178,7 +178,7 @@
         x-class="hasReviewsFilter === 'without' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >
         Without reviews
-        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="hasReviewsFilter === 'without' ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-600'" :text="courtCounts.withoutReviews"></span>
+        <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="hasReviewsFilter === 'without' ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-600'">{{ courtCounts.withoutReviews }}</span>
       </button>
     </div>
 
@@ -213,16 +213,16 @@
             >
             <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
             <div class="absolute bottom-4 left-4">
-              <span class="inline-flex items-center px-3 py-1 font-medium text-gray-700 text-sm bg-white/90 ring-1 ring-gray-700/10 ring-inset rounded-full" :text="court.state"></span>
+              <span class="inline-flex items-center px-3 py-1 font-medium text-gray-700 text-sm bg-white/90 ring-1 ring-gray-700/10 ring-inset rounded-full">{{ court.state }}</span>
             </div>
           </div>
 
           <!-- Content Container -->
           <div class="p-6">
             <div class="text-center">
-              <h3 class="font-semibold text-gray-900 text-xl group-hover:text-deep-brown duration-200 transition-colors" :text="court.name"></h3>
-              <p class="mt-2 text-gray-500 text-sm" :text="`${court.city}, ${court.state}`"></p>
-              <p class="mt-1 text-gray-500 text-sm" :text="court.address"></p>
+              <h3 class="font-semibold text-gray-900 text-xl group-hover:text-deep-brown duration-200 transition-colors">{{ court.name }}</h3>
+              <p class="mt-2 text-gray-500 text-sm">{{ `${court.city}, ${court.state}` }}</p>
+              <p class="mt-1 text-gray-500 text-sm">{{ court.address }}</p>
             </div>
           </div>
       </StxLink>
@@ -236,7 +236,7 @@
       <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
       </svg>
-      <p class="mt-4 font-medium text-gray-900" :text="(stateFilter() !== 'all' || hasReviewsFilter() !== 'all' || searchQuery() !== '') ? 'No courthouses match these filters' : 'No courthouses yet'"></p>
+      <p class="mt-4 font-medium text-gray-900">{{ (stateFilter() !== 'all' || hasReviewsFilter() !== 'all' || searchQuery() !== '') ? 'No courthouses match these filters' : 'No courthouses yet' }}</p>
       <p x-class="hasActiveFilters() ? '' : 'hidden'" class="mt-1 text-gray-500 text-sm">Try a different state, or clear the filters to see all courthouses.</p>
       <button
         x-class="hasActiveFilters() ? '' : 'hidden'"

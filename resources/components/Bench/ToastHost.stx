@@ -17,8 +17,8 @@
     x-class="t.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' : t.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : t.type === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-white border-gray-200 text-gray-800'"
   >
     <div class="flex-1 min-w-0">
-      <p :if="t.title" class="font-semibold text-sm" :text="t.title"></p>
-      <p class="text-sm break-words" :text="t.message"></p>
+      <p :if="t.title" class="font-semibold text-sm">{{ t.title }}</p>
+      <p class="text-sm break-words">{{ t.message }}</p>
     </div>
     <span class="flex-shrink-0 text-lg leading-none opacity-40" aria-hidden="true">&times;</span>
   </div>

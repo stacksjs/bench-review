@@ -67,14 +67,14 @@
               class="flex items-center justify-between w-full text-gray-900 text-left"
               @click="open.set(open() === idx ? -1 : idx)"
             >
-              <span class="font-semibold text-base" :text="faq.q"></span>
+              <span class="font-semibold text-base">{{ faq.q }}</span>
               <span class="flex items-center ml-6 h-7">
                 <Icon name="chevron-down" size="24" class="duration-200 transition-transform" x-class="open() === idx ? 'rotate-180' : ''" />
               </span>
             </button>
           </dt>
           <dd :if="open() === idx" class="mt-4 pr-12">
-            <p class="leading-7 text-base text-gray-600" :text="faq.a"></p>
+            <p class="leading-7 text-base text-gray-600">{{ faq.a }}</p>
           </dd>
       </div>
     </dl>

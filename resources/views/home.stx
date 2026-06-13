@@ -181,7 +181,7 @@
         </form>
         <div class="flex flex-wrap gap-2 mt-4 text-gray-500 text-xs">
           <span class="font-medium">Popular:</span>
-          <StxLink :for="cat in popularCategories" x-to="`/search?type=${cat.name}`" class="hover:text-gray-700 hover:underline" :text="cat.name"></StxLink>
+          <StxLink :for="cat in popularCategories" x-to="`/search?type=${cat.name}`" class="hover:text-gray-700 hover:underline">{{ cat.name }}</StxLink>
         </div>
       </div>
     </div>
@@ -241,13 +241,13 @@
             <div class="flex gap-4 items-center">
               <img class="object-cover h-14 w-14 ring-2 ring-gray-50 rounded-full grayscale group-hover:grayscale-0 duration-200 transition-all" x-src="judge.image_url" x-alt="judge.name">
               <div class="min-w-0 flex-1">
-                <h3 class="font-semibold text-gray-900 truncate" :text="judge.name"></h3>
-                <p :if="judge.court_name" class="text-gray-500 text-sm truncate" :text="judge.court_name"></p>
+                <h3 class="font-semibold text-gray-900 truncate">{{ judge.name }}</h3>
+                <p :if="judge.court_name" class="text-gray-500 text-sm truncate">{{ judge.court_name }}</p>
               </div>
             </div>
             <div class="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
-              <span class="text-amber-700 text-xs font-medium" :text="`${judge.review_count} ${judge.review_count === 1 ? 'review' : 'reviews'} this week`"></span>
-              <span :if="judge.avg_rating" class="font-medium text-gray-700 text-xs tabular-nums" :text="`${judge.avg_rating} ★`"></span>
+              <span class="text-amber-700 text-xs font-medium">{{ `${judge.review_count} ${judge.review_count === 1 ? 'review' : 'reviews'} this week` }}</span>
+              <span :if="judge.avg_rating" class="font-medium text-gray-700 text-xs tabular-nums">{{ `${judge.avg_rating} ★` }}</span>
             </div>
           </StxLink>
         </div>
@@ -264,8 +264,8 @@
       <div class="mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         <div class="flex items-end justify-between">
           <div>
-            <h2 class="font-bold text-3xl text-gray-900 tracking-tight" :text="showTopRated() ? 'Top-rated judges' : 'Featured judges'"></h2>
-            <p class="mt-2 text-gray-600" :text="showTopRated() ? 'Highest-rated judges based on published reviews.' : 'A sampling from the directory to get you started.'"></p>
+            <h2 class="font-bold text-3xl text-gray-900 tracking-tight">{{ showTopRated() ? 'Top-rated judges' : 'Featured judges' }}</h2>
+            <p class="mt-2 text-gray-600">{{ showTopRated() ? 'Highest-rated judges based on published reviews.' : 'A sampling from the directory to get you started.' }}</p>
           </div>
           <StxLink to="/judges" class="hidden sm:block font-semibold text-gray-700 text-sm hover:text-gray-900">
             View all judges <span aria-hidden="true">→</span>
@@ -283,12 +283,12 @@
             <div class="flex gap-4 items-center">
               <img class="object-cover h-16 w-16 ring-2 ring-gray-50 rounded-full grayscale group-hover:grayscale-0 duration-200 transition-all" x-src="judge.image_url" x-alt="judge.name">
               <div class="min-w-0">
-                <h3 class="font-semibold text-gray-900 truncate group-hover:text-deep-brown duration-200 transition-colors" :text="judge.name"></h3>
-                <p :if="judge.court_name" class="text-gray-500 text-sm truncate" :text="judge.court_name"></p>
+                <h3 class="font-semibold text-gray-900 truncate group-hover:text-deep-brown duration-200 transition-colors">{{ judge.name }}</h3>
+                <p :if="judge.court_name" class="text-gray-500 text-sm truncate">{{ judge.court_name }}</p>
               </div>
             </div>
             <div class="flex items-center justify-between mt-4 pt-4 border-gray-100 border-t">
-              <span class="font-medium text-amber-700 text-xs tabular-nums" :text="`${judge.avg_rating} ★  · ${judge.review_count} ${judge.review_count === 1 ? 'review' : 'reviews'}`"></span>
+              <span class="font-medium text-amber-700 text-xs tabular-nums">{{ `${judge.avg_rating} ★  · ${judge.review_count} ${judge.review_count === 1 ? 'review' : 'reviews'}` }}</span>
               <span class="font-medium text-gray-700 text-xs hover:text-gray-900">View profile →</span>
             </div>
           </StxLink>
@@ -306,9 +306,9 @@
             <div class="flex gap-4 items-center">
               <img class="object-cover h-16 w-16 ring-2 ring-gray-50 rounded-full grayscale group-hover:grayscale-0 duration-200 transition-all" x-src="judge.photo" x-alt="judge.name">
               <div class="min-w-0">
-                <h3 class="font-semibold text-gray-900 truncate group-hover:text-deep-brown duration-200 transition-colors" :text="judge.name"></h3>
-                <p class="text-gray-500 text-sm truncate" :text="judge.court.name"></p>
-                <p class="text-gray-400 text-xs" :text="judge.location"></p>
+                <h3 class="font-semibold text-gray-900 truncate group-hover:text-deep-brown duration-200 transition-colors">{{ judge.name }}</h3>
+                <p class="text-gray-500 text-sm truncate">{{ judge.court.name }}</p>
+                <p class="text-gray-400 text-xs">{{ judge.location }}</p>
               </div>
             </div>
             <div class="flex items-center justify-between mt-4 pt-4 border-gray-100 border-t">
@@ -398,18 +398,18 @@
         >
             <div class="flex items-center justify-between">
               <div class="flex items-center">
-                <div class="flex items-center justify-center h-9 w-9 font-semibold text-gray-500 text-sm bg-gray-100 rounded-full" :text="(review.title || 'A').slice(0, 1).toUpperCase()"></div>
+                <div class="flex items-center justify-center h-9 w-9 font-semibold text-gray-500 text-sm bg-gray-100 rounded-full">{{ (review.title || 'A').slice(0, 1).toUpperCase() }}</div>
                 <div class="ml-3">
                   <p class="font-medium text-gray-900 text-sm">Reviewer</p>
-                  <p class="text-gray-500 text-xs" :text="formatDate(review.created_at)"></p>
+                  <p class="text-gray-500 text-xs">{{ formatDate(review.created_at) }}</p>
                 </div>
               </div>
               <div class="flex items-center">
                 <Icon :for="star in stars" name="star" size="16" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-200'" />
               </div>
             </div>
-            <h3 class="mt-4 font-semibold line-clamp-2 text-gray-900" :text="review.title"></h3>
-            <p class="mt-2 line-clamp-3 text-gray-600 text-sm" :text="review.content"></p>
+            <h3 class="mt-4 font-semibold line-clamp-2 text-gray-900">{{ review.title }}</h3>
+            <p class="mt-2 line-clamp-3 text-gray-600 text-sm">{{ review.content }}</p>
         </StxLink>
       </div>
     </div>
@@ -433,10 +433,10 @@
         <ul class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
           <li :for="reviewer in activeReviewers" class="p-4 bg-white border border-gray-100 rounded-xl hover:border-emerald-200 hover:shadow-sm transition-all">
             <StxLink x-to="`/user/${reviewer.id}`" class="flex items-center gap-3">
-              <div class="flex items-center justify-center flex-none h-10 w-10 font-semibold text-emerald-700 text-xs bg-emerald-50 ring-1 ring-emerald-200/60 rounded-full" :text="(reviewer.name || '?').charAt(0).toUpperCase()"></div>
+              <div class="flex items-center justify-center flex-none h-10 w-10 font-semibold text-emerald-700 text-xs bg-emerald-50 ring-1 ring-emerald-200/60 rounded-full">{{ (reviewer.name || '?').charAt(0).toUpperCase() }}</div>
               <div class="min-w-0 flex-1">
-                <p class="font-medium text-gray-900 text-sm truncate" :text="reviewer.name"></p>
-                <p class="text-emerald-700 text-xs" :text="`${reviewer.review_count} ${reviewer.review_count === 1 ? 'review' : 'reviews'}`"></p>
+                <p class="font-medium text-gray-900 text-sm truncate">{{ reviewer.name }}</p>
+                <p class="text-emerald-700 text-xs">{{ `${reviewer.review_count} ${reviewer.review_count === 1 ? 'review' : 'reviews'}` }}</p>
               </div>
             </StxLink>
           </li>

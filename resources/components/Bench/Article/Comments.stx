@@ -56,7 +56,7 @@
 <div class="mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
   <div class="pt-8 border-gray-200 border-t">
     <h2 class="font-semibold text-gray-900 text-xl">
-      Comments <span class="ml-2 text-base text-gray-500" x-text="`(${comments().length})`"></span>
+      Comments <span class="ml-2 text-base text-gray-500">{{ `(${comments().length})` }}</span>
     </h2>
 
     <!-- Comment form -->
@@ -92,10 +92,10 @@
         <img class="flex-none h-10 w-10 rounded-full" x-src="comment.author.imageUrl" x-alt="comment.author.name">
         <div class="flex-auto">
           <div class="flex items-center justify-between">
-            <p class="font-semibold text-gray-900 text-sm" x-text="comment.author.name"></p>
-            <p class="text-gray-500 text-xs" x-text="comment.time"></p>
+            <p class="font-semibold text-gray-900 text-sm">{{ comment.author.name }}</p>
+            <p class="text-gray-500 text-xs">{{ comment.time }}</p>
           </div>
-          <p class="mt-1 leading-6 text-gray-700 text-sm" x-text="comment.content"></p>
+          <p class="mt-1 leading-6 text-gray-700 text-sm">{{ comment.content }}</p>
           <div class="flex gap-x-4 items-center mt-3 text-gray-500 text-xs">
             <button
               type="button"
@@ -103,7 +103,7 @@
               @click="likeComment(comment.id)"
             >
               <Icon name="bookmark" size="16" class="mr-1" />
-              <span x-text="comment.likes"></span>
+              <span>{{ comment.likes }}</span>
             </button>
             <button type="button" class="hover:text-gray-700">Reply</button>
             <button type="button" class="hover:text-gray-700">Report</button>

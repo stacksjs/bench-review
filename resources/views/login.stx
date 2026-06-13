@@ -108,9 +108,7 @@
           role="alert"
           aria-live="polite"
           class="px-4 py-3 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
-          x-class="submitError() ? '' : 'hidden'"
-          :text="submitError()"
-        ></div>
+          x-class="submitError() ? '' : 'hidden'">{{ submitError() }}</div>
 
         <button
           type="submit"
@@ -118,7 +116,7 @@
           class="inline-flex items-center justify-center px-3 py-1.5 w-full font-semibold text-sm/6 text-white bg-gray-600 hover:bg-gray-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
         >
           <svg :if="loading()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
-          <span :text="loading() ? 'Signing in...' : 'Sign in'"></span>
+          <span>{{ loading() ? 'Signing in...' : 'Sign in' }}</span>
         </button>
       </form>
     </div>

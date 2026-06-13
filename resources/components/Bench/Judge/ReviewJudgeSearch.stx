@@ -136,9 +136,9 @@
         >
           <img x-src="result.photo" class="object-cover flex-none h-10 w-10 ring-1 ring-gray-100 rounded-full grayscale filter" x-alt="result.name">
           <div class="min-w-0 flex-1">
-            <p class="font-medium text-gray-900 text-sm truncate" :text="result.name"></p>
-            <p class="text-gray-500 text-xs truncate" :text="result.court.name"></p>
-            <p :if="result.location" class="text-gray-400 text-xs truncate" :text="result.location"></p>
+            <p class="font-medium text-gray-900 text-sm truncate">{{ result.name }}</p>
+            <p class="text-gray-500 text-xs truncate">{{ result.court.name }}</p>
+            <p :if="result.location" class="text-gray-400 text-xs truncate">{{ result.location }}</p>
           </div>
           <svg class="h-4 w-4 text-gray-300 flex-none" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
@@ -148,7 +148,7 @@
     </div>
 
     <div :if="showEmpty" class="mt-2 p-4 text-center bg-gray-50 border border-gray-200 border-dashed rounded-md">
-      <p class="text-gray-600 text-sm">No judges match "<span :text="searchInput()"></span>".</p>
+      <p class="text-gray-600 text-sm">No judges match "<span>{{ searchInput() }}</span>".</p>
       <p class="mt-1 text-gray-400 text-xs">Try a different name or court.</p>
     </div>
   </div>
