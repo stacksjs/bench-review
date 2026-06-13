@@ -316,9 +316,10 @@
           <div class="flex gap-4 items-center">
             <img class="object-cover h-14 w-14 ring-1 ring-gray-100 rounded-full" x-src="avatarUrl" alt="Your profile photo">
             <label
-              class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-md transition-colors cursor-pointer"
+              class="inline-flex items-center justify-center px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-md transition-colors cursor-pointer"
               x-class="photoUploading() ? 'opacity-60 pointer-events-none' : ''"
             >
+              <svg :if="photoUploading()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
               <span :text="photoUploading() ? 'Uploading…' : 'Change photo'"></span>
               <input
                 type="file"
@@ -374,9 +375,11 @@
             type="button"
             @click="saveProfile()"
             x-disabled="saveStatus === 'saving'"
-            class="px-4 py-2 font-semibold text-sm text-white bg-gray-900 hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md transition-colors shadow-sm"
-            :text="saveStatus === 'saving' ? 'Saving…' : 'Save changes'"
-          >Save changes</button>
+            class="inline-flex items-center justify-center px-4 py-2 font-semibold text-sm text-white bg-gray-900 hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md transition-colors shadow-sm"
+          >
+            <svg :if="saveStatus() === 'saving'" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
+            <span :text="saveStatus === 'saving' ? 'Saving…' : 'Save changes'"></span>
+          </button>
         </div>
       </div>
     </section>
@@ -438,9 +441,11 @@
             type="button"
             @click="savePassword()"
             x-disabled="pwStatus === 'saving'"
-            class="px-4 py-2 font-semibold text-sm text-white bg-gray-900 hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md transition-colors shadow-sm"
-            :text="pwStatus === 'saving' ? 'Updating…' : 'Update password'"
-          >Update password</button>
+            class="inline-flex items-center justify-center px-4 py-2 font-semibold text-sm text-white bg-gray-900 hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md transition-colors shadow-sm"
+          >
+            <svg :if="pwStatus() === 'saving'" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
+            <span :text="pwStatus === 'saving' ? 'Updating…' : 'Update password'"></span>
+          </button>
         </div>
       </div>
     </section>
@@ -509,9 +514,11 @@
             type="button"
             @click="saveCredentialClaim()"
             x-disabled="credentialStatus === 'saving'"
-            class="px-4 py-2 font-semibold text-white text-sm bg-gray-900 hover:bg-gray-800 rounded-md disabled:opacity-50"
-            :text="credentialStatus === 'saving' ? 'Submitting…' : 'Submit claim for verification'"
-          ></button>
+            class="inline-flex items-center justify-center px-4 py-2 font-semibold text-white text-sm bg-gray-900 hover:bg-gray-800 rounded-md disabled:opacity-50"
+          >
+            <svg :if="credentialStatus() === 'saving'" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
+            <span :text="credentialStatus === 'saving' ? 'Submitting…' : 'Submit claim for verification'"></span>
+          </button>
         </div>
       </div>
     </section>
@@ -579,9 +586,11 @@
               type="button"
               @click="deleteAccount()"
               x-disabled="deleting"
-              class="px-4 py-2 font-semibold text-white text-sm bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50"
-              :text="deleting() ? 'Deleting…' : 'Permanently delete'"
-            ></button>
+              class="inline-flex items-center justify-center px-4 py-2 font-semibold text-white text-sm bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50"
+            >
+              <svg :if="deleting()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
+              <span :text="deleting() ? 'Deleting…' : 'Permanently delete'"></span>
+            </button>
             <button
               type="button"
               @click="confirmingDelete.set(false)"
