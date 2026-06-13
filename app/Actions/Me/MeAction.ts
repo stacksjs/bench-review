@@ -1,5 +1,6 @@
 import { Action } from '@stacksjs/actions'
 import { Auth, getUserRoles } from '@stacksjs/auth'
+import { db } from '@stacksjs/database'
 import { response } from '@stacksjs/router'
 import { bootRbac } from '../../Helpers/rbac'
 
@@ -29,11 +30,20 @@ export default new Action({
     const userId = user.id
     const roles = await getUserRoles(userId)
 
+    // Read avatar straight from the column so a reload reflects the
+    // stored photo regardless of whether Auth.user()'s model projection
+    // includes it (UploadAvatarAction writes users.avatar directly).
+    const row = await db.selectFrom('users')
+      .select(['avatar'])
+      .where('id', '=', Number(userId))
+      .executeTakeFirst() as { avatar: string | null } | undefined
+
     return response.json({
       id: userId,
       email: user.email,
       name: user.name,
-      roles: roles.map(r => r.name),
+      avatar: row?.avatar ?? (user as any).avatar ?? null,
+      roles: roles.map((r: { name: string }) => r.name),
     })
   },
 })

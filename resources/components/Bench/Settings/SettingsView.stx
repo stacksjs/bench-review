@@ -43,10 +43,40 @@
   syncFromAuth()
   onMount(() => syncFromAuth())
 
+  // Avatar source: the user's uploaded photo if set, else a deterministic
+  // initials placeholder (NOT a stock face — a misattributed real photo
+  // reads worse than honest initials). Updates reactively after upload.
   const avatarUrl = derived<string>(() => {
-    return authStore.user()?.avatar
-      || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+    const u = authStore.user()
+    if (u?.avatar) return u.avatar
+    const name = (u?.name || 'User').trim() || 'User'
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=256&background=1f2937&color=ffffff&bold=true`
   })
+
+  // "Change photo" upload state.
+  const photoUploading = state<boolean>(false)
+  const photoError = state<string>('')
+
+  // Wired to the hidden file input's @change. Sends the chosen image to
+  // POST /api/me/avatar via the auth store, which mirrors the new URL
+  // onto the cached user so avatarUrl above re-renders immediately.
+  async function handleAvatarChange(files: FileList | null): Promise<void> {
+    const file = files && files[0]
+    if (!file) return
+    photoUploading.set(true)
+    photoError.set('')
+    try {
+      const res = await authStore.uploadAvatar(file)
+      if (!res.ok)
+        photoError.set(res.error || 'Upload failed.')
+    }
+    catch (err) {
+      photoError.set(err instanceof Error ? err.message : 'Network error')
+    }
+    finally {
+      photoUploading.set(false)
+    }
+  }
 
   async function saveProfile(): Promise<void> {
     saveStatus.set('saving')
@@ -242,9 +272,29 @@
         <p class="mt-1 text-gray-500 text-sm">How your name appears on reviews and across Bench Review.</p>
       </div>
       <div class="px-6 py-6 sm:px-8 space-y-6">
-        <div class="flex gap-4 items-center">
-          <img class="object-cover h-14 w-14 ring-1 ring-gray-100 rounded-full" x-src="avatarUrl" alt="">
-          <button type="button" class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-md transition-colors">Change photo</button>
+        <div>
+          <div class="flex gap-4 items-center">
+            <img class="object-cover h-14 w-14 ring-1 ring-gray-100 rounded-full" x-src="avatarUrl" alt="Your profile photo">
+            <label
+              class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-md transition-colors cursor-pointer"
+              x-class="photoUploading() ? 'opacity-60 pointer-events-none' : ''"
+            >
+              <span :text="photoUploading() ? 'Uploading…' : 'Change photo'"></span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                x-disabled="photoUploading"
+                @change="handleAvatarChange($event.target.files)"
+                class="hidden"
+              >
+            </label>
+          </div>
+          <div
+            role="alert"
+            class="mt-2 text-red-600 text-xs"
+            x-class="photoError() ? '' : 'hidden'"
+            :text="photoError()"
+          ></div>
         </div>
 
         <div class="grid gap-x-6 gap-y-5 grid-cols-1 sm:grid-cols-2">

@@ -233,6 +233,13 @@ route.patch('/me', 'Actions/Me/UpdateMeAction')
   .middleware('auth')
   .skipCsrf()
 
+// Profile photo upload (Settings "Change photo"). Multipart `avatar`
+// file → EXIF-stripped 256² WebP on local disk → users.avatar.
+route.post('/me/avatar', 'Actions/Me/UploadAvatarAction')
+  .name('bench.me.avatar')
+  .middleware('auth')
+  .skipCsrf()
+
 route.get('/me/reviews', 'Actions/Me/MyReviewsAction')
   .name('bench.me.reviews')
   .middleware('auth')

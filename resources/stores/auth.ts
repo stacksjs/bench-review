@@ -353,6 +353,31 @@ defineStore('auth', () => {
       setUserCookie(next)
   }
 
+  /**
+   * Upload a new profile photo. POSTs the file as multipart to
+   * /api/me/avatar; on success mirrors the returned URL onto the cached
+   * user (signal + cookie) so every avatar binding updates without a
+   * refetch. Content-Type is left unset so the browser writes the
+   * multipart boundary itself (authFetch only adds Authorization/Accept).
+   */
+  async function uploadAvatar(file: File): Promise<{ ok: boolean, avatar?: string, error?: string }> {
+    try {
+      const form = new FormData()
+      form.append('avatar', file)
+      const res = await _apiFetch('/api/me/avatar', { method: 'POST', body: form })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean, avatar?: string, error?: string }
+      if (!res.ok || !data.ok || !data.avatar)
+        return { ok: false, error: data.error || 'Upload failed' }
+      const merged = { ...(user() ?? {}), avatar: data.avatar } as UserProfile
+      user.set(merged)
+      setUserCookie(merged)
+      return { ok: true, avatar: data.avatar }
+    }
+    catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'Network error' }
+    }
+  }
+
   return {
     user,
     token,
@@ -365,6 +390,7 @@ defineStore('auth', () => {
     logout,
     getUser,
     setUser,
+    uploadAvatar,
     fetchMe,
     authFetch,
     // Exposed for the admin store — admin login POSTs to its own
