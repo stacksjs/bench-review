@@ -6,6 +6,8 @@
   // store handles the API + in-memory cache.
   const store = useStore('adminUsers')
   const adminStore = useStore('admin')
+  const confirmStore = useStore('confirm')
+  const toast = useStore('toast')
 
   // Reset page size for this view (the dashboard set it to 1 for
   // count-only summaries; we want a real list here).
@@ -51,6 +53,7 @@
         return
       }
       cancelEdit()
+      toast.success('User updated', 'Changes saved.')
     }
     finally {
       saving.set(false)
@@ -68,10 +71,16 @@
   }
 
   async function confirmDelete(user: AdminUserRow): Promise<void> {
-    if (typeof window === 'undefined') return
-    const ok = window.confirm(`Delete user "${user.email}"? This also removes their reviews and follows. This cannot be undone.`)
+    const ok = await confirmStore.ask({
+      title: 'Delete user',
+      message: `Delete user "${user.email}"? This also removes their reviews and follows. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
     if (!ok) return
-    await store.deleteUser(user.id)
+    const deleted = await store.deleteUser(user.id)
+    if (deleted)
+      toast.success('User deleted', `${user.email} and their content were removed.`)
   }
 
   function onSearchInput(e: Event): void {
