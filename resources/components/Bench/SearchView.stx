@@ -28,6 +28,38 @@
   const totalResults = judgesStore.totalResults
   const stars: number[] = [1, 2, 3, 4, 5]
 
+  // Local derived flags for the search-driven empty-state panels,
+  // computed in JS so the signal calls are unambiguous. Consumed via
+  // x-class (CSS toggle) — NOT :if — because bindIf drops the binding
+  // of an :if branch that was false at first render. With data present
+  // on load these panels start false, and once the user searches/filters
+  // to an empty result set the :if version never re-rendered (stayed
+  // blank). x-class keeps the panel in the DOM with a live reactive
+  // binding. Mirrors Bench/ReviewsFeed's showFilteredEmpty/showGenuineEmpty.
+  // Every signal is CALLED with parens: a local derived like filteredJudges
+  // is read as filteredJudges() (not filteredJudges.length).
+  const showAllEmpty = derived<boolean>(() =>
+    search.tab() === 'all' && totalResults() === 0 && !judgesStore.loading())
+  const showJudgesEmpty = derived<boolean>(() =>
+    filteredJudges().length === 0 && !judgesStore.loading())
+  const showJudgesList = derived<boolean>(() =>
+    filteredJudges().length > 0)
+  const showCourtsEmpty = derived<boolean>(() =>
+    filteredCourts().length === 0 && !judgesStore.loading())
+  const showCourtsList = derived<boolean>(() =>
+    filteredCourts().length > 0)
+
+  // Tab-driven section wrappers. These were :if too, and because they
+  // host the x-class empty/list panels above, a wrapper dropped by bindIf
+  // (e.g. landing on the 'courts' tab leaves the judges wrapper false at
+  // first render) would take its x-class children down with it — the
+  // exact bindIf-drop bug, one level up. Keep the wrappers in the DOM via
+  // x-class so the inner reactive panels survive tab switches.
+  const showJudgesSection = derived<boolean>(() =>
+    (search.tab() === 'all' && totalResults() > 0) || search.tab() === 'judges')
+  const showCourtsSection = derived<boolean>(() =>
+    (search.tab() === 'all' && totalResults() > 0) || search.tab() === 'courts')
+
   function submitSearch(): void {
     search.updateUrlQuery()
   }
@@ -97,7 +129,7 @@
     </div>
 
     <div class="mt-8">
-      <div :if="search.tab === 'all' && totalResults === 0" class="mt-2 p-12 text-center bg-gray-50 border border-gray-200 border-dashed rounded-2xl">
+      <div x-class="showAllEmpty() ? '' : 'hidden'" class="mt-2 p-12 text-center bg-gray-50 border border-gray-200 border-dashed rounded-2xl">
         <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
         </svg>
@@ -109,16 +141,16 @@
         </div>
       </div>
 
-      <div :if="(search.tab === 'all' && totalResults > 0) || search.tab === 'judges'">
-        <h2 :if="search.tab === 'all'" class="font-semibold text-gray-900 text-lg">Judges</h2>
-        <div :if="filteredJudges.length === 0" class="mt-2 p-12 text-center bg-gray-50 border border-gray-200 border-dashed rounded-2xl">
+      <div x-class="showJudgesSection() ? '' : 'hidden'">
+        <h2 x-class="search.tab() === 'all' ? 'font-semibold text-gray-900 text-lg' : 'hidden'" class="font-semibold text-gray-900 text-lg">Judges</h2>
+        <div x-class="showJudgesEmpty() ? '' : 'hidden'" class="mt-2 p-12 text-center bg-gray-50 border border-gray-200 border-dashed rounded-2xl">
           <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
           </svg>
           <p class="mt-4 font-medium text-gray-900">No judges match your search.</p>
           <p class="mt-1 text-gray-500 text-sm">Try a different name, court, or location.</p>
         </div>
-        <ul role="list" :if="filteredJudges.length > 0" class="mt-4 divide-gray-100 divide-y">
+        <ul role="list" x-class="showJudgesList() ? 'mt-4 divide-gray-100 divide-y' : 'hidden'" class="mt-4 divide-gray-100 divide-y">
           <li :for="judge in filteredJudges" class="flex items-center justify-between py-5">
             <StxLink x-to="`/judges/${judge.id}/profile`" class="flex flex-1 gap-x-4 items-center min-w-0">
               <img class="object-cover flex-none h-12 w-12 rounded-full grayscale filter" x-src="judge.photo" x-alt="judge.name">
@@ -135,16 +167,16 @@
         </ul>
       </div>
 
-      <div :if="(search.tab === 'all' && totalResults > 0) || search.tab === 'courts'" x-class="search.tab === 'all' ? 'mt-12' : ''">
-        <h2 :if="search.tab === 'all'" class="font-semibold text-gray-900 text-lg">Court Houses</h2>
-        <div :if="filteredCourts.length === 0" class="mt-2 p-12 text-center bg-gray-50 border border-gray-200 border-dashed rounded-2xl">
+      <div x-class="!showCourtsSection() ? 'hidden' : (search.tab() === 'all' ? 'mt-12' : '')">
+        <h2 x-class="search.tab() === 'all' ? 'font-semibold text-gray-900 text-lg' : 'hidden'" class="font-semibold text-gray-900 text-lg">Court Houses</h2>
+        <div x-class="showCourtsEmpty() ? '' : 'hidden'" class="mt-2 p-12 text-center bg-gray-50 border border-gray-200 border-dashed rounded-2xl">
           <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
           </svg>
           <p class="mt-4 font-medium text-gray-900">No courts match your search.</p>
           <p class="mt-1 text-gray-500 text-sm">Try a different name, court, or location.</p>
         </div>
-        <div :if="filteredCourts.length > 0" class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-4">
+        <div x-class="showCourtsList() ? 'grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-4' : 'hidden'" class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-4">
           <StxLink
             :for="court in filteredCourts"
             x-to="`/court-houses/${court.id}/profile`"
