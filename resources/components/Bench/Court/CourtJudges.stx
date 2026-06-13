@@ -52,4 +52,11 @@
         </div>
       </li>
   </ul>
+
+  <div :if="courtJudges().length === 0" class="mt-8 p-8 text-center bg-gray-50 border border-gray-200 border-dashed rounded-lg">
+    <p class="text-gray-600 text-sm">No judges listed at this courthouse yet.</p>
+    <StxLink to="/judges" class="inline-block mt-4 font-semibold text-gray-700 text-sm hover:text-gray-900">
+      Browse all judges →
+    </StxLink>
+  </div>
 </div>
