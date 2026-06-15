@@ -444,6 +444,77 @@
 </script>
 
 <div class="min-h-screen bg-white">
+  <!-- Prose styles for the x-html'd review content. A plain <style>
+       INSIDE the component body (NOT @push) on purpose: the SPA router
+       swaps only <main> (config/stx.ts), and this component renders into
+       <main> — so the style travels with the article fragment and is
+       present on every SPA navigation AND hard reload. @push hoists to
+       <head> and is NOT re-injected on SPA nav (a saved blockquote/
+       heading rendered unstyled when navigating in from another page);
+       main.css custom rules aren't delivered to dev pages either. The
+       inner blockquote/h2/li can't carry crosswind utility classes since
+       the HTML comes from the editor, so they need real CSS here. -->
+  <style>
+    .article-body {
+      font-family: 'Charter', 'Iowan Old Style', 'Source Serif Pro', Georgia, Cambria, 'Times New Roman', serif;
+      font-size: 1.25rem;
+      line-height: 1.7;
+      color: #292929;
+    }
+    .article-body > * + * { margin-top: 1.4em; }
+    .article-body p { margin: 0; }
+    .article-body > p:first-child::first-letter {
+      float: left;
+      font-size: 4.6rem;
+      line-height: 1;
+      padding-right: 0.6rem;
+      padding-top: 0.35rem;
+      font-weight: 700;
+      color: #111;
+    }
+    .article-body h2 {
+      font-family: inherit;
+      font-size: 1.6rem;
+      font-weight: 700;
+      line-height: 1.3;
+      color: #1a1a1a;
+      margin-top: 2.5em;
+      margin-bottom: 0.6em;
+      letter-spacing: -0.01em;
+    }
+    .article-body h3 {
+      font-family: inherit;
+      font-size: 1.25rem;
+      font-weight: 700;
+      line-height: 1.35;
+      color: #1a1a1a;
+      margin-top: 2em;
+      margin-bottom: 0.5em;
+    }
+    .article-body strong { color: #111; font-weight: 700; }
+    .article-body em { font-style: italic; }
+    .article-body blockquote {
+      border-left: 3px solid #111;
+      padding-left: 1.25rem;
+      margin-left: 0;
+      font-style: italic;
+      color: #444;
+      font-size: 1.35rem;
+      line-height: 1.55;
+    }
+    .article-body ul, .article-body ol { padding-left: 1.5rem; margin: 1.4em 0; }
+    .article-body ul { list-style: disc; }
+    .article-body ol { list-style: decimal; }
+    .article-body li { margin: 0.4em 0; }
+    .article-body a {
+      color: #b45309;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      text-decoration-thickness: 1px;
+    }
+    .article-body a:hover { color: #92400e; }
+  </style>
+
   <!-- Reading progress bar. Sits above all article chrome so it stays
        visible during sticky-header interactions. Width is the live
        percentage from the scroll handler. -->
