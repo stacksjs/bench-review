@@ -66,7 +66,7 @@ export default new Action({
     if (!Number.isFinite(judgeId) || judgeId <= 0)
       return response.json({ error: 'Invalid judge id' }, 400)
 
-    const { perPage, page, offset } = resolvePaginatorArgs({ perPage: 10 })
+    const { perPage, page, offset } = resolvePaginatorArgs({ defaultPerPage: 20 })
 
     // Use db.selectFrom directly because (a) the where + count chain
     // needs to be run on the same builder shape and (b) hydrateLikeData

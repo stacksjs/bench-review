@@ -141,7 +141,7 @@ defineStore('reviews', () => {
   // server page would yield variable/empty pages. Sending `page` /
   // `per_page` makes LatestReviewsAction return the canonical paginator
   // instead of the raw array the `?limit=` form (home/court) still gets.
-  async function goToFeedPage(page = 1, perPage = 10): Promise<void> {
+  async function goToFeedPage(page = 1, perPage = 20): Promise<void> {
     // Cancel any previous in-flight page/category request first.
     if (feedAbort)
       feedAbort.abort()
@@ -178,7 +178,7 @@ defineStore('reviews', () => {
 
   // Convenience: (re)load the first page. Used on mount and whenever the
   // category filter changes (CategoriesList calls this after toggling).
-  function fetchFeed(perPage = 10): Promise<void> {
+  function fetchFeed(perPage = 20): Promise<void> {
     return goToFeedPage(1, perPage)
   }
 
@@ -210,7 +210,7 @@ defineStore('reviews', () => {
   // numbered pagination). The server `summary` carries rating
   // aggregates over ALL published reviews, so the profile header stays
   // correct regardless of which page is shown.
-  async function fetchByJudge(judgeId: number, page = 1, perPage = 10): Promise<void> {
+  async function fetchByJudge(judgeId: number, page = 1, perPage = 20): Promise<void> {
     // Mark this judge as in-flight without overwriting other judges'
     // load state — multiple panels can request different judges in
     // parallel without flickering each other's spinners.

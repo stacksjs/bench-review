@@ -9,15 +9,17 @@ import { buildPaginatorMeta, resolvePaginatorArgs } from '../../Helpers/paginate
  *
  * Two response shapes, selected by the query string:
  *
+ *   - DEFAULT (no `?limit`) → canonical paginator
+ *     (`{ data, current_page, per_page, total, last_page,
+ *     has_more_pages, ... }`). Defaults to page 1, per_page 20 when those
+ *     params are absent, and respects `?page` / `?per_page` when sent.
+ *     The public `/reviews` feed reads this form (`reviews` store
+ *     `goToFeedPage`) for numbered pagination. Accepts an optional
+ *     `?category=<practice_area>` to scope the page to one practice area
+ *     (resolved via the judges table).
  *   - `?limit=N`            → raw array of the newest N (capped at 20).
  *     The home page strip and the court page read this form
- *     (`reviews` store `fetchLatest`). Unchanged for back-compat.
- *   - `?page=N&per_page=M`  → canonical paginator
- *     (`{ data, current_page, per_page, total, last_page,
- *     has_more_pages, ... }`). The public `/reviews` feed reads this
- *     form (`reviews` store `goToFeedPage`) for numbered pagination.
- *     Accepts an optional `?category=<practice_area>` to scope the page
- *     to one practice area (resolved via the judges table).
+ *     (`reviews` store `fetchLatest`). Opt-in via `?limit` only.
  *
  * Published only — pending/rejected stay invisible to the public.
  * Hydrates `liked_by_me` per row when the request carries auth so the
@@ -39,12 +41,14 @@ export default new Action({
   description: 'Latest published reviews across all judges',
   method: 'GET',
   async handle() {
-    const hasPage = (request.query?.page ?? request.get?.('page')) != null
-    const hasPerPage = (request.query?.per_page ?? request.get?.('per_page')) != null
-
-    // Paginated feed path.
-    if (hasPage || hasPerPage) {
-      const { perPage, page, offset } = resolvePaginatorArgs({ perPage: 10 })
+    // The canonical paginator is the DEFAULT response. Only the explicit
+    // ?limit form returns the legacy raw array (home/court strips). This
+    // way hitting /api/reviews with no params still yields a sensible
+    // page — page 1, per_page 20 — rather than requiring the client to
+    // always send page/per_page.
+    const hasLimit = (request.query?.limit ?? request.get?.('limit')) != null
+    if (!hasLimit) {
+      const { perPage, page, offset } = resolvePaginatorArgs({ defaultPerPage: 20 })
 
       // Optional server-side practice-area filter (the /reviews sidebar).
       // Reviews don't carry practice_area — it lives on the judge — so we

@@ -27,10 +27,12 @@
   // Numbered pagination over the judge's reviews (server-side, replace).
   const currentPage = derived<number>(() => meta()?.current_page ?? 1)
   const lastPage = derived<number>(() => meta()?.last_page ?? 1)
-  function buildPages(current: number, last: number): Array<{ n: number, label: string, gap: boolean, active: boolean }> {
+  // No inline-object type annotations — stx script type-stripping leaks
+  // the nested colons and breaks the compiled script. Keep types simple.
+  function buildPages(current: number, last: number) {
     if (last <= 1) return []
     const cur = Math.max(1, Math.min(current, last))
-    const out: Array<{ n: number, label: string, gap: boolean, active: boolean }> = []
+    const out: any[] = []
     const page = (n: number) => out.push({ n, label: String(n), gap: false, active: n === cur })
     const gap = () => out.push({ n: 0, label: '…', gap: true, active: false })
     const lo = Math.max(2, cur - 1)

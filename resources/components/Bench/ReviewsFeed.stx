@@ -86,7 +86,7 @@
     // Paginated feed (load-more). Reads its OWN `feed` slice — NOT the
     // shared `latest` slice the home/court strips render — so paging
     // here never bleeds into those capped views.
-    reviewsStore.fetchFeed(10)
+    reviewsStore.fetchFeed()
     if (judgesStore.judges().length === 0)
       judgesStore.fetchJudges()
   }
@@ -173,12 +173,15 @@
 
   // Numbered pagination. buildPages returns plain objects (no signal
   // calls / no template ternary in the :for — footgun) describing each
-  // page button; the `pages` derived adds the variant class. goToPage
-  // fetches a server page and replaces the feed.
-  function buildPages(current: number, last: number): Array<{ n: number, label: string, gap: boolean, active: boolean }> {
+  // page button; the pages() derived adds the variant class. goToPage
+  // fetches a server page and replaces the feed. NOTE: no inline-object
+  // type annotations here — stx's script type-stripping leaks the nested
+  // colons from a return/var annotation like Array<{ n: number }>, which
+  // breaks the compiled script at doFragSwap. Keep types simple/inferred.
+  function buildPages(current: number, last: number) {
     if (last <= 1) return []
     const cur = Math.max(1, Math.min(current, last))
-    const out: Array<{ n: number, label: string, gap: boolean, active: boolean }> = []
+    const out: any[] = []
     const page = (n: number) => out.push({ n, label: String(n), gap: false, active: n === cur })
     const gap = () => out.push({ n: 0, label: '…', gap: true, active: false })
     const lo = Math.max(2, cur - 1)
@@ -364,7 +367,7 @@
   </div>
   <!-- Numbered pagination. The wrapper x-class toggle (not :if) keeps it
        in the DOM so it reactively appears once last_page > 1 is known.
-       The numbered button uses item.cls (precomputed in `pages`) so the
+       The numbered button uses item.cls (precomputed in pages()) so the
        :for carries no signal call-syntax. Prev/Next sit outside the :for
        so their call-syntax x-class is fine. -->
   <div x-class="reviewsStore.feedLastPage() > 1 ? 'flex flex-col items-center gap-3 mt-12' : 'hidden'">

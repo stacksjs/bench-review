@@ -145,17 +145,23 @@ export interface ResolvedPaginatorArgs {
  * over the page slice (admin tables, judge-joined review lists),
  * then call {@link buildPaginatorMeta} on the resulting array.
  */
-export function resolvePaginatorArgs(opts: { perPage?: number, page?: number } = {}): ResolvedPaginatorArgs {
+export function resolvePaginatorArgs(opts: { perPage?: number, page?: number, defaultPerPage?: number } = {}): ResolvedPaginatorArgs {
   const req = currentRequest as any
   const queryPerPage = readNumericQuery(req, 'per_page')
   const queryPage = readNumericQuery(req, 'page')
 
+  const clampPerPage = (n: number) => Math.max(1, Math.min(MAX_PER_PAGE, Math.floor(n)))
+  // Precedence: explicit override (opts.perPage) > client `?per_page` >
+  // caller's default (opts.defaultPerPage) > global default. Use
+  // `defaultPerPage` (not `perPage`) when you want the client to still
+  // be able to override via the query string.
   const perPage = opts.perPage !== undefined
-    ? Math.max(1, Math.min(MAX_PER_PAGE, Math.floor(opts.perPage)))
+    ? clampPerPage(opts.perPage)
     : (queryPerPage !== undefined
-        ? Math.max(1, Math.min(MAX_PER_PAGE, Math.floor(queryPerPage)))
-        : DEFAULT_PER_PAGE)
+        ? clampPerPage(queryPerPage)
+        : clampPerPage(opts.defaultPerPage ?? DEFAULT_PER_PAGE))
 
+  // Page always defaults to 1 when absent.
   const page = Math.max(1, Math.floor(opts.page ?? queryPage ?? 1))
   return { perPage, page, offset: (page - 1) * perPage }
 }
