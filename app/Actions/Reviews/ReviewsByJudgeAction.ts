@@ -27,6 +27,35 @@ import { buildPaginatorMeta, resolvePaginatorArgs } from '../../Helpers/paginate
  *
  * Resolves bench-review#28 (public read endpoints).
  */
+
+/**
+ * Fold a list of `{ rating }` rows into the canonical rating summary:
+ * total count, average (1-decimal), and a 5→1 star distribution with
+ * per-bucket counts + percentages. Computed over the full published
+ * set so the profile header stays correct as the list paginates.
+ */
+function buildRatingSummary(
+  ratingRows: Array<{ rating: number | string }>,
+  total: number,
+): { total: number, average: number, distribution: Array<{ stars: number, count: number, percentage: number }> } {
+  const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+  let sum = 0
+  for (const r of ratingRows) {
+    const v = Number(r.rating) || 0
+    sum += v
+    const bucket = Math.round(v)
+    if (bucket >= 1 && bucket <= 5)
+      counts[bucket]++
+  }
+  const average = total > 0 ? Math.round((sum / total) * 10) / 10 : 0
+  const distribution = [5, 4, 3, 2, 1].map(stars => ({
+    stars,
+    count: counts[stars] ?? 0,
+    percentage: total > 0 ? Math.round(((counts[stars] ?? 0) / total) * 100) : 0,
+  }))
+  return { total, average, distribution }
+}
+
 export default new Action({
   name: 'Reviews By Judge',
   description: 'Paginated published reviews for a single judge',
@@ -37,18 +66,26 @@ export default new Action({
     if (!Number.isFinite(judgeId) || judgeId <= 0)
       return response.json({ error: 'Invalid judge id' }, 400)
 
-    const { perPage, page, offset } = resolvePaginatorArgs()
+    const { perPage, page, offset } = resolvePaginatorArgs({ perPage: 10 })
 
     // Use db.selectFrom directly because (a) the where + count chain
     // needs to be run on the same builder shape and (b) hydrateLikeData
     // expects raw rows. The model layer's chainable .count() / .paginate()
     // are not reliable in our vendored framework copy (see issue body).
-    const countRow = await (db.selectFrom('judge_reviews') as any)
-      .select(['COUNT(*) as c'])
+    //
+    // Pull every published rating in one tiny query (single int column)
+    // so the summary aggregates (total + average + per-star
+    // distribution) reflect ALL reviews, not just the current page.
+    // Without this the profile's average/distribution would only cover
+    // the loaded slice — a latent bug now that the list paginates via
+    // load-more. Doubles as the paginator's `total`.
+    const ratingRows = await (db.selectFrom('judge_reviews') as any)
+      .select(['rating'])
       .where('judge_id', '=', judgeId)
       .where('status', '=', 'published')
-      .executeTakeFirst() as { c: number | string } | undefined
-    const total = Number(countRow?.c ?? 0)
+      .execute() as Array<{ rating: number | string }>
+    const total = ratingRows.length
+    const summary = buildRatingSummary(ratingRows, total)
 
     const rows = await (db.selectFrom('judge_reviews') as any)
       .selectAll()
@@ -60,6 +97,6 @@ export default new Action({
       .execute() as Array<Record<string, any>>
 
     const hydrated = await hydrateLikeData(rows ?? [])
-    return response.json(buildPaginatorMeta(hydrated, total, page, perPage))
+    return response.json({ ...buildPaginatorMeta(hydrated, total, page, perPage), summary })
   },
 })

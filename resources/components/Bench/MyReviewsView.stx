@@ -26,6 +26,16 @@
   })()
   const statusFilter = state<StatusFilter>(initialFilter)
 
+  // Client-side windowing over the (status-filtered) list. The profile
+  // dashboard derives its stats from the FULL `myReviews()` set, so we
+  // page in-memory here rather than paginate /api/me/reviews (which
+  // would starve those stats). Resets to the first window on tab change.
+  const PAGE_SIZE = 10
+  const visibleCount = state<number>(PAGE_SIZE)
+  function resetWindow(): void {
+    visibleCount.set(PAGE_SIZE)
+  }
+
   // Fetch in both top-level (hydration) and onMount (SPA nav).
   let hasFetched = false
   function fetchOnce(): void {
@@ -38,6 +48,7 @@
 
   function setFilter(next: StatusFilter): void {
     statusFilter.set(next)
+    resetWindow()
     // Push the filter to the URL so the browser back button + share
     // links work. `replace` (not `push`) so rapid pill clicks don't
     // bloat the history stack.
@@ -84,6 +95,13 @@
     if (f === 'all') return rows
     return rows.filter(r => (r.status || '').toLowerCase() === f)
   })
+
+  // Windowed slice actually rendered + the "is there more" flag.
+  const visible = derived<ProfileReviewRow[]>(() => filtered().slice(0, visibleCount()))
+  const hasMore = derived<boolean>(() => filtered().length > visibleCount())
+  function showMore(): void {
+    visibleCount.set(visibleCount() + PAGE_SIZE)
+  }
 
   // Empty-state copy keyed off the current filter so the message
   // matches the tab the user is on. "No published reviews yet" reads
@@ -227,7 +245,7 @@
          deliberately don't inline destructive actions here — a
          single-click delete on a list view is a footgun. -->
     <ul :if="filtered.length > 0" class="space-y-4 mt-8">
-      <li :for="r in filtered" class="p-5 bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all">
+      <li :for="r in visible" class="p-5 bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all">
         <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <StxLink
             x-to="`/article/${r.id}`"
@@ -264,5 +282,17 @@
         </div>
       </li>
     </ul>
+
+    <!-- Show more (client-side windowing). x-class toggle, not :if, so
+         it reactively appears/hides as the window grows or the tab
+         changes. -->
+    <div x-class="hasMore() ? 'flex flex-col items-center gap-3 mt-8' : 'hidden'">
+      <p class="text-gray-500 text-sm">{{ visible().length + ' of ' + filtered().length + ' reviews' }}</p>
+      <button
+        type="button"
+        @click="showMore()"
+        class="inline-flex items-center px-5 py-2.5 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+      >Show more</button>
+    </div>
   </div>
 </div>

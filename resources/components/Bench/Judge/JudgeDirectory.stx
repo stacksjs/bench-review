@@ -5,6 +5,17 @@
   const searchQuery = state<string>('')
   const stars: number[] = [1, 2, 3, 4, 5]
 
+  // Client-side windowing. The directory reads the SHARED `judges()`
+  // signal (also feeding the /reviews feed join, the category sidebar,
+  // and search), so we page in-memory rather than slice that signal.
+  // `visibleCount` grows on "Show more"; resets to the first window
+  // whenever a facet changes so a narrowed result starts at the top.
+  const PAGE_SIZE = 12
+  const visibleCount = state<number>(PAGE_SIZE)
+  function resetWindow(): void {
+    visibleCount.set(PAGE_SIZE)
+  }
+
   // Practice-area filter (bench-review#38). URL-driven via
   // ?practice_area=family so deep links + shares preserve the filter.
   // 'all' means no filter applied.
@@ -19,6 +30,7 @@
 
   function setPracticeFilter(next: PracticeFilter): void {
     practiceFilter.set(next)
+    resetWindow()
     syncFilterUrl()
   }
 
@@ -45,9 +57,9 @@
     return raw === 'with' || raw === 'without' ? raw : 'all'
   })() as HasReviewsFilter)
 
-  function setStateFilter(next: string): void { stateFilter.set(next); syncFilterUrl() }
-  function setRatingFilter(next: RatingFilter): void { ratingFilter.set(next); syncFilterUrl() }
-  function setHasReviewsFilter(next: HasReviewsFilter): void { hasReviewsFilter.set(next); syncFilterUrl() }
+  function setStateFilter(next: string): void { stateFilter.set(next); resetWindow(); syncFilterUrl() }
+  function setRatingFilter(next: RatingFilter): void { ratingFilter.set(next); resetWindow(); syncFilterUrl() }
+  function setHasReviewsFilter(next: HasReviewsFilter): void { hasReviewsFilter.set(next); resetWindow(); syncFilterUrl() }
 
   function syncFilterUrl(): void {
     if (typeof window === 'undefined') return
@@ -69,6 +81,7 @@
     ratingFilter.set('all')
     hasReviewsFilter.set('all')
     searchQuery.set('')
+    resetWindow()
     syncFilterUrl()
   }
 
@@ -148,6 +161,14 @@
     return rows
   })
 
+  // Windowed view of the filtered roster + the "is there more" flag the
+  // Show-more control toggles on.
+  const visibleJudges = derived<Judge[]>(() => filteredJudges().slice(0, visibleCount()))
+  const hasMoreJudges = derived<boolean>(() => filteredJudges().length > visibleCount())
+  function showMore(): void {
+    visibleCount.set(visibleCount() + PAGE_SIZE)
+  }
+
   // Local derived flags for the empty-state panel, computed in JS so the
   // signal calls are unambiguous. Consumed via x-class (CSS toggle) — NOT
   // :if — because bindIf drops the binding of an :if branch that was false
@@ -201,6 +222,7 @@
             <input
               type="text"
               x-model="searchQuery"
+              @input="resetWindow()"
               placeholder="Search by name, court, or location..."
               class="block pl-12 pr-4 py-3 w-full text-gray-900 sm:leading-6 sm:text-sm placeholder:text-gray-400 bg-gray-50 border-0 ring-1 ring-gray-200 ring-inset rounded-xl focus:ring-2 focus:ring-inset focus:ring-softBrown duration-200 transition-all"
             >
@@ -293,7 +315,7 @@
 
     <div class="grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
       <StxLink
-        :for="judge in filteredJudges"
+        :for="judge in visibleJudges"
         x-to="`/judges/${judge.id}/profile`"
         class="overflow-hidden relative flex flex-col bg-white border border-gray-200 rounded-2xl hover:border-gray-300 shadow-sm hover:shadow-lg hover:-translate-y-0.5 duration-300 transition-all group"
       >
@@ -337,6 +359,18 @@
             <span class="mt-3 text-gray-400 text-xs">No reviews yet</span>
           </div>
       </StxLink>
+    </div>
+
+    <!-- Show more (client-side windowing over the filtered roster).
+         x-class toggle — not :if — so the control stays in the DOM and
+         reactively appears/hides as the window grows or filters change. -->
+    <div x-class="hasMoreJudges() ? 'flex flex-col items-center gap-3 mt-12' : 'hidden'">
+      <p class="text-gray-500 text-sm">{{ visibleJudges().length + ' of ' + filteredJudges().length + ' judges' }}</p>
+      <button
+        type="button"
+        @click="showMore()"
+        class="inline-flex items-center px-5 py-2.5 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+      >Show more judges</button>
     </div>
 
     <!-- Empty state. Gated on !loading so it doesn't flash during the

@@ -1,5 +1,5 @@
 <script client>
-  import type { JudgeReviewRow } from '~/resources/stores/reviews'
+  import type { JudgeReviewMeta, JudgeReviewRow } from '~/resources/stores/reviews'
 
   const reviewsStore = useStore('reviews')
   const stars: number[] = [1, 2, 3, 4, 5]
@@ -15,14 +15,27 @@
   })
 
   const reviews = derived<JudgeReviewRow[]>(() => reviewsStore.reviewsForJudge(judgeId()))
-  const reviewCount = derived<number>(() => reviews().length)
+  const meta = derived<JudgeReviewMeta | null>(() => reviewsStore.judgeMeta(judgeId()))
+  // Headline count / average / distribution come from the server
+  // `summary` (computed over EVERY published review), not the loaded
+  // slice — the list paginates via load-more but these aggregates must
+  // reflect the whole set. Falls back to the loaded slice before the
+  // first response lands.
+  const reviewCount = derived<number>(() => meta()?.summary?.total ?? reviews().length)
   const isLoading = derived<boolean>(() => reviewsStore.isLoadingJudge(judgeId()))
   const isEmpty = derived<boolean>(() => !isLoading() && reviewCount() === 0)
+  const judgeHasMore = derived<boolean>(() => !!meta()?.has_more)
+  const loadingMore = derived<boolean>(() => reviewsStore.isLoadingMoreJudge(judgeId()))
+  function loadMore(): void {
+    reviewsStore.loadMoreForJudge(judgeId())
+  }
 
   // Average rounded to one decimal so the headline number reads like
   // "4.6" rather than "4.6000000001". Reuse across the summary chip
   // and the distribution histogram.
   const averageRating = derived<number>(() => {
+    const summary = meta()?.summary
+    if (summary && summary.total > 0) return summary.average
     const list = reviews()
     if (list.length === 0) return 0
     const sum = list.reduce((acc, r) => acc + (Number(r.rating) || 0), 0)
@@ -30,6 +43,9 @@
   })
 
   const ratingBuckets = derived<Array<{ stars: number, percentage: number }>>(() => {
+    const dist = meta()?.summary?.distribution
+    if (dist && dist.length > 0)
+      return dist.map(d => ({ stars: d.stars, percentage: d.percentage }))
     const list = reviews()
     if (list.length === 0)
       return [5, 4, 3, 2, 1].map(s => ({ stars: s, percentage: 0 }))
@@ -129,6 +145,21 @@
               <button type="button" class="font-semibold text-gray-500 text-sm hover:text-gray-700">{{ `Helpful (${review.likes ?? 0})` }}</button>
             </div>
         </div>
+      </div>
+
+      <!-- Load more reviews (server-side pagination). x-class toggle —
+           not :if — so the control stays in the DOM and reactively
+           shows/hides as pages load. -->
+      <div x-class="judgeHasMore() ? 'flex justify-center mt-8' : 'hidden'">
+        <button
+          type="button"
+          @click="loadMore()"
+          class="inline-flex items-center px-5 py-2.5 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+          x-class="loadingMore() ? 'opacity-60 pointer-events-none' : ''"
+        >
+          <span x-class="loadingMore() ? 'hidden' : ''">Load more reviews</span>
+          <span x-class="loadingMore() ? '' : 'hidden'">Loading…</span>
+        </button>
       </div>
     </div>
   </div>

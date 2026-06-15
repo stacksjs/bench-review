@@ -83,7 +83,10 @@
   function fetchOnce(): void {
     if (hasFetched) return
     hasFetched = true
-    reviewsStore.fetchLatest(20)
+    // Paginated feed (load-more). Reads its OWN `feed` slice — NOT the
+    // shared `latest` slice the home/court strips render — so paging
+    // here never bleeds into those capped views.
+    reviewsStore.fetchFeed(10)
     if (judgesStore.judges().length === 0)
       judgesStore.fetchJudges()
   }
@@ -123,7 +126,7 @@
     // false, every card shows the helpful button.
     const meId = authStore.user()?.id ?? null
 
-    return reviewsStore.latest()
+    return reviewsStore.feed()
       .filter((r: JudgeReviewRow) => r.judge_id != null)
       .filter((r: JudgeReviewRow) => {
         // No filter applied → keep everything. Otherwise only keep
@@ -170,10 +173,34 @@
   // :if empty panel (it stayed blank). x-class keeps the panel in the DOM
   // with a live, reactive binding. Mirrors the likeAuthPrompt/likeError
   // banners above.
+  // The "be the first in this category" panel must NOT show while there
+  // are still un-loaded server pages — a sparse category can be absent
+  // from the early pages but present later, so only declare it empty
+  // once the feed is fully exhausted. Until then the load-more block
+  // carries the "keep looking" message (counterLabel below). Without
+  // the `!feedHasMore()` guard the empty panel and the load-more button
+  // render at the same time (contradictory UI).
   const showFilteredEmpty = derived<boolean>(() =>
-    !reviewsStore.loadingLatest() && reviews().length === 0 && !!judgesStore.activeCategory())
+    !reviewsStore.loadingFeed() && reviews().length === 0 && !!judgesStore.activeCategory() && !reviewsStore.feedHasMore())
   const showGenuineEmpty = derived<boolean>(() =>
-    !reviewsStore.loadingLatest() && reviews().length === 0 && !judgesStore.activeCategory())
+    !reviewsStore.loadingFeed() && reviews().length === 0 && !judgesStore.activeCategory())
+
+  // Category-aware label for the load-more block. When a category is
+  // active the visible cards are client-filtered, so a plain "X of Y
+  // loaded" (server, unfiltered) would contradict what's on screen.
+  // Computed as a plain string in <script> to stay clear of the
+  // ternary-with-template-literal interpolation footgun.
+  const counterLabel = derived<string>(() => {
+    const cat = judgesStore.activeCategory()
+    const loaded = reviewsStore.feed().length
+    if (cat) {
+      const shown = reviews().length
+      if (shown === 0)
+        return 'No ' + cat + ' reviews in the ' + loaded + ' loaded so far — load more to keep looking'
+      return 'Showing ' + shown + ' ' + cat + ' review' + (shown === 1 ? '' : 's') + ' from ' + loaded + ' loaded'
+    }
+    return loaded + ' of ' + reviewsStore.feedTotal() + ' reviews loaded'
+  })
 </script>
 
 <!-- Stable wrapper is the component's scope root. Without it the FIRST
@@ -214,7 +241,7 @@
        line + meta line + 3-line body + footer chip row) so the feed
        doesn't shift when the real data lands. animate-pulse is the
        Tailwind/crosswind shimmer; no custom CSS needed. -->
-  <div :if="reviewsStore.loadingLatest && reviews.length === 0" class="space-y-6">
+  <div :if="reviewsStore.loadingFeed && reviews.length === 0" class="space-y-6">
     <div :for="i in [1, 2, 3]" class="py-6 animate-pulse border-b border-gray-200">
       <div class="flex items-center justify-between">
         <div class="flex items-center">
@@ -334,5 +361,22 @@
         </div>
       </div>
     </div>
+  </div>
+  <!-- Load more (server-side pagination). x-class toggle, not :if, so
+       the control stays in the DOM and reactively appears once the
+       first page reveals there are more rows (bindIf drops an :if that
+       is false at first render). counterLabel() is category-aware so it
+       never contradicts the client-filtered cards above. -->
+  <div x-class="reviewsStore.feedHasMore() ? 'flex flex-col items-center gap-3 mt-10' : 'hidden'">
+    <p class="text-gray-500 text-sm">{{ counterLabel() }}</p>
+    <button
+      type="button"
+      @click="reviewsStore.loadMoreFeed(10)"
+      class="inline-flex items-center px-5 py-2.5 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+      x-class="reviewsStore.loadingMoreFeed() ? 'opacity-60 pointer-events-none' : ''"
+    >
+      <span x-class="reviewsStore.loadingMoreFeed() ? 'hidden' : ''">Load more reviews</span>
+      <span x-class="reviewsStore.loadingMoreFeed() ? '' : 'hidden'">Loading…</span>
+    </button>
   </div>
 </div>

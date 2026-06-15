@@ -28,6 +28,24 @@ export interface LikeResult {
   error?: string
 }
 
+/** Rating aggregates over ALL published reviews for a judge — computed
+ *  server-side so the profile summary stays correct regardless of how
+ *  many list pages have been loaded into the in-memory slice. */
+export interface JudgeRatingSummary {
+  total: number
+  average: number
+  distribution: Array<{ stars: number, count: number, percentage: number }>
+}
+
+/** Pagination cursor + rating summary for one judge's review list. */
+export interface JudgeReviewMeta {
+  current_page: number
+  last_page: number
+  total: number
+  has_more: boolean
+  summary: JudgeRatingSummary
+}
+
 export interface SubmitReviewPayload {
   judge_id: number
   title: string
@@ -77,6 +95,27 @@ defineStore('reviews', () => {
   const loadingCurrent = state<boolean>(false)
   const currentNotFound = state<boolean>(false)
 
+  // Public `/reviews` feed slice. Paginated server-side via load-more.
+  // Kept SEPARATE from `latest` on purpose: `latest` is read as a
+  // fixed-size array by the home strip (slice 0,3) and the court page
+  // (slice 0,5), so the feed's growing accumulator must not bleed into
+  // those capped views. The feed is the only unbounded cross-judge
+  // surface, hence the only one that truly needs server pagination.
+  const feed = state<JudgeReviewRow[]>([])
+  const feedPage = state<number>(1)
+  const feedLastPage = state<number>(1)
+  const feedTotal = state<number>(0)
+  const loadingFeed = state<boolean>(false)
+  const loadingMoreFeed = state<boolean>(false)
+  const feedHasMore = derived<boolean>(() => feedPage() < feedLastPage())
+
+  // Per-judge pagination cursor + rating summary. `byJudge` holds the
+  // accumulated (load-more) list slice; `byJudgeMeta` holds the page
+  // cursor and the server-computed rating aggregates (so the average +
+  // distribution reflect every published review, not just loaded ones).
+  const byJudgeMeta = state<Record<number, JudgeReviewMeta>>({})
+  const loadingMoreByJudge = state<Record<number, boolean>>({})
+
   async function fetchLatest(limit = 6): Promise<void> {
     loadingLatest.set(true)
     try {
@@ -90,6 +129,54 @@ defineStore('reviews', () => {
     }
     finally {
       loadingLatest.set(false)
+    }
+  }
+
+  // Feed: first page (replaces the slice). Sending `page`/`per_page`
+  // makes LatestReviewsAction return the canonical paginator instead of
+  // the raw array the `?limit=` form (home/court) still gets.
+  async function fetchFeed(perPage = 10): Promise<void> {
+    loadingFeed.set(true)
+    try {
+      const res = await useStore('auth').authFetch(`/api/reviews?page=1&per_page=${perPage}`)
+      if (!res.ok) return
+      const json = await res.json() as { data?: JudgeReviewRow[], current_page?: number, last_page?: number, total?: number }
+      feed.set(Array.isArray(json?.data) ? json.data : [])
+      feedPage.set(Number(json?.current_page ?? 1))
+      feedLastPage.set(Number(json?.last_page ?? 1))
+      feedTotal.set(Number(json?.total ?? 0))
+    }
+    catch (err) {
+      console.error('[reviews] fetchFeed failed:', err)
+    }
+    finally {
+      loadingFeed.set(false)
+    }
+  }
+
+  // Feed: append the next page. De-dupes by id because a newly published
+  // review can shift the offset window between page loads, which would
+  // otherwise surface the same row twice.
+  async function loadMoreFeed(perPage = 10): Promise<void> {
+    if (loadingMoreFeed() || !feedHasMore()) return
+    loadingMoreFeed.set(true)
+    const next = feedPage() + 1
+    try {
+      const res = await useStore('auth').authFetch(`/api/reviews?page=${next}&per_page=${perPage}`)
+      if (!res.ok) return
+      const json = await res.json() as { data?: JudgeReviewRow[], current_page?: number, last_page?: number, total?: number }
+      const rows = Array.isArray(json?.data) ? json.data : []
+      const seen = new Set(feed().map(r => r.id))
+      feed.set([...feed(), ...rows.filter(r => !seen.has(r.id))])
+      feedPage.set(Number(json?.current_page ?? next))
+      feedLastPage.set(Number(json?.last_page ?? feedLastPage()))
+      feedTotal.set(Number(json?.total ?? feedTotal()))
+    }
+    catch (err) {
+      console.error('[reviews] loadMoreFeed failed:', err)
+    }
+    finally {
+      loadingMoreFeed.set(false)
     }
   }
 
@@ -117,31 +204,72 @@ defineStore('reviews', () => {
     }
   }
 
-  async function fetchByJudge(judgeId: number, page = 1, perPage = 25): Promise<void> {
+  async function fetchByJudge(judgeId: number, page = 1, perPage = 10, append = false): Promise<void> {
     // Mark this judge as in-flight without overwriting other judges'
     // load state — multiple panels can request different judges in
-    // parallel without flickering each other's spinners.
-    loadingByJudge.set({ ...loadingByJudge(), [judgeId]: true })
+    // parallel without flickering each other's spinners. Load-more uses
+    // a SEPARATE flag so the big "Loading reviews…" state doesn't
+    // replace the already-rendered list while the next page streams in.
+    const flag = append ? loadingMoreByJudge : loadingByJudge
+    flag.set({ ...flag(), [judgeId]: true })
     try {
       const url = `/api/judges/${judgeId}/reviews?page=${page}&per_page=${perPage}`
       const res = await useStore('auth').authFetch(url)
       if (!res.ok) return
-      // bench-review#28 — endpoint now returns the canonical paginator
-      // (`{ data, current_page, total, ... }`) instead of a raw array.
-      // The Array.isArray fallback keeps us safe if the endpoint shape
-      // ever regresses or a future endpoint variant returns an array.
-      const json = await res.json() as { data?: JudgeReviewRow[] } | JudgeReviewRow[]
+      // bench-review#28 — endpoint returns the canonical paginator
+      // (`{ data, current_page, total, ... }`) plus a `summary` block of
+      // rating aggregates (#pagination). The Array.isArray fallback keeps
+      // us safe if the endpoint shape ever regresses to a raw array.
+      const json = await res.json() as { data?: JudgeReviewRow[], current_page?: number, last_page?: number, total?: number, summary?: JudgeRatingSummary } | JudgeReviewRow[]
       const rows = Array.isArray(json) ? json : (json?.data ?? [])
-      byJudge.set({ ...byJudge(), [judgeId]: rows })
+
+      // Append (load-more) concatenates onto the existing slice, de-duped
+      // by id; a fresh fetch replaces it.
+      const existing = append ? (byJudge()[judgeId] ?? []) : []
+      const seen = new Set(existing.map(r => r.id))
+      byJudge.set({ ...byJudge(), [judgeId]: [...existing, ...rows.filter(r => !seen.has(r.id))] })
+
+      if (!Array.isArray(json)) {
+        const lastPage = Math.max(1, Number(json?.last_page ?? 1))
+        const curPage = Math.max(1, Number(json?.current_page ?? page))
+        const total = Number(json?.total ?? 0)
+        const summary: JudgeRatingSummary = json?.summary ?? { total, average: 0, distribution: [] }
+        byJudgeMeta.set({
+          ...byJudgeMeta(),
+          [judgeId]: {
+            current_page: curPage,
+            last_page: lastPage,
+            total: Number(total || summary.total || 0),
+            has_more: curPage < lastPage,
+            summary,
+          },
+        })
+      }
     }
     catch (err) {
       console.error(`[reviews] fetchByJudge(${judgeId}) failed:`, err)
     }
     finally {
-      const next = { ...loadingByJudge() }
+      const next = { ...flag() }
       delete next[judgeId]
-      loadingByJudge.set(next)
+      flag.set(next)
     }
+  }
+
+  // Append the next page of a judge's reviews. No-op when the cursor is
+  // missing or already at the last page.
+  async function loadMoreForJudge(judgeId: number, perPage = 10): Promise<void> {
+    const meta = byJudgeMeta()[judgeId]
+    if (!meta || !meta.has_more || isLoadingMoreJudge(judgeId)) return
+    await fetchByJudge(judgeId, meta.current_page + 1, perPage, true)
+  }
+
+  function judgeMeta(judgeId: number): JudgeReviewMeta | null {
+    return byJudgeMeta()[judgeId] ?? null
+  }
+
+  function isLoadingMoreJudge(judgeId: number): boolean {
+    return !!loadingMoreByJudge()[judgeId]
   }
 
   /**
@@ -286,6 +414,7 @@ defineStore('reviews', () => {
       // Also strip it from `latest` and any `byJudge` slice.
       if (current()?.id === reviewId) current.set(null)
       latest.set(latest().filter(r => r.id !== reviewId))
+      feed.set(feed().filter(r => r.id !== reviewId))
       const next = { ...byJudge() }
       for (const [k, rows] of Object.entries(next))
         next[Number(k)] = rows.filter(r => r.id !== reviewId)
@@ -342,6 +471,13 @@ defineStore('reviews', () => {
         ))
       }
 
+      const prevFeed = feed()
+      if (prevFeed.some(r => r.id === reviewId)) {
+        feed.set(prevFeed.map(r =>
+          r.id === reviewId ? { ...r, likes, liked_by_me: liked } : r,
+        ))
+      }
+
       const byJudgeMap = byJudge()
       let touched = false
       const nextByJudge: typeof byJudgeMap = {}
@@ -380,8 +516,19 @@ defineStore('reviews', () => {
     loadingCurrent,
     currentNotFound,
     hasAnyLatest,
+    // Public feed (paginated, load-more).
+    feed,
+    feedTotal,
+    feedHasMore,
+    loadingFeed,
+    loadingMoreFeed,
+    fetchFeed,
+    loadMoreFeed,
     fetchLatest,
     fetchByJudge,
+    loadMoreForJudge,
+    judgeMeta,
+    isLoadingMoreJudge,
     fetchById,
     submit,
     updateOwn,
