@@ -100,6 +100,14 @@
   const titleError = state<boolean>(false)
   const contentError = state<boolean>(false)
   const ratingError = state<boolean>(false)
+  // Clear the title error as the user fixes it — reactively off its
+  // x-model signal, NOT via an @focus handler. handleSubmit focuses the
+  // offending field, so an @focus-clear wiped the red border the instant
+  // it was set (you never saw it). Content + rating clear via their own
+  // @input / @click handlers.
+  effect(() => {
+    if (reviewTitle().trim()) titleError.set(false)
+  })
   // Sticky success state. Reviews land as `status=pending` and won't
   // show up on the judge's reviews page until a moderator publishes,
   // so a plain navigate-on-success looks like the form silently
@@ -203,13 +211,6 @@
       }
 
       const title = reviewTitle().trim()
-      if (!title) {
-        submitError.set('Add a review title.')
-        titleError.set(true)
-        toast.error('Validation error', 'Add a review title.')
-        document.getElementById('title')?.focus()
-        return
-      }
 
       // Read editor content from the DOM, not the signal. `ts-medium-
       // editor`'s `editor.subscribe('editableInput', …)` doesn't fire
@@ -229,22 +230,36 @@
       const visibleText = (editable?.textContent ?? content.replace(/<[^>]*>/g, ' '))
         .replace(/[ \s]+/g, ' ')
         .trim()
-      if (!visibleText) {
-        content = ''
-        submitError.set('Write a review before submitting.')
-        contentError.set(true)
-        toast.error('Validation error', 'Your review body is empty — write something before submitting.')
-        return
-      }
-      reviewContent.set(content)
-
       const overall = rating()
-      if (!overall || overall < 1) {
-        submitError.set('Give the judge an overall rating.')
-        ratingError.set(true)
-        toast.error('Validation error', 'Give the judge an overall rating.')
+
+      // Validate EVERY required field up front and flag them ALL at once,
+      // so each missing field lights up red together — rather than the
+      // old one-at-a-time early-return that only marked the first.
+      const missing: string[] = []
+      titleError.set(!title)
+      if (!title) missing.push('a review title')
+      const bodyEmpty = !visibleText
+      contentError.set(bodyEmpty)
+      if (bodyEmpty) {
+        content = ''
+        missing.push('your written review')
+      }
+      const ratingMissing = !overall || overall < 1
+      ratingError.set(ratingMissing)
+      if (ratingMissing) missing.push('an overall rating')
+
+      if (missing.length > 0) {
+        const msg = missing.length === 1
+          ? 'Please add ' + missing[0] + '.'
+          : 'Please add ' + missing.slice(0, -1).join(', ') + ' and ' + missing[missing.length - 1] + '.'
+        submitError.set(msg)
+        toast.error('Missing required fields', msg)
+        // Jump to the first offending field for keyboard users.
+        if (!title) document.getElementById('title')?.focus()
         return
       }
+
+      reviewContent.set(content)
 
       const result = await reviewsStore.submit({
         judge_id: Number(j.id),
@@ -471,10 +486,9 @@
             id="title"
             x-model="reviewTitle"
             x-disabled="!judge"
-            @focus="titleError.set(false)"
             placeholder="Brief summary of your experience"
-            class="block px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-            x-class="titleError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-300'"
+            class="block px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border rounded-md focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            x-class="titleError() ? 'border-red-500 ring-2 ring-red-300' : 'border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-200'"
           >
         </div>
       </div>
@@ -588,8 +602,8 @@
       <div>
         <label for="review" class="block font-medium text-gray-900 text-sm">Your Review</label>
         <div
-          class="mt-2 border focus-within:border-gray-900 focus-within:ring-2 focus-within:ring-gray-200 shadow-sm transition-colors"
-          x-class="contentError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-200'"
+          class="mt-2 border shadow-sm transition-colors"
+          x-class="contentError() ? 'border-red-500 ring-2 ring-red-300' : 'border-gray-200 focus-within:border-gray-900 focus-within:ring-2 focus-within:ring-gray-200'"
           @richtext-change="reviewContent.set($event.detail.html); contentError.set(false)"
           @input="reviewContent.set($event.target.innerHTML || ''); contentError.set(false)"
         >
