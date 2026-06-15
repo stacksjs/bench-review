@@ -26,14 +26,14 @@
   })()
   const statusFilter = state<StatusFilter>(initialFilter)
 
-  // Client-side windowing over the (status-filtered) list. The profile
-  // dashboard derives its stats from the FULL `myReviews()` set, so we
-  // page in-memory here rather than paginate /api/me/reviews (which
-  // would starve those stats). Resets to the first window on tab change.
+  // Client-side numbered pagination over the (status-filtered) list. The
+  // profile dashboard derives its stats from the FULL `myReviews()` set,
+  // so we page in-memory here rather than paginate /api/me/reviews (which
+  // would starve those stats). Resets to page 1 on tab change.
   const PAGE_SIZE = 10
-  const visibleCount = state<number>(PAGE_SIZE)
+  const currentPage = state<number>(1)
   function resetWindow(): void {
-    visibleCount.set(PAGE_SIZE)
+    currentPage.set(1)
   }
 
   // Fetch in both top-level (hydration) and onMount (SPA nav).
@@ -97,10 +97,37 @@
   })
 
   // Windowed slice actually rendered + the "is there more" flag.
-  const visible = derived<ProfileReviewRow[]>(() => filtered().slice(0, visibleCount()))
-  const hasMore = derived<boolean>(() => filtered().length > visibleCount())
-  function showMore(): void {
-    visibleCount.set(visibleCount() + PAGE_SIZE)
+  const lastPage = derived<number>(() => Math.max(1, Math.ceil(filtered().length / PAGE_SIZE)))
+  const visible = derived<ProfileReviewRow[]>(() => {
+    const p = Math.max(1, Math.min(currentPage(), lastPage()))
+    const start = (p - 1) * PAGE_SIZE
+    return filtered().slice(start, start + PAGE_SIZE)
+  })
+  function buildPages(current: number, last: number): Array<{ n: number, label: string, gap: boolean, active: boolean }> {
+    if (last <= 1) return []
+    const cur = Math.max(1, Math.min(current, last))
+    const out: Array<{ n: number, label: string, gap: boolean, active: boolean }> = []
+    const page = (n: number) => out.push({ n, label: String(n), gap: false, active: n === cur })
+    const gap = () => out.push({ n: 0, label: '…', gap: true, active: false })
+    const lo = Math.max(2, cur - 1)
+    const hi = Math.min(last - 1, cur + 1)
+    page(1)
+    if (lo > 2) gap()
+    for (let n = lo; n <= hi; n++) page(n)
+    if (hi < last - 1) gap()
+    page(last)
+    return out
+  }
+  const pages = derived(() => buildPages(Math.min(currentPage(), lastPage()), lastPage()).map(it => ({
+    ...it,
+    cls: it.gap
+      ? 'text-gray-400 border-transparent pointer-events-none'
+      : (it.active ? 'bg-gray-900 text-white border-gray-900' : 'text-gray-700 border-gray-300 hover:bg-gray-50'),
+  })))
+  function goToPage(n: number): void {
+    if (n < 1 || n > lastPage() || n === currentPage()) return
+    currentPage.set(n)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   // Empty-state copy keyed off the current filter so the message
@@ -283,16 +310,35 @@
       </li>
     </ul>
 
-    <!-- Show more (client-side windowing). x-class toggle, not :if, so
-         it reactively appears/hides as the window grows or the tab
-         changes. -->
-    <div x-class="hasMore() ? 'flex flex-col items-center gap-3 mt-8' : 'hidden'">
-      <p class="text-gray-500 text-sm">{{ visible().length + ' of ' + filtered().length + ' reviews' }}</p>
-      <button
-        type="button"
-        @click="showMore()"
-        class="inline-flex items-center px-5 py-2.5 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-      >Show more</button>
+    <!-- Numbered pagination (client-side over the filtered list).
+         Wrapper x-class toggle (not :if) so it stays in the DOM and
+         appears once last_page > 1. Numbered button uses item.cls
+         (precomputed) — no signal call-syntax in the :for. -->
+    <div x-class="lastPage() > 1 ? 'flex flex-col items-center gap-3 mt-8' : 'hidden'">
+      <nav class="flex flex-wrap items-center justify-center gap-1.5" aria-label="Pagination">
+        <button
+          type="button"
+          @click="goToPage(currentPage() - 1)"
+          class="inline-flex items-center px-3 py-2 font-medium text-sm rounded-md border transition-colors"
+          x-class="currentPage() <= 1 ? 'text-gray-300 border-gray-200 pointer-events-none' : 'text-gray-700 border-gray-300 hover:bg-gray-50'"
+          aria-label="Previous page"
+        >Prev</button>
+        <button
+          :for="item in pages()"
+          type="button"
+          @click="goToPage(item.n)"
+          class="inline-flex items-center justify-center min-w-[2.5rem] px-3 py-2 font-medium text-sm rounded-md border transition-colors tabular-nums"
+          x-class="item.cls"
+        >{{ item.label }}</button>
+        <button
+          type="button"
+          @click="goToPage(currentPage() + 1)"
+          class="inline-flex items-center px-3 py-2 font-medium text-sm rounded-md border transition-colors"
+          x-class="currentPage() >= lastPage() ? 'text-gray-300 border-gray-200 pointer-events-none' : 'text-gray-700 border-gray-300 hover:bg-gray-50'"
+          aria-label="Next page"
+        >Next</button>
+      </nav>
+      <p class="text-gray-500 text-xs">{{ 'Page ' + Math.min(currentPage(), lastPage()) + ' of ' + lastPage() + ' · ' + filtered().length + ' reviews' }}</p>
     </div>
   </div>
 </div>

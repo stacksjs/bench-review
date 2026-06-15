@@ -55,6 +55,10 @@
   const activeCategory = derived<string>(() => judgesStore.activeCategory())
   function setActiveCategory(categoryKey: string): void {
     judgesStore.setActiveCategory(categoryKey)
+    // Category filtering is server-side now (numbered pagination needs
+    // consistent page sizes), so reload the feed's first page under the
+    // new filter. goToFeedPage reads the active category from the store.
+    useStore('reviews').goToFeedPage(1)
   }
 </script>
 

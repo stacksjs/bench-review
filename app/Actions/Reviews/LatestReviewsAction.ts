@@ -15,8 +15,9 @@ import { buildPaginatorMeta, resolvePaginatorArgs } from '../../Helpers/paginate
  *   - `?page=N&per_page=M`  → canonical paginator
  *     (`{ data, current_page, per_page, total, last_page,
  *     has_more_pages, ... }`). The public `/reviews` feed reads this
- *     form (`reviews` store `fetchFeed` / `loadMoreFeed`) so it can
- *     page past the old hard cap of 20 via load-more.
+ *     form (`reviews` store `goToFeedPage`) for numbered pagination.
+ *     Accepts an optional `?category=<practice_area>` to scope the page
+ *     to one practice area (resolved via the judges table).
  *
  * Published only — pending/rejected stay invisible to the public.
  * Hydrates `liked_by_me` per row when the request carries auth so the
@@ -45,15 +46,40 @@ export default new Action({
     if (hasPage || hasPerPage) {
       const { perPage, page, offset } = resolvePaginatorArgs({ perPage: 10 })
 
-      const countRow = await (db.selectFrom('judge_reviews') as any)
+      // Optional server-side practice-area filter (the /reviews sidebar).
+      // Reviews don't carry practice_area — it lives on the judge — so we
+      // resolve the matching judge ids first, then scope reviews by
+      // judge_id. Doing this server-side keeps page sizes consistent;
+      // a client-side filter on top of a server page would produce
+      // variable/empty pages under numbered pagination.
+      const category = String(request.query?.category ?? request.get?.('category') ?? '').trim()
+      let judgeIds: number[] | null = null
+      if (category) {
+        const jrows = await (db.selectFrom('judges') as any)
+          .select(['id'])
+          .where('practice_area', '=', category)
+          .execute() as Array<{ id: number | string }>
+        judgeIds = jrows.map(r => Number(r.id))
+        // No judges in this category → empty page (skip the IN () query,
+        // which some drivers reject for an empty list).
+        if (judgeIds.length === 0)
+          return response.json(buildPaginatorMeta([], 0, page, perPage))
+      }
+
+      let countQ = (db.selectFrom('judge_reviews') as any)
         .select(['COUNT(*) as c'])
         .where('status', '=', 'published')
-        .executeTakeFirst() as { c: number | string } | undefined
+      if (judgeIds)
+        countQ = countQ.where('judge_id', 'in', judgeIds)
+      const countRow = await countQ.executeTakeFirst() as { c: number | string } | undefined
       const total = Number(countRow?.c ?? 0)
 
-      const rows = await (db.selectFrom('judge_reviews') as any)
+      let dataQ = (db.selectFrom('judge_reviews') as any)
         .selectAll()
         .where('status', '=', 'published')
+      if (judgeIds)
+        dataQ = dataQ.where('judge_id', 'in', judgeIds)
+      const rows = await dataQ
         .orderBy('created_at', 'desc')
         .limit(perPage)
         .offset(offset)

@@ -17,17 +17,45 @@
   const reviews = derived<JudgeReviewRow[]>(() => reviewsStore.reviewsForJudge(judgeId()))
   const meta = derived<JudgeReviewMeta | null>(() => reviewsStore.judgeMeta(judgeId()))
   // Headline count / average / distribution come from the server
-  // `summary` (computed over EVERY published review), not the loaded
-  // slice — the list paginates via load-more but these aggregates must
-  // reflect the whole set. Falls back to the loaded slice before the
-  // first response lands.
+  // `summary` (computed over EVERY published review), not the current
+  // page — the list paginates but these aggregates must reflect the
+  // whole set. Falls back to the loaded slice before the first response.
   const reviewCount = derived<number>(() => meta()?.summary?.total ?? reviews().length)
   const isLoading = derived<boolean>(() => reviewsStore.isLoadingJudge(judgeId()))
   const isEmpty = derived<boolean>(() => !isLoading() && reviewCount() === 0)
-  const judgeHasMore = derived<boolean>(() => !!meta()?.has_more)
-  const loadingMore = derived<boolean>(() => reviewsStore.isLoadingMoreJudge(judgeId()))
-  function loadMore(): void {
-    reviewsStore.loadMoreForJudge(judgeId())
+
+  // Numbered pagination over the judge's reviews (server-side, replace).
+  const currentPage = derived<number>(() => meta()?.current_page ?? 1)
+  const lastPage = derived<number>(() => meta()?.last_page ?? 1)
+  function buildPages(current: number, last: number): Array<{ n: number, label: string, gap: boolean, active: boolean }> {
+    if (last <= 1) return []
+    const cur = Math.max(1, Math.min(current, last))
+    const out: Array<{ n: number, label: string, gap: boolean, active: boolean }> = []
+    const page = (n: number) => out.push({ n, label: String(n), gap: false, active: n === cur })
+    const gap = () => out.push({ n: 0, label: '…', gap: true, active: false })
+    const lo = Math.max(2, cur - 1)
+    const hi = Math.min(last - 1, cur + 1)
+    page(1)
+    if (lo > 2) gap()
+    for (let n = lo; n <= hi; n++) page(n)
+    if (hi < last - 1) gap()
+    page(last)
+    return out
+  }
+  const pages = derived(() => buildPages(currentPage(), lastPage()).map(it => ({
+    ...it,
+    cls: it.gap
+      ? 'text-gray-400 border-transparent pointer-events-none'
+      : (it.active ? 'bg-gray-900 text-white border-gray-900' : 'text-gray-700 border-gray-300 hover:bg-gray-50'),
+  })))
+  function goToPage(n: number): void {
+    if (n < 1 || n > lastPage() || n === currentPage()) return
+    // Ignore clicks while a page is already loading — currentPage()
+    // only updates after the fetch resolves, so without this a fast
+    // second click would fire a concurrent request that races.
+    if (reviewsStore.isLoadingJudge(judgeId())) return
+    reviewsStore.fetchByJudge(judgeId(), n)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   // Average rounded to one decimal so the headline number reads like
@@ -87,8 +115,10 @@
     </div>
   </div>
 
-  <!-- Loading state -->
-  <div :if="isLoading()" class="mt-8 text-center text-gray-500 text-sm">
+  <!-- Loading state — only on the FIRST load (no page yet). On page
+       changes the current page stays visible and swaps when the next
+       arrives, so we don't flash this over an existing list. -->
+  <div :if="isLoading() && reviewCount() === 0" class="mt-8 text-center text-gray-500 text-sm">
     Loading reviews…
   </div>
 
@@ -147,19 +177,35 @@
         </div>
       </div>
 
-      <!-- Load more reviews (server-side pagination). x-class toggle —
-           not :if — so the control stays in the DOM and reactively
-           shows/hides as pages load. -->
-      <div x-class="judgeHasMore() ? 'flex justify-center mt-8' : 'hidden'">
-        <button
-          type="button"
-          @click="loadMore()"
-          class="inline-flex items-center px-5 py-2.5 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-          x-class="loadingMore() ? 'opacity-60 pointer-events-none' : ''"
-        >
-          <span x-class="loadingMore() ? 'hidden' : ''">Load more reviews</span>
-          <span x-class="loadingMore() ? '' : 'hidden'">Loading…</span>
-        </button>
+      <!-- Numbered pagination. Wrapper x-class toggle (not :if) so it
+           stays in the DOM and appears once last_page > 1. The numbered
+           button uses item.cls (precomputed) so the :for has no signal
+           call-syntax; Prev/Next are outside the loop. -->
+      <div x-class="lastPage() > 1 ? 'flex flex-col items-center gap-3 mt-10' : 'hidden'">
+        <nav class="flex flex-wrap items-center justify-center gap-1.5" aria-label="Pagination">
+          <button
+            type="button"
+            @click="goToPage(currentPage() - 1)"
+            class="inline-flex items-center px-3 py-2 font-medium text-sm rounded-md border transition-colors"
+            x-class="currentPage() <= 1 ? 'text-gray-300 border-gray-200 pointer-events-none' : 'text-gray-700 border-gray-300 hover:bg-gray-50'"
+            aria-label="Previous page"
+          >Prev</button>
+          <button
+            :for="item in pages()"
+            type="button"
+            @click="goToPage(item.n)"
+            class="inline-flex items-center justify-center min-w-[2.5rem] px-3 py-2 font-medium text-sm rounded-md border transition-colors tabular-nums"
+            x-class="item.cls"
+          >{{ item.label }}</button>
+          <button
+            type="button"
+            @click="goToPage(currentPage() + 1)"
+            class="inline-flex items-center px-3 py-2 font-medium text-sm rounded-md border transition-colors"
+            x-class="currentPage() >= lastPage() ? 'text-gray-300 border-gray-200 pointer-events-none' : 'text-gray-700 border-gray-300 hover:bg-gray-50'"
+            aria-label="Next page"
+          >Next</button>
+        </nav>
+        <p class="text-gray-500 text-xs">{{ 'Page ' + currentPage() + ' of ' + lastPage() }}</p>
       </div>
     </div>
   </div>

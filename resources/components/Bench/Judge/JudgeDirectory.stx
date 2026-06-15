@@ -5,15 +5,15 @@
   const searchQuery = state<string>('')
   const stars: number[] = [1, 2, 3, 4, 5]
 
-  // Client-side windowing. The directory reads the SHARED `judges()`
-  // signal (also feeding the /reviews feed join, the category sidebar,
-  // and search), so we page in-memory rather than slice that signal.
-  // `visibleCount` grows on "Show more"; resets to the first window
-  // whenever a facet changes so a narrowed result starts at the top.
+  // Client-side numbered pagination. The directory reads the SHARED
+  // `judges()` signal (also feeding the /reviews feed join, the category
+  // sidebar, and search), so we page in-memory rather than slice that
+  // signal server-side. `currentPage` resets to 1 whenever a facet
+  // changes (every setter + the search box call resetWindow).
   const PAGE_SIZE = 12
-  const visibleCount = state<number>(PAGE_SIZE)
+  const currentPage = state<number>(1)
   function resetWindow(): void {
-    visibleCount.set(PAGE_SIZE)
+    currentPage.set(1)
   }
 
   // Practice-area filter (bench-review#38). URL-driven via
@@ -163,10 +163,37 @@
 
   // Windowed view of the filtered roster + the "is there more" flag the
   // Show-more control toggles on.
-  const visibleJudges = derived<Judge[]>(() => filteredJudges().slice(0, visibleCount()))
-  const hasMoreJudges = derived<boolean>(() => filteredJudges().length > visibleCount())
-  function showMore(): void {
-    visibleCount.set(visibleCount() + PAGE_SIZE)
+  const lastPage = derived<number>(() => Math.max(1, Math.ceil(filteredJudges().length / PAGE_SIZE)))
+  const pageJudges = derived<Judge[]>(() => {
+    const p = Math.max(1, Math.min(currentPage(), lastPage()))
+    const start = (p - 1) * PAGE_SIZE
+    return filteredJudges().slice(start, start + PAGE_SIZE)
+  })
+  function buildPages(current: number, last: number): Array<{ n: number, label: string, gap: boolean, active: boolean }> {
+    if (last <= 1) return []
+    const cur = Math.max(1, Math.min(current, last))
+    const out: Array<{ n: number, label: string, gap: boolean, active: boolean }> = []
+    const page = (n: number) => out.push({ n, label: String(n), gap: false, active: n === cur })
+    const gap = () => out.push({ n: 0, label: '…', gap: true, active: false })
+    const lo = Math.max(2, cur - 1)
+    const hi = Math.min(last - 1, cur + 1)
+    page(1)
+    if (lo > 2) gap()
+    for (let n = lo; n <= hi; n++) page(n)
+    if (hi < last - 1) gap()
+    page(last)
+    return out
+  }
+  const pages = derived(() => buildPages(Math.min(currentPage(), lastPage()), lastPage()).map(it => ({
+    ...it,
+    cls: it.gap
+      ? 'text-gray-400 border-transparent pointer-events-none'
+      : (it.active ? 'bg-gray-900 text-white border-gray-900' : 'text-gray-700 border-gray-300 hover:bg-gray-50'),
+  })))
+  function goToPage(n: number): void {
+    if (n < 1 || n > lastPage() || n === currentPage()) return
+    currentPage.set(n)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   // Local derived flags for the empty-state panel, computed in JS so the
@@ -315,7 +342,7 @@
 
     <div class="grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
       <StxLink
-        :for="judge in visibleJudges"
+        :for="judge in pageJudges"
         x-to="`/judges/${judge.id}/profile`"
         class="overflow-hidden relative flex flex-col bg-white border border-gray-200 rounded-2xl hover:border-gray-300 shadow-sm hover:shadow-lg hover:-translate-y-0.5 duration-300 transition-all group"
       >
@@ -361,16 +388,35 @@
       </StxLink>
     </div>
 
-    <!-- Show more (client-side windowing over the filtered roster).
-         x-class toggle — not :if — so the control stays in the DOM and
-         reactively appears/hides as the window grows or filters change. -->
-    <div x-class="hasMoreJudges() ? 'flex flex-col items-center gap-3 mt-12' : 'hidden'">
-      <p class="text-gray-500 text-sm">{{ visibleJudges().length + ' of ' + filteredJudges().length + ' judges' }}</p>
-      <button
-        type="button"
-        @click="showMore()"
-        class="inline-flex items-center px-5 py-2.5 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-      >Show more judges</button>
+    <!-- Numbered pagination (client-side over the filtered roster).
+         Wrapper x-class toggle (not :if) so it stays in the DOM and
+         appears once last_page > 1. Numbered button uses item.cls
+         (precomputed) — no signal call-syntax in the :for. -->
+    <div x-class="lastPage() > 1 ? 'flex flex-col items-center gap-3 mt-12' : 'hidden'">
+      <nav class="flex flex-wrap items-center justify-center gap-1.5" aria-label="Pagination">
+        <button
+          type="button"
+          @click="goToPage(currentPage() - 1)"
+          class="inline-flex items-center px-3 py-2 font-medium text-sm rounded-md border transition-colors"
+          x-class="currentPage() <= 1 ? 'text-gray-300 border-gray-200 pointer-events-none' : 'text-gray-700 border-gray-300 hover:bg-gray-50'"
+          aria-label="Previous page"
+        >Prev</button>
+        <button
+          :for="item in pages()"
+          type="button"
+          @click="goToPage(item.n)"
+          class="inline-flex items-center justify-center min-w-[2.5rem] px-3 py-2 font-medium text-sm rounded-md border transition-colors tabular-nums"
+          x-class="item.cls"
+        >{{ item.label }}</button>
+        <button
+          type="button"
+          @click="goToPage(currentPage() + 1)"
+          class="inline-flex items-center px-3 py-2 font-medium text-sm rounded-md border transition-colors"
+          x-class="currentPage() >= lastPage() ? 'text-gray-300 border-gray-200 pointer-events-none' : 'text-gray-700 border-gray-300 hover:bg-gray-50'"
+          aria-label="Next page"
+        >Next</button>
+      </nav>
+      <p class="text-gray-500 text-xs">{{ 'Page ' + Math.min(currentPage(), lastPage()) + ' of ' + lastPage() + ' · ' + filteredJudges().length + ' judges' }}</p>
     </div>
 
     <!-- Empty state. Gated on !loading so it doesn't flash during the
