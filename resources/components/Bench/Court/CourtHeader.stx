@@ -80,9 +80,9 @@
     <div class="flex gap-x-6 items-center">
       <img x-src="courtImage" x-alt="courtName" class="object-cover flex-none h-16 w-16 ring-1 ring-gray-900/10 rounded-lg">
       <div>
-        <div class="text-gray-500 text-sm/6">Courthouse <span class="text-gray-700">{{ `#${courtHeaderId}` }}</span></div>
-        <h1 class="mt-1 font-semibold text-base text-gray-900">{{ courtName }}</h1>
-        <p class="mt-0.5 text-gray-500 text-sm">{{ `${courtCity}${courtCity && courtState ? ', ' : ''}${courtState}` }}</p>
+        <div class="text-gray-500 text-sm/6">Courthouse <span class="text-gray-700" :text="`#${courtHeaderId}`"></span></div>
+        <h1 class="mt-1 font-semibold text-base text-gray-900" :text="courtName"></h1>
+        <p class="mt-0.5 text-gray-500 text-sm" :text="`${courtCity}${courtCity && courtState ? ', ' : ''}${courtState}`"></p>
       </div>
     </div>
   </div>

@@ -43,7 +43,7 @@
         <p class="mt-4 text-gray-600 text-sm/6">Are you a clerk? This is for you.</p>
         <p class="flex gap-x-1 items-baseline mt-6">
           <span class="font-semibold text-4xl text-gray-800 tracking-tight">$0</span>
-          <span class="font-semibold text-gray-600 text-sm/6">/<span>{{ pricingPeriod() === 'monthly' ? 'month' : 'year' }}</span></span>
+          <span class="font-semibold text-gray-600 text-sm/6">/<span x-text="pricingPeriod() === 'monthly' ? 'month' : 'year'"></span></span>
         </p>
         <StxLink to="/register" aria-describedby="tier-free"
           class="block mt-6 px-2.5 py-1.5 font-semibold text-center text-gray-600 text-sm/6 ring-1 ring-gray-200 ring-inset rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 hover:ring-gray-300">Get
@@ -63,8 +63,8 @@
         <h3 id="tier-hobby" class="font-semibold text-gray-600 text-lg/8">Professional</h3>
         <p class="mt-4 text-gray-600 text-sm/6">For anyone curious about judge reviews.</p>
         <p class="flex gap-x-1 items-baseline mt-6">
-          <span class="font-semibold text-4xl text-gray-800 tracking-tight">$<span>{{ pricingPeriod() === 'monthly' ? '10' : '60' }}</span></span>
-          <span class="font-semibold text-gray-600 text-sm/6">/<span>{{ pricingPeriod() === 'monthly' ? 'month' : 'year' }}</span></span>
+          <span class="font-semibold text-4xl text-gray-800 tracking-tight">$<span x-text="pricingPeriod() === 'monthly' ? '10' : '60'"></span></span>
+          <span class="font-semibold text-gray-600 text-sm/6">/<span x-text="pricingPeriod() === 'monthly' ? 'month' : 'year'"></span></span>
         </p>
         <StxLink to="/register" aria-describedby="tier-hobby"
           class="block mt-6 px-2.5 py-1.5 font-semibold text-center text-sm/6 text-white bg-gray-600 hover:bg-gray-500 rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm">Get
