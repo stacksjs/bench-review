@@ -463,14 +463,13 @@
     }
     .article-body > * + * { margin-top: 1.4em; }
     .article-body p { margin: 0; }
-    .article-body > p:first-child::first-letter {
-      float: left;
-      font-size: 4.6rem;
-      line-height: 1;
-      padding-right: 0.6rem;
-      padding-top: 0.35rem;
-      font-weight: 700;
-      color: #111;
+    /* No drop cap: review content is user-generated and can start with
+       anything (a heading, a short line, pasted preamble), so a floated
+       ::first-letter ends up huge and overlaps the following hr/heading. */
+    .article-body hr {
+      border: 0;
+      border-top: 1px solid #e5e7eb;
+      margin: 2em 0;
     }
     .article-body h2 {
       font-family: inherit;
