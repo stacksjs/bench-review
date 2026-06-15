@@ -12,6 +12,9 @@ interface SubmitPayload {
   content?: string
   rating?: number
   type?: 'positive' | 'negative' | 'neutral'
+  fairness_rating?: number
+  knowledge_rating?: number
+  demeanor_rating?: number
 }
 
 const ALLOWED_TYPES = ['positive', 'negative', 'neutral'] as const
@@ -55,6 +58,20 @@ export default new Action({
       rule: schema.number().min(1).max(5),
       message: 'Pick a rating between 1 and 5 stars.',
     },
+    // Per-aspect performance ratings — required on every new submission
+    // (the form collects all three before enabling submit). 1–5 stars.
+    fairness_rating: {
+      rule: schema.number().min(1).max(5),
+      message: 'Rate Fairness & Impartiality between 1 and 5 stars.',
+    },
+    knowledge_rating: {
+      rule: schema.number().min(1).max(5),
+      message: 'Rate Legal Knowledge between 1 and 5 stars.',
+    },
+    demeanor_rating: {
+      rule: schema.number().min(1).max(5),
+      message: 'Rate Professional Demeanor between 1 and 5 stars.',
+    },
     type: {
       // `schema.string().in([...])` is what `LogAction.ts` in the
       // framework defaults uses, but `StringValidator` doesn't actually
@@ -71,6 +88,9 @@ export default new Action({
 
     const judgeId = Number(body.judge_id)
     const rating = Number(body.rating)
+    const fairnessRating = Number(body.fairness_rating)
+    const knowledgeRating = Number(body.knowledge_rating)
+    const demeanorRating = Number(body.demeanor_rating)
     const title = String(body.title ?? '').trim()
     // Anonymity flag (bench-review#36). Accept truthy values
     // (boolean true OR string "true"/"1") so different client
@@ -150,6 +170,9 @@ export default new Action({
       title,
       content,
       rating,
+      fairness_rating: fairnessRating,
+      knowledge_rating: knowledgeRating,
+      demeanor_rating: demeanorRating,
       type,
       status: 'pending',
       comments: 0,

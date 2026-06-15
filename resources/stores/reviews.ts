@@ -6,6 +6,11 @@ export interface JudgeReviewRow {
   title: string
   content: string
   rating: number
+  // Per-aspect performance ratings (1–5), 0 on legacy rows pre-dating
+  // the columns. Hydrated on read for any future per-aspect display.
+  fairness_rating?: number
+  knowledge_rating?: number
+  demeanor_rating?: number
   likes?: number
   comments?: number
   type?: string
@@ -55,6 +60,10 @@ export interface SubmitReviewPayload {
   // bench-review#36 — when true, public surfaces render the author
   // as "Anonymous <role_label>" instead of their real name.
   anonymized?: boolean
+  // Per-aspect performance ratings (1–5). Required on every submission.
+  fairness_rating: number
+  knowledge_rating: number
+  demeanor_rating: number
 }
 
 export interface SubmitResult {

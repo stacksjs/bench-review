@@ -108,6 +108,11 @@
   effect(() => {
     if (reviewTitle().trim()) titleError.set(false)
   })
+  // Per-aspect performance-rating errors → red ring on the offending
+  // star row. Cleared as soon as the user picks a star for that aspect.
+  const fairnessError = state<boolean>(false)
+  const knowledgeError = state<boolean>(false)
+  const demeanorError = state<boolean>(false)
   // Sticky success state. Reviews land as `status=pending` and won't
   // show up on the judge's reviews page until a moderator publishes,
   // so a plain navigate-on-success looks like the form silently
@@ -201,6 +206,9 @@
     titleError.set(false)
     contentError.set(false)
     ratingError.set(false)
+    fairnessError.set(false)
+    knowledgeError.set(false)
+    demeanorError.set(false)
 
     try {
       const j = judge()
@@ -248,6 +256,18 @@
       ratingError.set(ratingMissing)
       if (ratingMissing) missing.push('an overall rating')
 
+      // Per-aspect performance ratings are required too. Flag each empty
+      // row individually (red ring) and add one summary line to the
+      // message — the rings show exactly which aspects are missing.
+      const fairnessMissing = fairness() < 1
+      const knowledgeMissing = knowledge() < 1
+      const demeanorMissing = demeanor() < 1
+      fairnessError.set(fairnessMissing)
+      knowledgeError.set(knowledgeMissing)
+      demeanorError.set(demeanorMissing)
+      if (fairnessMissing || knowledgeMissing || demeanorMissing)
+        missing.push('the performance ratings')
+
       if (missing.length > 0) {
         const msg = missing.length === 1
           ? 'Please add ' + missing[0] + '.'
@@ -268,6 +288,9 @@
         rating: overall,
         type: ratingType(overall),
         anonymized: anonymized(),
+        fairness_rating: fairness(),
+        knowledge_rating: knowledge(),
+        demeanor_rating: demeanor(),
       })
 
       if (!result.ok) {
@@ -499,14 +522,14 @@
         <div class="flex items-center justify-between">
           <label for="fairness" class="font-medium text-gray-900 text-sm">Fairness & Impartiality</label>
           <div class="flex items-center space-x-1 w-64">
-            <div class="flex items-center space-x-1">
+            <div class="flex items-center space-x-1 rounded-md" x-class="fairnessError() ? 'ring-2 ring-red-300 ring-offset-2' : ''">
               <button
                 :for="star in stars"
                 type="button"
                 x-disabled="!judge"
                 class="hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 x-class="(hoverFairness || fairness) >= star ? 'text-yellow-400' : 'text-gray-300'"
-                @click="fairness.set(star)"
+                @click="fairness.set(star); fairnessError.set(false)"
                 @mouseenter="hoverFairness.set(star)"
                 @mouseleave="hoverFairness.set(0)"
               >
@@ -520,14 +543,14 @@
         <div class="flex items-center justify-between">
           <label for="knowledge" class="font-medium text-gray-900 text-sm">Legal Knowledge</label>
           <div class="flex items-center space-x-1 w-64">
-            <div class="flex items-center space-x-1">
+            <div class="flex items-center space-x-1 rounded-md" x-class="knowledgeError() ? 'ring-2 ring-red-300 ring-offset-2' : ''">
               <button
                 :for="star in stars"
                 type="button"
                 x-disabled="!judge"
                 class="hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 x-class="(hoverKnowledge || knowledge) >= star ? 'text-yellow-400' : 'text-gray-300'"
-                @click="knowledge.set(star)"
+                @click="knowledge.set(star); knowledgeError.set(false)"
                 @mouseenter="hoverKnowledge.set(star)"
                 @mouseleave="hoverKnowledge.set(0)"
               >
@@ -541,14 +564,14 @@
         <div class="flex items-center justify-between">
           <label for="demeanor" class="font-medium text-gray-900 text-sm">Professional Demeanor</label>
           <div class="flex items-center space-x-1 w-64">
-            <div class="flex items-center space-x-1">
+            <div class="flex items-center space-x-1 rounded-md" x-class="demeanorError() ? 'ring-2 ring-red-300 ring-offset-2' : ''">
               <button
                 :for="star in stars"
                 type="button"
                 x-disabled="!judge"
                 class="hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 x-class="(hoverDemeanor || demeanor) >= star ? 'text-yellow-400' : 'text-gray-300'"
-                @click="demeanor.set(star)"
+                @click="demeanor.set(star); demeanorError.set(false)"
                 @mouseenter="hoverDemeanor.set(star)"
                 @mouseleave="hoverDemeanor.set(0)"
               >
