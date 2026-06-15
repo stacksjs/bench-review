@@ -461,7 +461,7 @@
       line-height: 1.7;
       color: #292929;
     }
-    .article-body > * + * { margin-top: 1.4em; }
+    .article-body > * + * { margin-top: 1.65em; }
     .article-body p { margin: 0; }
     /* No drop cap: review content is user-generated and can start with
        anything (a heading, a short line, pasted preamble), so a floated
@@ -469,7 +469,7 @@
     .article-body hr {
       border: 0;
       border-top: 1px solid #e5e7eb;
-      margin: 2em 0;
+      margin: 2.5em 0;
     }
     .article-body h2 {
       font-family: inherit;
@@ -495,7 +495,9 @@
     .article-body blockquote {
       border-left: 3px solid #111;
       padding-left: 1.25rem;
-      margin-left: 0;
+      /* Explicit top+bottom so the quote is clearly set apart from the
+         surrounding paragraphs (the following <p> was hugging it). */
+      margin: 2em 0;
       font-style: italic;
       color: #444;
       font-size: 1.35rem;
