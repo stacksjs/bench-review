@@ -217,6 +217,67 @@
     })
   }
 
+  // Block-format buttons (H2 / H3 / Quote) are BROKEN in this fork: the
+  // built-in buttons fire actions `append-h2` / `append-h3` /
+  // `append-blockquote`, but the editor's `execAction` switch only has
+  // cases for the bare names (`h2` / `h3` / `quote`). The `append-*`
+  // names fall through to `execCommand('append-blockquote', …)` — not a
+  // real command — and silently no-op. (Bold/italic/lists/justify work
+  // because their action names ARE valid execCommand names; the slash
+  // menu works because it calls formatBlock directly.) Apply the block
+  // format ourselves on click. The library's no-op handler still runs,
+  // harmlessly. data-action on the DOM button is the button NAME
+  // (h2/h3/quote) — that's also why the icon swap keys off it.
+  const BLOCK_ACTION_TO_TAG = {
+    h2: 'h2',
+    h3: 'h3',
+    quote: 'blockquote',
+  }
+  function closestBlockTag(editable) {
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0) return ''
+    const node = sel.getRangeAt(0).startContainer
+    let el = node.nodeType === 3 ? node.parentElement : node
+    while (el && el !== editable) {
+      const t = el.tagName
+      if (t === 'H1' || t === 'H2' || t === 'H3' || t === 'H4' || t === 'BLOCKQUOTE' || t === 'PRE' || t === 'P' || t === 'DIV')
+        return t
+      el = el.parentElement
+    }
+    return ''
+  }
+  function attachBlockFormatHandlers(toolbarEl, editable) {
+    if (!toolbarEl) return
+    toolbarEl.querySelectorAll('button[data-action]').forEach((btn) => {
+      if (btn.__benchBlockPatched) return
+      const tag = BLOCK_ACTION_TO_TAG[btn.getAttribute('data-action')]
+      if (!tag) return
+      btn.__benchBlockPatched = true
+      const upper = tag.toUpperCase()
+      btn.addEventListener('click', (event) => {
+        // Take over completely: stop the toolbar's delegated (bubble)
+        // click handler so the library's broken `append-*` path never
+        // runs — guarantees a single, correct formatBlock with no
+        // double-toggle, regardless of the library's internal routing.
+        // (Toolbar buttons preventDefault their mousedown, so the
+        // editable keeps focus + selection and formatBlock applies.)
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        // Toggle: if the caret's block is already this tag, drop back to
+        // a plain paragraph; otherwise apply the block format.
+        const isActive = closestBlockTag(editable) === upper
+        document.execCommand('formatBlock', false, isActive ? 'p' : tag)
+        // Sync the active highlight, and fire a change so draft autosave
+        // / validation see the new content.
+        setTimeout(() => {
+          if (closestBlockTag(editable) === upper) btn.classList.add('medium-editor-button-active')
+          else btn.classList.remove('medium-editor-button-active')
+          editable.dispatchEvent(new Event('input', { bubbles: true }))
+        }, 20)
+      })
+    })
+  }
+
   function mountRichTextHost(host) {
     // Idempotency guard — MutationObserver below can fire multiple times
     // for the same host (attribute changes, child additions); don't
@@ -308,9 +369,11 @@
     // MediumEditor lazily adds buttons after init.
     applyToolbarIcons(host.querySelector('.medium-editor-toolbar'))
     attachCaretFixHandlers(host.querySelector('.medium-editor-toolbar'), editable)
+    attachBlockFormatHandlers(host.querySelector('.medium-editor-toolbar'), editable)
     requestAnimationFrame(() => {
       applyToolbarIcons(host.querySelector('.medium-editor-toolbar'))
       attachCaretFixHandlers(host.querySelector('.medium-editor-toolbar'), editable)
+      attachBlockFormatHandlers(host.querySelector('.medium-editor-toolbar'), editable)
     })
 
     // Keyboard shortcuts (⌘B / ⌘I / ⌘U) bypass the toolbar buttons
