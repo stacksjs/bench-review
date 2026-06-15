@@ -798,18 +798,19 @@
     </div>
   </article>
 
-  <!-- Comments thread (bench-review#44). Lives OUTSIDE the `<article :if>`
+  <!-- Comments thread (bench-review#44). Lives OUTSIDE the article :if
        wrapper deliberately. Nesting a scoped component (Comments has its
-       own `data-stx-scope`) inside a reactive `:if` trips stacksjs/stx#1737:
+       own data-stx-scope) inside a reactive :if trips stacksjs/stx#1737:
        when the conditional element is initially detached (reviewsStore.current
-       is null until fetchById resolves), `bindIf`'s `disposeSubtreeScopes` walk
-       deletes the nested scope's entry from `window.stx._scopes` — and the
-       component's `<script data-stx-scoped>` IIFE only runs once at parse time,
-       so the scope never re-registers. Symptom: every `:if` / `:else-if` / `:else`
-       inside Comments would silently fail (all branches stay visible because
+       is null until fetchById resolves), bindIf's disposeSubtreeScopes walk
+       deletes the nested scope's entry from window.stx._scopes — and the
+       component's scoped-script IIFE only runs once at parse time, so the
+       scope never re-registers. Symptom: every :if / :else-if / :else inside
+       Comments would silently fail (all branches stay visible because
        processElement is never called on them). x-class hide/show on this
        wrapper keeps the element mounted, so the scope-walk dispatch reaches
-       Comments uninterrupted. -->
+       Comments uninterrupted. NOTE: no backticks in this comment — they leak
+       into the merged setup function and break the script (Unexpected token). -->
   <div
     class="mx-auto pt-12 px-4 sm:px-6 max-w-3xl"
     x-class="commentsVisible ? '' : 'hidden'"
@@ -820,80 +821,12 @@
 
 @push('styles')
 <style>
-  /* Medium-style serif. System serif stack avoids a webfont dependency
-     and matches the editorial register we want. */
-  .article-body {
-    font-family: 'Charter', 'Iowan Old Style', 'Source Serif Pro', Georgia, Cambria, 'Times New Roman', serif;
-    font-size: 1.25rem;
-    line-height: 1.7;
-    color: #292929;
-  }
-
-  .article-body > * + * { margin-top: 1.4em; }
-
-  .article-body p { margin: 0; }
-
-  /* Drop cap on the very first paragraph. Subtle scale + tighter
-     leading so the cap doesn't push the column over. */
-  .article-body > p:first-child::first-letter {
-    float: left;
-    font-size: 4.6rem;
-    line-height: 1;
-    padding-right: 0.6rem;
-    padding-top: 0.35rem;
-    font-weight: 700;
-    color: #111;
-  }
-
-  .article-body h2 {
-    font-family: inherit;
-    font-size: 1.6rem;
-    font-weight: 700;
-    line-height: 1.3;
-    color: #1a1a1a;
-    margin-top: 2.5em;
-    margin-bottom: 0.6em;
-    letter-spacing: -0.01em;
-  }
-
-  .article-body h3 {
-    font-family: inherit;
-    font-size: 1.25rem;
-    font-weight: 700;
-    line-height: 1.35;
-    color: #1a1a1a;
-    margin-top: 2em;
-    margin-bottom: 0.5em;
-  }
-
-  .article-body strong { color: #111; font-weight: 700; }
-  .article-body em { font-style: italic; }
-
-  .article-body blockquote {
-    border-left: 3px solid #111;
-    padding-left: 1.25rem;
-    margin-left: 0;
-    font-style: italic;
-    color: #444;
-    font-size: 1.35rem;
-    line-height: 1.55;
-  }
-
-  .article-body ul, .article-body ol {
-    padding-left: 1.5rem;
-    margin: 1.4em 0;
-  }
-  .article-body ul { list-style: disc; }
-  .article-body ol { list-style: decimal; }
-  .article-body li { margin: 0.4em 0; }
-
-  .article-body a {
-    color: #b45309;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-    text-decoration-thickness: 1px;
-  }
-  .article-body a:hover { color: #92400e; }
+  /* The .article-body prose rules (serif, drop-cap, headings, blockquote,
+     lists, links) live in the GLOBAL stylesheet (resources/assets/styles/
+     main.css) — NOT here — because per-page @push styles aren't re-injected
+     on SPA navigation and aren't shipped for this dynamic route in prod, so
+     a saved blockquote/heading rendered unstyled when viewed. Only the
+     component-specific star rule stays here. */
 
   /* The star icons inherit color via currentColor, but the inline-svg
      stars in the header use fill=currentColor so x-class colors fill

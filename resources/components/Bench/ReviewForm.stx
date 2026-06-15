@@ -206,11 +206,11 @@
 
       const title = reviewTitle().trim()
 
-      // Read editor content from the DOM, not the signal. `ts-medium-
-      // editor`'s `editor.subscribe('editableInput', …)` doesn't fire
-      // on this build, so the @richtext-change → reviewContent.set()
-      // chain never updates. The contenteditable's `innerHTML` is the
-      // ground truth.
+      // Read editor content from the DOM, not the signal. The
+      // ts-medium-editor editor.subscribe('editableInput', …) hook
+      // doesn't fire on this build, so the @richtext-change ->
+      // reviewContent.set() chain never updates. The contenteditable's
+      // innerHTML is the ground truth.
       const editable = document.querySelector('[data-richtext-host] .medium-editor-element') as HTMLElement | null
       let content = (editable?.innerHTML || '').trim()
       // Fall back to the signal only when the editor node isn't mounted.
@@ -436,8 +436,14 @@
   </div>
 
   <!-- Step 1: pick a judge (no card around it — the search component
-       brings its own surface). -->
-  <div :if="!judge && !submitted">
+       brings its own surface). x-class toggle (NOT :if): the preload
+       effect sets judge synchronously at setup, so on the /review/:id
+       path this block is false at bindIf's first pass — :if would DROP
+       it and it would never reappear when the user clicks "Change judge"
+       (judge.set(null)), which is exactly that bug. x-class keeps it
+       mounted and reactively shows it. Safe to always-mount: nothing
+       inside reads judge()/submitted(), so no null-access while hidden. -->
+  <div x-class="(!judge() && !submitted()) ? '' : 'hidden'">
     @include('Bench/Judge/ReviewJudgeSearch')
   </div>
 
