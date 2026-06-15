@@ -107,7 +107,7 @@
         </nav>
       </div>
       <div class="flex gap-x-4 items-center">
-        <span class="hidden sm:inline text-gray-600 text-sm">{{ adminName }}</span>
+        <span class="hidden sm:inline text-gray-600 text-sm" :text="adminName"></span>
         <StxLink to="/" class="text-gray-500 text-sm hover:text-gray-900">View site</StxLink>
         <button
           type="button"
