@@ -13,12 +13,6 @@
   const reviewContent = state<string>('')
   const rating = state<StarRating>(0)
   const hoverRating = state<StarRating>(0)
-  const fairness = state<StarRating>(0)
-  const hoverFairness = state<StarRating>(0)
-  const knowledge = state<StarRating>(0)
-  const hoverKnowledge = state<StarRating>(0)
-  const demeanor = state<StarRating>(0)
-  const hoverDemeanor = state<StarRating>(0)
   const judge = state<SelectedJudge | null>(null)
   // Anonymity toggle (bench-review#36). Defaults OFF — anonymity is
   // an explicit opt-in, not the default privacy posture. Clerks /
@@ -108,11 +102,6 @@
   effect(() => {
     if (reviewTitle().trim()) titleError.set(false)
   })
-  // Per-aspect performance-rating errors → red ring on the offending
-  // star row. Cleared as soon as the user picks a star for that aspect.
-  const fairnessError = state<boolean>(false)
-  const knowledgeError = state<boolean>(false)
-  const demeanorError = state<boolean>(false)
   // Sticky success state. Reviews land as `status=pending` and won't
   // show up on the judge's reviews page until a moderator publishes,
   // so a plain navigate-on-success looks like the form silently
@@ -206,9 +195,6 @@
     titleError.set(false)
     contentError.set(false)
     ratingError.set(false)
-    fairnessError.set(false)
-    knowledgeError.set(false)
-    demeanorError.set(false)
 
     try {
       const j = judge()
@@ -256,18 +242,6 @@
       ratingError.set(ratingMissing)
       if (ratingMissing) missing.push('an overall rating')
 
-      // Per-aspect performance ratings are required too. Flag each empty
-      // row individually (red ring) and add one summary line to the
-      // message — the rings show exactly which aspects are missing.
-      const fairnessMissing = fairness() < 1
-      const knowledgeMissing = knowledge() < 1
-      const demeanorMissing = demeanor() < 1
-      fairnessError.set(fairnessMissing)
-      knowledgeError.set(knowledgeMissing)
-      demeanorError.set(demeanorMissing)
-      if (fairnessMissing || knowledgeMissing || demeanorMissing)
-        missing.push('the performance ratings')
-
       if (missing.length > 0) {
         const msg = missing.length === 1
           ? 'Please add ' + missing[0] + '.'
@@ -288,9 +262,6 @@
         rating: overall,
         type: ratingType(overall),
         anonymized: anonymized(),
-        fairness_rating: fairness(),
-        knowledge_rating: knowledge(),
-        demeanor_rating: demeanor(),
       })
 
       if (!result.ok) {
@@ -493,13 +464,15 @@
     </div>
   </div>
 
-  <!-- Step 3: performance ratings — only enabled once a judge is set. -->
+  <!-- The review: title, a single overall rating (Yelp-style — the old
+       per-aspect "Judge's Performance" scorecard was dropped), and the
+       freeform text. One card, only enabled once a judge is set. -->
   <div :if="judge && !submitted" class="p-6 sm:p-8 bg-white border border-gray-200 rounded-2xl shadow-sm mt-2">
-    <h2 class="font-semibold text-base text-gray-900">Judge's Performance</h2>
-    <p class="mt-1 text-gray-500 text-sm">Rate the judge's performance in different aspects.</p>
+    <h2 class="font-semibold text-base text-gray-900">Your review</h2>
+    <p class="mt-1 text-gray-500 text-sm">A title, your overall rating, and your written feedback.</p>
 
-    <div class="mt-8 space-y-8">
-      <!-- Title field -->
+    <div class="mt-6 space-y-8">
+      <!-- Title -->
       <div>
         <label for="title" class="block font-medium text-gray-900 text-sm">Review Title</label>
         <div class="mt-2">
@@ -516,91 +489,6 @@
         </div>
       </div>
 
-      <!-- Sub-ratings grouped in a soft surface so they read as one
-           "performance scorecard" block rather than three loose rows. -->
-      <div class="p-5 bg-gray-50 border border-gray-200 rounded-xl space-y-5">
-        <div class="flex items-center justify-between">
-          <label for="fairness" class="font-medium text-gray-900 text-sm">Fairness & Impartiality</label>
-          <div class="flex items-center space-x-1 w-64">
-            <div class="flex items-center space-x-1 rounded-md" x-class="fairnessError() ? 'ring-2 ring-red-300 ring-offset-2' : ''">
-              <button
-                :for="star in stars"
-                type="button"
-                x-disabled="!judge"
-                class="hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                x-class="(hoverFairness || fairness) >= star ? 'text-yellow-400' : 'text-gray-300'"
-                @click="fairness.set(star); fairnessError.set(false)"
-                @mouseenter="hoverFairness.set(star)"
-                @mouseleave="hoverFairness.set(0)"
-              >
-                <Icon name="star" size="24" />
-              </button>
-            </div>
-            <span class="ml-2 w-24 text-gray-500 text-sm">{{ fairness() ? getRatingText(fairness()) : '' }}</span>
-          </div>
-        </div>
-
-        <div class="flex items-center justify-between">
-          <label for="knowledge" class="font-medium text-gray-900 text-sm">Legal Knowledge</label>
-          <div class="flex items-center space-x-1 w-64">
-            <div class="flex items-center space-x-1 rounded-md" x-class="knowledgeError() ? 'ring-2 ring-red-300 ring-offset-2' : ''">
-              <button
-                :for="star in stars"
-                type="button"
-                x-disabled="!judge"
-                class="hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                x-class="(hoverKnowledge || knowledge) >= star ? 'text-yellow-400' : 'text-gray-300'"
-                @click="knowledge.set(star); knowledgeError.set(false)"
-                @mouseenter="hoverKnowledge.set(star)"
-                @mouseleave="hoverKnowledge.set(0)"
-              >
-                <Icon name="star" size="24" />
-              </button>
-            </div>
-            <span class="ml-2 w-24 text-gray-500 text-sm">{{ knowledge() ? getRatingText(knowledge()) : '' }}</span>
-          </div>
-        </div>
-
-        <div class="flex items-center justify-between">
-          <label for="demeanor" class="font-medium text-gray-900 text-sm">Professional Demeanor</label>
-          <div class="flex items-center space-x-1 w-64">
-            <div class="flex items-center space-x-1 rounded-md" x-class="demeanorError() ? 'ring-2 ring-red-300 ring-offset-2' : ''">
-              <button
-                :for="star in stars"
-                type="button"
-                x-disabled="!judge"
-                class="hover:text-yellow-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                x-class="(hoverDemeanor || demeanor) >= star ? 'text-yellow-400' : 'text-gray-300'"
-                @click="demeanor.set(star); demeanorError.set(false)"
-                @mouseenter="hoverDemeanor.set(star)"
-                @mouseleave="hoverDemeanor.set(0)"
-              >
-                <Icon name="star" size="24" />
-              </button>
-            </div>
-            <span class="ml-2 w-24 text-gray-500 text-sm">{{ demeanor() ? getRatingText(demeanor()) : '' }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    </div>
-  </div>
-
-  <!-- Step 4: The actual review — rating + freeform text. Last card
-       before the action bar.
-       The "Case context" card (case number / case date / your role /
-       post-anonymously toggle) used to live here. It was unwired:
-       SubmitReviewAction only sends judge_id/title/content/rating/type,
-       and the API/DB have no columns for case metadata or anonymity.
-       Dropped rather than mocked so users don't fill in fields that
-       silently disappear. Restore (with API + schema support) if/when
-       we actually do something with case context. -->
-  <div :if="judge && !submitted" class="p-6 sm:p-8 bg-white border border-gray-200 rounded-2xl shadow-sm mt-2">
-    <h2 class="font-semibold text-base text-gray-900">Your review</h2>
-    <p class="mt-1 text-gray-500 text-sm">Overall rating and your written feedback.</p>
-
-    <div class="mt-6 space-y-8">
       <div>
         <label for="rating" class="block font-medium text-gray-900 text-sm">Overall Rating</label>
         <div class="mt-2 flex items-center space-x-2">

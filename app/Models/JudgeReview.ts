@@ -172,53 +172,6 @@ export default defineModel({
       },
       factory: () => 0,
     },
-
-    // Per-aspect performance ratings (1–5). Collected on the review form
-    // alongside the overall rating; required on new submissions (enforced
-    // by SubmitReviewAction + the form). `default 0` covers pre-existing
-    // rows submitted before these columns existed, so the model
-    // validation floor is 0 rather than 1 (the action requires 1–5).
-    fairness_rating: {
-      required: false,
-      order: 9,
-      fillable: true,
-      default: 0,
-      validation: {
-        rule: schema.number().min(0).max(5),
-        message: {
-          max: 'Rating cannot exceed 5',
-        },
-      },
-      factory: faker => faker.number.int({ min: 1, max: 5 }),
-    },
-
-    knowledge_rating: {
-      required: false,
-      order: 10,
-      fillable: true,
-      default: 0,
-      validation: {
-        rule: schema.number().min(0).max(5),
-        message: {
-          max: 'Rating cannot exceed 5',
-        },
-      },
-      factory: faker => faker.number.int({ min: 1, max: 5 }),
-    },
-
-    demeanor_rating: {
-      required: false,
-      order: 11,
-      fillable: true,
-      default: 0,
-      validation: {
-        rule: schema.number().min(0).max(5),
-        message: {
-          max: 'Rating cannot exceed 5',
-        },
-      },
-      factory: faker => faker.number.int({ min: 1, max: 5 }),
-    },
   },
 
   dashboard: {

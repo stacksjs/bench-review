@@ -408,9 +408,6 @@ declare module '@stacksjs/database' {
       type: string
       status: string
       anonymized: number
-      fairness_rating: number
-      knowledge_rating: number
-      demeanor_rating: number
       judge_id: number
       user_id: number
     }
