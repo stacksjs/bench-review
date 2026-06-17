@@ -12,13 +12,16 @@ import { notifyModeratorsOfFlag } from '../../Helpers/notifyModerators'
  * is captured when present so we can rate-limit repeat-flaggers and
  * spot abuse patterns. Anonymous flags accepted because the trust
  * model needs friction-free reporting — a reader shouldn't have to
- * sign up just to surface a problem. Anti-abuse note: rate-limit on
- * the route layer (TODO once we have a middleware for it).
+ * sign up just to surface a problem. Anti-abuse: the route applies a
+ * 10/10min/IP throttle (routes/api.ts).
  *
  * Status starts at 'open'. Admin queue surfaces these; the moderator
  * dismisses (no review change) or actions (review gets edited/
- * rejected as a result). The unique (judge_review_id, user_id) index
- * stops signed-in users from spam-flagging the same review.
+ * rejected as a result). Dedup is enforced at the APP layer below (an
+ * explicit lookup) — there is NO unique DB index on review_flags.
+ * Signed-in repeat-flags collapse to a silent 200; anonymous
+ * repeat-flags are bounded only by the route throttle (no per-anon
+ * identifier is persisted to dedup on).
  *
  * Resolves bench-review#27.
  */
@@ -64,9 +67,10 @@ export default new Action({
     if (!review)
       return response.json({ error: 'Review not found.' }, 404)
 
-    // Capture reporter id when signed in. Anonymous flags pass user_id=null;
-    // the partial-unique index in the migration scopes the dedup constraint
-    // to non-null user_ids, so anonymous repeat-flags don't collide.
+    // Capture reporter id when signed in. Anonymous flags pass user_id=null
+    // and are NOT deduplicated (no per-anon identifier persisted) — the
+    // route throttle (10/10min/IP) is the only guard against anon repeats.
+    // Persistent anon dedup would need an ip column on review_flags.
     let userId: number | null = null
     try {
       const me = await Auth.user()

@@ -25,9 +25,11 @@ route.get('/coming-soon', 'Controllers/ComingSoonController@index')
 // no email, no PII. Aggregates over published reviews only.
 route.get('/users/{id}', 'Actions/Users/UserShowAction')
   .name('bench.users.show')
+  .middleware('throttle:60,1m') // public profile runs 3 aggregate queries/hit — cap it like /judges
 
 route.get('/users/{id}/reviews', 'Actions/Users/UserReviewsAction')
   .name('bench.users.reviews')
+  .middleware('throttle:60,1m')
 
 // Home page activity slices — trending judges, top-rated judges,
 // active reviewers in one round-trip. See HomeHighlightsAction for the
