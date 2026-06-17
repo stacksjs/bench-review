@@ -1,5 +1,5 @@
 import { Action } from '@stacksjs/actions'
-import { Auth } from '@stacksjs/auth'
+import { Auth, isEmailVerified } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
@@ -31,6 +31,13 @@ export default new Action({
     const userId = (me as any)?.id
     if (!userId)
       return response.json({ error: 'Not authenticated.' }, 401)
+
+    // Email-verification gate — judge responses are public content, so
+    // hold them to the same bar as review submission (SubmitReviewAction).
+    // The verified-judge credential check below is separate from email
+    // verification and does not imply it.
+    if (!isEmailVerified(me as any))
+      return response.json({ error: 'Please verify your email address before posting a response — check your inbox for the verification link.' }, 403)
 
     const reviewId = Number(request.params?.id)
     const review = await db.selectFrom('judge_reviews')

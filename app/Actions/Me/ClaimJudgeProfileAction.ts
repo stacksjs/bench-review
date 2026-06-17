@@ -1,5 +1,5 @@
 import { Action } from '@stacksjs/actions'
-import { Auth } from '@stacksjs/auth'
+import { Auth, isEmailVerified } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
@@ -33,6 +33,12 @@ export default new Action({
     const userId = (me as any)?.id
     if (!userId)
       return response.json({ error: 'Not authenticated.' }, 401)
+
+    // Email-verification gate — same trust posture as review submission
+    // (SubmitReviewAction). Don't let unverified accounts queue admin work:
+    // a judge claim enters the credential-verification queue.
+    if (!isEmailVerified(me as any))
+      return response.json({ error: 'Please verify your email address before claiming a judge profile — check your inbox for the verification link.' }, 403)
 
     const judgeId = Number(request.get?.('judgeId'))
     if (!Number.isFinite(judgeId) || judgeId <= 0)

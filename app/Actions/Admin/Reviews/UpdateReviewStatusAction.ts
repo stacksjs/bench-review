@@ -38,6 +38,15 @@ export default new Action({
     if (!ALLOWED_STATUSES.has(status))
       return response.json({ error: 'Status must be "published" or "rejected".' }, 422)
 
+    // Resolve the moderator up front. The `admin` middleware already
+    // guarantees an authenticated admin; resolving here (and 401-ing if
+    // it's somehow absent) means the audit log is guaranteed an actor and
+    // we never mutate review status with an unlogged moderation action.
+    const admin = await Auth.user().catch(() => null)
+    const adminId = (admin as any)?.id
+    if (!adminId)
+      return response.json({ error: 'Not authenticated.' }, 401)
+
     const existing = await db.selectFrom('judge_reviews')
       .select(['id', 'user_id', 'status'])
       .where('id', '=', reviewId)
@@ -53,15 +62,12 @@ export default new Action({
     // Audit trail — record who moderated, and to what. Logged on every
     // status change (independent of whether the author gets notified).
     if (existing.status !== status) {
-      const admin = await Auth.user().catch(() => null)
-      const adminId = (admin as any)?.id
-      if (adminId)
-        await logModeration({
-          actorUserId: Number(adminId),
-          action: status === 'published' ? 'review.publish' : 'review.reject',
-          targetType: 'review',
-          targetId: reviewId,
-        })
+      await logModeration({
+        actorUserId: Number(adminId),
+        action: status === 'published' ? 'review.publish' : 'review.reject',
+        targetType: 'review',
+        targetId: reviewId,
+      })
     }
 
     // Notify the review's author IFF status actually changed AND the
@@ -70,11 +76,9 @@ export default new Action({
     // dedup, since toggling status back and forth is a deliberate
     // moderation signal the user should see each time.
     if (existing.user_id != null && existing.status !== status) {
-      const me = await Auth.user().catch(() => null)
-      const actorId = (me as any)?.id ?? null
       await notify({
         userId: Number(existing.user_id),
-        actorUserId: actorId,
+        actorUserId: adminId,
         type: status === 'published' ? 'approved' : 'rejected',
         reviewId,
       })
