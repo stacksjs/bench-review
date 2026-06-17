@@ -5,6 +5,7 @@
   // dashboard reuses the already-fetched data (and vice versa).
   const adminUsers = useStore('adminUsers')
   const adminReviews = useStore('adminReviews')
+  const adminFlags = useStore('adminFlags')
 
   // Snapshot signal — refresh once per mount via the same dual-call
   // pattern used elsewhere (hard reload + SPA nav, see
@@ -17,9 +18,12 @@
     adminUsers.perPage.set(1)
     adminReviews.perPage.set(1)
     adminReviews.statusFilter.set('pending')
+    // adminFlags defaults to the 'open' filter — fetchFlags() returns the
+    // open queue (capped at 200 server-side, which is plenty for a badge).
     await Promise.all([
       adminUsers.fetchUsers(),
       adminReviews.fetchReviews(),
+      adminFlags.fetchFlags(),
     ])
   }
   fetchSummary()
@@ -27,6 +31,9 @@
 
   const pendingCount = derived<number>(() => adminReviews.total())
   const userCount = derived<number>(() => adminUsers.total())
+  // openCount counts loaded open flags; 200 means "200 or more" (the API cap).
+  const flagCount = derived<number>(() => adminFlags.openCount())
+  const flagCountLabel = derived<string>(() => (adminFlags.openCount() >= 200 ? '200+' : String(adminFlags.openCount())))
 </script>
 
 <div class="space-y-6">
@@ -41,6 +48,11 @@
       <p class="mt-2 font-bold text-3xl text-gray-900" :text="pendingCount()"></p>
       <p class="mt-2 font-semibold text-gray-600 text-sm">Open moderation queue &rarr;</p>
     </StxLink>
+    <StxLink to="/admin/flags" class="block p-6 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
+      <p class="font-medium text-gray-500 text-sm">Open flags</p>
+      <p class="mt-2 font-bold text-3xl" x-class="flagCount() > 0 ? 'text-amber-600' : 'text-gray-900'" :text="flagCountLabel()"></p>
+      <p class="mt-2 font-semibold text-gray-600 text-sm">Triage reports &rarr;</p>
+    </StxLink>
     <StxLink to="/admin/users" class="block p-6 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
       <p class="font-medium text-gray-500 text-sm">Total users</p>
       <p class="mt-2 font-bold text-3xl text-gray-900" :text="userCount()"></p>
@@ -50,6 +62,7 @@
       <p class="font-medium text-gray-500 text-sm">Quick actions</p>
       <div class="flex flex-col gap-y-1 mt-2">
         <StxLink to="/admin/reviews?status=pending" class="font-semibold text-gray-900 text-sm hover:underline">Review pending submissions</StxLink>
+        <StxLink to="/admin/flags?status=open" class="font-semibold text-gray-900 text-sm hover:underline">Triage flagged reviews</StxLink>
         <StxLink to="/admin/users" class="font-semibold text-gray-900 text-sm hover:underline">Promote a user to admin</StxLink>
         <StxLink to="/" class="font-semibold text-gray-600 text-sm hover:underline">View public site</StxLink>
       </div>

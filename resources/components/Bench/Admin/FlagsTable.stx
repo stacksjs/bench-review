@@ -1,0 +1,162 @@
+<script client>
+  import type { AdminFlagRow, FlagStatusFilter } from '~/resources/stores/adminFlags'
+
+  const store = useStore('adminFlags')
+  const toast = useStore('toast')
+
+  let hasFetched = false
+  function bootstrap(): void {
+    if (hasFetched) return
+    hasFetched = true
+    // The dashboard "Flag queue" widget links here with ?status=open;
+    // honour a status query-param if present, else default to open.
+    if (typeof window !== 'undefined') {
+      const fromUrl = new URLSearchParams(window.location.search).get('status')
+      if (fromUrl === 'open' || fromUrl === 'resolved' || fromUrl === 'dismissed' || fromUrl === 'all')
+        store.statusFilter.set(fromUrl as FlagStatusFilter)
+    }
+    store.fetchFlags()
+  }
+  bootstrap()
+  onMount(() => { bootstrap() })
+
+  // Re-entry guard for the per-row dismiss/resolve mutations. Signal
+  // call-syntax inside the :for (x-disabled/:text) is the forbidden
+  // footgun, so this is a plain JS guard against rapid double-clicks —
+  // never bound in the loop body.
+  const mutatingId = state<number | null>(null)
+
+  async function dismiss(flag: AdminFlagRow): Promise<void> {
+    if (mutatingId()) return
+    mutatingId.set(flag.id)
+    try {
+      if (await store.resolveFlag(flag.id, 'dismiss'))
+        toast.success('Flag dismissed', 'Marked as not actionable.')
+    }
+    finally { mutatingId.set(null) }
+  }
+  async function resolve(flag: AdminFlagRow): Promise<void> {
+    if (mutatingId()) return
+    mutatingId.set(flag.id)
+    try {
+      if (await store.resolveFlag(flag.id, 'resolve'))
+        toast.success('Flag resolved', 'Marked as acted on — take the review down from the Reviews tab if needed.')
+    }
+    finally { mutatingId.set(null) }
+  }
+
+  function setFilter(next: FlagStatusFilter): void {
+    store.setStatusFilter(next)
+  }
+
+  function formatDate(s: string | null | undefined): string {
+    if (!s) return ''
+    const d = new Date(s)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  }
+
+  const REASON_LABELS: Record<string, string> = {
+    off_topic: 'Off-topic',
+    harassment: 'Harassment',
+    threat: 'Threat',
+    spam: 'Spam',
+    privacy: 'Privacy',
+    inaccurate: 'Inaccurate',
+    other: 'Other',
+  }
+  function reasonLabel(reason: string | null | undefined): string {
+    return REASON_LABELS[(reason || '').toLowerCase()] || (reason || 'Flag')
+  }
+
+  const emptyTitle = derived<string>(() => {
+    const s = store.statusFilter()
+    if (s === 'open') return 'No open flags'
+    if (s === 'resolved') return 'No resolved flags'
+    if (s === 'dismissed') return 'No dismissed flags'
+    return 'No flags yet'
+  })
+  const emptyHint = derived<string>(() => {
+    if (store.statusFilter() === 'open') return 'You\'re all caught up — community reports appear here for triage.'
+    return 'Closed-out flags show up here.'
+  })
+
+  const TABS: Array<{ key: FlagStatusFilter, label: string }> = [
+    { key: 'open', label: 'Open' },
+    { key: 'resolved', label: 'Resolved' },
+    { key: 'dismissed', label: 'Dismissed' },
+    { key: 'all', label: 'All' },
+  ]
+</script>
+
+<div class="space-y-4">
+  <div>
+    <h1 class="font-bold text-2xl text-gray-900">Flag queue</h1>
+    <p class="mt-1 text-gray-600 text-sm">Community reports on reviews. Dismiss the ones that aren't actionable; resolve the ones you act on (take the review down from the Reviews tab).</p>
+  </div>
+
+  <div class="flex gap-x-1 border-b border-gray-200">
+    <button
+      :for="tab in TABS"
+      type="button"
+      @click="setFilter(tab.key)"
+      class="px-4 py-2 font-medium text-sm border-b-2 transition-colors"
+      x-class="store.statusFilter() === tab.key ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300'">{{ tab.label }}</button>
+  </div>
+
+  <div
+    role="alert"
+    class="px-4 py-3 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
+    x-class="store.actionError() ? '' : 'hidden'">{{ store.actionError() }}</div>
+
+  <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div :if="store.loading() && store.flags().length === 0" class="px-4 py-12 text-center text-gray-500 text-sm">
+      Loading flags…
+    </div>
+    <!-- x-class hidden (not :if) so inner bindings stay subscribed across
+         filter changes — the bindIf remove/re-add cycle drops them. -->
+    <div
+      class="px-6 py-16 text-center"
+      x-class="!store.loading() && store.flags().length === 0 ? '' : 'hidden'"
+    >
+      <p class="font-semibold text-gray-900 text-sm">{{ emptyTitle() }}</p>
+      <p class="mt-1 max-w-md mx-auto text-gray-500 text-xs leading-relaxed">{{ emptyHint() }}</p>
+    </div>
+    <ul x-class="store.flags().length > 0 ? 'divide-gray-100 divide-y' : 'hidden'">
+      <li :for="flag in store.flags" class="px-4 py-4">
+        <div class="flex justify-between gap-x-4">
+          <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap gap-2 items-center">
+              <span class="inline-block px-2 py-0.5 font-medium text-xs text-gray-800 bg-gray-100 rounded-full">{{ reasonLabel(flag.reason) }}</span>
+              <span
+                class="inline-block px-2 py-0.5 font-medium text-xs rounded-full"
+                x-class="flag.status === 'open' ? 'bg-amber-100 text-amber-800' : flag.status === 'resolved' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'">{{ flag.status }}</span>
+              <span class="text-gray-500 text-xs">{{ formatDate(flag.created_at) }}</span>
+            </div>
+            <p :if="flag.review" class="mt-1.5 text-gray-700 text-sm">
+              On review:
+              <StxLink x-to="`/article/${flag.review.id}`" class="font-semibold text-gray-900 hover:underline">{{ flag.review.title }}</StxLink>
+              <span class="text-gray-400"> · {{ flag.review.status }}</span>
+            </p>
+            <p :if="!flag.review" class="mt-1.5 text-gray-400 text-sm">The flagged review no longer exists.</p>
+            <p :if="flag.details" class="mt-1 text-gray-600 text-sm">{{ flag.details }}</p>
+            <p class="mt-1 text-gray-400 text-xs">{{ flag.user_id ? 'Reported by user #' + flag.user_id : 'Reported anonymously' }}</p>
+            <p :if="flag.moderator_note" class="mt-1 text-gray-500 text-xs italic">Moderator note: {{ flag.moderator_note }}</p>
+          </div>
+          <div class="flex flex-shrink-0 gap-x-2 items-start" x-class="flag.status === 'open' ? '' : 'hidden'">
+            <button
+              type="button"
+              @click="dismiss(flag)"
+              class="px-2.5 py-1 font-medium text-gray-700 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
+            >Dismiss</button>
+            <button
+              type="button"
+              @click="resolve(flag)"
+              class="px-2.5 py-1 font-medium text-emerald-800 text-xs bg-emerald-50 border border-emerald-200 rounded hover:bg-emerald-100"
+            >Resolve</button>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </div>
+</div>

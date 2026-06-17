@@ -82,7 +82,7 @@
           <StxLink
             to="/admin"
             class="inline-flex items-center px-3 py-2 font-medium text-sm rounded-md"
-            x-class="isActive('/admin') && !isActive('/admin/users') && !isActive('/admin/reviews') && !isActive('/admin/credentials') && !isActive('/admin/moderation') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'"
+            x-class="isActive('/admin') && !isActive('/admin/users') && !isActive('/admin/reviews') && !isActive('/admin/flags') && !isActive('/admin/credentials') && !isActive('/admin/moderation') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'"
           >Dashboard</StxLink>
           <StxLink
             to="/admin/users"
