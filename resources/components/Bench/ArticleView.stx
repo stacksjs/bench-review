@@ -51,9 +51,9 @@
   // Seeded/anonymous reviews have user_id=null and the author check
   // resolves false → button stays visible for everyone else.
   const isOwnReview = derived<boolean>(() => {
-    const me = authStore.user()
-    const row = reviewsStore.current()
-    return !!me && !!row && Number(me.id) === Number((row as any).user_id)
+    // Server-decided: ShowReviewAction sets is_mine for the authenticated
+    // author. The raw user_id is no longer sent (de-anonymization guard).
+    return !!(reviewsStore.current() as any)?.is_mine
   })
   // Surfaces the auth-required prompt under the helpful button when
   // an anonymous user clicks. We don't redirect — a redirect would
@@ -172,11 +172,8 @@
   // surfaces are author-only by design (readers don't need to see
   // moderation state on someone else's review).
   const isMine = derived<boolean>(() => {
-    const r = reviewsStore.current()
-    const me = authStore.user()
-    if (!r || !me) return false
-    const authorId = (r as any).user_id
-    return authorId != null && Number(authorId) === Number((me as any).id)
+    // Server-decided is_mine (user_id is no longer sent — de-anon guard).
+    return !!(reviewsStore.current() as any)?.is_mine
   })
   // True for the author-only moderation states (pending / rejected).
   // Used to hide the Edit button on published reviews (server rejects

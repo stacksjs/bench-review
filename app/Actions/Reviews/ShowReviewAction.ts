@@ -137,6 +137,11 @@ export default new Action({
       // anonymous or claim columns not migrated — no judge composer.
     }
 
-    return response.json({ ...hydrated, judge, author, photos, response: judgeResponse, can_respond_as_judge: canRespondAsJudge })
+    // Never leak the raw user_id on this public endpoint (de-anonymization
+    // vector — see toPublicReviewRow). The author payload above already
+    // applies the anonymity gate; is_mine carries the "my review" signal
+    // the client needs (viewerIsAuthor was resolved in the middleware).
+    const { user_id: _omitUserId, ...safeHydrated } = hydrated as any
+    return response.json({ ...safeHydrated, is_mine: viewerIsAuthor, judge, author, photos, response: judgeResponse, can_respond_as_judge: canRespondAsJudge })
   },
 })

@@ -41,6 +41,30 @@ const ROLE_DISPLAY: Record<string, string> = {
   observer: 'observer',
 }
 
+/**
+ * Strip the raw `user_id` from a review row before it goes out on a
+ * PUBLIC endpoint, replacing it with a server-computed `is_mine` boolean.
+ *
+ * Why: public review lists/detail mix anonymized + named reviews. Leaking
+ * `user_id` lets an attacker de-anonymize — correlate a row's id against
+ * `/api/users/{id}/reviews` (which only lists NON-anonymized reviews): a
+ * user_id present in the public feed but absent from that user's public
+ * list is one of their anonymous reviews. So `user_id` must never leave
+ * the server on these surfaces. The frontend only needs to know "is this
+ * my review" (to hide the helpful button on your own); `is_mine` carries
+ * exactly that without exposing the id of anyone else.
+ */
+export function toPublicReviewRow<T extends { user_id?: number | null }>(
+  row: T,
+  viewerId: number | null,
+): Omit<T, 'user_id'> & { is_mine: boolean } {
+  const { user_id, ...rest } = row as any
+  return {
+    ...rest,
+    is_mine: viewerId != null && user_id != null && Number(viewerId) === Number(user_id),
+  }
+}
+
 export function publicReviewerFor(
   review: { anonymized?: boolean | number | null, user_id?: number | null },
   user: { id?: number, name?: string | null, role_label?: string | null } | null,

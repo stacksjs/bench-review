@@ -119,18 +119,10 @@
     for (const j of judgesStore.judges())
       byId[j.id] = j
 
-    // Resolve current user id once per derived re-run rather than
-    // per-row. authStore.user() is reactive — sign-in mid-page
-    // re-runs the derived and the isOwn flag flips for the user's
-    // own cards. Anonymous reads: meId stays null, isOwn always
-    // false, every card shows the helpful button.
-    const meId = authStore.user()?.id ?? null
-
     return reviewsStore.feed()
       .filter((r: JudgeReviewRow) => r.judge_id != null)
       .map((r: JudgeReviewRow) => {
         const j = byId[r.judge_id as number]
-        const authorId = (r as any).user_id ?? null
         return {
           id: r.id,
           title: r.title,
@@ -142,11 +134,11 @@
           // carries auth, kept in lock-step on toggle by the reviews
           // store's fan-out (resources/stores/reviews.ts:toggleLike).
           liked: !!(r as any).liked_by_me,
-          // Hide the helpful button on the user's own cards. Server
-          // also rejects own-likes (LikeReviewAction 422), this is
-          // the UX side of that gate. Seeded reviews have user_id=null
-          // → authorId is null → isOwn always false → button visible.
-          isOwn: meId != null && authorId != null && Number(meId) === Number(authorId),
+          // Hide the helpful button on the user's own cards. Server-
+          // decided via is_mine (the raw user_id is no longer sent — a
+          // de-anonymization guard); the server also rejects own-likes
+          // (LikeReviewAction 422), so this is purely the UX side.
+          isOwn: !!(r as any).is_mine,
           comments: r.comments ?? 0,
           type: r.type,
           status: r.status,

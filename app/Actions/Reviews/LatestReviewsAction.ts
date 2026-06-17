@@ -1,8 +1,10 @@
 import { Action } from '@stacksjs/actions'
+import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { hydrateLikeData } from '../../Helpers/reviewLikes'
 import { buildPaginatorMeta, resolvePaginatorArgs } from '../../Helpers/paginate'
+import { toPublicReviewRow } from '../../Helpers/reviewerLabel'
 
 /**
  * GET /api/reviews — latest published reviews across all judges.
@@ -41,6 +43,12 @@ export default new Action({
   description: 'Latest published reviews across all judges',
   method: 'GET',
   async handle() {
+    // Resolve the viewer once. Every public response strips the raw
+    // user_id (de-anonymization guard, see toPublicReviewRow) and carries
+    // is_mine instead.
+    const me = await Auth.user().catch(() => null)
+    const viewerId = (me as any)?.id ?? null
+
     // The canonical paginator is the DEFAULT response. Only the explicit
     // ?limit form returns the legacy raw array (home/court strips). This
     // way hitting /api/reviews with no params still yields a sensible
@@ -90,7 +98,8 @@ export default new Action({
         .execute() as Array<Record<string, any>>
 
       const hydrated = await hydrateLikeData(rows ?? [])
-      return response.json(buildPaginatorMeta(hydrated, total, page, perPage))
+      const publicRows = hydrated.map(r => toPublicReviewRow(r, viewerId))
+      return response.json(buildPaginatorMeta(publicRows, total, page, perPage))
     }
 
     // Legacy capped-array path (home/court strips).
@@ -106,6 +115,7 @@ export default new Action({
       .get()
 
     const hydrated = await hydrateLikeData(rows ?? [])
-    return response.json(hydrated)
+    const publicRows = hydrated.map(r => toPublicReviewRow(r, viewerId))
+    return response.json(publicRows)
   },
 })

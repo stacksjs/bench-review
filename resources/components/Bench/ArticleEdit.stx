@@ -78,8 +78,10 @@
       return
     }
 
-    const authorId = (row as any).user_id
-    if (authorId == null || Number(authorId) !== Number((me as any).id)) {
+    // Ownership is server-decided: ShowReviewAction sets is_mine for the
+    // authenticated author (the raw user_id is no longer sent — a
+    // de-anonymization guard). The !me check above already punted anons.
+    if (!(row as any).is_mine) {
       navigate(`/article/${reviewId}`, true)
       return
     }

@@ -1,8 +1,10 @@
 import { Action } from '@stacksjs/actions'
+import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { hydrateLikeData } from '../../Helpers/reviewLikes'
 import { buildPaginatorMeta, resolvePaginatorArgs } from '../../Helpers/paginate'
+import { toPublicReviewRow } from '../../Helpers/reviewerLabel'
 
 /**
  * GET /api/judges/:id/reviews — paginated list of published reviews
@@ -97,6 +99,11 @@ export default new Action({
       .execute() as Array<Record<string, any>>
 
     const hydrated = await hydrateLikeData(rows ?? [])
-    return response.json({ ...buildPaginatorMeta(hydrated, total, page, perPage), summary })
+    // Strip raw user_id (de-anonymization guard); is_mine carries the
+    // "my review" signal the client needs. See toPublicReviewRow.
+    const me = await Auth.user().catch(() => null)
+    const viewerId = (me as any)?.id ?? null
+    const publicRows = hydrated.map(r => toPublicReviewRow(r, viewerId))
+    return response.json({ ...buildPaginatorMeta(publicRows, total, page, perPage), summary })
   },
 })

@@ -37,6 +37,16 @@ export default new Action({
     if (!existing)
       return response.json({ error: 'Review not found.' }, 404)
 
+    // Cascade to every child table that FKs judge_reviews (SQLite has no
+    // FK constraints, so app-level cascade is the only cleanup — mirrors
+    // DeleteMyReviewAction). Best-effort on children so a missing table
+    // doesn't 500; the judge_reviews delete is the must-succeed step.
+    // (Photo FILES on disk aren't removed here — separate storage sweep.)
+    await db.deleteFrom('judge_reviews_likes').where('judge_review_id', '=', reviewId).execute().catch(() => {})
+    await db.deleteFrom('review_comments').where('judge_review_id', '=', reviewId).execute().catch(() => {})
+    await db.deleteFrom('review_photos').where('judge_review_id', '=', reviewId).execute().catch(() => {})
+    await db.deleteFrom('review_flags').where('judge_review_id', '=', reviewId).execute().catch(() => {})
+    await db.deleteFrom('user_notifications').where('review_id', '=', reviewId).execute().catch(() => {})
     await db.deleteFrom('judge_reviews').where('id', '=', reviewId).execute()
 
     const admin = await Auth.user().catch(() => null)

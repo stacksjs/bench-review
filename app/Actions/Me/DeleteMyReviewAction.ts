@@ -9,8 +9,8 @@ import { schema } from '@stacksjs/validation'
  *
  * Permitted on ANY status (pending / rejected / published) — the
  * author is in charge of their own content. Cascades the same way as
- * the admin delete: like rows, notifications scoped to the review,
- * and the row itself.
+ * the admin delete: likes, comments, photos, flags, the review's
+ * notifications, and the row itself.
  *
  * Non-owners get 404 (response indistinguishable from a missing row).
  */
@@ -41,10 +41,16 @@ export default new Action({
     if (!existing || existing.user_id == null || Number(existing.user_id) !== Number(userId))
       return response.json({ error: 'Review not found' }, 404)
 
-    // Cascade. Best-effort on the pivot deletes so a missing table on
-    // a fresh checkout doesn't 500 the request — the actual review
-    // delete is the only must-succeed step.
+    // Cascade to every child table that FKs judge_reviews (SQLite has no
+    // FK constraints here, so app-level cascade is the only cleanup).
+    // Best-effort on the children so a missing table on a fresh checkout
+    // doesn't 500 the request — the judge_reviews delete is the only
+    // must-succeed step. (Photo FILES on disk are not removed here — a
+    // separate storage-sweep concern; only the rows go.)
     await db.deleteFrom('judge_reviews_likes').where('judge_review_id', '=', reviewId).execute().catch(() => {})
+    await db.deleteFrom('review_comments').where('judge_review_id', '=', reviewId).execute().catch(() => {})
+    await db.deleteFrom('review_photos').where('judge_review_id', '=', reviewId).execute().catch(() => {})
+    await db.deleteFrom('review_flags').where('judge_review_id', '=', reviewId).execute().catch(() => {})
     await db.deleteFrom('user_notifications').where('review_id', '=', reviewId).execute().catch(() => {})
     await db.deleteFrom('judge_reviews').where('id', '=', reviewId).execute()
 

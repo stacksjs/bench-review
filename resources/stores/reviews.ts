@@ -11,7 +11,12 @@ export interface JudgeReviewRow {
   type?: string
   status?: string
   judge_id: number
+  // `user_id` is NOT sent on public review endpoints anymore (it leaked
+  // a de-anonymization vector — see app/Helpers/reviewerLabel.toPublicReviewRow).
+  // The server sends `is_mine` instead: true when the authenticated viewer
+  // authored this row. Use that for "my review" UX, never user_id.
   user_id?: number | null
+  is_mine?: boolean
   created_at?: string | null
   updated_at?: string | null
   // Server-hydrated when the request carried an auth token. Drives
