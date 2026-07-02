@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 import { buildApp } from '@stacksjs/stx'
+import { tsAnalyticsTag } from '@stacksjs/ts-analytics/stx'
+import { TS_ANALYTICS_APP_ID } from './config/ts-analytics'
 import { injectSeoHead, SEO_PAGES } from './app/Helpers/seoPages'
 import { buildRobotsTxt, buildSitemapXml, normalizeBase } from './app/Helpers/sitemap'
 
@@ -30,6 +32,34 @@ try {
 }
 catch (err) {
   console.warn('[build] SEO head injection skipped:', err instanceof Error ? err.message : err)
+}
+
+// ts-analytics: inject the shared tracker into every built page's <head>.
+// buildApp()'s SSG output ignores config.app.head, so — like the SEO step
+// above — splice the tag in post-build. Keyed by App ID (shared with
+// stx.config.ts via config/ts-analytics.ts, so serve + static match); the
+// endpoint is baked into the integration (override via TS_ANALYTICS_ENDPOINT).
+try {
+  const tag = tsAnalyticsTag({ appId: TS_ANALYTICS_APP_ID })
+  if (tag) {
+    const glob = new Bun.Glob('**/*.html')
+    let injected = 0
+    // eslint-disable-next-line ts/no-top-level-await
+    for await (const file of glob.scan('dist')) {
+      const path = `dist/${file}`
+      // eslint-disable-next-line ts/no-top-level-await
+      const html = await Bun.file(path).text()
+      if (!html.includes('</head>') || html.includes(tag))
+        continue
+      // eslint-disable-next-line ts/no-top-level-await
+      await Bun.write(path, html.replace('</head>', `${tag}</head>`))
+      injected++
+    }
+    console.log(`[build] injected ts-analytics into ${injected} static pages`)
+  }
+}
+catch (err) {
+  console.warn('[build] ts-analytics injection skipped:', err instanceof Error ? err.message : err)
 }
 
 // buildApp() emits a page-derived dist/sitemap.xml hardcoded to localhost
