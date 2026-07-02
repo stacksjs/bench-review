@@ -9,4 +9,4 @@
  * The API endpoint is baked into the integration — override per-deploy with the
  * `TS_ANALYTICS_ENDPOINT` env var if a deploy needs a non-default host.
  */
-export const TS_ANALYTICS_APP_ID = 'B65FUT7V'
+export const TS_ANALYTICS_APP_ID = '5SQQK9H4'
