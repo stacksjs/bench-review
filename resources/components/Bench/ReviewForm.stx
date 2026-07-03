@@ -509,7 +509,7 @@
               @mouseenter="hoverRating.set(star)"
               @mouseleave="hoverRating.set(0)"
             >
-              <Icon name="star" size="32" />
+              <Icon name="heroicons:star-solid" size="32" />
             </button>
           </div>
           <span class="ml-3 font-medium text-gray-700 text-sm">{{ ratingText() }}</span>

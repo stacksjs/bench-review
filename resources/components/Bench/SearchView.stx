@@ -160,7 +160,7 @@
               </div>
             </StxLink>
             <div class="flex gap-x-2 items-center">
-              <Icon :for="star in stars" name="star" size="16" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" />
+              <Icon :for="star in stars" name="heroicons:star-solid" size="16" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" />
               <span class="ml-1 text-gray-500 text-xs">{{ `(${judge.reviewCount})` }}</span>
             </div>
           </li>

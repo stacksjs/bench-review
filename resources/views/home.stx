@@ -405,7 +405,7 @@
                 </div>
               </div>
               <div class="flex items-center">
-                <Icon :for="star in stars" name="star" size="16" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-200'" />
+                <Icon :for="star in stars" name="heroicons:star-solid" size="16" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-200'" />
               </div>
             </div>
             <h3 class="mt-4 font-semibold line-clamp-2 text-gray-900">{{ review.title }}</h3>

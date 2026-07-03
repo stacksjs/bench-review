@@ -191,7 +191,7 @@
       <h2 class="font-semibold text-2xl text-gray-900">{{ averageRating() }}</h2>
       <div class="flex items-center">
         <div class="flex items-center">
-          <Icon :for="star in stars" name="star" size="20" x-class="star <= Math.round(averageRating()) ? 'text-yellow-400' : 'text-gray-300'" />
+          <Icon :for="star in stars" name="heroicons:star-solid" size="20" x-class="star <= Math.round(averageRating()) ? 'text-yellow-400' : 'text-gray-300'" />
         </div>
         <p class="ml-2 text-gray-500 text-sm">{{ `Based on ${reviewCount()} review${reviewCount() === 1 ? '' : 's'}` }}</p>
       </div>
@@ -257,7 +257,7 @@
                   <h4 class="font-semibold text-gray-900 text-sm">{{ review.title }}</h4>
                   <div class="flex items-center">
                     <div class="flex items-center">
-                      <Icon :for="star in stars" name="star" size="16" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'" />
+                      <Icon :for="star in stars" name="heroicons:star-solid" size="16" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'" />
                     </div>
                     <span class="ml-2 text-gray-500 text-sm">{{ formatDate(review.created_at) }}</span>
                   </div>

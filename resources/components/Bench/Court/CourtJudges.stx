@@ -43,7 +43,7 @@
         </StxLink>
         <div class="flex gap-x-4 items-center sm:gap-x-6">
           <div class="hidden sm:flex sm:items-center">
-            <Icon :for="star in stars" name="star" size="16" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" />
+            <Icon :for="star in stars" name="heroicons:star-solid" size="16" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" />
             <span class="ml-2 text-gray-500 text-xs">{{ judge.reviewCount }}</span>
           </div>
           <StxLink x-to="`/judges/${judge.id}/profile`" class="font-semibold text-gray-700 text-sm hover:text-gray-900">
