@@ -15,7 +15,12 @@ export default defineModel({
     },
     useApi: {
       uri: 'notifications',
-      routes: ['index', 'store', 'show', 'update', 'destroy'],
+      // SECURITY: auto-CRUD disabled. The generator emits UNAUTHENTICATED
+      // routes with no ownership check, so `PATCH/DELETE /api/notifications/{id}`
+      // would let anyone read/mutate/delete other users' notifications.
+      // The app's own guarded Actions (Me/NotificationsIndexAction,
+      // NotificationReadAction, NotificationsReadAllAction) cover all needs.
+      routes: [],
     },
   },
 

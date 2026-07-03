@@ -56,7 +56,14 @@ export default defineModel({
 
     useApi: {
       uri: 'judge-reviews',
-      routes: ['index', 'store', 'show'],
+      // SECURITY: auto-CRUD disabled. The generator emits UNAUTHENTICATED
+      // routes and ignores middleware, so `GET /api/judge-reviews?status=pending`
+      // would return unmoderated reviews WITH raw user_id (defeating anonymity
+      // + joinable to /api/users emails), and `POST /api/judge-reviews` would
+      // create a published review with no auth, no email gate, and no
+      // sanitizeReviewHtml (stored XSS + moderation bypass). All review reads
+      // /writes go through guarded Actions (Reviews/*, Me/*). Keep this [].
+      routes: [],
     },
 
     // Wires `JudgeReview._likeable.{like,unlike,isLiked,likeCount,likedBy}`

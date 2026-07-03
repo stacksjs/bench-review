@@ -36,6 +36,7 @@ route.get('/users/{id}/reviews', 'Actions/Users/UserReviewsAction')
 // per-section query details. Resolves bench-review#34.
 route.get('/home/highlights', 'Actions/HomeHighlightsAction')
   .name('bench.home.highlights')
+  .middleware('throttle:60,1m') // public, runs 3 aggregate queries/hit — cap like /users/{id}
 
 // SEO surface. Sitemap lives under /api/ since this file auto-prefixes,
 // but robots.txt is a static file in public/ that points at the full
@@ -183,6 +184,7 @@ route.post('/reviews', 'Actions/Reviews/SubmitReviewAction')
 route.post('/reviews/{id}/photos', 'Actions/Reviews/UploadReviewPhotosAction')
   .name('bench.reviews.photos.upload')
   .middleware('auth')
+  .middleware('throttle:10,10m') // CPU-bound sharp pipeline — throttle like review submit
   .skipCsrf()
 
 route.delete('/me/photos/{id}', 'Actions/Me/DeleteMyReviewPhotoAction')
@@ -223,6 +225,7 @@ route.post('/reviews/{id}/flag', 'Actions/Reviews/FlagReviewAction')
 route.post('/reviews/{id}/like', 'Actions/Reviews/LikeReviewAction')
   .name('bench.reviews.like')
   .middleware('auth')
+  .middleware('throttle:60,1m') // per-user write-churn guard
   .skipCsrf()
 
 // Self-routes — return data scoped to the authenticated user. Auth-
@@ -240,6 +243,7 @@ route.patch('/me', 'Actions/Me/UpdateMeAction')
 route.post('/me/avatar', 'Actions/Me/UploadAvatarAction')
   .name('bench.me.avatar')
   .middleware('auth')
+  .middleware('throttle:10,10m') // CPU-bound sharp pipeline + per-call disk write
   .skipCsrf()
 
 route.get('/me/reviews', 'Actions/Me/MyReviewsAction')
@@ -369,11 +373,13 @@ route.get('/me/follows', 'Actions/Me/MyFollowsAction')
 route.post('/judges/{id}/follow', 'Actions/Judges/FollowJudgeAction')
   .name('bench.judges.follow')
   .middleware('auth')
+  .middleware('throttle:60,1m') // per-user write-churn guard
   .skipCsrf()
 
 route.delete('/judges/{id}/follow', 'Actions/Judges/UnfollowJudgeAction')
   .name('bench.judges.unfollow')
   .middleware('auth')
+  .middleware('throttle:60,1m') // per-user write-churn guard
   .skipCsrf()
 
 // Admin — separate login endpoint. Verifies the user has the `admin`

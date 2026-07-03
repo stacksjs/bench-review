@@ -66,7 +66,14 @@ export default defineModel({
     useApi: {
       uri: 'users', // your-url.com/api/users
 
-      routes: ['index', 'store', 'show'],
+      // SECURITY: auto-CRUD disabled. The ORM route generator emits
+      // UNAUTHENTICATED index/store/show and IGNORES any `middleware`
+      // config, so `GET /api/users` would dump every account (email,
+      // role, credential fields, filterable by ?email=/?name=) with no
+      // auth. Real user reads go through dedicated guarded Actions
+      // (Users/UserShowAction, Me/*). Do NOT re-add routes here unless
+      // the generator is fixed to apply auth middleware.
+      routes: [],
     },
 
     observe: true,

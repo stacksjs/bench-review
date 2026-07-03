@@ -58,10 +58,22 @@ const UNWRAP_TAGS = new Set([
 // the rest are either active-content vectors (iframe, embed, object,
 // form controls) or out-of-band metadata that has no business in a
 // review body (link, meta, noscript).
+//
+// CRITICAL: this set MUST contain every HTML raw-text / RCDATA / PLAINTEXT
+// element. HTMLRewriter (lol-html) is a streaming tokenizer, not a DOM: the
+// `element` handler never fires on the *contents* of a raw-text element, so
+// unwrapping one via removeAndKeepContent() re-emits its inner markup as
+// UNESCAPED text into a normal-parsing context — a stored-XSS bypass. The
+// full raw-text set is script/style/textarea/title/xmp/iframe/noembed/
+// noframes/noscript/plaintext (+ svg/math foreign content); all are dropped
+// here so the "unwrap unknown tags" default below can never leak live markup.
 const DROP_TAGS = new Set([
   'script', 'style', 'iframe', 'embed', 'object', 'link', 'meta', 'noscript',
   'form', 'input', 'button', 'select', 'textarea', 'fieldset', 'label',
   'svg', 'math', 'video', 'audio', 'source', 'track', 'canvas',
+  // Raw-text/RCDATA/PLAINTEXT wrappers — their contents tokenize as text and
+  // survive removeAndKeepContent() unescaped. Must be dropped, not unwrapped.
+  'title', 'xmp', 'plaintext', 'noembed', 'noframes', 'template',
 ])
 
 const SAFE_HREF = /^(https?:|mailto:)/i

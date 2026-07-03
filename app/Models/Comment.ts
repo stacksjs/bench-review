@@ -15,7 +15,12 @@ export default defineModel({
     },
     useApi: {
       uri: 'comments',
-      routes: ['index', 'store', 'show', 'update', 'destroy'],
+      // SECURITY: auto-CRUD disabled. The generator emits UNAUTHENTICATED
+      // routes with no ownership check, so `POST /api/comments` would bypass
+      // sanitizeReviewHtml + moderation and `PATCH/DELETE /api/comments/{id}`
+      // would let anyone edit/delete others' comments. Real comment flows go
+      // through guarded Actions (Reviews/CommentSubmitAction, Me/DeleteMyCommentAction).
+      routes: [],
     },
   },
 

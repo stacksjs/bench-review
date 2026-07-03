@@ -1,16 +1,23 @@
 import { Action } from '@stacksjs/actions'
 import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
-import { unlinkSync } from 'node:fs'
-import { join } from 'node:path'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { disk } from '../../Storage/disk'
 
 /**
  * DELETE /api/me/photos/{id} — owner removes one of their own review
- * photos. Hard delete + unlinks the three on-disk variants (best-
- * effort; missing files don't fail the row delete since drift can
- * happen during a partial-process failure).
+ * photos. Hard delete + removes the three stored variants THROUGH the
+ * storage facade (best-effort; a missing object doesn't fail the row
+ * delete since drift can happen during a partial-process failure).
+ *
+ * Deletion goes through disk().delete(key), NOT a hardcoded local fs
+ * path: on the S3 disk the old fs-path reconstruction silently no-op'd
+ * (join(cwd, 'https:/bucket…') never matched), so the row vanished but
+ * the object stayed publicly fetchable forever — a right-to-removal
+ * failure for legally-sensitive media. The key is recovered from the
+ * stable `uploads/review-photos/...` segment of the stored URL
+ * (unprefixed; the S3 driver re-applies any configured prefix).
  *
  * Non-owners get 404. The user_id check is the security boundary;
  * the review's status doesn't gate the delete (an owner can clean
@@ -43,18 +50,24 @@ export default new Action({
     if (!existing || Number(existing.user_id) !== Number(userId))
       return response.json({ error: 'Photo not found' }, 404)
 
-    // Unlink the three on-disk variants. Map the public URL back to
-    // the filesystem path. Best-effort — a missing file logs but
-    // doesn't fail the row delete.
-    const root = process.cwd()
-    for (const url of [existing.thumb_url, existing.card_url, existing.full_url]) {
-      try {
-        if (typeof url !== 'string') continue
-        const rel = url.replace(/^\/+/, '')
-        unlinkSync(join(root, rel))
-      }
-      catch { /* file missing or unreachable; row delete still proceeds */ }
+    // Remove the three stored variants through the storage facade so
+    // this works on any disk. The row holds public URLs, so recover the
+    // storage key from the stable `uploads/review-photos/...` segment
+    // (unprefixed — the facade re-applies any S3 prefix). Best-effort:
+    // a missing object doesn't fail the row delete.
+    const store = disk()
+    const keyOf = (url: string): string | null => {
+      if (typeof url !== 'string')
+        return null
+      const i = url.indexOf('uploads/review-photos/')
+      return i === -1 ? null : url.slice(i)
     }
+    await Promise.all(
+      [existing.thumb_url, existing.card_url, existing.full_url]
+        .map(keyOf)
+        .filter((k): k is string => k !== null)
+        .map(k => store.delete(k).catch(() => { /* object gone; row delete still proceeds */ })),
+    )
 
     await db.deleteFrom('review_photos')
       .where('id', '=', photoId)

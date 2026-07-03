@@ -77,7 +77,14 @@ export default new Action({
 
     // Active reviewers — users who have the most published reviews in
     // the last 30 days. Public-safe payload only: id, name, count.
-    // Anonymous reviews (user_id null) are excluded.
+    //
+    // anonymized=0 is a SECURITY filter, not a nicety: an anonymized
+    // review still carries its user_id, so without this clause a user
+    // who only ever posts anonymously would surface here BY NAME, and
+    // the counts become a de-anonymization oracle (diff this count
+    // against /users/{id}/reviews, which already excludes anonymized,
+    // to learn how many anonymous reviews a named user wrote). Mirror
+    // the same guard used in UserShowAction / UserReviewsAction.
     const reviewerRows = await (db.selectFrom('judge_reviews') as any)
       .innerJoin('users' as any, 'users.id', '=', 'judge_reviews.user_id')
       .select([
@@ -88,6 +95,7 @@ export default new Action({
       .where('judge_reviews.status', '=', 'published')
       .where('judge_reviews.created_at', '>=', thirtyDaysAgo)
       .where('judge_reviews.user_id', 'is not', null)
+      .where('judge_reviews.anonymized', '=', 0)
       .groupBy('users.id')
       .orderBy('review_count', 'desc')
       .limit(5)

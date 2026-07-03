@@ -17,14 +17,16 @@ export default defineModel({
     },
     useApi: {
       uri: 'subscribers',
-      routes: ['index', 'store', 'show', 'update', 'destroy'],
-      // Subscriber rows are PII (email + status + source). Auth-gate
-      // every CRUD route. The public signup path is the dedicated
-      // `/api/email/subscribe` action — that has its own rate-limited,
-      // CSRF-skipped handler that wraps `Subscriber.create()`. Apps
-      // that want public destroy (one-click unsubscribe) should use
-      // the existing `/api/email/unsubscribe` UUID-token route, not
-      // expose `DELETE /api/subscribers/{id}`.
+      // SECURITY: auto-CRUD disabled. Subscriber rows are PII (email +
+      // status + source). The `middleware: ['auth']` below is SILENTLY
+      // DROPPED by the ORM route generator — it never reads it — so these
+      // routes would be fully unauthenticated: `GET /api/subscribers`
+      // leaks the email list and `DELETE /api/subscribers/{id}` lets
+      // anyone unsubscribe others. Public signup/unsubscribe already have
+      // dedicated token/rate-limited actions (/api/email/subscribe,
+      // /api/email/unsubscribe). Keep routes []; the middleware is
+      // retained only to document intent for when the generator is fixed.
+      routes: [],
       middleware: ['auth'],
     },
   },
