@@ -1,20 +1,31 @@
 <script client>
   // Global confirmation modal. Mounted once per layout. Renders whenever
   // the confirm store is open; the buttons settle the promise that the
-  // calling `confirmStore.ask(...)` is awaiting.
+  // calling confirmStore.ask(...) is awaiting.
   //
-  // Visibility: ALL overlay/positioning classes live in the x-class TRUE
-  // branch (not the static class) — mirrors the working Admin/UsersTable
-  // modal. If the overlay classes were static, the modal would paint as a
-  // full-screen overlay before the client x-class binding hides it (a
-  // visible empty-modal flash on every page load). With them in x-class,
-  // the closed state collapses to a bare empty <div>. The backdrop is the
-  // root's own bg; clicking it dismisses, clicking the panel does not.
+  // Visibility: ALL overlay/positioning classes live in the derived TRUE
+  // branch (not the static class). If the overlay classes were static,
+  // the modal would paint as a full-screen overlay before the client
+  // binding hides it (a visible empty-modal flash on every page load).
+  // The backdrop is the overlay's own bg; clicking it dismisses,
+  // clicking the panel does not.
+  //
+  // The class expressions live in deriveds (not inline x-class ternaries)
+  // deliberately: the include compiler only registers a component's scope
+  // variables when the script calls state/derived/effect. A useStore-only
+  // script gets an EMPTY scope registration, every binding referencing
+  // confirmStore silently evaluates to '', and the dialog paints as a
+  // naked unhidden shell at the bottom of every page. The deriveds keep
+  // this component on the healthy compile path.
   const confirmStore = useStore('confirm')
+  const overlayClass = derived<string>(() =>
+    confirmStore.open() ? 'fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/40' : 'hidden')
+  const acceptClass = derived<string>(() =>
+    confirmStore.danger() ? 'bg-red-600 hover:bg-red-500' : 'bg-gray-900 hover:bg-gray-800')
 </script>
 
 <div
-  x-class="confirmStore.open() ? 'fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/40' : 'hidden'"
+  x-class="overlayClass()"
   @click="confirmStore.dismiss()"
 >
   <div
@@ -36,7 +47,7 @@
         type="button"
         @click="confirmStore.accept()"
         class="px-4 py-2 font-medium text-white text-sm rounded-lg transition-colors"
-        x-class="confirmStore.danger() ? 'bg-red-600 hover:bg-red-500' : 'bg-gray-900 hover:bg-gray-800'"
+        x-class="acceptClass()"
         :text="confirmStore.confirmLabel()"
       ></button>
     </div>

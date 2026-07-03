@@ -1,6 +1,4 @@
 <script client>
-  type ToastKind = 'success' | 'error'
-
   interface ApiErrorBody {
     errors?: Array<{ message?: string }>
     message?: string
@@ -8,26 +6,13 @@
 
   const email = state<string>('')
   const loading = state<boolean>(false)
-  // Toast state. <Notification> from @stacksjs/components renders the
-  // visual; we drive its visibility from outside via the wrapping :if
-  // because stx's ref store only holds DOM elements, not the
-  // component's defineExpose'd `show`/`close` methods. The slot content
-  // uses :text so title/message stay reactive across separate shows.
-  const successVisible = state<boolean>(false)
-  const errorVisible = state<boolean>(false)
-  const toastTitle = state<string>('')
-  const toastMessage = state<string>('')
-  const TOAST_DURATION_MS = 5000
-  let toastTimer: ReturnType<typeof setTimeout> | null = null
-
-  function showToast(type: ToastKind, title: string, message: string): void {
-    toastTitle.set(title)
-    toastMessage.set(message)
-    if (type === 'error') { errorVisible.set(true); successVisible.set(false) }
-    else { successVisible.set(true); errorVisible.set(false) }
-    if (toastTimer) clearTimeout(toastTimer)
-    toastTimer = setTimeout(() => { successVisible.set(false); errorVisible.set(false) }, TOAST_DURATION_MS)
-  }
+  // Toasts go through the shared toast store (rendered by the layout's
+  // ToastHost). The old inline <Notification> from @stacksjs/components
+  // is unusable here: its client script interpolates props via a
+  // context-blind HTML-escaped interpolation, so the emitted script
+  // contains an entity-encoded string literal and dies with
+  // "Unexpected token &" on every page load.
+  const toast = useStore('toast')
 
   function parseApiErrorMessage(text: string): string {
     if (!text) return 'Please try again.'
@@ -45,8 +30,6 @@
 
   async function submitEmail(): Promise<void> {
     loading.set(true)
-    successVisible.set(false)
-    errorVisible.set(false)
     try {
       const response = await fetch('/api/subscribe', {
         method: 'POST',
@@ -58,13 +41,13 @@
       })
       if (!response.ok) {
         const body = await response.text().catch(() => '')
-        showToast('error', `Subscription failed (${response.status})`, parseApiErrorMessage(body))
+        toast.error(`Subscription failed (${response.status})`, parseApiErrorMessage(body))
       } else {
-        showToast('success', 'Thanks!', "You're on the list. Stay tuned for more updates.")
+        toast.success('Thanks!', "You're on the list. Stay tuned for more updates.")
         email.set('')
       }
     } catch {
-      showToast('error', 'Network error', 'Please try again.')
+      toast.error('Network error', 'Please try again.')
     }
     loading.set(false)
   }
@@ -111,18 +94,6 @@
             class="flex-none px-3.5 py-2.5 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm"
           >{{ loading() ? 'Subscribing...' : 'Notify me' }}</button>
         </form>
-      </div>
-      <div :if="successVisible()" @close="successVisible.set(false)">
-        <Notification type="success" position="top-right" :show="true" :duration="0">
-          <p class="text-sm font-medium">{{ toastTitle() }}</p>
-          <p class="mt-1 text-sm opacity-90">{{ toastMessage() }}</p>
-        </Notification>
-      </div>
-      <div :if="errorVisible()" @close="errorVisible.set(false)">
-        <Notification type="error" position="top-right" :show="true" :duration="0">
-          <p class="text-sm font-medium">{{ toastTitle() }}</p>
-          <p class="mt-1 text-sm opacity-90">{{ toastMessage() }}</p>
-        </Notification>
       </div>
     </div>
     <div class="flex mt-16 mx-auto sm:mt-24 lg:ml-10 lg:mr-0 lg:mt-0 xl:ml-32">
