@@ -269,7 +269,7 @@
       <!-- Empty state -->
       <div :if="reviewsLoaded && reviews.length === 0" class="mt-6 p-10 text-center bg-white border border-gray-200 rounded-lg">
         <p class="font-semibold text-gray-900 text-base">No published reviews yet.</p>
-        <p class="mt-2 text-gray-500 text-sm">{{ isOwnProfile() ? 'When a moderator approves your first review, it lands here.' : 'This reviewer hasn\\'t had a review published yet.' }}</p>
+        <p class="mt-2 text-gray-500 text-sm">{{ isOwnProfile() ? 'When a moderator approves your first review, it lands here.' : 'This reviewer hasn\'t had a review published yet.' }}</p>
       </div>
 
       <!-- Reviews -->
