@@ -436,50 +436,65 @@ export const trendingJudges: TrendingJudge[] = [
   },
 ]
 
+// Inline SVGs (heroicons v2 mini) for the Recent Activity markers. These
+// live in the data — a plain .ts module — NOT in a component <script>,
+// because stx's scope-var extractor can't parse a multi-line object of
+// SVG strings. LeftSidebar renders activity.iconSvg via x-html (trusted
+// constants, never user input).
+const ACTIVITY_ICON_SVGS: Record<string, string> = {
+  'heroicons:chat-bubble-left': '<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" clip-rule="evenodd" d="M10 3c-4.31 0-8 3.033-8 7 0 2.024.978 3.825 2.499 5.085a3.478 3.478 0 0 1-.522 1.756.75.75 0 0 0 .584 1.143 5.976 5.976 0 0 0 3.936-1.108c.487.082.99.124 1.503.124 4.31 0 8-3.033 8-7s-3.69-7-8-7Z"/></svg>',
+  'heroicons:document-text': '<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" clip-rule="evenodd" d="M4.5 2A1.5 1.5 0 0 0 3 3.5v13A1.5 1.5 0 0 0 4.5 18h11a1.5 1.5 0 0 0 1.5-1.5V7.621a1.5 1.5 0 0 0-.44-1.06l-4.12-4.122A1.5 1.5 0 0 0 10.88 2H4.5Zm2.25 8.5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Zm0 3a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Z"/></svg>',
+  'heroicons:user-plus': '<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M10 5a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM1.615 16.428a1.224 1.224 0 0 1-.569-1.175 6.002 6.002 0 0 1 11.908 0c.058.467-.172.92-.57 1.174A9.953 9.953 0 0 1 7 18a9.953 9.953 0 0 1-5.385-1.572ZM16.25 5.75a.75.75 0 0 0-1.5 0v2h-2a.75.75 0 0 0 0 1.5h2v2a.75.75 0 0 0 1.5 0v-2h2a.75.75 0 0 0 0-1.5h-2v-2Z"/></svg>',
+  'heroicons:check-circle': '<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" clip-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z"/></svg>',
+  'heroicons:chat-bubble-left-right': '<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M10 3c-4.31 0-8 3.033-8 7 0 2.024.978 3.825 2.499 5.085a3.478 3.478 0 0 1-.522 1.756.75.75 0 0 0 .584 1.143 5.976 5.976 0 0 0 3.936-1.108c.487.082.99.124 1.503.124 4.31 0 8-3.033 8-7s-3.69-7-8-7Z"/></svg>',
+  'heroicons:calendar': '<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.75 2a.75.75 0 0 1 .75.75V4h7V2.75a.75.75 0 0 1 1.5 0V4h.25A2.75 2.75 0 0 1 18 6.75v8.5A2.75 2.75 0 0 1 15.25 18H4.75A2.75 2.75 0 0 1 2 15.25v-8.5A2.75 2.75 0 0 1 4.75 4H5V2.75A.75.75 0 0 1 5.75 2Zm-1 5.5c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25v-6.5c0-.69-.56-1.25-1.25-1.25H4.75Z"/></svg>',
+}
+const FALLBACK_ACTIVITY_ICON = '<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><circle cx="10" cy="10" r="4"/></svg>'
+
 export const recentActivity: Activity[] = [
   {
     id: 1,
     content: 'New review posted for Hon. Sarah Johnson',
     date: '1h ago',
     dateTime: '2024-02-20T11:00',
-    icon: 'ChatBubbleLeftIcon',
+    icon: 'heroicons:chat-bubble-left',
   },
   {
     id: 2,
     content: 'Case CR-2024-001 updated',
     date: '2h ago',
     dateTime: '2024-02-20T10:00',
-    icon: 'DocumentTextIcon',
+    icon: 'heroicons:document-text',
   },
   {
     id: 3,
     content: 'New judge profile added',
     date: '3h ago',
     dateTime: '2024-02-20T09:00',
-    icon: 'UserPlusIcon',
+    icon: 'heroicons:user-plus',
   },
   {
     id: 4,
     content: 'Case FC-2024-015 status changed to Closed',
     date: '4h ago',
     dateTime: '2024-02-20T08:00',
-    icon: 'CheckCircleIcon',
+    icon: 'heroicons:check-circle',
   },
   {
     id: 5,
     content: 'New comment added to review #123',
     date: '5h ago',
     dateTime: '2024-02-20T07:00',
-    icon: 'ChatBubbleLeftRightIcon',
+    icon: 'heroicons:chat-bubble-left-right',
   },
   {
     id: 6,
     content: 'Case BK-2024-003 scheduled for hearing',
     date: '6h ago',
     dateTime: '2024-02-20T06:00',
-    icon: 'CalendarIcon',
+    icon: 'heroicons:calendar',
   },
-]
+].map(a => ({ ...a, iconSvg: ACTIVITY_ICON_SVGS[a.icon] ?? FALLBACK_ACTIVITY_ICON }))
 
 export const blogPosts: BlogPost[] = [
   {

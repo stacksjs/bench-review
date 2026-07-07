@@ -2,8 +2,16 @@
   import type { Activity, TrendingJudge } from '~/resources/types'
   import { recentActivity as allActivity, trendingJudges as allTrending } from '~/resources/functions/sample'
 
-  const trendingJudges = derived<TrendingJudge[]>(() => allTrending)
-  const recentActivity = derived<Activity[]>(() => allActivity)
+  // These local consts MUST NOT be named `recentActivity` / `trendingJudges`:
+  // sample.ts exports symbols with those exact names, and stx bundles this
+  // client script with Bun.build, which inlines the import and renames the
+  // colliding LOCAL const (recentActivity -> recentActivity2). Scope
+  // registration then binds the template's bare name to the raw imported
+  // array, not this derived — a silent misregistration (it rendered
+  // "undefined"/"defin" in the icon circle before). Distinct names avoid the
+  // clash entirely. Per-activity icon SVG lives in the data (sample.ts).
+  const trendingList = derived<TrendingJudge[]>(() => allTrending)
+  const activityFeed = derived<Activity[]>(() => allActivity)
   const lastIndex = derived<number>(() => allActivity.length - 1)
 </script>
 <div class="top-4">
@@ -12,7 +20,7 @@
     <div class="p-4">
       <h2 class="font-semibold text-base text-gray-900">Trending Judges</h2>
       <div class="mt-4 space-y-4">
-        <div :for="judge in trendingJudges" class="flex items-center space-x-3">
+        <div :for="judge in trendingList" class="flex items-center space-x-3">
             <img class="h-8 w-8 rounded-full grayscale filter" x-src="judge.photo" x-alt="judge.name" />
             <div class="flex-1 min-w-0">
               <p class="font-medium text-gray-900 text-sm">{{ judge.name }}</p>
@@ -30,13 +38,13 @@
       <h2 class="font-semibold text-base text-gray-900">Recent Activity</h2>
       <div class="flow-root mt-4">
         <ul role="list" class="-mb-8">
-          <li :for="(activity, activityIdx) in recentActivity">
+          <li :for="(activity, activityIdx) in activityFeed">
               <div class="relative pb-8">
                 <span :if="activityIdx !== lastIndex()" class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
                 <div class="flex relative space-x-3">
                   <div>
                     <span class="flex items-center justify-center h-8 w-8 bg-gray-400 ring-8 ring-white rounded-full">
-                      <span class="h-5 w-5 text-white" aria-hidden="true">{{ activity.icon }}</span>
+                      <span class="flex text-white" x-html="activity.iconSvg" aria-hidden="true"></span>
                     </span>
                   </div>
                   <div class="flex flex-1 justify-between pt-1.5 space-x-4 min-w-0">

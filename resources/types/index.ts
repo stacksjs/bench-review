@@ -98,6 +98,8 @@ export interface Activity {
   date: string
   dateTime: string
   icon: string
+  /** Precomputed inline SVG for the activity marker (trusted constant). */
+  iconSvg?: string
 }
 
 export interface BlogPost {
