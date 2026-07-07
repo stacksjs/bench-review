@@ -2,6 +2,7 @@
 declare module "stx/routes" {
   interface RouteMap {
     '/admin/credentials': {  }
+    '/admin/flags': {  }
     '/admin/login': {  }
     '/admin/moderation': {  }
     '/admin/reviews': {  }
