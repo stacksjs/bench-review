@@ -9,7 +9,6 @@
       <!-- Left Sidebar - Case Categories -->
       <div class="hidden lg:block lg:col-span-2 space-y-6">
         @include('Bench/CategoriesList')
-        @include('Bench/LeftSidebar')
       </div>
 
       <!-- Main Feed: Bench/ReviewsFeed owns the fetch, the derived
