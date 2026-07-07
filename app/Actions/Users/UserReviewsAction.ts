@@ -66,7 +66,8 @@ export default new Action({
         'judge_reviews.content as content',
         'judge_reviews.rating as rating',
         'judge_reviews.type as type',
-        'judge_reviews.likes as likes',
+        // No `likes` column on judge_reviews — the judge_reviews_likes pivot is
+        // the source of truth; hydrateLikeData() below supplies the count.
         'judge_reviews.created_at as created_at',
         'judge_reviews.judge_id as judge_id',
         'judges.name as judge_name',
