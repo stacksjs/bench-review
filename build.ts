@@ -2,6 +2,7 @@
 import { buildApp } from '@stacksjs/stx'
 import { tsAnalyticsTag } from '@stacksjs/ts-analytics/stx'
 import { TS_ANALYTICS_APP_ID } from './config/ts-analytics'
+import { cspMetaTag } from './app/Helpers/cspMeta'
 import { injectSeoHead, SEO_PAGES } from './app/Helpers/seoPages'
 import { buildRobotsTxt, buildSitemapXml, normalizeBase } from './app/Helpers/sitemap'
 
@@ -60,6 +61,33 @@ try {
 }
 catch (err) {
   console.warn('[build] ts-analytics injection skipped:', err instanceof Error ? err.message : err)
+}
+
+// Content-Security-Policy (bench-review#3 hardening). Splice a CSP <meta>
+// into every built page's <head>, same post-build mechanism as the SEO +
+// analytics steps. Ships only the provably-non-breaking baseline
+// (object-src/base-uri/form-action); the exfil-blocking connect/img/script
+// directives are env-dependent and must be verified against a live app
+// before enabling — see app/Helpers/cspMeta.ts. Best-effort + idempotent.
+try {
+  const tag = cspMetaTag()
+  const glob = new Bun.Glob('**/*.html')
+  let injected = 0
+  // eslint-disable-next-line ts/no-top-level-await
+  for await (const file of glob.scan('dist')) {
+    const path = `dist/${file}`
+    // eslint-disable-next-line ts/no-top-level-await
+    const html = await Bun.file(path).text()
+    if (!html.includes('</head>') || html.includes('http-equiv="Content-Security-Policy"'))
+      continue
+    // eslint-disable-next-line ts/no-top-level-await
+    await Bun.write(path, html.replace('</head>', `${tag}</head>`))
+    injected++
+  }
+  console.log(`[build] injected CSP meta into ${injected} static pages`)
+}
+catch (err) {
+  console.warn('[build] CSP meta injection skipped:', err instanceof Error ? err.message : err)
 }
 
 // buildApp() emits a page-derived dist/sitemap.xml hardcoded to localhost
