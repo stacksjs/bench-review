@@ -16,7 +16,7 @@
     "typecheck:app": "bun tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
-    "@stacksjs/components": "^0.2.72",
+    "@stacksjs/components": "^0.2.82",
     "chart.js": "^4.5.1",
     "leaflet": "^1.9.4",
     "ofetch": "^1.5.1",
@@ -28,8 +28,8 @@
     "ts-medium-editor": "^0.1.0"
   },
   "devDependencies": {
-    "@stacksjs/stx": "^0.2.72",
-    "bun-plugin-stx": "^0.2.72",
+    "@stacksjs/stx": "^0.2.82",
+    "bun-plugin-stx": "^0.2.82",
     "@stacksjs/ts-i18n": "0.1.8",
     "@types/leaflet": "^1.9.21",
     "bun-git-hooks": "^0.3.1"

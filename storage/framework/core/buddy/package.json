@@ -96,7 +96,7 @@
     "@stacksjs/collections": "^0.70.23",
     "@stacksjs/config": "^0.70.23",
     "@stacksjs/database": "^0.70.23",
-    "@stacksjs/desktop": "^0.70.23",
+    "@stacksjs/desktop": "^0.2.82",
     "@stacksjs/dns": "^0.70.23",
     "@stacksjs/email": "^0.70.23",
     "@stacksjs/enums": "^0.70.23",
@@ -127,7 +127,7 @@
     "@stacksjs/ui": "^0.70.23",
     "@stacksjs/utils": "^0.70.23",
     "@stacksjs/validation": "^0.70.23",
-    "@stacksjs/ts-cloud": "^0.2.21"
+    "@stacksjs/ts-cloud": "^0.7.10"
   },
   "devDependencies": {
     "better-dx": "^0.2.12"
