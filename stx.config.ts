@@ -12,6 +12,7 @@
  * - `app.head.script`: registers ts-analytics, keyed by App ID (Fathom-style).
  */
 import { tsAnalytics } from '@stacksjs/ts-analytics/stx'
+import { FONT_HEAD_TAGS } from './app/Helpers/fontHead'
 import { TS_ANALYTICS_APP_ID } from './config/ts-analytics'
 
 export default {
@@ -38,6 +39,10 @@ export default {
       script: [
         ...tsAnalytics({ appId: TS_ANALYTICS_APP_ID }),
       ],
+      // Self-hosted Geist webfont (preload + @font-face + body override).
+      // Static pages get the same tags spliced in by build.ts — the SSG
+      // ignores app.head, this covers the dev server shell.
+      headRaw: FONT_HEAD_TAGS,
       bodyClass: 'min-h-screen bg-off-white font-sans antialiased',
     },
     router: {

@@ -3,6 +3,7 @@ import { buildApp } from '@stacksjs/stx'
 import { tsAnalyticsTag } from '@stacksjs/ts-analytics/stx'
 import { TS_ANALYTICS_APP_ID } from './config/ts-analytics'
 import { cspMetaTag } from './app/Helpers/cspMeta'
+import { FONT_HEAD_TAGS } from './app/Helpers/fontHead'
 import { injectSeoHead, SEO_PAGES } from './app/Helpers/seoPages'
 import { buildRobotsTxt, buildSitemapXml, normalizeBase } from './app/Helpers/sitemap'
 
@@ -61,6 +62,30 @@ try {
 }
 catch (err) {
   console.warn('[build] ts-analytics injection skipped:', err instanceof Error ? err.message : err)
+}
+
+// Webfont (self-hosted Geist): preload + @font-face + body font-family.
+// Same post-build splice as SEO/analytics — buildApp()'s SSG ignores
+// config.app.head, so the dev-server headRaw never reaches static pages.
+// Best-effort + idempotent.
+try {
+  const glob = new Bun.Glob('**/*.html')
+  let injected = 0
+  // eslint-disable-next-line ts/no-top-level-await
+  for await (const file of glob.scan('dist')) {
+    const path = `dist/${file}`
+    // eslint-disable-next-line ts/no-top-level-await
+    const html = await Bun.file(path).text()
+    if (!html.includes('</head>') || html.includes('geist-latin-wght-normal.woff2'))
+      continue
+    // eslint-disable-next-line ts/no-top-level-await
+    await Bun.write(path, html.replace('</head>', `${FONT_HEAD_TAGS}</head>`))
+    injected++
+  }
+  console.log(`[build] injected webfont head into ${injected} static pages`)
+}
+catch (err) {
+  console.warn('[build] webfont head injection skipped:', err instanceof Error ? err.message : err)
 }
 
 // Content-Security-Policy (bench-review#3 hardening). Splice a CSP <meta>

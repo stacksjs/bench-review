@@ -14,6 +14,13 @@
   const submitError = state<string>('')
   const submitAttempted = state<boolean>(false)
 
+  // Element refs for focusing the first invalid field on submit —
+  // composable refs instead of document.getElementById (CLAUDE.md bans
+  // bare document.* in stx scripts).
+  const nameFieldRef = useRef('contact-name-field')
+  const emailFieldRef = useRef('contact-email-field')
+  const messageFieldRef = useRef('contact-message-field')
+
   async function submit(): Promise<void> {
     if (loading()) return
     submitAttempted.set(true)
@@ -22,7 +29,8 @@
       const msg = 'Please fill in your name, email, and message.'
       submitError.set(msg)
       toast.error('Message not sent', msg)
-      document.getElementById(!contactName().trim() ? 'name' : !contactEmail().trim() ? 'contact-email' : 'message')?.focus()
+      const target = !contactName().trim() ? nameFieldRef : !contactEmail().trim() ? emailFieldRef : messageFieldRef
+      target.value?.focus()
       return
     }
     loading.set(true)
@@ -32,7 +40,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: contactName(), email: contactEmail(), topic: topic(), message: contactMessage() }),
       })
-      if (!res.ok) throw new Error('Could not send message — please try again')
+      if (!res.ok) throw new Error('Could not send message. Please try again.')
       sent.set(true)
     }
     catch (e) {
@@ -53,7 +61,7 @@
       <div>
         <h1 class="font-bold text-4xl text-gray-900 tracking-tight sm:text-5xl">Get in touch</h1>
         <p class="mt-6 leading-8 text-gray-600 text-lg">
-          We read every message. Whether you have feedback, want to flag an issue, or work in the legal community and want to partner with us — we'd love to hear from you.
+          We read every message. Whether you have feedback, want to flag an issue, or work in the legal community and want to partner with us, we'd love to hear from you.
         </p>
 
         <dl class="mt-12 space-y-6 text-base/7 text-gray-600">
@@ -92,9 +100,10 @@
                   x-model="contactName"
                   type="text"
                   id="name"
+                  ref="contact-name-field"
                   required
                   @focus="submitAttempted.set(false)"
-                  class="block px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2"
+                  class="block px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 rounded-lg focus:outline focus:outline-2 focus:outline-gray-900 -outline-offset-1 focus:-outline-offset-2"
                   x-class="submitAttempted() && !contactName().trim() ? 'outline-red-500 ring-1 ring-red-300' : 'outline-gray-300'"
                 >
               </div>
@@ -107,9 +116,10 @@
                   x-model="contactEmail"
                   type="email"
                   id="contact-email"
+                  ref="contact-email-field"
                   required
                   @focus="submitAttempted.set(false)"
-                  class="block px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2"
+                  class="block px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 rounded-lg focus:outline focus:outline-2 focus:outline-gray-900 -outline-offset-1 focus:-outline-offset-2"
                   x-class="submitAttempted() && !contactEmail().trim() ? 'outline-red-500 ring-1 ring-red-300' : 'outline-gray-300'"
                 >
               </div>
@@ -121,7 +131,7 @@
                 <select
                   x-model="topic"
                   id="topic"
-                  class="block px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2"
+                  class="block px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 outline-gray-300 rounded-lg focus:outline focus:outline-2 focus:outline-gray-900 -outline-offset-1 focus:-outline-offset-2"
                 >
                   <option value="general">General question</option>
                   <option value="report">Report a review</option>
@@ -139,10 +149,11 @@
                 <textarea
                   x-model="contactMessage"
                   id="message"
+                  ref="contact-message-field"
                   rows="5"
                   required
                   @focus="submitAttempted.set(false)"
-                  class="block px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 rounded-md focus:outline focus:outline-2 focus:outline-gray-600 -outline-offset-1 focus:-outline-offset-2"
+                  class="block px-3 py-2 w-full text-gray-900 sm:text-sm bg-white outline outline-1 rounded-lg focus:outline focus:outline-2 focus:outline-gray-900 -outline-offset-1 focus:-outline-offset-2"
                   x-class="submitAttempted() && !contactMessage().trim() ? 'outline-red-500 ring-1 ring-red-300' : 'outline-gray-300'"
                 ></textarea>
               </div>
@@ -153,7 +164,7 @@
             <button
               type="submit"
               x-disabled="loading"
-              class="inline-flex items-center justify-center px-4 py-2 w-full font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              class="inline-flex items-center justify-center px-4 py-2 w-full font-semibold text-sm text-white bg-gray-900 hover:bg-gray-800 active:scale-[0.98] rounded-lg shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg :if="loading()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
               <span :show="!loading">Send message</span>

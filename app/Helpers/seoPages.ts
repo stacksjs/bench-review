@@ -35,7 +35,7 @@ export const SEO_PAGES: Record<string, PageSeo> = {
   },
   'reviews.html': {
     path: '/reviews',
-    description: 'The latest judge reviews on Bench Review — honest, first-hand accounts of courtroom conduct, temperament, and fairness.',
+    description: 'The latest judge reviews on Bench Review: honest, first-hand accounts of courtroom conduct, temperament, and fairness.',
   },
   'court-houses.html': {
     path: '/court-houses',
@@ -47,7 +47,7 @@ export const SEO_PAGES: Record<string, PageSeo> = {
   },
   'about.html': {
     path: '/about',
-    description: 'About Bench Review — bringing transparency to the judiciary with reviews from the people who appear before judges.',
+    description: 'About Bench Review: bringing transparency to the judiciary with reviews from the people who appear before judges.',
   },
   'guidelines.html': {
     path: '/guidelines',
@@ -55,7 +55,7 @@ export const SEO_PAGES: Record<string, PageSeo> = {
   },
   'contact.html': {
     path: '/contact',
-    description: 'Contact Bench Review — report a review, request removal of personal information, or get in touch with our team.',
+    description: 'Contact Bench Review: report a review, request removal of personal information, or get in touch with our team.',
   },
   'terms.html': {
     path: '/terms',
@@ -63,7 +63,7 @@ export const SEO_PAGES: Record<string, PageSeo> = {
   },
   'privacy.html': {
     path: '/privacy',
-    description: 'Bench Review Privacy Policy — what we collect, how we use it, and your data rights.',
+    description: 'Bench Review Privacy Policy: what we collect, how we use it, and your data rights.',
   },
   'search.html': {
     path: '/search',

@@ -8,7 +8,7 @@
   const faqs: Faq[] = [
     {
       q: 'Who can write a review?',
-      a: 'Anyone with a verified Bench Review account can submit a review. We prioritize reviews from clerks, attorneys, court staff, and parties to a case — people with first-hand experience appearing before a judge.'
+      a: 'Anyone with a verified Bench Review account can submit a review. We prioritize reviews from clerks, attorneys, court staff, and parties to a case: people with first-hand experience appearing before a judge.'
     },
     {
       q: 'Can I review anonymously?',
@@ -20,11 +20,11 @@
     },
     {
       q: 'Is the content I read free?',
-      a: 'Free accounts can write reviews and read summaries. A Professional subscription ($10/mo) unlocks full review text, advanced search, and analytics. Clerks always get free access — that\'s our way of saying thanks.'
+      a: 'Free accounts can write reviews and read summaries. A Professional subscription ($10/mo) unlocks full review text, advanced search, and analytics. Clerks always get free access. That\'s our way of saying thanks.'
     },
     {
       q: 'Where does the judge data come from?',
-      a: 'Judge profiles are sourced from publicly available court records, bar associations, and judicial directories. Reviews are user-contributed. Judges (or their chambers) can claim their profile at /judges/signup to post official responses to reviews — once verified, responses appear prominently alongside the review.'
+      a: 'Judge profiles are sourced from publicly available court records, bar associations, and judicial directories. Reviews are user-contributed. Judges (or their chambers) can claim their profile at /judges/signup to post official responses to reviews. Once verified, responses appear prominently alongside the review.'
     },
     {
       q: 'Can a judge get a review removed?',
@@ -82,7 +82,7 @@
     <div class="mt-16 p-8 text-center bg-off-gray rounded-2xl">
       <h2 class="font-semibold text-gray-900 text-xl">Still have questions?</h2>
       <p class="mt-2 text-gray-600">We're happy to help.</p>
-      <StxLink to="/contact" class="inline-block mt-4 px-4 py-2 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md">Contact us</StxLink>
+      <StxLink to="/contact" class="inline-block mt-4 px-4 py-2 font-semibold text-sm text-white bg-gray-900 hover:bg-gray-800 active:scale-[0.98] rounded-lg shadow-sm transition">Contact us</StxLink>
     </div>
   </div>
 </div>
