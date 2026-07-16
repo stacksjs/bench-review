@@ -4,7 +4,7 @@
  */
 
 import * as crypto from 'node:crypto'
-import { XMLParser } from 'fast-xml-parser'
+import { XMLParser } from '@stacksjs/ts-xml'
 
 export interface AWSCredentials {
   accessKeyId: string
@@ -431,7 +431,7 @@ export class AWSClient {
     )
 
     const canonicalHeaders = sortedHeaderKeys
-      .map((key: any) => `${key.toLowerCase()}:${headers[key].trim()}\n`)
+      .map((key: any) => `${key.toLowerCase()}:${headers[key]!.trim()}\n`)
       .join('')
 
     const signedHeaders = sortedHeaderKeys
@@ -516,7 +516,7 @@ export class AWSClient {
   }
 
   /**
-   * Parse XML response using fast-xml-parser
+   * Parse XML response using @stacksjs/ts-xml
    */
   private parseXmlResponse(xml: string): any {
     try {
@@ -530,7 +530,7 @@ export class AWSClient {
       // Remove XML wrapper nodes to get to actual data
       const keys = Object.keys(parsed)
       if (keys.length === 1) {
-        return parsed[keys[0]]
+        return parsed[keys[0]!]
       }
 
       return parsed

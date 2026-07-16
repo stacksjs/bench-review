@@ -1,5 +1,23 @@
+import type Stripe from 'stripe'
+import { createRequire } from 'node:module'
 import { services } from '@stacksjs/config'
-import Stripe from 'stripe'
+
+const require = createRequire(import.meta.url)
+
+// `stripe` is an opt-in dependency: it is only installed when Stripe payments
+// are enabled in config. Resolved lazily (synchronously, on first use) so
+// importing `@stacksjs/payments` never hard-requires the package.
+function StripeCtor(): typeof import('stripe').default {
+  try {
+    return require('stripe')
+  }
+  catch {
+    throw new Error(
+      'Stripe payments are being used but the `stripe` package is not installed. '
+      + 'It is an opt-in dependency — run `bun add stripe` to enable server-side Stripe payments.',
+    )
+  }
+}
 
 let _stripe: Stripe | null = null
 
@@ -21,8 +39,11 @@ export const stripe: Stripe = new Proxy({} as Stripe, {
       // pantry-vendored Stripe SDK types are compiled against — bumping
       // it here without bumping the SDK would mean responses include
       // fields the SDK doesn't know about. Update both at once.
-      const apiVersion = (services?.stripe?.apiVersion as Stripe.LatestApiVersion | undefined)
-        ?? '2026-01-28.preview'
+      const apiVersion: Stripe.LatestApiVersion = '2026-03-25.dahlia'
+      const configuredVersion = services?.stripe?.apiVersion
+      if (configuredVersion && configuredVersion !== apiVersion)
+        throw new Error(`Stripe API version ${configuredVersion} does not match the installed SDK version ${apiVersion}`)
+      const Stripe = StripeCtor()
       _stripe = new Stripe(apiKey, { apiVersion })
     }
     return (_stripe as any)[prop]

@@ -1,7 +1,7 @@
 {
   "name": "@bun-examples/stx",
   "type": "module",
-  "version": "0.70.45",
+  "version": "0.70.87",
   "description": "Your project description.",
   "author": "your-name <your-email>",
   "contributors": [
@@ -37,7 +37,7 @@
     "dist"
   ],
   "scripts": {
-    "buddy": "bun ./storage/framework/core/buddy/src/cli.ts",
+    "buddy": "./buddy",
     "stacks": "bun run buddy",
     "setup": "./storage/framework/scripts/setup.sh",
     "fresh": "bun run buddy fresh",

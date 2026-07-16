@@ -16,17 +16,7 @@ import type { ExtractParams, InferValidations, JobOptions, RequestInstance } fro
  */
 export interface ActionValidations {
   [key: string]: {
-    // Accepts any ts-validation validator (`schema.string()`, `schema.number()`,
-    // …). The param is `any` (not `unknown`) because a validator's method is
-    // `(value: T) => …` and `(value: T)` isn't assignable to `(value: unknown)`
-    // by contravariance; `errors` is loose because the real return is
-    // `{ valid, errors: ValidationError[] | ValidationErrorMap }` and the
-    // consumer (validateActionInput) narrows to the array form. Keeping the
-    // shape structural (rather than `Validator<any>`) avoids rippling into the
-    // Action class's InferValidations/ResolveBody generics. The clean fix —
-    // `rule: Validator<any>` + a ValidationResult-aware consumer — belongs
-    // upstream; see stacksjs/stacks (filed).
-    rule: { validate: (value: any) => { valid: boolean, errors?: any } }
+    rule: { validate: (value: any) => any }
     message?: string | Record<string, string>
   }
 }
@@ -147,9 +137,11 @@ interface ActionOptions<
   before?: (
     request: InferRequest<TModel, TValidations, TPath>,
   ) => void | Response | Promise<void | Response>
-  handle: (
-    request: InferRequest<TModel, TValidations, TPath>,
-  ) => ActionResult | Promise<ActionResult>
+  handle: {
+    bivarianceHack: (
+      request: InferRequest<TModel, TValidations, TPath>,
+    ) => ActionResult | Promise<ActionResult>
+  }['bivarianceHack']
   /**
    * Lightweight dependency factory (stacksjs/stacks#1870 R-6).
    * Returns the deps the action's `handle` / `before` / `authorize`
@@ -206,7 +198,7 @@ export type ActionResult =
   | string
   | number
   | boolean
-  | Record<string, unknown>
+  | object
   | unknown[]
 
 export class Action<
@@ -223,7 +215,7 @@ export class Action<
   enabled?: ActionOptions['enabled']
   path?: ActionOptions<TModel, TValidations, TPath>['path']
   method?: ActionOptions['method']
-  validations?: ActionOptions<TModel, TValidations, TPath>['validations']
+  validations?: TValidations
   requestFile?: string
   /** @see {@link ActionOptions.skipCsrf} */
   skipCsrf?: boolean

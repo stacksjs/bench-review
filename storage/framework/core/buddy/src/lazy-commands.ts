@@ -30,10 +30,16 @@ const commandRegistry: Record<string, CommandLoader> = {
   'deploy': { path: './commands/deploy.ts', exportName: 'deploy' },
   'dev': { path: './commands/dev.ts', exportName: 'dev' },
   'dns': { path: './commands/dns.ts', exportName: 'dns' },
+  'dns:pull': { path: './commands/dns.ts', exportName: 'dns' },
+  'dns:diff': { path: './commands/dns.ts', exportName: 'dns' },
+  'dns:sync': { path: './commands/dns.ts', exportName: 'dns' },
   'doctor': { path: './commands/doctor.ts', exportName: 'doctor' },
   'domains': { path: './commands/domains.ts', exportName: 'domains' },
   'email': { path: './commands/email.ts', exportName: 'email' },
   'env': { path: './commands/env.ts', exportName: 'env' },
+  'extension:init': { path: './commands/extension.ts', exportName: 'extension' },
+  'extension:build': { path: './commands/extension.ts', exportName: 'extension' },
+  'extension:package': { path: './commands/extension.ts', exportName: 'extension' },
   // Feature install / uninstall — single file registers all pairs.
   'dashboard:install': { path: './commands/features.ts', exportName: 'features' },
   'dashboard:uninstall': { path: './commands/features.ts', exportName: 'features' },
@@ -93,6 +99,7 @@ const commandRegistry: Record<string, CommandLoader> = {
   'seed:roles': { path: './commands/seed.ts', exportName: 'seed' },
   'roles:seed': { path: './commands/seed.ts', exportName: 'seed' },
   'serve': { path: './commands/serve.ts', exportName: 'serve' },
+  'serve:api': { path: './commands/serve.ts', exportName: 'serveApi' },
   'setup': { path: './commands/setup.ts', exportName: 'setup' },
   'share': { path: './commands/share.ts', exportName: 'share' },
   'stack': { path: './commands/stacks.ts', exportName: 'stacks' },
@@ -265,7 +272,7 @@ export function getCommandsToLoad(args: string[]): string[] {
     return Object.keys(commandRegistry)
 
   // Extract base command (before ':')
-  const baseCommand = requestedCommand.split(':')[0]
+  const baseCommand = requestedCommand.split(':')[0]!
 
   // Special case: 'list' command needs all commands to display them
   if (baseCommand === 'list') {

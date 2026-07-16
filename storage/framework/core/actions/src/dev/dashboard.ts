@@ -2,7 +2,7 @@ import process from 'node:process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { bold, cyan, dim, green } from '@stacksjs/cli'
 import { projectPath, storagePath } from '@stacksjs/path'
-import { buildDashboardUrl, buildManifest, buildSidebarConfig, discoverModels, findAvailablePort, waitForServer } from './dashboard-utils'
+import { buildDashboardUrl, buildManifest, discoverModels, findAvailablePort, waitForServer } from './dashboard-utils'
 
 // buddyOptions serializes `verbose: false` as `--verbose false`, so
 // process.argv.includes('--verbose') would always match. Check the value too.
@@ -522,12 +522,26 @@ async function startStxServer(): Promise<void> {
   // dashboard's layout resolution stays consistent with the other dev
   // servers.
   let stxModule: any
+  // Local stx checkout first (same convention as the Craft SDK resolution
+  // below) so framework development picks up engine fixes before a release;
+  // STX_SRC overrides the default location.
   try {
-    const vendoredStx = projectPath('pantry/@stacksjs/stx/dist/index.js')
-    if (await Bun.file(vendoredStx).exists())
-      stxModule = await import(vendoredStx)
+    const localStx = process.env.STX_SRC
+      || `${process.env.HOME}/Code/Tools/stx/packages/stx/src/index.ts`
+    if (await Bun.file(localStx).exists())
+      stxModule = await import(localStx)
   }
   catch { /* fall through */ }
+  if (stxModule && verbose)
+    console.log('[Dashboard] Using local stx checkout')
+  if (!stxModule) {
+    try {
+      const vendoredStx = projectPath('pantry/@stacksjs/stx/dist/index.js')
+      if (await Bun.file(vendoredStx).exists())
+        stxModule = await import(vendoredStx)
+    }
+    catch { /* fall through */ }
+  }
 
   // Mount the config-editor API routes. The settings UI talks to these
   // to list config files, read their resolved values, and write edits
@@ -962,9 +976,7 @@ const dashboardHttpsUrl = dashboardDomain ? `https://${dashboardDomain}` : null
 const dashboardLocalUrl = `http://localhost:${dashboardPort}`
 
 // Use local HTTP URL — Craft webview loads directly, no proxy needed
-const baseRoute = dashboardLocalUrl
-const sidebarConfig = buildSidebarConfig(baseRoute, discoveredModels, dashboardToggles)
-const initialUrl = `http://localhost:${dashboardPort}/?native-sidebar=1`
+const initialUrl = `http://localhost:${dashboardPort}/`
 
 // Print vite-style output
 const elapsedMs = (Bun.nanoseconds() - startTime) / 1_000_000
@@ -1014,27 +1026,38 @@ console.log()
 // config loading which prints warnings before our console.log override is
 // active. We also let it be missing — the native window is a nicety, not a
 // requirement; the dashboard runs fine as a plain web server in that case.
-let createApp: ((_opts: any) => { show: () => Promise<void>, close: () => void }) | null = null
-try {
-  const localCraftSdk = process.env.HOME
-    ? `${process.env.HOME}/Code/Tools/craft/packages/typescript/src/index.ts`
-    : undefined
-
-  ;({ createApp } = localCraftSdk && existsSync(localCraftSdk)
-    ? await import(localCraftSdk)
-    : await import('craft-native'))
+interface CraftApplication {
+  show: () => Promise<void>
+  close: () => void
 }
-catch {
+
+type CraftCreateApp = (options: Record<string, unknown>) => CraftApplication
+
+let createApp: CraftCreateApp | undefined
+const localCraftSdk = process.env.HOME
+  ? `${process.env.HOME}/Code/Tools/craft/packages/typescript/src/index.ts`
+  : undefined
+
+if (localCraftSdk && existsSync(localCraftSdk)) {
   try {
-    ;({ createApp } = await import('@craft-native/craft'))
+    ;({ createApp } = await import(localCraftSdk) as { createApp?: CraftCreateApp })
   }
   catch {
+    // Continue with installed package candidates below.
+  }
+}
+
+if (!createApp) {
+  const packageNames = ['craft-native', '@craft-native/craft', '@stacksjs/ts-craft'] as const
+  for (const packageName of packageNames) {
     try {
-      ;({ createApp } = await import('@stacksjs/ts-craft'))
+      ;({ createApp } = await import(packageName) as { createApp?: CraftCreateApp })
+      if (createApp)
+        break
     }
     catch {
       // The Craft SDK isn't installed (or its native bindings failed to
-      // load on this platform). Fall through to web-only mode below.
+      // load on this platform). Continue to the next compatible package.
     }
   }
 }
@@ -1100,16 +1123,16 @@ if (createApp) {
   // exits. Skip native-window mode entirely instead and let the web fallback
   // below handle it.
   if (!craftBinaryPath) {
-    createApp = null
+    createApp = undefined
   }
 
   if (!createApp) {
     // eslint-disable-next-line no-console
     console.log(`  ${dim('Native window unavailable. Set CRAFT_BIN to a craft binary, or open the URL above in a browser.')}\n`)
-    await new Promise(() => {})
+    await new Promise<never>(() => {})
   }
 
-  const app = createApp({
+  const app = createApp!({
     url: initialUrl,
     quiet: !verbose,
     ...(craftBinaryPath && { craftPath: craftBinaryPath }),
@@ -1118,9 +1141,11 @@ if (createApp) {
       width: 1400,
       height: 900,
       titlebarHidden: true,
-      nativeSidebar: true,
-      sidebarWidth: 240,
-      sidebarConfig,
+      // Real vibrancy behind the stx-rendered macOS sidebar (see
+      // views/dashboard/layouts/default.stx). The native NSOutlineView
+      // sidebar is retired — the web one owns rendering and behavior.
+      webSidebarMaterial: true,
+      webSidebarWidth: 250,
       ...(appIconPath && { icon: appIconPath }),
     },
   })

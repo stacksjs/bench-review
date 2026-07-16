@@ -10,6 +10,7 @@ import { err, ok } from '@stacksjs/error-handling'
 import { log } from '@stacksjs/logging'
 import process from 'node:process'
 import { parseEnvelope } from './envelope'
+import { updatedRowCount } from './utils'
 
 // Prevent unhandled rejections from crashing the worker
 process.on('unhandledRejection', (reason, _promise) => {
@@ -98,7 +99,7 @@ async function sweepStaleReservations(): Promise<number> {
       .set({ reserved_at: null, available_at: now })
       .where('reserved_at', '<=', cutoff)
       .executeTakeFirst()
-    const requeued = Number((result as { numUpdatedRows?: number | bigint })?.numUpdatedRows ?? 0)
+    const requeued = updatedRowCount(result)
     if (requeued > 0) {
       log.warn(
         `[queue] Requeued ${requeued} job(s) whose reservation exceeded the `
@@ -280,16 +281,23 @@ async function processJobsFromDatabase(initialQueues: string[], concurrency: num
           continue
         }
 
-        for (const job of jobs) {
+        // Process the reserved batch CONCURRENTLY (stacksjs/stacks#1984).
+        // Previously this awaited each job in a for-loop, so `--concurrency=N`
+        // reserved N jobs but ran them one at a time — the flag delivered no
+        // parallelism, and if the worker died mid-batch the reserved-but-
+        // unstarted jobs sat `reserved_at` (a burned attempt each) until the
+        // sweep. Running them together starts every reserved job at once.
+        // Default `concurrency=1` → a single-element batch, so the common case
+        // is unchanged. processJob catches internally, but guard anyway.
+        await Promise.all(jobs.map(async (job) => {
           try {
             log.info(`Processing job ${job.id} from queue "${queueName}"`)
             await trackInFlight(processJob(job))
           }
           catch {
-            // processJob should never throw, but just in case
             log.error(`Unexpected error processing job ${job.id}`)
           }
-        }
+        }))
       }
 
       // Sleep between polling cycles
@@ -332,7 +340,7 @@ async function fetchPendingJobs(queueName: string, limit: number): Promise<any[]
       .where('reserved_at', 'is', null)
       .executeTakeFirst()
 
-    const updated = Number((result as any)?.numUpdatedRows ?? 0)
+    const updated = updatedRowCount(result)
     if (updated > 0) {
       claimed.push(job)
     }
@@ -477,18 +485,55 @@ async function processJob(job: any): Promise<void> {
 
     if (currentAttempts >= maxAttempts) {
       // Move to failed jobs
-      log.info(`[Queue] Job ${jobId} exceeded max attempts (${currentAttempts}/${maxAttempts}), moving to failed_jobs`)
-      try {
-        await moveToFailedJobs(job, jobError)
+      log.info(`[Queue] Job ${jobId} exceeded max attempts (${currentAttempts}/${maxAttempts})`)
+      // Only delete the job from `jobs` once it is durably recorded somewhere.
+      // Previously `deleteJob` ran unconditionally even when the failed_jobs
+      // insert failed (missing table, lock, disk) — the exhausted job was then
+      // gone from `jobs`, absent from `failed_jobs`, and never dead-lettered:
+      // silent, permanent payload loss. If we can't persist it, leave the row
+      // in place so the reservation sweep re-picks it up (a slow retry beats
+      // losing the data). (stacksjs/stacks#1957)
+      //
+      // A job re-queued from `failed_jobs` (marked `_retriedFromFailed` by
+      // retryFailedJob) that exhausts its retries AGAIN dead-letters instead
+      // of looping back into failed_jobs forever (stacksjs/stacks#1885/#1984).
+      // If the DLQ table isn't migrated, moveToDeadLetter returns false and we
+      // fall back to failed_jobs (today's behavior).
+      let persisted = false
+      if (parsedPayload?._retriedFromFailed === true) {
+        try {
+          const { moveToDeadLetter } = await import('./dead-letter')
+          persisted = await moveToDeadLetter({
+            queue: job.queue,
+            payload: job.payload,
+            exception: jobError.stack || jobError.message,
+          }, 'repeat-failure', 2)
+          if (persisted)
+            log.info(`[Queue] Job ${jobId} re-failed after retry — moved to dead_letter_jobs`)
+        }
+        catch {
+          persisted = false
+        }
       }
-      catch {
-        log.info(`[Queue] Failed to move job ${jobId} to failed_jobs`)
+      if (!persisted) {
+        log.info(`[Queue] Moving job ${jobId} to failed_jobs`)
+        try {
+          persisted = await moveToFailedJobs(job, jobError)
+        }
+        catch {
+          persisted = false
+        }
       }
-      try {
-        await deleteJob(jobId)
+      if (persisted) {
+        try {
+          await deleteJob(jobId)
+        }
+        catch {
+          log.info(`[Queue] Failed to delete failed job ${jobId}`)
+        }
       }
-      catch {
-        log.info(`[Queue] Failed to delete failed job ${jobId}`)
+      else {
+        log.error(`[Queue] Job ${jobId} exhausted its retries but could NOT be persisted to failed_jobs — leaving it in the queue to avoid data loss (the reservation sweep will retry it). Check that the failed_jobs table exists and is writable.`)
       }
 
       // Poison-message detection + circuit-breaker accounting
@@ -530,6 +575,15 @@ async function processJob(job: any): Promise<void> {
       else if (typeof backoffDelays === 'number' && backoffDelays > 0) {
         retryDelay = backoffDelays
       }
+
+      // Clamp to a finite, non-negative delay. A bad backoff entry — a
+      // non-numeric, NaN, or negative value in a user-supplied `backoff`
+      // array — would otherwise flow into `available_at = now + retryDelay`,
+      // making the job due immediately (or never), i.e. a hot retry loop
+      // instead of the intended backoff (stacksjs/stacks#1957 queue sweep).
+      retryDelay = Number(retryDelay)
+      if (!Number.isFinite(retryDelay) || retryDelay < 0)
+        retryDelay = 30
 
       log.info(`[Queue] Job ${jobId} will be retried in ${retryDelay}s (attempt ${currentAttempts}/${maxAttempts})`)
       try {
@@ -578,7 +632,14 @@ async function releaseJob(jobId: number, delaySeconds: number = 30): Promise<voi
 /**
  * Move a job to the failed_jobs table
  */
-async function moveToFailedJobs(job: any, error: Error): Promise<void> {
+/**
+ * Persist an exhausted job to `failed_jobs`. Returns `true` only when the row
+ * was durably written — the caller uses that to decide whether it's safe to
+ * delete the job from `jobs`. Returning `false` (instead of swallowing the
+ * error) is what keeps a persistence failure from silently destroying the
+ * payload (stacksjs/stacks#1957).
+ */
+async function moveToFailedJobs(job: any, error: Error): Promise<boolean> {
   try {
     const failedAt = new Date().toISOString().slice(0, 19).replace('T', ' ')
     const uuid = crypto.randomUUID()
@@ -596,9 +657,11 @@ async function moveToFailedJobs(job: any, error: Error): Promise<void> {
         failed_at: failedAt,
       })
       .execute()
+    return true
   }
   catch (insertError) {
     log.error('Failed to log failed job:', insertError)
+    return false
   }
 }
 
@@ -701,7 +764,7 @@ async function processJobsFromRedis(queueName: string, concurrency: number): Pro
     throw new Error('Redis queue connection is not configured. Check config/queue.ts')
   }
 
-  const queue = new RedisQueue(queueName, redisConfig)
+  const queue = new RedisQueue(queueName, redisConfig as ConstructorParameters<typeof RedisQueue>[1])
 
   const { emitQueueEvent, getWorkerTracker } = await import('./events')
   const tracker = getWorkerTracker()
@@ -896,12 +959,27 @@ export async function retryFailedJob(id: number): Promise<void> {
     throw new Error(`Failed job ${id} not found`)
   }
 
+  // Mark the re-queued payload so that if it fails AGAIN it dead-letters
+  // instead of looping back into failed_jobs forever (stacksjs/stacks#1885 /
+  // #1984). The marker is a reserved envelope key the worker's terminal-
+  // failure path reads; if the payload isn't parseable JSON we re-queue it
+  // verbatim (no marker — same as before).
+  let payloadToRequeue = failedJob.payload
+  try {
+    const env = JSON.parse(failedJob.payload || '{}')
+    env._retriedFromFailed = true
+    payloadToRequeue = JSON.stringify(env)
+  }
+  catch {
+    // unparseable payload — re-queue as-is
+  }
+
   // Re-queue the job
   await db
     .insertInto('jobs')
     .values({
       queue: failedJob.queue,
-      payload: failedJob.payload,
+      payload: payloadToRequeue,
       attempts: 0,
       reserved_at: null,
       available_at: now,

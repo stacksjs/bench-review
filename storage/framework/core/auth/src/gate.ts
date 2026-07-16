@@ -25,6 +25,25 @@ export type GateCallback<T = any> = (_user: UserModel | null, ..._args: T[]) => 
 export type PolicyMethod<T = any> = (_user: UserModel | null, _model?: T, ..._args: any[]) => boolean | null | Promise<boolean | null> | AuthorizationResponse
 
 /**
+ * Method names that live on `BasePolicy.prototype` (or `Object`) and must
+ * NEVER be resolvable as an ability. Without this guard, `policyInstance[ability]`
+ * (unrestricted bracket access) would resolve inherited helpers like `allow`
+ * / `allowIf` / `before` when the ability string is caller-influenced (e.g. a
+ * generic `/can/:ability` route), and calling `allow()` returns an
+ * unconditional ALLOW — a fail-open authorization bypass. See the auth
+ * correctness sweep (stacksjs/stacks#1985).
+ */
+const RESERVED_POLICY_MEMBERS: ReadonlySet<string> = new Set([
+  'before',
+  'allow',
+  'deny',
+  'denyIf',
+  'denyUnless',
+  'allowIf',
+  'constructor',
+])
+
+/**
  * Authorization response for detailed allow/deny
  */
 export class AuthorizationResponse {
@@ -263,18 +282,48 @@ export async function authorize(ability: string, user: UserModel | null, ...args
  * Get detailed inspection result for an ability check
  */
 export async function inspect(ability: string, user: UserModel | null, ...args: any[]): Promise<AuthorizationResponse> {
-  // Run before callbacks
+  let response: AuthorizationResponse | null = null
+
+  // Run before callbacks. An explicit true/false is an override that
+  // short-circuits policy/gate resolution — but it still passes through the
+  // after callbacks below (Laravel parity).
   for (const callback of state.beforeCallbacks) {
     const beforeResult = await callback(user, ability, args)
     if (beforeResult === true) {
-      return AuthorizationResponse.allow()
+      response = AuthorizationResponse.allow()
+      break
     }
     if (beforeResult === false) {
-      return AuthorizationResponse.deny()
+      response = AuthorizationResponse.deny()
+      break
     }
     // null means continue checking
   }
 
+  if (!response)
+    response = await resolveAbility(ability, user, args)
+
+  // Run after callbacks for EVERY resolution path — policy, inline gate, and
+  // the default deny — not just inline gates as before. A global
+  // `Gate.after()` override / lockdown kill-switch was previously bypassed
+  // for any policy-resolved ability (the common case for model
+  // authorization: view/update/delete). stacksjs/stacks#1985.
+  for (const callback of state.afterCallbacks) {
+    const afterResult = await callback(user, ability, response.isAllowed, args)
+    if (typeof afterResult === 'boolean') {
+      return afterResult ? AuthorizationResponse.allow() : AuthorizationResponse.deny()
+    }
+  }
+
+  return response
+}
+
+/**
+ * Resolve an ability through the policy -> inline-gate -> default-deny chain,
+ * WITHOUT running the before/after callbacks. `inspect()` owns those so they
+ * apply uniformly to every path.
+ */
+async function resolveAbility(ability: string, user: UserModel | null, args: any[]): Promise<AuthorizationResponse> {
   // Check for policy first (if model is passed)
   const model = args[0]
   if (model && typeof model === 'object') {
@@ -295,9 +344,14 @@ export async function inspect(ability: string, user: UserModel | null, ...args: 
         }
       }
 
-      // Check policy method
-      const method = policyInstance[ability] as PolicyMethod | undefined
-      if (method) {
+      // Resolve the ability to a policy method, but never to an inherited
+      // BasePolicy/Object helper (see RESERVED_POLICY_MEMBERS) — that path
+      // is a fail-open bypass when the ability string is caller-influenced.
+      // Require an own function too, so only real ability methods run.
+      const method = RESERVED_POLICY_MEMBERS.has(ability)
+        ? undefined
+        : policyInstance[ability] as PolicyMethod | undefined
+      if (typeof method === 'function') {
         const result = await method.call(policyInstance, user, ...args)
         // null is treated as "no opinion" — fall through to deny here since
         // we already exhausted the policy resolution path for this ability.
@@ -309,18 +363,7 @@ export async function inspect(ability: string, user: UserModel | null, ...args: 
   // Check inline gate
   const gate = state.gates.get(ability)
   if (gate) {
-    const result = await gate(user, ...args)
-    const response = normalizeResponse(result)
-
-    // Run after callbacks
-    for (const callback of state.afterCallbacks) {
-      const afterResult = await callback(user, ability, response.isAllowed, args)
-      if (typeof afterResult === 'boolean') {
-        return afterResult ? AuthorizationResponse.allow() : AuthorizationResponse.deny()
-      }
-    }
-
-    return response
+    return normalizeResponse(await gate(user, ...args))
   }
 
   // No gate or policy found - deny by default

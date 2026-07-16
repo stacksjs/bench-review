@@ -34,9 +34,24 @@ import MaintenanceMiddleware from './app/Middleware/Maintenance'
 // Registered unconditionally because the auth middleware + Role middleware
 // both reach for the helpers at request time regardless of which feature
 // the project opts into.
-import { createBqbRbacStore, setRbacStore } from '@stacksjs/auth'
-
-setRbacStore(createBqbRbacStore())
+// DEFERRED, non-blocking wiring on purpose. This file is dynamically
+// imported by the route loader while other entrypoints (a test file, the
+// API server) may still be mid-way through evaluating the @stacksjs/auth
+// async module graph. With a static `import { setRbacStore } ...`, Bun
+// could execute this module against auth's partially-evaluated record:
+// the exported function exists (hoisted) but rbac.ts's module-level
+// `let store` hadn't initialized, so calling it threw
+// `Cannot access 'store' before initialization`, the whole bootstrap
+// import failed, and EVERY framework default route (auth, 2FA, passkeys,
+// dashboard) silently vanished — the loader logs one line and carries
+// on. A blocking `await import('@stacksjs/auth')` here deadlocks instead
+// (auth's evaluation can be waiting on the same route-loading pass that
+// is importing this file), so the wiring is fire-and-forget: routes
+// register immediately, and the RBAC store lands the moment auth's
+// evaluation completes — before any real request needs it.
+import('@stacksjs/auth')
+  .then(({ createBqbRbacStore, setRbacStore }) => setRbacStore(createBqbRbacStore()))
+  .catch(err => console.error('[bootstrap] RBAC store wiring failed:', err))
 
 // Global maintenance / coming-soon gate. Registered first so the
 // `buddy down` / `buddy coming-soon` (and their env-var equivalents)
@@ -56,6 +71,10 @@ setRbacStore(createBqbRbacStore())
 // return `undefined`, bun-router's chain treats that as a short-circuit
 // to an empty 200, and every route returns `200 OK Content-Length: 0`.
 route.use(MaintenanceMiddleware.toRouterHandler() as any)
+
+// Locale cookie + STX-style path redirect (`/locale/en` → `/en/…`).
+// Overridable by registering the same path in app routes first.
+await route.register(frameworkPath('defaults/routes/core.ts'))
 
 // Feature-gated route registration. The dashboard.ts file currently bundles
 // ~687 lines covering auth, password reset, email subscribe, storefront
@@ -81,4 +100,15 @@ if (feature('dashboard')) {
   // JSON endpoints for the dev dashboard UI. Kept separate from the view
   // routes above so the data layer is one obvious file to grep.
   await route.register(frameworkPath('defaults/routes/dashboard-api.ts'))
+}
+
+// Email webhook + unsubscribe routes (stacksjs/stacks#1881, #1880).
+// Always mounted when the `email` feature is on — the underlying
+// handlers self-disable when their provider credentials aren't
+// configured (they 401 rather than processing). Apps that need a
+// non-default mount path register their own routes in `routes/api.ts`
+// and the framework's mount silently no-ops since user routes
+// register first.
+if (feature('email')) {
+  await route.register(frameworkPath('defaults/routes/email.ts'))
 }

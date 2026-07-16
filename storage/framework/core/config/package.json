@@ -1,7 +1,8 @@
 {
   "name": "@stacksjs/config",
   "type": "module",
-  "version": "0.70.45",
+  "sideEffects": false,
+  "version": "0.70.87",
   "description": "The Stacks config helper methods.",
   "author": "Chris Breuer",
   "contributors": [
@@ -27,11 +28,16 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "bun": "./src/index.ts",
-      "import": "./dist/index.js"
+      "development": "./src/index.ts",
+      "bun": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./*": {
-      "bun": "./*"
+      "development": "./src/*",
+      "bun": "./dist/*",
+      "import": "./dist/*",
+      "default": "./dist/*"
     }
   },
   "files": [
@@ -44,11 +50,11 @@
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "ts-pantry": "^0.8.16"
+    "ts-pantry": "^0.10.11"
   },
   "devDependencies": {
     "@stacksjs/alias": "workspace:*",
-    "better-dx": "^0.2.12",
+    "better-dx": "^0.2.16",
     "@stacksjs/types": "workspace:*",
     "bunfig": "^0.15.11"
   }

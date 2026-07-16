@@ -12,7 +12,29 @@
 // consumes `--watch` so `args` ends up empty in that subprocess, which used to
 // trip the `args.length === 0` short-circuit and silently disable auto-imports.
 const args = process.argv.slice(2)
-const fastCommands = ['dev', 'build', 'test', 'lint', '--version', '-v', 'version', '--help', '-h', 'help']
+const fastCommands = [
+  'dev',
+  'build',
+  'test',
+  'lint',
+  '--version',
+  '-v',
+  'version',
+  '--help',
+  '-h',
+  'help',
+  // Database / codegen — must not pull the full auto-import graph (router,
+  // orm models, …) before bun-query-builder can diff schemas. A broken
+  // `@stacksjs/bun-router` install used to make `generate:migrations` exit 1
+  // with no output because the preloader died while loading `@stacksjs/router`.
+  'migrate',
+  'fresh',
+  'seed',
+  'generate',
+  'make',
+  'key:generate',
+  'scaffold:crud',
+]
 const isRepl = !process.argv[1]
 const skipPreloader = isRepl || (args.length > 0 && fastCommands.some(cmd => args[0] === cmd || args[0].startsWith(`${cmd}:`)))
 
@@ -22,11 +44,20 @@ if (!skipPreloader) {
   const productionCommands = ['cloud:remove', 'cloud:rm', 'cloud:destroy', 'cloud:cleanup', 'cloud:clean-up', 'undeploy']
   const isProductionCommand = productionCommands.includes(args[0])
 
-  // Handle deploy command which can have an optional env argument: `deploy [env]`
+  // Handle deploy command: the env may be positional (`deploy staging`) or a
+  // flag (`deploy --staging`). CI deploys use the flag form, so detecting only
+  // the positional arg left APP_ENV wrong and loaded the wrong .env file.
   const isDeployCommand = args[0] === 'deploy'
   if (isDeployCommand) {
-    // Check if second arg is an environment (not a flag starting with -)
-    const deployEnv = args[1] && !args[1].startsWith('-') ? args[1] : 'production'
+    const flagEnv = args.includes('--production') || args.includes('--prod')
+      ? 'production'
+      : args.includes('--staging')
+        ? 'staging'
+        : args.includes('--development') || args.includes('--dev')
+          ? 'development'
+          : undefined
+    const positionalEnv = args[1] && !args[1].startsWith('-') ? args[1] : undefined
+    const deployEnv = flagEnv ?? positionalEnv ?? 'production'
     process.env.APP_ENV = deployEnv
     process.env.NODE_ENV = deployEnv
   }
@@ -40,7 +71,21 @@ if (!skipPreloader) {
 
   // Auto-load .env files based on environment
   // Set quiet: true to prevent duplicate logging across multiple processes
-  autoLoadEnv({ quiet: true })
+  //
+  // keysFile MUST be passed here: autoLoadEnv only resolves a decryption
+  // private key from a keys FILE when explicitly told which one to read —
+  // without it, an encrypted .env.production (DOTENV_PUBLIC_KEY_PRODUCTION
+  // + `encrypted:...` values) loads with every encrypted value left as raw
+  // ciphertext in process.env, silently breaking anything that reads
+  // process.env.SOME_SECRET directly (e.g. deploy-time credentials like
+  // HCLOUD_TOKEN/PORKBUN_API_KEY) with no error — it just looks like a
+  // bogus/expired credential downstream.
+  // Pass the resolved env so autoLoadEnv reads `.env.<env>` with the matching
+  // `DOTENV_PRIVATE_KEY_<ENV>` (it defaults to `development` otherwise), and
+  // overload so this decrypted pass overrides the still-encrypted values the
+  // earlier `@stacksjs/env/plugin.js` bunfig preload seeds into process.env
+  // (loadEnv won't overwrite already-set vars without it).
+  autoLoadEnv({ quiet: true, keysFile: '.env.keys', env: process.env.APP_ENV, overload: true })
 }
 
 // stx template engine plugin
@@ -257,7 +302,12 @@ export async function loadAutoImports() {
 // Skip for fast commands (dev, build, test, etc.) and CLI info commands.
 // `args[0]` may be undefined when running a script directly (e.g. dev subprocess);
 // guard so .includes() doesn't accidentally treat that as a CLI info command.
-const skipAutoImports = skipPreloader || (args.length > 0 && ['--version', '-v', 'version', '--help', '-h', 'help'].includes(args[0]))
+// `./buddy dev` server subprocesses set STACKS_DEV_SERVER=1. They load only
+// what they need themselves — the API injects globals via injectGlobalAutoImports
+// and reads the cached package-discovery manifest, while the frontend/docs
+// servers never touch models — so the preloader's eager ~800ms auto-import +
+// discoverPackages pass is redundant work on the critical boot path. Skip it.
+const skipAutoImports = skipPreloader || process.env.STACKS_DEV_SERVER === '1' || (args.length > 0 && ['--version', '-v', 'version', '--help', '-h', 'help'].includes(args[0]))
 if (!skipAutoImports) {
   await loadAutoImports()
 

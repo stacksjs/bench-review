@@ -6,8 +6,8 @@
  */
 
 import type { Result } from '@stacksjs/error-handling'
-import { existsSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { log as _log } from '@stacksjs/logging'
 
 // Defensive log wrapper to handle cases where log methods might not be initialized.
@@ -23,6 +23,7 @@ const log = {
 }
 import { err, handleError, ok } from '@stacksjs/error-handling'
 import { path } from '@stacksjs/path'
+import type { MigrationOperation } from '@stacksjs/query-builder'
 import {
   createQueryBuilder,
   executeMigration as qbExecuteMigration,
@@ -73,6 +74,12 @@ function getDriver(): string {
 function getDialect(): 'sqlite' | 'mysql' | 'postgres' {
   const driver = getDriver()
   if (driver === 'sqlite' || driver === 'mysql' || driver === 'postgres') return driver
+  // SingleStore is MySQL wire-compatible, so all of the internal migration
+  // plumbing that needs a concrete engine (connection ports, admin database,
+  // DROP TABLE) treats it as MySQL. DDL *generation* is different — it must
+  // use the real 'singlestore' dialect so bun-query-builder's SingleStore
+  // driver drops foreign keys (which SingleStore rejects). See getQbDialect.
+  if (driver === 'singlestore') return 'mysql'
   if (driver === 'dynamodb') {
     throw new Error(
       '[database] DB_CONNECTION=dynamodb is not compatible with the SQL migration runner. '
@@ -83,6 +90,16 @@ function getDialect(): 'sqlite' | 'mysql' | 'postgres' {
   throw new Error(
     `[database] Unknown DB_CONNECTION "${driver}". Allowed values: sqlite, mysql, postgres, dynamodb.`,
   )
+}
+
+/**
+ * The dialect handed to bun-query-builder's DDL generator. Identical to
+ * `getDialect()` except SingleStore is preserved (not collapsed to MySQL) so
+ * bqb selects its SingleStore driver — which drops foreign-key constraints
+ * (unsupported by SingleStore) and can emit distributed-table clauses.
+ */
+function getQbDialect(): 'sqlite' | 'mysql' | 'singlestore' | 'postgres' {
+  return getDriver() === 'singlestore' ? 'singlestore' : getDialect()
 }
 
 /**
@@ -127,6 +144,8 @@ function prepareMigrationModelsDir(): { modelsDir: string, skip: boolean } {
  *
  * SQLite does not support:
  * - ALTER TABLE ADD CONSTRAINT (foreign keys must be defined at table creation)
+ * - CREATE TYPE ... AS ENUM (SQLite has no user-defined types; enum columns
+ *   are plain TEXT, with the allowed values enforced at the validation layer)
  *
  * Note: CREATE UNIQUE INDEX files are deliberately NOT skipped — the SQLite
  * dialect driver never renders inline UNIQUE in CREATE TABLE, so the
@@ -181,6 +200,7 @@ export function preprocessSqliteMigrations(): void {
   const replayMigrations: string[] = []
 
   const addConstraintPattern = /^\s*ALTER\s+TABLE\s+.+\s+ADD\s+CONSTRAINT\s+/i
+  const createTypePattern = /^\s*CREATE\s+TYPE\s+/i
   // Match CREATE UNIQUE INDEX, capturing the index name. These files MUST run
   // on SQLite — the dialect driver never renders inline UNIQUE in CREATE
   // TABLE, so this index is the only uniqueness enforcement (#1952).
@@ -259,6 +279,20 @@ export function preprocessSqliteMigrations(): void {
     const allAddConstraint = statements.every(s => addConstraintPattern.test(s))
     if (allAddConstraint) {
       skipMigration(file, 'SQLite does not support ALTER TABLE ADD CONSTRAINT')
+      continue
+    }
+
+    // Skip files that only contain CREATE TYPE ... AS ENUM (Postgres enum
+    // types). SQLite has no user-defined types — enum columns are plain
+    // TEXT, with the allowed values enforced at the model/validation layer
+    // — so `buddy generate:migrations`' enum-type "auto-misc" files are
+    // dead on SQLite and their `CREATE TYPE` syntax otherwise dies a fresh
+    // migrate with `near "TYPE": syntax error`. Same skip-and-keep policy
+    // as ADD CONSTRAINT above: the file is valid on MySQL/Postgres, so
+    // leave it on disk and just mark it executed for SQLite. (#1916)
+    const allCreateType = statements.every(s => createTypePattern.test(s))
+    if (allCreateType) {
+      skipMigration(file, 'SQLite does not support CREATE TYPE (enum types)')
       continue
     }
 
@@ -359,22 +393,30 @@ export function preprocessSqliteMigrations(): void {
   if (droppedMigrations.length > 0 || replayMigrations.length > 0) {
     try {
       const dbPath = join(process.cwd(), dbConfig.connections.sqlite.database || 'stacks.db')
-      if (existsSync(dbPath)) {
-        const { Database } = require('bun:sqlite')
-        const writeDb = new Database(dbPath)
-        try {
-          writeDb.exec(`CREATE TABLE IF NOT EXISTS migrations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            migration TEXT NOT NULL UNIQUE,
-            executed_at DATETIME DEFAULT CURRENT_TIMESTAMP
-          )`)
-          const insert = writeDb.prepare('INSERT OR IGNORE INTO migrations (migration) VALUES (?)')
-          for (const migration of droppedMigrations) insert.run(migration)
-          const unrecord = writeDb.prepare('DELETE FROM migrations WHERE migration = ?')
-          for (const migration of replayMigrations) unrecord.run(migration)
-        }
-        finally { writeDb.close() }
+      // Record the skips even when the DB file does NOT exist yet. On a
+      // fresh SQLite install ensureDatabaseExists() is a no-op (SQLite
+      // auto-creates on open), so the file is absent here — and if we
+      // bailed on that, the skip records would never land and the runner
+      // would then execute the very ALTER TABLE ADD CONSTRAINT / CREATE
+      // TYPE files we just skipped, dying with a "near CONSTRAINT/TYPE"
+      // syntax error on the first fresh migrate. `new Database()` creates
+      // the file; qbExecuteMigration opens the same one next and honors
+      // these records. (stacksjs/stacks#1916 fresh-install gap.)
+      mkdirSync(dirname(dbPath), { recursive: true })
+      const { Database } = require('bun:sqlite')
+      const writeDb = new Database(dbPath)
+      try {
+        writeDb.exec(`CREATE TABLE IF NOT EXISTS migrations (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          migration TEXT NOT NULL UNIQUE,
+          executed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`)
+        const insert = writeDb.prepare('INSERT OR IGNORE INTO migrations (migration) VALUES (?)')
+        for (const migration of droppedMigrations) insert.run(migration)
+        const unrecord = writeDb.prepare('DELETE FROM migrations WHERE migration = ?')
+        for (const migration of replayMigrations) unrecord.run(migration)
       }
+      finally { writeDb.close() }
     }
     catch (e) {
       log.debug(`[migration] Could not record dropped migrations as executed: ${e}`)
@@ -543,7 +585,7 @@ async function countAppliedMigrations(): Promise<number> {
   try {
     const row = await (db as any)
       .selectFrom('migrations')
-      .select((eb: any) => eb.fn.count<number>('id').as('n'))
+      .select((eb: any) => eb.fn.count('id').as('n'))
       .executeTakeFirst()
     if (!row) return 0
     const n = Number(row.n ?? row.N ?? 0)
@@ -801,7 +843,53 @@ async function dropFrameworkTables(dialect: 'sqlite' | 'mysql' | 'postgres'): Pr
  * the runner never sees it, so model edits silently no-op'd — defeating
  * the "models are the source of truth" promise.
  */
-export async function generateMigrations(): Promise<Result<string, Error>> {
+export interface GenerateMigrationsOptions {
+  /**
+   * Emit data-preserving `RENAME COLUMN` for unambiguous detected renames
+   * (default true). False forces literal DROP + ADD. Falls back to the
+   * `STACKS_MIGRATE_NO_RENAME` env flag (set by the `buddy migrate` command
+   * across the action subprocess boundary).
+   */
+  applyRenames?: boolean
+  /**
+   * Diff against the live database instead of the snapshot. Falls back to the
+   * `STACKS_MIGRATE_FROM_DB` env flag.
+   */
+  fromDb?: boolean
+}
+
+function resolveGenerateOptions(options: GenerateMigrationsOptions): { applyRenames?: boolean, fromDb?: boolean } {
+  const applyRenames = options.applyRenames ?? (process.env.STACKS_MIGRATE_NO_RENAME === '1' ? false : undefined)
+  const fromDb = options.fromDb ?? (process.env.STACKS_MIGRATE_FROM_DB === '1' ? true : undefined)
+  return { applyRenames, fromDb }
+}
+
+/**
+ * Preview the pending migration as a list of structured operations WITHOUT
+ * writing any files or advancing the snapshot. The `buddy migrate` command
+ * uses this (in the interactive parent process) to gate destructive changes
+ * behind confirmation before spawning the non-interactive migrate action.
+ */
+export async function previewPendingMigrations(options: GenerateMigrationsOptions = {}): Promise<MigrationOperation[]> {
+  try {
+    configureQueryBuilder()
+    const dialect = getDialect()
+    const { modelsDir, skip } = prepareMigrationModelsDir()
+    if (skip)
+      return []
+    const { applyRenames, fromDb } = resolveGenerateOptions(options)
+    const result = await qbGenerateMigration(modelsDir, { dialect: getQbDialect(), dryRun: true, applyRenames, fromDb })
+    return result.operations ?? []
+  }
+  catch (error) {
+    // A preview must never block the migrate flow on its own failure — the
+    // real generate (with proper error handling) runs right after.
+    log.debug(`[migration] preview failed: ${error instanceof Error ? error.message : String(error)}`)
+    return []
+  }
+}
+
+export async function generateMigrations(options: GenerateMigrationsOptions = {}): Promise<Result<string, Error>> {
   try {
     // Step-progress at debug — buddy's intro/outro carries the user-
     // visible signal. On a no-op generate we want zero lines between
@@ -819,8 +907,18 @@ export async function generateMigrations(): Promise<Result<string, Error>> {
       return ok('Migrations generated')
     }
 
+    const { applyRenames, fromDb } = resolveGenerateOptions(options)
     log.debug(`[migration] Generating migrations for dialect: ${dialect}, models: ${modelsDir}`)
-    const result = await qbGenerateMigration(modelsDir, { dialect })
+    // dryRun: true — bun-query-builder's own file writer numbers migrations
+    // from its own internal counter (1, 2, 3, ...), unaware of any already-
+    // committed migration files. On a project with existing migrations that
+    // collided with committed files (e.g. a fresh 0000000001-*.sql next to
+    // the real 0000000001-*.sql), and `persistGeneratedMigrations` below —
+    // which numbers correctly, continuing from the highest existing file —
+    // then saw its own content already on disk and silently skipped writing
+    // anything. Keeping the qb call dry-run makes `persistGeneratedMigrations`
+    // the single place that ever writes a migration file.
+    const result = await qbGenerateMigration(modelsDir, { dialect: getQbDialect(), dryRun: true, applyRenames, fromDb })
 
     if (result.hasChanges) {
       const written = persistGeneratedMigrations(result.sqlStatements ?? [])
@@ -959,7 +1057,10 @@ export async function generateMigrations2(): Promise<Result<string, Error>> {
       return ok('Migrations generated')
     }
 
-    await qbGenerateMigration(modelsDir, { dialect, full: true })
+    // dryRun: true — see the comment on the equivalent call in
+    // generateMigrations() above; bun-query-builder's own file writer
+    // doesn't know about already-committed migration numbering.
+    await qbGenerateMigration(modelsDir, { dialect: getQbDialect(), full: true, dryRun: true })
 
     log.success('Migrations generated')
     return ok('Migrations generated')

@@ -1,7 +1,8 @@
 {
   "name": "@stacksjs/actions",
   "type": "module",
-  "version": "0.70.45",
+  "sideEffects": false,
+  "version": "0.70.87",
   "description": "The Stacks actions.",
   "author": "Chris Breuer",
   "contributors": [
@@ -29,17 +30,24 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "bun": "./src/index.ts",
-      "import": "./dist/index.js"
+      "development": "./src/index.ts",
+      "bun": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./run-action": {
       "types": "./dist/run-action.d.ts",
-      "bun": "./src/run-action.ts",
-      "import": "./dist/run-action.js"
+      "development": "./src/run-action.ts",
+      "bun": "./dist/run-action.js",
+      "import": "./dist/run-action.js",
+      "default": "./dist/run-action.js"
     },
     "./*": {
-      "bun": "./src/*",
-      "import": "./dist/*"
+      "types": "./dist/*.d.ts",
+      "development": "./src/*.ts",
+      "bun": "./dist/*.js",
+      "import": "./dist/*.js",
+      "default": "./dist/*.js"
     }
   },
   "module": "dist/index.js",
@@ -54,8 +62,10 @@
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@stacksjs/bunpress": "^0.1.5",
-    "@stacksjs/ts-cloud": "^0.7.10",
+    "@stacksjs/bumpx": "^0.2.6",
+    "@stacksjs/bunpress": "^0.1.12",
+    "@stacksjs/logsmith": "^0.2.3",
+    "@stacksjs/ts-cloud": "^0.7.17",
     "@stacksjs/ts-md": "^0.1.1"
   },
   "devDependencies": {
@@ -64,7 +74,7 @@
     "@stacksjs/config": "workspace:*",
     "@stacksjs/database": "workspace:*",
     "@stacksjs/tlsx": "^0.13.2",
-    "better-dx": "^0.2.12",
+    "better-dx": "^0.2.16",
     "@stacksjs/dns": "workspace:*",
     "@stacksjs/enums": "workspace:*",
     "@stacksjs/env": "workspace:*",
@@ -76,5 +86,13 @@
     "@stacksjs/strings": "workspace:*",
     "@stacksjs/utils": "workspace:*",
     "@stacksjs/validation": "workspace:*"
+  },
+  "peerDependencies": {
+    "pickier": "^0.1.28"
+  },
+  "peerDependenciesMeta": {
+    "pickier": {
+      "optional": true
+    }
   }
 }

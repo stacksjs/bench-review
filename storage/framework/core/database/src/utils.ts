@@ -5,12 +5,8 @@
  * configured using the stacks database config.
  */
 
-import type { DatabaseSchema } from '@stacksjs/query-builder'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { createQueryBuilder, setConfig } from '@stacksjs/query-builder'
-
-// Permissive schema type that accepts any table name with any columns
-// This allows the query builder to work before model types are generated
-type AnySchema = DatabaseSchema<any> & Record<string, { columns: Record<string, any>, primaryKey: string }>
 
 // Use default values to avoid circular dependencies initially
 // These can be overridden later once config is fully loaded
@@ -32,6 +28,7 @@ interface DbConfig {
   connections: {
     sqlite: DbConnectionConfig
     mysql: DbConnectionConfig
+    singlestore: DbConnectionConfig
     postgres: DbConnectionConfig
   }
 }
@@ -46,8 +43,42 @@ let dbConfig: DbConfig = {
   connections: {
     sqlite: { database: sqliteDefaults.database, prefix: '' },
     mysql: { name: mysqlDefaults.database, host: mysqlDefaults.host, username: mysqlDefaults.username, password: mysqlDefaults.password, port: mysqlDefaults.port, prefix: '' },
+    singlestore: { name: mysqlDefaults.database, host: mysqlDefaults.host, username: mysqlDefaults.username, password: mysqlDefaults.password, port: mysqlDefaults.port, prefix: '' },
     postgres: { name: postgresDefaults.database, host: postgresDefaults.host, username: postgresDefaults.username, password: postgresDefaults.password, port: postgresDefaults.port, prefix: '' },
   },
+}
+
+// Test-only config mutex (stacksjs/stacks#1862 follow-up) ------------------
+//
+// `initializeDbConfig` mutates process-wide state (`dbConfig`, `dbDriver`,
+// `appEnv`, and the cached `_dbInstance` below). Bun's test runner evaluates
+// multiple test files' top-level code — including their `beforeAll`/`it`
+// callbacks — concurrently in one process, so two files that each want
+// their own isolated sqlite database and both call `initializeDbConfig()`
+// can interleave: file B's call clobbers file A's config (and nulls the
+// shared `_dbInstance`) while file A's own hooks/tests are still mid-flight,
+// silently pointing file A's queries at file B's database instead.
+//
+// There's no per-file isolation of this state today — that would need
+// AsyncLocalStorage-scoped config threaded through bun:test's hook
+// scheduling, which bun:test doesn't expose a seam for — so instead, any
+// test file that calls `initializeDbConfig` with its own database should
+// hold this lock for its *entire* lifetime: acquire first thing in
+// `beforeAll`, release last thing in `afterAll` (wrap the release in a
+// `finally` so a thrown cleanup error can't leave the lock stuck and hang
+// every subsequent file). That serializes just the subset of files that
+// mutate this shared config against each other, while every other test
+// file keeps running fully concurrently.
+let dbConfigLockTail: Promise<void> = Promise.resolve()
+
+export function acquireDbConfigLock(): Promise<() => void> {
+  let release: () => void = () => {}
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const acquired = dbConfigLockTail.then(() => release)
+  dbConfigLockTail = dbConfigLockTail.then(() => held)
+  return acquired
 }
 
 // Function to initialize the config when it's available
@@ -63,6 +94,14 @@ export function initializeDbConfig(config: any): void {
 
   // Update bun-query-builder config
   updateQueryBuilderConfig()
+
+  // Drop the cached query-builder instance so the next `db` access renders
+  // SQL for the overridden dialect. The connection itself is rebuilt by
+  // bun-query-builder's signature check, but the cached instance keeps
+  // rendering with the dialect captured at creation — a config override
+  // from mysql back to sqlite otherwise executes `NOW()`-style SQL against
+  // the sqlite connection (cross-file test interference).
+  _dbInstance = null
 }
 
 // Simple functions with defensive defaults
@@ -81,10 +120,13 @@ function getDatabaseConfig(): DbConfig {
 /**
  * Get the dialect type for bun-query-builder
  */
-function getDialect(): 'sqlite' | 'mysql' | 'postgres' {
+function getDialect(): 'sqlite' | 'mysql' | 'singlestore' | 'postgres' {
   const driver = getDriver()
   if (driver === 'sqlite') return 'sqlite'
   if (driver === 'mysql') return 'mysql'
+  // Pass 'singlestore' through to bun-query-builder (>=0.1.42), which shares
+  // MySQL's runtime DML behavior for the dialect via isMysqlLike.
+  if (driver === 'singlestore') return 'singlestore'
   if (driver === 'postgres') return 'postgres'
   return 'sqlite' // default fallback
 }
@@ -114,6 +156,17 @@ function getDbConfig(): { database: string, username?: string, password?: string
     }
   }
 
+  // SingleStore reuses the MySQL connection shape (wire protocol + port 3306).
+  if (driver === 'singlestore') {
+    return {
+      database: database.connections?.singlestore?.name || 'stacks',
+      host: database.connections?.singlestore?.host ?? '127.0.0.1',
+      username: database.connections?.singlestore?.username ?? 'root',
+      password: database.connections?.singlestore?.password ?? '',
+      port: database.connections?.singlestore?.port ?? 3306,
+    }
+  }
+
   if (driver === 'postgres') {
     const dbName = database.connections?.postgres?.name ?? 'stacks'
     const finalDbName = env === 'testing' ? `${dbName}_testing` : dbName
@@ -138,7 +191,7 @@ function updateQueryBuilderConfig(): void {
   const dbConfigForQb = getDbConfig()
 
   setConfig({
-    dialect,
+    dialect: dialect as Parameters<typeof setConfig>[0]['dialect'],
     database: dbConfigForQb as any,
     verbose: getEnv() !== 'production',
     timestamps: {
@@ -147,7 +200,11 @@ function updateQueryBuilderConfig(): void {
       defaultOrderColumn: 'created_at',
     },
     softDeletes: {
-      enabled: false,
+      // Boot-time default; mirrors config/query-builder.ts. Enabled so the
+      // ORM read path filters out `deleted_at` rows by default (per-model
+      // behavior still gated by the `useSoftDeletes` trait). See the config
+      // file for the full rationale.
+      enabled: true,
       column: 'deleted_at',
       defaultFilter: true,
     },
@@ -171,7 +228,18 @@ function ensureConfigLoaded(): Promise<void> {
   if (!_configInitPromise) {
     _configInitPromise = (async () => {
       try {
-        const { config } = await import('@stacksjs/config')
+        const { config, overridesReady } = await import('@stacksjs/config')
+        // `config.database` is a Proxy read (see `readMerged()` in
+        // @stacksjs/config) that falls back to framework defaults until the
+        // project's own `config/database.ts` has actually finished loading.
+        // `overridesReady` is the signal for that — awaiting it here closes
+        // a race where a fast one-shot script (e.g. a `bun -e` script or a
+        // CLI command issuing its first query very early in boot) reads the
+        // proxy before the project override lands, locks in the framework's
+        // default connection settings via `initializeDbConfig`, and never
+        // retries since `_dbInstance` is only invalidated from inside
+        // `initializeDbConfig` itself.
+        await overridesReady
         if (config) {
           initializeDbConfig(config)
           // Reset instance so next access uses updated config
@@ -191,10 +259,73 @@ export async function ensureDatabaseConfigLoaded(): Promise<void> {
   await ensureConfigLoaded()
 }
 
+// SQLite bootstrap pragmas (stacksjs/stacks#1951) now live in
+// @stacksjs/query-builder — the one chokepoint every framework
+// query-builder instance is created through — so EVERY fresh sqlite
+// connection gets `foreign_keys = ON`, including builders created outside
+// this module (e.g. the ORM auto-CRUD routes). Re-exported here for
+// backwards compatibility with existing imports.
+export { applySqlitePragmas, SQLITE_BOOTSTRAP_PRAGMAS } from '@stacksjs/query-builder'
+
+/**
+ * SQLite transaction serialization (stacksjs/stacks#1953).
+ *
+ * Bun.SQL's sqlite adapter is a single shared connection and
+ * bun-query-builder tracks transaction depth per-connection, so two
+ * CONCURRENT `db.transaction()` calls interleave: the second BEGIN is
+ * issued as a savepoint inside the first caller's transaction (or fails
+ * outright with "cannot start a transaction within a transaction"), and
+ * the first COMMIT destroys the second caller's savepoint ("no such
+ * savepoint: qb_sp_N"). Either way the loser 500s on perfectly legal
+ * work — e.g. two near-simultaneous registrations for different emails.
+ * Queue transactions through a promise-chain mutex so they run one at a
+ * time instead of colliding. MySQL/Postgres pool connections, so they
+ * are unaffected; the patch is only applied for the sqlite dialect.
+ *
+ * Same-async-context NESTING is exempt from the queue: a nested
+ * `db.transaction()` inside an open transaction's callback is the
+ * sequential savepoint case bun-query-builder handles correctly, and
+ * queueing it would deadlock — the inner call would wait for the outer
+ * transaction (its own caller) to finish.
+ */
+const sqliteTxOwner = new AsyncLocalStorage<true>()
+let sqliteTxTail: Promise<void> = Promise.resolve()
+
+function serializeSqliteTransaction<T>(run: () => Promise<T>): Promise<T> {
+  if (sqliteTxOwner.getStore())
+    return run()
+
+  const result = sqliteTxTail.then(() => sqliteTxOwner.run(true, run))
+  // Keep the chain alive after a rollback — the rejection still surfaces
+  // to this transaction's caller via `result`.
+  sqliteTxTail = result.then(() => undefined, () => undefined)
+  return result
+}
+
+function applySqliteTransactionSerialization(instance: RawQueryBuilder): void {
+  // Patch the instance's own property (not the proxy) so internal callers
+  // like `transactional()` — which invokes `this.transaction(...)` — are
+  // serialized too.
+  const original = (instance.transaction as (...args: any[]) => Promise<any>).bind(instance)
+  ;(instance as any).transaction = (...args: any[]) =>
+    serializeSqliteTransaction(() => original(...args))
+}
+
 function getDb(): ReturnType<typeof createQueryBuilder> {
   if (!_dbInstance) {
     updateQueryBuilderConfig()
+    // stacksjs/stacks#1951 — the wrapped createQueryBuilder applies the
+    // sqlite bootstrap pragmas to the freshly captured connection, so every
+    // instance recreation (config reload nulls `_dbInstance`, and a config
+    // change can swap bun-query-builder's signature-keyed singleton) is
+    // re-bootstrapped without an explicit call here.
     _dbInstance = createQueryBuilder()
+    // stacksjs/stacks#1953 — re-applied on every instance recreation
+    // (config reload nulls `_dbInstance`). Pragmas themselves are applied
+    // inside the wrapped createQueryBuilder (#1951), so only the
+    // transaction serialization patch is needed here.
+    if (getDialect() === 'sqlite')
+      applySqliteTransactionSerialization(_dbInstance)
   }
   return _dbInstance
 }
@@ -221,7 +352,8 @@ type UnsafeReturn = Promise<any> & { execute: () => Promise<any> }
  * with no schema). Tests cover the runtime semantics.
  */
 export interface FluentChain {
-  where: (...args: any[]) => FluentChain
+  where(callback: (eb: import('./types').StacksExpressionBuilder) => unknown): FluentChain
+  where(...args: any[]): FluentChain
   whereNull: (...args: any[]) => FluentChain
   whereNotNull: (...args: any[]) => FluentChain
   whereIn: (...args: any[]) => FluentChain
@@ -249,7 +381,8 @@ export interface FluentChain {
   orderBy: (...args: any[]) => FluentChain
   limit: (...args: any[]) => FluentChain
   offset: (...args: any[]) => FluentChain
-  select: (...args: any[]) => FluentChain
+  select(selection: ((eb: import('./types').StacksExpressionBuilder) => unknown) | ReadonlyArray<string | ((eb: import('./types').StacksExpressionBuilder) => unknown) | unknown>): FluentChain
+  select(...args: any[]): FluentChain
   selectAll: () => FluentChain
   selectAllRelations: () => FluentChain
   selectRaw: (...args: any[]) => FluentChain
@@ -285,6 +418,7 @@ export interface FluentChain {
   max: (...args: any[]) => Promise<any>
   exists: () => Promise<boolean>
   doesntExist: () => Promise<boolean>
+  $call: (callback: (query: FluentChain) => FluentChain) => FluentChain
   // Allow indexing for dynamic where${Column} helpers that bun-query-builder
   // generates at the type level via mapped templates.
   [key: string]: any
@@ -370,6 +504,7 @@ export interface DatabaseSchema {}
 export type TableName = (keyof DatabaseSchema & string) | (string & {})
 
 interface Db extends Pick<Required<RawQueryBuilder>, GenericPassthroughKeys> {
+  fn: import('./types').ExpressionFunctions
   selectFrom: (table: TableName) => FluentChain
   insertInto: (table: TableName) => FluentChain
   updateTable: (table: TableName) => FluentChain

@@ -1,5 +1,5 @@
 
-type UserModel = InstanceType<typeof User>
+type UserModel = NonNullable<Awaited<ReturnType<typeof User.find>>>
 import type {
   AuthCredentials,
   AuthToken,
@@ -60,7 +60,7 @@ function authStateOrNull(): RequestAuthState | null {
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
-import { createToken as createRawToken, parseScopes } from './tokens'
+import { createToken as createRawToken, getPasswordChangedAt, isIssuedBeforePasswordChange, parseScopes } from './tokens'
 
 export class Auth {
   // Per-request state lives on the request object via `authStateOrNull()`
@@ -281,7 +281,7 @@ export class Auth {
     // The per-IP throttle middleware on /api/auth/login is the first
     // line; this is the second (in case the attacker rotates IPs but
     // keeps targeting one inbox).
-    const isRateLimited = RateLimiter.isRateLimited(email)
+    const isRateLimited = await RateLimiter.isRateLimited(email)
 
     const user = await User.where('email', '=', email).first()
     const authPass = credentials[password] || ''
@@ -302,13 +302,13 @@ export class Auth {
       return false
 
     if (hashCheck && user) {
-      RateLimiter.resetAttempts(email)
+      await RateLimiter.resetAttempts(email)
       const state = authStateOrNull()
       if (state) state.authUser = user
       return true
     }
 
-    RateLimiter.recordFailedAttempt(email)
+    await RateLimiter.recordFailedAttempt(email)
     return false
   }
 
@@ -615,6 +615,12 @@ export class Auth {
     if (accessToken.revoked)
       return false
 
+    // Reject tokens issued before the user last changed their password
+    // (stacksjs/stacks#1957). Binds validity to the durable users row,
+    // so a stolen token survives neither a reset nor the sweep gap.
+    if (isIssuedBeforePasswordChange(accessToken.created_at, await getPasswordChangedAt(accessToken.user_id)))
+      return false
+
     // Mark the token as freshly-used. Used to be a rotation path here
     // (`if (hoursSinceLastUse >= 24h) await this.rotateToken(token)`)
     // but the rotated bearer was **discarded** by the caller —
@@ -671,7 +677,22 @@ export class Auth {
     if (!accessToken?.user_id)
       return undefined
 
-    return await User.find(accessToken.user_id as number)
+    const user = await User.find(accessToken.user_id as number)
+
+    // Reject tokens issued before the user last changed their password
+    // (stacksjs/stacks#1957). The previous code read
+    // `(user as any).password_changed_at` off the ORM instance, but that
+    // column is undeclared (added by a defensive ALTER in auth-tables, not
+    // part of the model schema), so the ORM never exposes it as a bare
+    // property — the read was ALWAYS undefined and this backstop was inert
+    // on the primary `authMiddleware` / `Auth.user()` path while the
+    // `validateToken` path (query-backed) worked. Query the durable users
+    // row exactly like `validateToken`; getPasswordChangedAt degrades to
+    // legacy-allow on a missing column/table. See stacksjs/stacks#1985.
+    if (isIssuedBeforePasswordChange(accessToken.created_at, await getPasswordChangedAt(accessToken.user_id)))
+      return undefined
+
+    return user
   }
 
   /**

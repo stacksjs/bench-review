@@ -9,6 +9,7 @@ interface EnumObject {
 export const envEnum: EnumObject = {
   APP_ENV: ['local', 'dev', 'development', 'staging', 'prod', 'production'],
   DB_CONNECTION: ['mysql', 'sqlite', 'postgres', 'dynamodb'],
+  DB_MIGRATE_FRESH: ['allow', 'confirm', 'disabled'],
   // MAIL_MAILER lists the drivers `@stacksjs/email` actually ships
   // (`registerDefaultDrivers()` in src/email.ts). `postmark`,
   // `nodemailer`, and `sendmail` previously appeared here but had no
@@ -92,6 +93,8 @@ export interface StacksEnv {
   DB_QUERY_LOGGING_ANALYZE_ALL: boolean | undefined
   DB_QUERY_LOGGING_EXPLAIN_PLAN: boolean | undefined
   DB_QUERY_LOGGING_SUGGESTIONS: boolean | undefined
+  DB_MIGRATE_CONFIRM: boolean | undefined
+  DB_MIGRATE_FRESH: 'allow' | 'confirm' | 'disabled' | undefined
   DATABASE_URL: string | undefined
 
   // AWS
@@ -182,6 +185,7 @@ export interface StacksEnv {
   AUTH_USERNAME_FIELD: string | undefined
   AUTH_PASSWORD_FIELD: string | undefined
   AUTH_TOKEN_EXPIRY: number | undefined
+  AUTH_REFRESH_TOKEN_EXPIRY: number | undefined
   AUTH_TOKEN_ROTATION: number | undefined
   AUTH_PASSWORD_RESET_EXPIRE: number | undefined
   AUTH_PASSWORD_RESET_THROTTLE: number | undefined

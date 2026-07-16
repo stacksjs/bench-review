@@ -1,7 +1,8 @@
 {
   "name": "@stacksjs/alias",
   "type": "module",
-  "version": "0.70.45",
+  "sideEffects": false,
+  "version": "0.70.87",
   "description": "The Stacks aliases.",
   "author": "Chris Breuer",
   "contributors": [
@@ -24,8 +25,10 @@
   ],
   "exports": {
     ".": {
-      "bun": "./src/index.ts",
-      "import": "./dist/index.js"
+      "development": "./src/index.ts",
+      "bun": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "module": "dist/index.js",
@@ -40,7 +43,7 @@
     "prepublishOnly": "bun run build"
   },
   "devDependencies": {
-    "better-dx": "^0.2.12",
+    "better-dx": "^0.2.16",
     "@stacksjs/path": "workspace:*"
   }
 }

@@ -143,6 +143,14 @@ export async function sendVerificationEmail(user: { id: number, email: string, n
       },
     })
 
+    // template() swallows missing-template and STX-render failures into
+    // empty strings instead of throwing (template.ts returns
+    // { html: '', text: '' }), which would mail a blank email with no
+    // verification link. Treat an empty render as failure so the
+    // plain-text fallback below actually fires (stacksjs/stacks#1944).
+    if (!html && !text)
+      throw new Error('email-verification template missing or rendered empty')
+
     await mail.send({
       to: user.email,
       subject: `Verify Your ${appName} Email Address`,
@@ -177,9 +185,12 @@ export async function verifyEmail(userId: number, token: string): Promise<EmailV
     return { success: false, message: 'No verification request found. Please request a new verification email.' }
   }
 
-  // Check expiration
+  // Check expiration. Fail closed: a missing/unparseable expires_at must be
+  // treated as expired, not "never expires" — `new Date() > InvalidDate` is
+  // false, which would have let a row with a null expires_at verify forever
+  // (the reset module already fails closed the same way). #1985.
   const expiresAt = new Date(record.expires_at as string)
-  if (new Date() > expiresAt) {
+  if (Number.isNaN(expiresAt.getTime()) || new Date() > expiresAt) {
     await db
       .deleteFrom('email_verifications')
       .where('user_id', '=', userId)
@@ -226,6 +237,12 @@ export async function resendVerificationEmail(user: { id: number, email: string,
   if (existing) {
     const createdAt = new Date(existing.created_at as string)
     const secondsSince = (Date.now() - createdAt.getTime()) / 1000
+    // Fail closed: an unparseable created_at yields NaN, and `NaN < 60` is
+    // false, which would have bypassed the resend cooldown entirely (email
+    // bombing). Treat NaN as "still cooling down". #1985.
+    if (Number.isNaN(secondsSince)) {
+      return { success: false, message: 'Please wait a moment before requesting another verification email.' }
+    }
     if (secondsSince < 60) {
       return { success: false, message: `Please wait ${Math.ceil(60 - secondsSince)} seconds before requesting another verification email.` }
     }

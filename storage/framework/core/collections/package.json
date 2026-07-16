@@ -1,7 +1,7 @@
 {
   "name": "@stacksjs/collections",
   "type": "module",
-  "version": "0.70.45",
+  "version": "0.70.87",
   "description": "The Stacks collections.",
   "author": "Chris Breuer",
   "contributors": [
@@ -30,12 +30,16 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "bun": "./src/index.ts",
-      "import": "./dist/index.js"
+      "development": "./src/index.ts",
+      "bun": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./*": {
-      "bun": "./src/*",
-      "import": "./dist/*"
+      "development": "./src/*",
+      "bun": "./dist/*",
+      "import": "./dist/*",
+      "default": "./dist/*"
     }
   },
   "module": "dist/index.js",
@@ -50,8 +54,10 @@
     "test": "bun test",
     "prepublishOnly": "bun run build"
   },
-  "devDependencies": {
-    "better-dx": "^0.2.12",
+  "dependencies": {
     "ts-collect": "^0.4.0"
+  },
+  "devDependencies": {
+    "better-dx": "^0.2.16"
   }
 }

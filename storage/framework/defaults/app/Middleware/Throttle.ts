@@ -41,7 +41,7 @@ export default new Middleware({
 
   async handle(request) {
     // Get throttle params from middleware params (e.g., '60,1' from 'throttle:60,1')
-    const params = (request as any)._middlewareParams?.throttle || '60,1'
+    const params = request._middlewareParams?.throttle || '60,1'
 
     // Get or create rate limiter for this pattern
     let limiter = limiterCache.get(params)
@@ -82,7 +82,11 @@ export default new Middleware({
           'X-RateLimit-Remaining': result.headers.get('X-RateLimit-Remaining') || '0',
           'X-RateLimit-Reset': result.headers.get('X-RateLimit-Reset') || '',
           'Retry-After': retryAfter,
-          'Access-Control-Allow-Origin': '*',
+          // CORS headers (if any) are applied by the router's post-response
+          // CORS wrapper using the configured policy — hardcoding
+          // `Access-Control-Allow-Origin: *` here leaked the rate-limit
+          // body cross-origin even when the configured policy was
+          // restrictive. See stacksjs/stacks#1859 R-3.
         },
       })
     }

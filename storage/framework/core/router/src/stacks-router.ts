@@ -15,11 +15,79 @@ import { Middleware } from './middleware'
 import './request-augmentation'
 import process from 'node:process'
 import { Buffer } from 'node:buffer'
+import { existsSync } from 'node:fs'
 import { timingSafeEqual } from 'node:crypto'
 import { log, report } from '@stacksjs/logging'
 import { path as p } from '@stacksjs/path'
 import { UploadedFile } from '@stacksjs/storage'
 import { applyRequestEnhancements, Router } from '@stacksjs/bun-router'
+
+// --- Split-router-instance detection (stacksjs/stacks#1975 / #1982) ---------
+// Two physically distinct @stacksjs/router modules can load in one process: an
+// app vendors storage/framework/core AND installs the published dist package,
+// and a tsconfig `paths` mapping (`@stacksjs/* -> ./*/src`) resolves core files
+// to ./router/src while root files (routes/, app/) resolve to node_modules
+// dist. Historically that split user routes onto one `route` instance while the
+// server served another's empty table — every route 404'd with NO error logged.
+//
+// That split is now HARMLESS: the `route` singleton (below) and the
+// request-context ALS (request-context.ts) are keyed on process-global Symbols,
+// so every loaded copy shares one route table and one request context. We still
+// record each loaded module and warn once — a duplicated install is wasteful
+// and worth fixing — but it no longer breaks routing, so we do NOT throw.
+const ROUTER_INSTANCES_KEY = Symbol.for('@stacksjs/router:loaded-instances')
+const loadedRouterInstances: Set<string> = ((globalThis as Record<symbol, unknown>)[ROUTER_INSTANCES_KEY] ??= new Set<string>()) as Set<string>
+loadedRouterInstances.add(import.meta.path)
+const MULTI_INSTANCE_WARNED_KEY = Symbol.for('@stacksjs/router:multi-instance-warned')
+
+/**
+ * Warn (once per process) when more than one @stacksjs/router module has loaded
+ * (stacksjs/stacks#1975 / #1982). Routing still works — the route table and
+ * request context are process-global singletons — but a duplicated install is
+ * worth surfacing. Called at serve() boot. Returns whether a split was detected
+ * so callers/tests can assert on it without capturing logs.
+ */
+export function warnOnMultipleRouterInstances(): boolean {
+  if (loadedRouterInstances.size <= 1)
+    return false
+  const g = globalThis as Record<symbol, unknown>
+  if (!g[MULTI_INSTANCE_WARNED_KEY]) {
+    g[MULTI_INSTANCE_WARNED_KEY] = true
+    const paths = [...loadedRouterInstances].map(p => `    - ${p}`).join('\n')
+    log.warn(
+      `${loadedRouterInstances.size} distinct @stacksjs/router modules loaded in one process; they now share one route `
+      + `table (stacksjs/stacks#1982) so routing still works, but this is a duplicated install worth fixing. It usually `
+      + `means an app vendors storage/framework/core AND installs the published @stacksjs/* dist, and a tsconfig \`paths\` `
+      + `mapping (\`@stacksjs/* -> ./*/src\`) splits module resolution between core files and root files. See stacksjs/stacks#1975.\n`
+      + `Loaded instances:\n${paths}`,
+    )
+  }
+  return true
+}
+
+// Resolve a scaffold-defaults file (under storage/framework/defaults). A
+// vendored checkout has it on disk and wins; a node_modules app has no
+// storage/framework, so fall back to the published @stacksjs/defaults package
+// (which ships the app/ + resources/ trees). Without this the router can't load
+// default Actions/Middleware/Controllers on a node_modules deploy and the API
+// server fails to boot.
+let __defaultsPkgRoot: string | null | undefined
+function resolveDefaultsPath(rel: string): string {
+  const vendored = p.storagePath(`framework/defaults/${rel}`)
+  if (existsSync(vendored))
+    return vendored
+  if (__defaultsPkgRoot === undefined) {
+    try {
+      const pkgJson = Bun.resolveSync('@stacksjs/defaults/package.json', process.cwd())
+      __defaultsPkgRoot = pkgJson.slice(0, pkgJson.lastIndexOf('/'))
+    }
+    catch {
+      __defaultsPkgRoot = null
+    }
+  }
+  return __defaultsPkgRoot ? `${__defaultsPkgRoot}/${rel}` : vendored
+}
+
 import { runWithRequest } from './request-context'
 import { isApiRequest, JSON_CONTENT_TYPE } from './api-shape'
 import { clearTrackedQueries, createErrorResponse, createMiddlewareErrorResponse } from './error-handler'
@@ -276,7 +344,7 @@ function isExposeRoutesAuthorized(req: Request): boolean {
 async function applyCorsIfConfigured(req: EnhancedRequest, response: Response): Promise<Response> {
   if (!req._corsConfig || !response) return response
   try {
-    const { applyCorsHeaders } = await import(p.storagePath('framework/defaults/app/Middleware/Cors.ts'))
+    const { applyCorsHeaders } = await import(resolveDefaultsPath('app/Middleware/Cors.ts'))
     return (applyCorsHeaders as (req: Request, res: Response, cfg?: unknown) => Response)(
       req as unknown as Request,
       response,
@@ -600,7 +668,7 @@ async function getMiddlewareAliases(): Promise<Record<string, string>> {
     }
     catch {
       try {
-        const defaultModule = await import(p.storagePath('framework/defaults/app/Middleware.ts'))
+        const defaultModule = await import(resolveDefaultsPath('app/Middleware.ts'))
         return defaultModule.default || {}
       }
       catch {
@@ -649,7 +717,14 @@ async function resolveMiddlewareName(name: string): Promise<string> {
 }
 
 /**
- * Load a middleware by name
+ * Load a middleware by name.
+ *
+ * Returns null when the alias cannot be resolved to a module with a
+ * usable `handle()` — callers MUST treat null as fatal for the route
+ * (fail closed), never as "skip this middleware". A found-but-broken
+ * file (no default export / no handle method) is cached as null so the
+ * breakage is deterministic; a missing file is NOT cached, so creating
+ * the file in dev fixes the alias without a restart.
  */
 async function loadMiddleware(name: string): Promise<MiddlewareHandler | null> {
   if (middlewareCache.has(name)) {
@@ -659,26 +734,46 @@ async function loadMiddleware(name: string): Promise<MiddlewareHandler | null> {
   const className = await resolveMiddlewareName(name)
 
   // Try loading from app/Middleware first (user overrides)
+  let userPathError: unknown
   try {
     const userPath = p.appPath(`Middleware/${className}.ts`)
     const middleware = await import(userPath)
-    const handler = middleware.default as MiddlewareHandler | null
+    const handler = (middleware.default ?? null) as MiddlewareHandler | null
+    if (!handler || typeof handler.handle !== 'function') {
+      // The file exists and shadows the framework default — a missing
+      // default export here is a bug in the user's middleware, not a
+      // reason to silently fall back to different behavior.
+      log.error(`[Router] Middleware '${name}' resolved to ${userPath}, but the file has no default export with a handle() method`)
+      middlewareCache.set(name, null)
+      return null
+    }
     middlewareCache.set(name, handler)
     return handler
   }
-  catch {
-    // Fall back to framework defaults
-    try {
-      const defaultPath = p.storagePath(`framework/defaults/app/Middleware/${className}.ts`)
-      const middleware = await import(defaultPath)
-      const handler = middleware.default as MiddlewareHandler | null
-      middlewareCache.set(name, handler)
-      return handler
-    }
-    catch (err: unknown) {
-      log.error(`[Router] Failed to load middleware '${name}' (resolved to '${className}'):`, err)
+  catch (err: unknown) {
+    userPathError = err
+  }
+
+  // Fall back to framework defaults
+  try {
+    const defaultPath = resolveDefaultsPath(`app/Middleware/${className}.ts`)
+    const middleware = await import(defaultPath)
+    const handler = (middleware.default ?? null) as MiddlewareHandler | null
+    if (!handler || typeof handler.handle !== 'function') {
+      log.error(`[Router] Middleware '${name}' resolved to ${defaultPath}, but the file has no default export with a handle() method`)
+      middlewareCache.set(name, null)
       return null
     }
+    middlewareCache.set(name, handler)
+    return handler
+  }
+  catch (err: unknown) {
+    // Surface BOTH lookup failures — the user-path error was previously
+    // swallowed, which hid "user file exists but fails to import" behind
+    // a misleading defaults-only message.
+    const userMsg = userPathError instanceof Error ? userPathError.message : String(userPathError)
+    log.error(`[Router] Failed to load middleware '${name}' (resolved to '${className}'). app/Middleware: ${userMsg}; defaults:`, err)
+    return null
   }
 }
 
@@ -773,6 +868,56 @@ function parseMiddlewareName(middleware: string): { name: string, params?: strin
     name: middleware.substring(0, colonIndex),
     params: middleware.substring(colonIndex + 1),
   }
+}
+
+/**
+ * Resolve every middleware alias referenced by a registered route and
+ * report the ones that don't load. `csrf` is always checked too — it's
+ * auto-injected on unsafe methods even when no route lists it.
+ *
+ * Resolution is inherently lazy (`.middleware(name)` is a sync chainable
+ * that just records a string; the alias map and middleware modules load
+ * via async dynamic import), so a throw at literal registration time is
+ * impossible. Calling this after all routes are registered — the end of
+ * `importRoutes()` and the compiled-binary boot in core/server — IS
+ * effectively registration-time validation. See stacksjs/stacks#1957.
+ */
+export async function findUnresolvableRouteMiddleware(): Promise<Array<{ alias: string, routes: string[] }>> {
+  const usage = new Map<string, string[]>()
+  for (const [routeKey, entries] of routeMiddlewareRegistry) {
+    for (const entry of entries) {
+      const { name } = parseMiddlewareName(entry)
+      const routes = usage.get(name) ?? []
+      routes.push(routeKey)
+      usage.set(name, routes)
+    }
+  }
+  if (!usage.has('csrf'))
+    usage.set('csrf', ['(auto-injected on POST/PUT/PATCH/DELETE)'])
+
+  const unresolvable: Array<{ alias: string, routes: string[] }> = []
+  for (const [alias, routes] of usage) {
+    const handler = await loadMiddleware(alias)
+    if (!handler || typeof handler.handle !== 'function')
+      unresolvable.push({ alias, routes })
+  }
+  return unresolvable
+}
+
+/**
+ * Throw when any registered route references a middleware alias that
+ * cannot be resolved. Fail-closed boot validation: a typo'd `auth` alias
+ * must abort startup loudly, not serve the route unprotected (the
+ * request-time guard in createMiddlewareHandler 500s as a backstop).
+ */
+export async function assertRouteMiddlewareResolvable(): Promise<void> {
+  const unresolvable = await findUnresolvableRouteMiddleware()
+  if (unresolvable.length === 0)
+    return
+  const detail = unresolvable
+    .map(u => `"${u.alias}" (used by ${u.routes.join(', ')})`)
+    .join('; ')
+  throw new Error(`[Router] Unresolvable middleware alias(es): ${detail}. Check the alias map in app/Middleware.ts or add app/Middleware/<Class>.ts.`)
 }
 
 /**
@@ -890,9 +1035,19 @@ function createMiddlewareHandler(routeKey: string, handler: StacksHandler): Rout
         middlewareEntries.unshift('csrf')
       }
 
+      // Only pay for pathname extraction when debug logging is actually on —
+      // this runs per request on every middleware-bearing route. The level
+      // gate mirrors `log.debug`'s own cheap-exit, and the cheap string slice
+      // avoids a full `new URL()` parse on the hot path in production.
       if (middlewareEntries.length > 0) {
-        const urlPath = new URL(req.url).pathname
-        log.debug(`[middleware] Executing chain: [${middlewareEntries.join(', ')}] for ${method} ${urlPath}`)
+        const lvl = (process.env.LOG_LEVEL || 'info').toLowerCase()
+        if (lvl !== 'info' && lvl !== 'warn' && lvl !== 'error') {
+          const schemeEnd = req.url.indexOf('://')
+          const pathStart = schemeEnd === -1 ? 0 : req.url.indexOf('/', schemeEnd + 3)
+          const q = req.url.indexOf('?', pathStart < 0 ? 0 : pathStart)
+          const urlPath = pathStart < 0 ? '/' : req.url.slice(pathStart, q === -1 ? undefined : q)
+          log.debug(`[middleware] Executing chain: [${middlewareEntries.join(', ')}] for ${method} ${urlPath}`)
+        }
       }
 
       // Pre-resolve every entry to its handler + priority. Each
@@ -919,7 +1074,19 @@ function createMiddlewareHandler(routeKey: string, handler: StacksHandler): Rout
         }
 
         const middleware = await loadMiddleware(middlewareName)
-        if (!middleware || typeof middleware.handle !== 'function') continue
+        if (!middleware || typeof middleware.handle !== 'function') {
+          // Fail CLOSED. The previous `continue` served the route WITHOUT
+          // the middleware — a typo'd `auth` alias silently unprotected the
+          // route. Every entry point (including dev hot-reload cache clears
+          // and late package registrations) must get a 500 instead.
+          // Boot-time validation (assertRouteMiddlewareResolvable) catches
+          // these earlier and louder; this branch is the request-time
+          // guarantee. See stacksjs/stacks#1957.
+          log.error(`[Router] Middleware '${middlewareName}' on ${routeKey} could not be resolved — failing closed`)
+          const failClosedError = new Error(`Middleware '${middlewareName}' could not be resolved`)
+          const failClosedResponse = await createErrorResponse(failClosedError, enhancedReq, { status: 500 })
+          return await applyCorsIfConfigured(enhancedReq, failClosedResponse)
+        }
         // Bounds-check the priority. The chain is sorted by this number; a
         // NaN sneaks past the comparator (NaN comparisons evaluate false) and
         // misorders silently, while a negative value makes a middleware run
@@ -1056,7 +1223,7 @@ function createMiddlewareHandler(routeKey: string, handler: StacksHandler): Rout
         const safeMethod = req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS'
         if (safeMethod) {
           try {
-            const { seedCsrfCookieIfMissing } = await import(p.storagePath('framework/defaults/app/Middleware/Csrf.ts'))
+            const { seedCsrfCookieIfMissing } = await import(resolveDefaultsPath('app/Middleware/Csrf.ts'))
             response = (seedCsrfCookieIfMissing as (req: Request, res: Response) => Response)(
               enhancedReq as unknown as Request,
               response,
@@ -1153,7 +1320,7 @@ function createMiddlewareHandler(routeKey: string, handler: StacksHandler): Rout
       // compression don't pay the load cost.
       if (enhancedReq._compress === true && response) {
         try {
-          const { applyCompression } = await import(p.storagePath('framework/defaults/app/Middleware/Compress.ts'))
+          const { applyCompression } = await import(resolveDefaultsPath('app/Middleware/Compress.ts'))
           return await (applyCompression as (req: Request, res: Response) => Promise<Response>)(enhancedReq as unknown as Request, response)
         }
         catch (err) {
@@ -1288,11 +1455,30 @@ function cachedImport(fullPath: string): Promise<any> {
   return p
 }
 
+// Resolved-handler cache. A string handler resolves to an immutable
+// RouteHandlerFn (module is import-cached, the action wrapper is rebuilt the
+// same way every time), so resolving it once per route and reusing the result
+// removes a per-request `fileExists` stat + closure allocation from the single
+// hottest path. Caches the PROMISE (like `cachedImport`) to collapse concurrent
+// first-resolves; evicts on rejection so a transient failure can be retried.
+// Same lifetime as `cachedImport` — a dev hot-reload restarts the process and
+// clears both, so this never serves a stale handler.
+const _resolvedHandlerCache = new Map<string, Promise<RouteHandlerFn>>()
+function resolveStringHandler(handlerPath: string): Promise<RouteHandlerFn> {
+  let resolved = _resolvedHandlerCache.get(handlerPath)
+  if (!resolved) {
+    resolved = resolveStringHandlerUncached(handlerPath)
+    _resolvedHandlerCache.set(handlerPath, resolved)
+    resolved.catch(() => _resolvedHandlerCache.delete(handlerPath))
+  }
+  return resolved
+}
+
 /**
  * Resolve a string handler to an actual handler function
  * Supports user overrides: checks user's app/ first, then falls back to defaults
  */
-async function resolveStringHandler(handlerPath: string): Promise<RouteHandlerFn> {
+async function resolveStringHandlerUncached(handlerPath: string): Promise<RouteHandlerFn> {
   assertSafeHandlerPath(handlerPath)
   let modulePath = handlerPath
 
@@ -1305,7 +1491,7 @@ async function resolveStringHandler(handlerPath: string): Promise<RouteHandlerFn
 
     // Try user path first, then fall back to defaults
     const userPath = p.appPath(`${controllerPath}.ts`)
-    const defaultPath = p.storagePath(`framework/defaults/app/${controllerPath}.ts`)
+    const defaultPath = resolveDefaultsPath(`app/${controllerPath}.ts`)
     const fullPath = await fileExists(userPath) ? userPath : defaultPath
 
     try {
@@ -1345,13 +1531,13 @@ async function resolveStringHandler(handlerPath: string): Promise<RouteHandlerFn
   else if (modulePath.includes('Actions')) {
     // Try user path first, then fall back to defaults
     const userPath = p.projectPath(`app/${modulePath}.ts`)
-    const defaultPath = p.storagePath(`framework/defaults/app/${modulePath}.ts`)
+    const defaultPath = resolveDefaultsPath(`app/${modulePath}.ts`)
     fullPath = await fileExists(userPath) ? userPath : defaultPath
   }
   else {
     // Generic app path - try user first, then defaults
     const userPath = p.appPath(`${modulePath}.ts`)
-    const defaultPath = p.storagePath(`framework/defaults/app/${modulePath}.ts`)
+    const defaultPath = resolveDefaultsPath(`app/${modulePath}.ts`)
     fullPath = await fileExists(userPath) ? userPath : defaultPath
   }
 
@@ -1404,7 +1590,7 @@ async function resolveStringHandler(handlerPath: string): Promise<RouteHandlerFn
             // resolves to an older `@stacksjs/bun-router`.
             return Response.json(
               { error: 'Validation failed', errors: validationResult.errors },
-              422,
+              { status: 422 },
             )
           }
         }
@@ -1419,7 +1605,7 @@ async function resolveStringHandler(handlerPath: string): Promise<RouteHandlerFn
           const auth = await action.authorize(req)
           if (auth instanceof Response) return auth
           if (auth === false) {
-            return Response.json({ error: 'Forbidden' }, 403)
+            return Response.json({ error: 'Forbidden' }, { status: 403 })
           }
         }
 
@@ -1541,11 +1727,21 @@ async function getRequestInput(
 ): Promise<Record<string, unknown>> {
   const input: Record<string, unknown> = {}
 
-  // Get query parameters (always strings on the wire)
-  const url = new URL(req.url)
-  url.searchParams.forEach((value, key) => {
-    input[key] = value
-  })
+  // Get query parameters (always strings on the wire). Reuse the query
+  // already parsed into `req.query` by enhanceRequest when present; only fall
+  // back to a fresh `new URL()` parse if this runs before enhancement
+  // (defensive — the action path always enhances first). Saves a full URL
+  // parse on every validated request.
+  const q = req.query
+  if (q) {
+    for (const key in q) input[key] = q[key]
+  }
+  else {
+    const url = new URL(req.url)
+    url.searchParams.forEach((value, key) => {
+      input[key] = value
+    })
+  }
 
   // Get route params if available (also strings — bun-router doesn't
   // know the route-pattern type)
@@ -1793,6 +1989,225 @@ export function stream(
   return new Response(body, { status: options.status ?? 200, headers: merged })
 }
 
+// Per-request merged input: query + JSON body + form body + route params, in
+// that precedence order (later sources win). Memoized on the request via
+// `_allInputCache` so repeated `req.all()/get()/input()` calls don't re-merge.
+// A standalone function (not a per-request closure) so the request helpers
+// below can be shared module-level functions rather than re-allocated per
+// request.
+function getAllInputFor(req: EnhancedRequest): Record<string, unknown> {
+  const cached = (req as any)._allInputCache as Record<string, unknown> | undefined
+  if (cached)
+    return cached
+
+  const input: Record<string, unknown> = {}
+  const query = req.query as Record<string, unknown> | undefined
+  if (query) {
+    for (const key in query) input[key] = query[key]
+  }
+  if (req.jsonBody && typeof req.jsonBody === 'object')
+    Object.assign(input, req.jsonBody)
+  if (req.formBody && typeof req.formBody === 'object')
+    Object.assign(input, req.formBody)
+  if (req.params && typeof req.params === 'object')
+    Object.assign(input, req.params)
+
+  ;(req as any)._allInputCache = input
+  return input
+}
+
+// Shared implementations of the Laravel-style request helpers. Assigned onto
+// each request by a single `Object.assign` (reference copy) instead of
+// allocating ~25 fresh closures per request — all per-request state lives on
+// the request object, so each method reads it through `this`. `ThisType`
+// types `this` as the request inside every method.
+const REQUEST_METHODS: Record<string, (...args: any[]) => any> & ThisType<EnhancedRequest> = {
+  get(key: string, defaultValue?: any) {
+    const input = getAllInputFor(this)
+    const value = input[key]
+    return value !== undefined ? value : defaultValue
+  },
+  input(key: string, defaultValue?: any) {
+    const input = getAllInputFor(this)
+    const value = input[key]
+    return value !== undefined ? value : defaultValue
+  },
+  all() {
+    return getAllInputFor(this)
+  },
+  only(keys: string[]) {
+    const input = getAllInputFor(this)
+    const result: Record<string, unknown> = {}
+    for (const key of keys) {
+      if (key in input)
+        result[key] = input[key]
+    }
+    return result
+  },
+  except(keys: string[]) {
+    const input = getAllInputFor(this)
+    const result: Record<string, unknown> = { ...input }
+    for (const key of keys) delete result[key]
+    return result
+  },
+  has(key: string | string[]) {
+    const input = getAllInputFor(this)
+    if (Array.isArray(key))
+      return key.every(k => k in input && input[k] !== undefined)
+    return key in input && input[key] !== undefined
+  },
+  hasAny(keys: string[]) {
+    const input = getAllInputFor(this)
+    return keys.some(k => k in input && input[k] !== undefined)
+  },
+  filled(key: string | string[]) {
+    const input = getAllInputFor(this)
+    const isFilled = (k: string): boolean => {
+      const value = input[k]
+      return value !== undefined && value !== null && value !== '' && !(Array.isArray(value) && value.length === 0)
+    }
+    if (Array.isArray(key))
+      return key.every(isFilled)
+    return isFilled(key)
+  },
+  missing(key: string | string[]) {
+    const input = getAllInputFor(this)
+    if (Array.isArray(key))
+      return key.every(k => !(k in input) || input[k] === undefined)
+    return !(key in input) || input[key] === undefined
+  },
+  string(key: string, defaultValue: string = '') {
+    const input = getAllInputFor(this)
+    const value = input[key]
+    return value !== undefined && value !== null ? String(value) : defaultValue
+  },
+  // Strict numeric parsing: `Number.parseInt('123abc')` returns 123 silently,
+  // so we require the entire string to be a valid number — trailing garbage
+  // falls through to `defaultValue`.
+  integer(key: string, defaultValue: number = 0) {
+    const input = getAllInputFor(this)
+    const value = input[key]
+    if (value === undefined || value === null || value === '')
+      return defaultValue
+    if (typeof value === 'number')
+      return Number.isFinite(value) ? Math.trunc(value) : defaultValue
+    const str = String(value).trim()
+    if (!/^-?\d+$/.test(str))
+      return defaultValue
+    const parsed = Number.parseInt(str, 10)
+    return Number.isFinite(parsed) ? parsed : defaultValue
+  },
+  float(key: string, defaultValue: number = 0) {
+    const input = getAllInputFor(this)
+    const value = input[key]
+    if (value === undefined || value === null || value === '')
+      return defaultValue
+    if (typeof value === 'number')
+      return Number.isFinite(value) ? value : defaultValue
+    const str = String(value).trim()
+    if (!/^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(str))
+      return defaultValue
+    const parsed = Number.parseFloat(str)
+    return Number.isFinite(parsed) ? parsed : defaultValue
+  },
+  boolean(key: string, defaultValue: boolean = false) {
+    const input = getAllInputFor(this)
+    const value = input[key]
+    if (value === undefined || value === null)
+      return defaultValue
+    if (typeof value === 'boolean')
+      return value
+    if (value === 'true' || value === '1' || value === 1)
+      return true
+    if (value === 'false' || value === '0' || value === 0)
+      return false
+    return defaultValue
+  },
+  array(key: string) {
+    const input = getAllInputFor(this)
+    const value = input[key]
+    if (Array.isArray(value))
+      return value
+    return value !== undefined && value !== null ? [value] : []
+  },
+  // File handling — returns UploadedFile with store/storeAs methods.
+  file(key: string) {
+    const files = (this.files || {}) as Record<string, File | File[]>
+    const file = files[key]
+    if (!file)
+      return null
+    const rawFile = Array.isArray(file) ? file[0] : file
+    return rawFile ? new UploadedFile(rawFile) : null
+  },
+  getFiles(key: string) {
+    const files = (this.files || {}) as Record<string, File | File[]>
+    const file = files[key]
+    if (!file)
+      return []
+    const fileArray = Array.isArray(file) ? file : [file]
+    return fileArray.map(f => new UploadedFile(f))
+  },
+  hasFile(key: string) {
+    const files = (this.files || {}) as Record<string, File | File[]>
+    return key in files && files[key] !== undefined
+  },
+  allFiles() {
+    const files = (this.files || {}) as Record<string, File | File[]>
+    const result: Record<string, UploadedFile | UploadedFile[]> = {}
+    for (const [key, value] of Object.entries(files)) {
+      if (Array.isArray(value))
+        result[key] = value.map(f => new UploadedFile(f as File))
+      else
+        result[key] = new UploadedFile(value as File)
+    }
+    return result
+  },
+  // Auth — returns the authenticated user/token set by middleware.
+  async user() {
+    return this._authenticatedUser
+  },
+  async userToken() {
+    return this._currentAccessToken
+  },
+  // Strict: a missing token, a token without an `abilities` array, or a
+  // non-string ability all fail closed.
+  async tokenCan(ability: string) {
+    if (typeof ability !== 'string' || ability.length === 0)
+      return false
+    const token = this._currentAccessToken as any
+    if (!token || typeof token !== 'object')
+      return false
+    if (!Array.isArray(token.abilities))
+      return false
+    if (token.abilities.includes('*'))
+      return true
+    return token.abilities.includes(ability)
+  },
+  async tokenCant(ability: string) {
+    return !(await this.tokenCan!(ability))
+  },
+  // Gate / Policy macros (stacksjs/stacks#1874 F-9). Lazy-import `@stacksjs/auth`
+  // to dodge the router←auth cycle; resolve the user from `_authenticatedUser`,
+  // passing `null` when missing so public-read policies still get a chance.
+  async can(ability: string, ...args: unknown[]) {
+    if (typeof ability !== 'string' || ability.length === 0)
+      return false
+    const { Gate } = await import('@stacksjs/auth')
+    const user = (this._authenticatedUser as Parameters<typeof Gate.allows>[1]) ?? null
+    return Gate.allows(ability, user, ...args)
+  },
+  async cannot(ability: string, ...args: unknown[]) {
+    return !(await this.can!(ability, ...args))
+  },
+  // Throw-on-deny variant (Laravel's `$this->authorize(...)`). Throws
+  // AuthorizationException (403) on deny.
+  async authorize(ability: string, ...args: unknown[]) {
+    const { Gate } = await import('@stacksjs/auth')
+    const user = (this._authenticatedUser as Parameters<typeof Gate.authorize>[1]) ?? null
+    await Gate.authorize(ability, user, ...args)
+  },
+}
+
 // Decorate the incoming request with the helpers the framework's middleware
 // and actions assume are always available. Names follow Laravel's convention
 // because that's the API surface Stacks userland expects.
@@ -1810,256 +2225,10 @@ export function enhanceRequest(req: EnhancedRequest): EnhancedRequest {
     ;req.query = query
   }
 
-  // Cached input data — computed once on first access
-  let cachedInput: Record<string, unknown> | null = null
-
-  const getAllInput = (): Record<string, unknown> => {
-    if (cachedInput) return cachedInput
-
-    const input: Record<string, unknown> = {}
-
-    // Query parameters
-    for (const [key, value] of Object.entries(query || {})) {
-      input[key] = value
-    }
-
-    // JSON body
-    if (req.jsonBody && typeof req.jsonBody === 'object') {
-      for (const [key, value] of Object.entries(req.jsonBody)) {
-        input[key] = value
-      }
-    }
-
-    // Form body
-    if (req.formBody && typeof req.formBody === 'object') {
-      for (const [key, value] of Object.entries(req.formBody)) {
-        input[key] = value
-      }
-    }
-
-    // Route params
-    if (req.params && typeof req.params === 'object') {
-      for (const [key, value] of Object.entries(req.params)) {
-        input[key] = value
-      }
-    }
-
-    cachedInput = input
-    return input
-  }
-
-  // Add Laravel-style methods
-  ;req.get = <T = any>(key: string, defaultValue?: T): T => {
-    const input = getAllInput()
-    const value = input[key]
-    return (value !== undefined ? value : defaultValue) as T
-  }
-
-  ;req.input = <T = any>(key: string, defaultValue?: T): T => {
-    const input = getAllInput()
-    const value = input[key]
-    return (value !== undefined ? value : defaultValue) as T
-  }
-
-  ;req.all = (): Record<string, unknown> => getAllInput()
-
-  ;req.only = <T extends Record<string, unknown>>(keys: string[]): T => {
-    const input = getAllInput()
-    const result = {} as T
-    for (const key of keys) {
-      if (key in input) {
-        (result as any)[key] = input[key]
-      }
-    }
-    return result
-  }
-
-  ;req.except = <T extends Record<string, unknown>>(keys: string[]): T => {
-    const input = getAllInput()
-    const result = { ...input } as T
-    for (const key of keys) {
-      delete (result as any)[key]
-    }
-    return result
-  }
-
-  ;req.has = (key: string | string[]): boolean => {
-    const input = getAllInput()
-    if (Array.isArray(key)) {
-      return key.every(k => k in input && input[k] !== undefined)
-    }
-    return key in input && input[key] !== undefined
-  }
-
-  ;req.hasAny = (keys: string[]): boolean => {
-    const input = getAllInput()
-    return keys.some(k => k in input && input[k] !== undefined)
-  }
-
-  ;req.filled = (key: string | string[]): boolean => {
-    const input = getAllInput()
-    const isFilled = (k: string): boolean => {
-      const value = input[k]
-      return value !== undefined && value !== null && value !== '' && !(Array.isArray(value) && value.length === 0)
-    }
-    if (Array.isArray(key)) {
-      return key.every(isFilled)
-    }
-    return isFilled(key)
-  }
-
-  ;req.missing = (key: string | string[]): boolean => {
-    const input = getAllInput()
-    if (Array.isArray(key)) {
-      return key.every(k => !(k in input) || input[k] === undefined)
-    }
-    return !(key in input) || input[key] === undefined
-  }
-
-  ;req.string = (key: string, defaultValue: string = ''): string => {
-    const input = getAllInput()
-    const value = input[key]
-    return value !== undefined && value !== null ? String(value) : defaultValue
-  }
-
-  // Strict numeric parsing: `Number.parseInt('123abc')` returns 123 silently,
-  // which lets callers accept partial numeric input they didn't intend
-  // (e.g. pagination size gets set to the leading digits of a typo'd query
-  // param). We require the entire string to be a valid number — any trailing
-  // garbage falls through to `defaultValue`.
-  ;req.integer = (key: string, defaultValue: number = 0): number => {
-    const input = getAllInput()
-    const value = input[key]
-    if (value === undefined || value === null || value === '') return defaultValue
-    if (typeof value === 'number') return Number.isFinite(value) ? Math.trunc(value) : defaultValue
-    const str = String(value).trim()
-    if (!/^-?\d+$/.test(str)) return defaultValue
-    const parsed = Number.parseInt(str, 10)
-    return Number.isFinite(parsed) ? parsed : defaultValue
-  }
-
-  ;req.float = (key: string, defaultValue: number = 0): number => {
-    const input = getAllInput()
-    const value = input[key]
-    if (value === undefined || value === null || value === '') return defaultValue
-    if (typeof value === 'number') return Number.isFinite(value) ? value : defaultValue
-    const str = String(value).trim()
-    if (!/^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(str)) return defaultValue
-    const parsed = Number.parseFloat(str)
-    return Number.isFinite(parsed) ? parsed : defaultValue
-  }
-
-  ;req.boolean = (key: string, defaultValue: boolean = false): boolean => {
-    const input = getAllInput()
-    const value = input[key]
-    if (value === undefined || value === null) return defaultValue
-    if (typeof value === 'boolean') return value
-    if (value === 'true' || value === '1' || value === 1) return true
-    if (value === 'false' || value === '0' || value === 0) return false
-    return defaultValue
-  }
-
-  ;req.array = <T = unknown>(key: string): T[] => {
-    const input = getAllInput()
-    const value = input[key]
-    if (Array.isArray(value)) return value as T[]
-    return value !== undefined && value !== null ? [value as T] : []
-  }
-
-  // File handling methods - returns UploadedFile with store/storeAs methods
-  ;req.file = (key: string): UploadedFile | null => {
-    const files = req.files || {}
-    const file = files[key]
-    if (!file) return null
-    const rawFile = Array.isArray(file) ? file[0] : file
-    return rawFile ? new UploadedFile(rawFile) : null
-  }
-
-  ;req.getFiles = (key: string): UploadedFile[] => {
-    const files = req.files || {}
-    const file = files[key]
-    if (!file) return []
-    const fileArray = Array.isArray(file) ? file : [file]
-    return fileArray.map(f => new UploadedFile(f))
-  }
-
-  ;req.hasFile = (key: string): boolean => {
-    const files = req.files || {}
-    return key in files && files[key] !== undefined
-  }
-
-  ;req.allFiles = (): Record<string, UploadedFile | UploadedFile[]> => {
-    const files = req.files || {}
-    const result: Record<string, UploadedFile | UploadedFile[]> = {}
-    for (const [key, value] of Object.entries(files)) {
-      if (Array.isArray(value)) {
-        result[key] = value.map(f => new UploadedFile(f as File))
-      } else {
-        result[key] = new UploadedFile(value as File)
-      }
-    }
-    return result
-  }
-
-  // Auth method - returns the authenticated user set by middleware
-  ;req.user = async (): Promise<any> => {
-    // Return user set by auth middleware (e.g., BearerToken middleware)
-    return req._authenticatedUser
-  }
-
-  // Get the current access token instance
-  ;req.userToken = async (): Promise<any> => {
-    return req._currentAccessToken
-  }
-
-  // Check if the current token has an ability.
-  // Strict: a missing token, a token without an `abilities` array, or
-  // a non-string ability all fail-closed. Earlier shape did
-  // `token.abilities?.includes('*')` which silently accepted any object
-  // with a truthy `abilities[Symbol.iterator]` — a malformed token
-  // produced by a partially-completed auth race could grant wildcard
-  // permissions because of how `?.includes` resolves on non-arrays.
-  ;req.tokenCan = async (ability: string): Promise<boolean> => {
-    if (typeof ability !== 'string' || ability.length === 0) return false
-    const token = req._currentAccessToken
-    if (!token || typeof token !== 'object') return false
-    if (!Array.isArray(token.abilities)) return false
-    if (token.abilities.includes('*')) return true
-    return token.abilities.includes(ability)
-  }
-
-  // Check if the current token does NOT have an ability
-  ;req.tokenCant = async (ability: string): Promise<boolean> => {
-    return !(await req.tokenCan(ability))
-  }
-
-  // Gate / Policy macros (stacksjs/stacks#1874 F-9). Lazy-import
-  // `@stacksjs/auth` to dodge the router←auth cycle declared in
-  // `auth/package.json`. Resolve the user from `_authenticatedUser`
-  // (stamped by the Auth middleware) — passing `null` when missing so
-  // gates that explicitly handle the unauthenticated case still get a
-  // chance to allow (e.g. public-read policies).
-  ;req.can = async (ability: string, ...args: unknown[]): Promise<boolean> => {
-    if (typeof ability !== 'string' || ability.length === 0) return false
-    const { Gate } = await import('@stacksjs/auth')
-    const user = (req._authenticatedUser as Parameters<typeof Gate.allows>[1]) ?? null
-    return Gate.allows(ability, user, ...args)
-  }
-
-  ;req.cannot = async (ability: string, ...args: unknown[]): Promise<boolean> => {
-    return !(await req.can(ability, ...args))
-  }
-
-  // Throw-on-deny variant (Laravel's `$this->authorize(...)`). Reuses
-  // the same Gate path so policy `before()` / `after()` hooks fire
-  // consistently regardless of which macro the caller picks. Throws
-  // `AuthorizationException` (status 403) on deny — handlers can let
-  // it bubble to the global error handler or catch and reshape.
-  ;req.authorize = async (ability: string, ...args: unknown[]): Promise<void> => {
-    const { Gate } = await import('@stacksjs/auth')
-    const user = (req._authenticatedUser as Parameters<typeof Gate.authorize>[1]) ?? null
-    await Gate.authorize(ability, user, ...args)
-  }
+  // Assign the shared Laravel-style request helpers by reference (a single
+  // Object.assign), instead of allocating ~25 closures per request. Per-request
+  // input is memoized on the request by getAllInputFor() — see REQUEST_METHODS.
+  Object.assign(req, REQUEST_METHODS)
 
   return req
 }
@@ -2087,11 +2256,23 @@ function wrapHandler(handler: StacksHandler, skipParsing = false): RouteHandlerF
         // throws log at error with full stack; thrown 4xx HttpErrors
         // are kept out of the error stream.
         report(error, { label: `[Router] ${handlerPath}` })
+        // Extract a thrown 4xx/5xx status (HttpError + duck-typed shapes)
+        // and forward it, mirroring createMiddlewareErrorResponse. Without
+        // this, createErrorResponse defaults every handler-thrown error to
+        // 500 (error-handler.ts: `options?.status || 500`), flattening a
+        // thrown HttpError(409) to a masked 500 on the wire. With it, #1946's
+        // production 4xx branch surfaces the clean message. 5xx and plain
+        // Errors stay undefined -> 500 default, still masked. See #1957.
+        const rawStatus = (error as { statusCode?: unknown, status?: unknown })?.statusCode
+          ?? (error as { status?: unknown })?.status
+        const status = typeof rawStatus === 'number' && Number.isInteger(rawStatus) && rawStatus >= 400 && rawStatus < 600
+          ? rawStatus
+          : undefined
         // Return Ignition-style error page in development, JSON in production
         return await createErrorResponse(
           error instanceof Error ? error : new Error(String(error)),
           req,
-          { handlerPath },
+          { handlerPath, status },
         )
       }
     }
@@ -2134,6 +2315,10 @@ async function parseRequestBody(req: EnhancedRequest): Promise<void> {
       // empty string → no parse attempt). See stacksjs/stacks#1859 H-5.
       const cloned = req.clone()
       const raw = await cloned.text()
+      // Stash the exact unparsed bytes so `request.rawBody()` can return them
+      // for webhook signature verification (Stripe/GitHub/Slack). A
+      // re-serialized `jsonBody` is NOT byte-identical and fails HMAC checks.
+      ;req._rawBody = raw
       if (raw.length === 0) {
         ;req.jsonBody = {}
       }
@@ -2182,8 +2367,8 @@ async function parseRequestBody(req: EnhancedRequest): Promise<void> {
         }
       })
 
-      ;req.formBody = formBody
-      ;req.files = files
+      Reflect.set(req, 'formBody', formBody)
+      Reflect.set(req, 'files', files)
     }
   }
   catch (e) {
@@ -2476,7 +2661,7 @@ export function createStacksRouter(config: StacksRouterConfig = {}): StacksRoute
           checks,
           timestamp: Date.now(),
         }
-        return Response.json(body, healthy ? 200 : 503)
+        return Response.json(body, { status: healthy ? 200 : 503 })
       })
       // Internal route-introspection endpoint. Powers `buddy dev` route
       // listing on startup and future `buddy route:list` consumers.
@@ -2494,7 +2679,7 @@ export function createStacksRouter(config: StacksRouterConfig = {}): StacksRoute
       // no auth gate, publishing the full route table + action paths
       // to anyone who learned the URL.
       bunRouter.get('/__routes', (req: Request) => {
-        if (!isExposeRoutesAuthorized(req)) return Response.json({ error: 'disabled' }, 404)
+        if (!isExposeRoutesAuthorized(req)) return Response.json({ error: 'disabled' }, { status: 404 })
         return Response.json(listRegisteredRoutes())
       })
 
@@ -2511,7 +2696,7 @@ export function createStacksRouter(config: StacksRouterConfig = {}): StacksRoute
         // decodeURIComponent because the signer URL-encodes the path
         // (slashes, spaces, etc.) when minting the URL — the JWT
         // claim is the raw path, so we must decode here to compare.
-        const params = req.params as Record<string, string> | undefined
+        const params = (req as Request & { params?: Record<string, string> }).params
         const rawPath = params?.path
           ? decodeURIComponent(params.path)
           : decodeURIComponent(url.pathname.replace(/^\/__storage\//, ''))
@@ -2564,7 +2749,7 @@ export function createStacksRouter(config: StacksRouterConfig = {}): StacksRoute
       // exposing the route table. SwaggerUI/Insomnia/Postman can point
       // straight at this URL in dev for instant docs.
       bunRouter.get('/__openapi.json', async (req: Request) => {
-        if (!isExposeRoutesAuthorized(req)) return Response.json({ error: 'disabled' }, 404)
+        if (!isExposeRoutesAuthorized(req)) return Response.json({ error: 'disabled' }, { status: 404 })
         try {
           const { generateOpenApi } = await import('@stacksjs/api')
           const spec = await (generateOpenApi as () => Promise<unknown>)()
@@ -2573,7 +2758,7 @@ export function createStacksRouter(config: StacksRouterConfig = {}): StacksRoute
         catch (err) {
           return Response.json(
             { error: 'OpenAPI generation failed', message: err instanceof Error ? err.message : String(err) },
-            500,
+            { status: 500 },
           )
         }
       })
@@ -2591,16 +2776,22 @@ export function createStacksRouter(config: StacksRouterConfig = {}): StacksRoute
     //   downstream route silently breaks. See stacksjs/stacks#1870 R-2.
     // - any other handler-shaped object with a `handle()` method — also wrapped,
     //   under the same contract.
-    use(middleware: ActionHandler | Middleware | { handle: (req: EnhancedRequest) => void | Promise<void> }) {
+    use(middleware: ActionHandler | ((req: EnhancedRequest, next: () => Promise<Response>) => Response | Promise<Response>) | Middleware | { handle: (req: EnhancedRequest) => void | Promise<void> }) {
       // bunRouter.use() is async, so we need to call it properly
       // For synchronous chaining, we push directly to globalMiddleware
-      const adapted = adaptMiddlewareForBunRouter(middleware)
+      const adapted = adaptMiddlewareForBunRouter(middleware as ActionHandler)
       bunRouter.globalMiddleware.push(adapted as any)
       return stacksRouter
     },
 
     // Serve the router
     async serve(options: ServerOptions = {}): Promise<Server<unknown>> {
+      // Warn (don't crash) on a split router (#1975/#1982). The route table is
+      // now a process-global singleton, so a second instance pulled in by user
+      // route files shares the same table — routing works — but a duplicated
+      // install is still worth flagging. By now importRoutes() has run, so any
+      // second instance is already registered.
+      warnOnMultipleRouterInstances()
       return bunRouter.serve(options)
     },
 
@@ -2666,17 +2857,27 @@ export function createStacksRouter(config: StacksRouterConfig = {}): StacksRoute
         p.frameworkPath('orm/routes.ts'),
         p.frameworkPath('core/orm/routes.ts'),
       ]
+      let ormRoutesLoaded = false
       for (const candidate of ormRoutesCandidates) {
         try {
           if (await Bun.file(candidate).exists()) {
             await import(candidate)
+            ormRoutesLoaded = true
             break
           }
         }
         catch (error) {
-          log.debug(`ORM routes load failed for ${candidate}:`, error)
+          // WARN, not debug: a throwing candidate is a real problem. This
+          // loader tries the canonical copy first and falls through to the
+          // legacy one on ANY error — so a canonical file that throws at
+          // import (e.g. a hard `import config/qb.ts` on a project without
+          // one) silently serves the STALE legacy copy, and every edit to
+          // the canonical file appears to do nothing. Make that visible.
+          log.warn(`[router] ORM routes candidate failed to load, falling back to next: ${candidate}\n`, error)
         }
       }
+      if (!ormRoutesLoaded)
+        log.warn('[router] No ORM routes candidate loaded — model useApi endpoints are unavailable.')
 
       // Load routes from discovered packages
       log.debug('[router] Loading discovered package routes...')
@@ -2686,6 +2887,14 @@ export function createStacksRouter(config: StacksRouterConfig = {}): StacksRoute
       catch (error) {
         log.debug('Package route discovery skipped:', error)
       }
+
+      // Fail-closed boot validation (stacksjs/stacks#1957): every
+      // middleware alias referenced by a registered route — including
+      // those from discovered pantry packages above — must resolve NOW.
+      // A typo'd alias aborts boot instead of serving the route
+      // unprotected; the request-time guard in createMiddlewareHandler
+      // is the 500 backstop for anything registered after this point.
+      await assertRouteMiddlewareResolvable()
     },
 
     // Load routes from discovered Stacks packages in pantry
@@ -2745,7 +2954,7 @@ export interface StacksRouterInstance {
   resource: (name: string, handler: string, options?: ResourceRouteOptions) => StacksRouterInstance
   match: (methods: string[], path: string, handler: StacksHandler) => ChainableRoute
   health: () => StacksRouterInstance
-  use: (middleware: ActionHandler) => StacksRouterInstance
+  use: (middleware: ActionHandler | ((req: EnhancedRequest, next: () => Promise<Response>) => Response | Promise<Response>)) => StacksRouterInstance
   register: (routePath: string, options?: { prefix?: string, middleware?: string | string[] }) => Promise<StacksRouterInstance>
   serve: (options?: ServerOptions) => Promise<Server<unknown>>
   handleRequest: (req: Request) => Promise<Response>
@@ -2761,8 +2970,19 @@ export interface StacksRouterInstance {
   loadDiscoveredRoutes: () => Promise<void>
 }
 
-// Create and export a default router instance
-export const route = createStacksRouter()
+// Create and export a default router instance.
+//
+// Promoted to a process-global singleton (keyed by a well-known Symbol) so
+// that if two physically distinct @stacksjs/router modules ever load in one
+// process — the dist-only-app-that-also-vendors-core split of
+// stacksjs/stacks#1975 / #1982 — they SHARE one route table instead of
+// registering user routes on one instance while the server serves another's
+// (empty) table (every route 404s). In the normal single-instance case `??=`
+// runs createStacksRouter() exactly once, so this is byte-identical to the
+// previous module-local singleton. Pairs with the request-context ALS, which
+// is globalized the same way so request state is shared across copies too.
+const ROUTE_SINGLETON_KEY = Symbol.for('@stacksjs/router:route-singleton')
+export const route: StacksRouterInstance = ((globalThis as Record<symbol, unknown>)[ROUTE_SINGLETON_KEY] ??= createStacksRouter()) as StacksRouterInstance
 
 // Promise-based route loading to prevent race conditions under concurrency
 let routesLoadPromise: Promise<void> | null = null

@@ -40,3 +40,9 @@ export {
   generateTOTPSecret,
   totpKeyUri,
 } from '@stacksjs/ts-auth'
+
+// TOTP setup/enable/disable + login-challenge persistence
+export * from './two-factor'
+
+// Team resolution from auth credentials (dashboard-form scoping)
+export * from './team'

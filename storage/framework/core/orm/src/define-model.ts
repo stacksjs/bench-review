@@ -1,4 +1,4 @@
-import { createModel, type ModelDefinition as BQBModelDefinition, registerModel } from '@stacksjs/query-builder'
+import { createModel, type OrmModelDefinition as BQBModelDefinition, type OrmModelStatic, registerModel } from '@stacksjs/query-builder'
 import type { InferRelationNames } from '@stacksjs/query-builder'
 import type { SearchOptions } from '@stacksjs/types'
 import { log } from '@stacksjs/logging'
@@ -198,6 +198,79 @@ const MODEL_INSTANCE_INTERNAL_KEYS = new Set([
 ])
 
 const STACKS_PROXY_TAG = Symbol.for('stacks.modelInstanceProxy')
+
+/**
+ * Maps each trait-bag method name to how it must be invoked when called on
+ * a hydrated model instance (`user.checkout(...)`, `post.like(userId)`)
+ * instead of the static bag (`User._billable.checkout(user, ...)`).
+ *
+ * `buildTraitMethods()` builds two shapes of trait function depending on
+ * the trait:
+ *   - 'id'    — taggable/categorizable/commentable/likeable functions take
+ *               the row's primary key as their first argument.
+ *   - 'model' — billable/twoFactor functions take the whole model (so they
+ *               can read arbitrary columns like `stripe_id` and call
+ *               `model.update(...)`) as their first argument.
+ *
+ * `likedBy` is intentionally omitted: it looks up every row liked *by* a
+ * given user — a reverse, cross-row query unrelated to any single
+ * instance's own id — so it stays reachable only via the static bag
+ * (`Model._likeable.likedBy(userId)`).
+ */
+const TRAIT_INSTANCE_METHOD_BINDINGS: Record<string, { bag: keyof TraitMethods, mode: 'id' | 'model' }> = {
+  tags: { bag: '_taggable', mode: 'id' },
+  tagCount: { bag: '_taggable', mode: 'id' },
+  addTag: { bag: '_taggable', mode: 'id' },
+  activeTags: { bag: '_taggable', mode: 'id' },
+  inactiveTags: { bag: '_taggable', mode: 'id' },
+  removeTag: { bag: '_taggable', mode: 'id' },
+
+  categories: { bag: '_categorizable', mode: 'id' },
+  categoryCount: { bag: '_categorizable', mode: 'id' },
+  addCategory: { bag: '_categorizable', mode: 'id' },
+  activeCategories: { bag: '_categorizable', mode: 'id' },
+  inactiveCategories: { bag: '_categorizable', mode: 'id' },
+  removeCategory: { bag: '_categorizable', mode: 'id' },
+
+  comments: { bag: '_commentable', mode: 'id' },
+  commentCount: { bag: '_commentable', mode: 'id' },
+  addComment: { bag: '_commentable', mode: 'id' },
+  approvedComments: { bag: '_commentable', mode: 'id' },
+  pendingComments: { bag: '_commentable', mode: 'id' },
+  rejectedComments: { bag: '_commentable', mode: 'id' },
+
+  likes: { bag: '_likeable', mode: 'id' },
+  likeCount: { bag: '_likeable', mode: 'id' },
+  like: { bag: '_likeable', mode: 'id' },
+  unlike: { bag: '_likeable', mode: 'id' },
+  isLiked: { bag: '_likeable', mode: 'id' },
+
+  createStripeUser: { bag: '_billable', mode: 'model' },
+  updateStripeUser: { bag: '_billable', mode: 'model' },
+  deleteStripeUser: { bag: '_billable', mode: 'model' },
+  createOrGetStripeUser: { bag: '_billable', mode: 'model' },
+  retrieveStripeUser: { bag: '_billable', mode: 'model' },
+  defaultPaymentMethod: { bag: '_billable', mode: 'model' },
+  setDefaultPaymentMethod: { bag: '_billable', mode: 'model' },
+  addPaymentMethod: { bag: '_billable', mode: 'model' },
+  paymentMethods: { bag: '_billable', mode: 'model' },
+  newSubscription: { bag: '_billable', mode: 'model' },
+  updateSubscription: { bag: '_billable', mode: 'model' },
+  cancelSubscription: { bag: '_billable', mode: 'model' },
+  activeSubscription: { bag: '_billable', mode: 'model' },
+  checkout: { bag: '_billable', mode: 'model' },
+  createSetupIntent: { bag: '_billable', mode: 'model' },
+  subscriptionHistory: { bag: '_billable', mode: 'model' },
+  transactionHistory: { bag: '_billable', mode: 'model' },
+  connectAccount: { bag: '_billable', mode: 'model' },
+  createConnectAccount: { bag: '_billable', mode: 'model' },
+  connectOnboardLink: { bag: '_billable', mode: 'model' },
+  syncConnectStatus: { bag: '_billable', mode: 'model' },
+  chargeWithSplit: { bag: '_billable', mode: 'model' },
+
+  generateTwoFactorForModel: { bag: '_twoFactor', mode: 'model' },
+  verifyTwoFactorCode: { bag: '_twoFactor', mode: 'model' },
+}
 
 /**
  * Walk a dot-separated path against a relations map and return the
@@ -481,6 +554,24 @@ function wrapModelInstance<T extends object>(
           if (Array.isArray(related)) return related.map(x => wrapModelInstance(x, casts))
           return wrapModelInstance(related, casts)
         }
+
+        // Trait instance methods (taggable/categorizable/commentable/
+        // likeable/billable/twoFactor) — see TRAIT_INSTANCE_METHOD_BINDINGS.
+        // `_definition.__traitMethods` is stamped per-model by
+        // `defineModel()`, so a relation-traversed instance of a
+        // *different* model (reached via `_relations` above) still
+        // resolves its *own* model's trait bag here, not the parent's.
+        const binding = TRAIT_INSTANCE_METHOD_BINDINGS[prop]
+        if (binding) {
+          const traitBags = (target as any)._definition?.__traitMethods as TraitMethods | undefined
+          const bag = traitBags?.[binding.bag] as Record<string, (...args: any[]) => any> | undefined
+          const fn = bag?.[prop]
+          if (typeof fn === 'function') {
+            return binding.mode === 'model'
+              ? (...args: any[]) => fn(recv, ...args)
+              : (...args: any[]) => fn((target as any).id, ...args)
+          }
+        }
       }
       const v = Reflect.get(target, prop, target)
       return typeof v === 'function' ? v.bind(target) : v
@@ -753,19 +844,22 @@ const MASS_ASSIGNMENT_SYSTEM_COLUMNS = new Set([
  * payload (unchanged) or throws `MassAssignmentException` on the first
  * forbidden field it sees.
  *
- * Mode resolution mirrors Laravel:
+ * Deny-by-default. Once a model declares `attributes`, only those declared
+ * columns may be mass-assigned, so a request body can't smuggle in an
+ * undeclared column like `role` / `is_admin`:
  *
- *   • If any attribute carries `fillable: true` → allowlist mode. Fields
- *     not on the allowlist (or in the system-column / FK exemption set)
- *     throw `not-fillable`.
- *   • Else, `guarded: true` attrs throw `guarded`; everything else passes.
- *   • Else, the model has no opinion on mass assignment → permissive
- *     (matches the framework's pre-fix behavior so existing apps that
- *     declare neither don't suddenly start throwing).
- *
- * `_id`-suffixed columns are always allowed through (FK columns); the
- * model usually doesn't list them in `attributes`, so blocking them
- * would break every belongsTo write.
+ *   • If any attribute carries `fillable: true` → the allowlist is exactly
+ *     that explicit `fillable` subset (Laravel `$fillable`).
+ *   • Else → the allowlist is every declared attribute (minus `guarded`).
+ *   • `guarded: true` always wins — including on foreign-key (`*_id`)
+ *     columns. The old code blanket-exempted every `*_id` key, so a
+ *     `guarded` `owner_id` / `account_id` was still mass-assignable and an
+ *     attacker could re-parent a record or cross tenants. Now guarded FKs
+ *     throw like any other guarded column.
+ *   • Non-guarded `*_id` columns stay assignable even when not separately
+ *     declared in `attributes`, so `belongsTo` writes keep working.
+ *   • A model that declares no `attributes` at all has no column vocabulary
+ *     to validate against → permissive (the only escape hatch left).
  *
  * Callers can opt out per-call via `{ force: true }` — used by the
  * `forceCreate` / `forceUpdate` static helpers.
@@ -781,24 +875,33 @@ function applyMassAssignmentRules(
   const attrs = (definition as any).attributes as Record<string, { fillable?: boolean, guarded?: boolean }> | undefined
   if (!attrs) return data
 
+  const declared = new Set<string>()
   const fillable = new Set<string>()
   const guarded = new Set<string>()
   for (const [k, a] of Object.entries(attrs)) {
     const col = snakeCase(k)
+    declared.add(col)
     if (a?.fillable === true) fillable.add(col)
     if (a?.guarded === true) guarded.add(col)
   }
 
-  const allowlistMode = fillable.size > 0
+  // Explicit `fillable` narrows the allowlist; otherwise every declared,
+  // non-guarded attribute is assignable. Deny-by-default either way.
+  const allowed = fillable.size > 0 ? fillable : declared
 
   for (const key of Object.keys(data)) {
     if (MASS_ASSIGNMENT_SYSTEM_COLUMNS.has(key)) continue
-    if (key.endsWith('_id')) continue // foreign keys
 
+    // Guarded wins for every column, FK included.
     if (guarded.has(key))
       throw new MassAssignmentException(definition.name, key, 'guarded')
 
-    if (allowlistMode && !fillable.has(key))
+    // Non-guarded foreign keys remain assignable so belongsTo writes work
+    // even when the FK column isn't separately declared as an attribute.
+    if (key.endsWith('_id'))
+      continue
+
+    if (!allowed.has(key))
       throw new MassAssignmentException(definition.name, key, 'not-fillable')
   }
 
@@ -1471,7 +1574,7 @@ function wrapQueryMethodsWithCasts(baseModel: Record<string, unknown>, casts: Re
   }
 }
 
-interface StacksModelDefinition {
+interface StacksModelDefinition extends Omit<BQBModelDefinition, 'attributes' | 'indexes' | 'traits'> {
   name: string
   table: string
   primaryKey?: string
@@ -1498,7 +1601,7 @@ interface StacksModelDefinition {
    * }
    * ```
    */
-  traits?: Record<string, unknown>
+  traits?: NonNullable<BQBModelDefinition['traits']> & Record<string, unknown>
   indexes?: Array<{ name: string, columns: string[], unique?: boolean, where?: string }>
   casts?: Record<string, CastType | CasterInterface>
   attributes: {
@@ -1566,13 +1669,31 @@ import { collectEncryptedAttributes, decryptValue, encryptValue, isEncrypted } f
  * // Result: Post.with('author') — 'author' narrowed to valid relations
  * ```
  */
-export function defineModel<const TDef extends ModelDefinition>(definition: TDef) {
+export type StacksModelStatic<TDef extends ModelDefinition> = OrmModelStatic<TDef> & TDef & TraitMethods & {
+  update: (id: number | string, data: Record<string, unknown>) => ReturnType<OrmModelStatic<TDef>['find']>
+  forceUpdate: (id: number | string, data: Record<string, unknown>) => ReturnType<OrmModelStatic<TDef>['find']>
+  forceCreate: (data: Record<string, unknown>) => ReturnType<OrmModelStatic<TDef>['create']>
+  delete: (id: number | string) => Promise<boolean>
+  withoutEvents: <T>(fn: () => T | Promise<T>) => Promise<T>
+}
+
+export function defineModel<const TDef extends ModelDefinition>(definition: TDef): StacksModelStatic<TDef> {
   log.debug(`[orm] Defining model: ${definition.name} (table: ${definition.table})`)
 
   // Build event hooks from observer configuration and search indexing
   const observeHooks = buildEventHooks(definition as unknown as BQBModelDefinition)
   const searchHooks = buildSearchHooks(definition as unknown as BQBModelDefinition)
   const hooks = mergeModelHooks(observeHooks, searchHooks)
+
+  // Build trait methods based on model config. Computed early (before
+  // `defWithHooks`/`createModel`) and stamped onto `definition` itself so
+  // every `ModelInstance` built from it — including relation-traversed
+  // instances of *this* model reached via a different model's `.with()`,
+  // which construct with their own model's definition — can find its own
+  // trait bag via `_definition.__traitMethods` in `wrapModelInstance`'s
+  // proxy `get` trap. See TRAIT_INSTANCE_METHOD_BINDINGS.
+  const traitMethods = buildTraitMethods(definition as unknown as BQBModelDefinition)
+  ;(definition as any).__traitMethods = traitMethods
 
   // Merge hooks into definition
   const defWithHooks = hooks
@@ -1581,7 +1702,7 @@ export function defineModel<const TDef extends ModelDefinition>(definition: TDef
 
   // Create the base model from bun-query-builder (provides all typed query methods)
   // Note: createModel's return type is declared as void in .d.ts but actually returns an object at runtime
-  const baseModel = createModel(defWithHooks as TDef & BQBModelDefinition) as unknown as Record<string, unknown>
+  const baseModel = createModel(defWithHooks as TDef) as OrmModelStatic<TDef> & Record<string, unknown>
 
   // Make ModelInstance attribute access ergonomic: `user.password`,
   // `car.slug`, `{ ...booking }` all do the right thing instead of
@@ -1645,9 +1766,6 @@ export function defineModel<const TDef extends ModelDefinition>(definition: TDef
     applyAudit(baseModel, definition.name, definition.primaryKey || 'id', auditOpts)
   }
 
-  // Build trait methods based on model config
-  const traitMethods = buildTraitMethods(definition as unknown as BQBModelDefinition)
-
   // Static-level event suppression helpers. `Model.withoutEvents(fn)`
   // runs `fn` with the lifecycle-event ALS scope marked suppressed —
   // equivalent to the module-level `withoutEvents` but bound to the
@@ -1691,7 +1809,7 @@ export function defineModel<const TDef extends ModelDefinition>(definition: TDef
   // the result of `createModel`.
   registerModel(definition.name, finalModel)
 
-  return finalModel
+  return finalModel as unknown as StacksModelStatic<TDef>
 }
 
 function buildEventHooks(definition: BQBModelDefinition): BQBModelDefinition['hooks'] | undefined {
@@ -1699,6 +1817,30 @@ function buildEventHooks(definition: BQBModelDefinition): BQBModelDefinition['ho
   if (!observe) return undefined
 
   const modelName = definition.name.toLowerCase()
+
+  // Model events deliver a PLAIN attribute object, not the raw
+  // bun-query-builder ModelInstance the hooks receive. The instance
+  // exposes columns only through `.get()` / `.attributes` (plus an `id`
+  // getter) — arbitrary column properties are undefined on it — while
+  // every listener registered in app/Events.ts reads
+  // `payload.monitor_id`-style snake_case keys straight off the payload.
+  // Dispatching the raw instance meant every such listener resolved
+  // undefined, found nothing, and silently no-oped: incident:created /
+  // incident:updated notifications and checkresult:created webhooks were
+  // dead code end-to-end (found wiring statusreportupdate:created in
+  // stacksjs/status). `.attributes` is the full snake_case column map
+  // (including the primary key after insert), which is exactly the shape
+  // listeners expect. Broadcast callbacks (broadcastOn/broadcastWith)
+  // keep receiving the instance — they are user-supplied functions with
+  // their own contract, not property-reading listeners.
+  const toEventPayload = (model: any): any => {
+    const attributes = model?.attributes
+    if (!attributes || typeof attributes !== 'object') return model
+    const pk = definition.primaryKey || 'id'
+    const payload: Record<string, unknown> = { ...attributes }
+    if (payload[pk] === undefined && model[pk] !== undefined) payload[pk] = model[pk]
+    return payload
+  }
 
   // Lazy import to avoid circular dependency. Suppression check is done
   // INSIDE the dispatcher (rather than at the hook caller) so even
@@ -1798,7 +1940,7 @@ function buildEventHooks(definition: BQBModelDefinition): BQBModelDefinition['ho
     ? ['create', 'update', 'delete']
     : Array.isArray(observe) ? observe : []
 
-  const hooks: NonNullable<BQBModelDefinition['hooks']> = {}
+  const hooks: { -readonly [K in keyof NonNullable<BQBModelDefinition['hooks']>]: NonNullable<BQBModelDefinition['hooks']>[K] } = {}
 
   if (events.includes('create')) {
     hooks.beforeCreate = async (model: any) => {
@@ -1815,8 +1957,9 @@ function buildEventHooks(definition: BQBModelDefinition): BQBModelDefinition['ho
       // Order: `created` first (specific), then `saved` (general) — same
       // as Eloquent so a `saved` listener can rely on `created` having
       // already fired for the insert path.
-      await dispatchEvent(`${modelName}:created`, model)
-      await dispatchEvent(`${modelName}:saved`, model)
+      const payload = toEventPayload(model)
+      await dispatchEvent(`${modelName}:created`, payload)
+      await dispatchEvent(`${modelName}:saved`, payload)
       // Broadcast AFTER the event dispatch so any event-listener-side
       // mutation of the model is reflected in the broadcast payload.
       await dispatchBroadcast(`${modelName}:created`, model)
@@ -1831,8 +1974,9 @@ function buildEventHooks(definition: BQBModelDefinition): BQBModelDefinition['ho
       if (!updatingOk) throw new Error(`[ORM] ${modelName}:updating event cancelled the operation`)
     }
     hooks.afterUpdate = async (model: any) => {
-      await dispatchEvent(`${modelName}:updated`, model)
-      await dispatchEvent(`${modelName}:saved`, model)
+      const payload = toEventPayload(model)
+      await dispatchEvent(`${modelName}:updated`, payload)
+      await dispatchEvent(`${modelName}:saved`, payload)
       await dispatchBroadcast(`${modelName}:updated`, model)
     }
   }
@@ -1843,7 +1987,7 @@ function buildEventHooks(definition: BQBModelDefinition): BQBModelDefinition['ho
       if (!shouldProceed) throw new Error(`[ORM] ${modelName}:deleting event cancelled the operation`)
     }
     hooks.afterDelete = async (model: any) => {
-      await dispatchEvent(`${modelName}:deleted`, model)
+      await dispatchEvent(`${modelName}:deleted`, toEventPayload(model))
       await dispatchBroadcast(`${modelName}:deleted`, model)
     }
   }
@@ -1917,8 +2061,9 @@ function resolveSearchConfig(useSearch: unknown): SearchableTraitConfig | null {
 function buildSearchHooks(definition: BQBModelDefinition): BQBModelDefinition['hooks'] | undefined {
   const config = resolveSearchConfig(definition.traits?.useSearch)
   if (!config) return undefined
+  const searchConfig = config
 
-  const indexName = config.index ?? definition.table ?? snakeCase(`${definition.name}s`)
+  const indexName = searchConfig.index ?? definition.table ?? snakeCase(`${definition.name}s`)
 
   /**
    * Project a model into a searchable document. Resolution order
@@ -1930,8 +2075,8 @@ function buildSearchHooks(definition: BQBModelDefinition): BQBModelDefinition['h
    *   3. fall back to the raw model attributes
    */
   function projectDocument(model: any): Record<string, unknown> | null | undefined {
-    if (typeof config.shape === 'function') {
-      try { return config.shape(model) }
+    if (typeof searchConfig.shape === 'function') {
+      try { return searchConfig.shape(model) }
       catch (err) {
         log.warn(`[orm/search] shape() threw for ${definition.name}: ${(err as Error).message}`)
         return undefined

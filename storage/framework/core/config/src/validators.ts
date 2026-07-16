@@ -112,12 +112,12 @@ const SCHEMA: Partial<Record<keyof StacksConfig, SchemaSection>> = {
   },
   database: {
     rules: {
-      'default': checkOneOf(['sqlite', 'mysql', 'postgres', 'dynamodb']),
+      'default': checkOneOf(['sqlite', 'mysql', 'singlestore', 'postgres', 'dynamodb']),
     },
   },
   cache: {
     rules: {
-      'driver': checkOneOf(['memory', 'redis']),
+      'driver': checkOneOf(['memory', 'redis', 'singlestore']),
     },
   },
   queue: {
@@ -132,7 +132,12 @@ const SCHEMA: Partial<Record<keyof StacksConfig, SchemaSection>> = {
   },
   email: {
     rules: {
-      'default': checkOneOf(['ses', 'sendgrid', 'mailgun', 'mailtrap', 'smtp', 'log']),
+      // Every driver Mail.registerDefaultDrivers() ships, including the
+      // tests-only in-memory 'capture' driver — its own docblock tells
+      // tests to set `config.email.default = 'capture'`, which this list
+      // used to reject (and a failed validation degrades unrelated boot
+      // consumers like the ORM search hook).
+      'default': checkOneOf(['ses', 'sendgrid', 'mailgun', 'mailtrap', 'smtp', 'log', 'capture']),
     },
   },
 }

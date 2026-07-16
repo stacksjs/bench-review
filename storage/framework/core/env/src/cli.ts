@@ -303,6 +303,7 @@ export function setEnv(
 ): { success: boolean, output?: string, error?: string } {
   const cwd = options.cwd || process.cwd()
   const envPath = resolve(cwd, options.file || '.env')
+  const keysPath = resolve(cwd, options.keysFile || '.env.keys')
 
   try {
     let content = ''
@@ -314,11 +315,21 @@ export function setEnv(
     let found = false
     let publicKey: string | undefined
 
-    // First pass: find public key
+    // Extract environment name from file path (basename only), matching the
+    // naming scheme encryptEnv/decryptEnv use (e.g. `.env.production` ->
+    // `DOTENV_PUBLIC_KEY_PRODUCTION`), so we look for the right key line
+    // instead of only ever matching the bare, unsuffixed `DOTENV_PUBLIC_KEY=`.
+    const envFileName = options.file || '.env'
+    const baseName = envFileName.split('/').pop() || ''
+    const env = baseName.replace(/^\.env\./, '').replace(/^\.env$/, '').toUpperCase()
+    const publicKeyName = env ? `DOTENV_PUBLIC_KEY_${env}` : 'DOTENV_PUBLIC_KEY'
+    const privateKeyName = env ? `DOTENV_PRIVATE_KEY_${env}` : 'DOTENV_PRIVATE_KEY'
+
+    // First pass: find public key for this file
     for (const line of lines) {
       const trimmed = line.trim()
-      if (trimmed.startsWith('DOTENV_PUBLIC_KEY=')) {
-        const match = trimmed.match(/^DOTENV_PUBLIC_KEY=["']?([^"'\n]+)["']?/)
+      if (trimmed.startsWith(`${publicKeyName}=`)) {
+        const match = trimmed.match(/^[^=]+=["']?([^"'\n]+)["']?/)
         if (match) {
           publicKey = match[1]
         }
@@ -326,9 +337,27 @@ export function setEnv(
       }
     }
 
-    // If no public key and encryption requested, generate one
+    // A public key found in the .env file is only usable if its matching
+    // private key is actually saved in the keys file. Reusing a public key
+    // whose private key was never generated/saved (e.g. a scaffolded .env
+    // that ships a demo DOTENV_PUBLIC_KEY with no .env.keys, or a lost
+    // .env.keys) would silently encrypt the value with a key nobody can
+    // ever decrypt again.
+    if (publicKey) {
+      let hasMatchingPrivateKey = false
+      if (existsSync(keysPath)) {
+        const keysContent = readFileSync(keysPath, 'utf-8')
+        const { parsed: keys } = parse(keysContent)
+        hasMatchingPrivateKey = Boolean(keys[privateKeyName])
+      }
+
+      if (!hasMatchingPrivateKey) {
+        publicKey = undefined
+      }
+    }
+
+    // If no usable keypair and encryption requested, generate one
     if (!options.plain && !publicKey) {
-      const keysPath = resolve(cwd, options.keysFile || '.env.keys')
       const keypair = generateKeypair()
       publicKey = keypair.publicKey
 
@@ -338,14 +367,17 @@ export function setEnv(
         keysContent = readFileSync(keysPath, 'utf-8')
       }
 
-      const envFileName = options.file || '.env'
-      const baseName = envFileName.split('/').pop() || ''
-      const env = baseName.replace(/^\.env\./, '').replace(/^\.env$/, '').toUpperCase()
-      const publicKeyName = env ? `DOTENV_PUBLIC_KEY_${env}` : 'DOTENV_PUBLIC_KEY'
-      const privateKeyName = env ? `DOTENV_PRIVATE_KEY_${env}` : 'DOTENV_PRIVATE_KEY'
-
       keysContent += `\n${publicKeyName}="${keypair.publicKey}"\n${privateKeyName}="${keypair.privateKey}"\n`
       writeFileSync(keysPath, keysContent, 'utf-8')
+
+      // Drop any stale/orphaned public key line(s) for this file before
+      // adding the fresh one, so repeated regeneration can't pile up
+      // duplicate DOTENV_PUBLIC_KEY* lines.
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const lineEntry = lines[i]
+        if (lineEntry !== undefined && lineEntry.trim().startsWith(`${publicKeyName}=`))
+          lines.splice(i, 1)
+      }
 
       // Add public key to .env file
       lines.unshift(`${publicKeyName}="${publicKey}"`)
@@ -408,16 +440,26 @@ export function getEnv(
     let privateKey: string | undefined
     const keysPath = resolve(cwd, options.keysFile || '.env.keys')
 
+    const envFileName = options.file || '.env'
+    const baseName = envFileName.split('/').pop() || ''
+    const env = baseName.replace(/^\.env\./, '').replace(/^\.env$/, '').toUpperCase()
+    const privateKeyName = env ? `DOTENV_PRIVATE_KEY_${env}` : 'DOTENV_PRIVATE_KEY'
+
     if (existsSync(keysPath)) {
       const keysContent = readFileSync(keysPath, 'utf-8')
       const { parsed: keys } = parse(keysContent)
-
-      const envFileName = options.file || '.env'
-      const baseName = envFileName.split('/').pop() || ''
-      const env = baseName.replace(/^\.env\./, '').replace(/^\.env$/, '').toUpperCase()
-      const privateKeyName = env ? `DOTENV_PRIVATE_KEY_${env}` : 'DOTENV_PRIVATE_KEY'
       privateKey = keys[privateKeyName]
     }
+
+    // No .env.keys (or it lacks this env's key): fall back to the process
+    // env, the dotenvx convention for CI runners and servers, where
+    // .env.keys must never exist (it's the one file that can't be
+    // committed). Without this fallback, `buddy deploy` from GitHub
+    // Actions shipped still-encrypted `encrypted:...` ciphertext as every
+    // site's .env and the app crash-looped on config validation
+    // (stacksjs/status, 2026-07-04).
+    if (!privateKey)
+      privateKey = process.env[privateKeyName]
 
     // Load and parse .env file
     const envContent = readFileSync(envPath, 'utf-8')

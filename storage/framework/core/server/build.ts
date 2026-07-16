@@ -1,3 +1,4 @@
+import { dts } from 'bun-plugin-dtsx'
 import { frameworkExternal, intro, outro } from '../build/src'
 
 const { startTime } = await intro({
@@ -31,9 +32,12 @@ const requestedTargets = (process.env.STACKS_SERVER_TARGETS || '')
   .map(s => s.trim())
   .filter(Boolean)
 
-const targets = requestedTargets.length > 0
-  ? requestedTargets
-  : ['host']
+// Compile standalone binaries ONLY when targets are explicitly requested —
+// deploys set STACKS_SERVER_TARGETS (e.g. `bun-linux-x64`). A normal package
+// build/publish requests nothing and ships ONLY the library entry
+// (dist/index.js); the ~90 MB host binary must never land in the npm tarball
+// (it embeds the whole Bun runtime and is rebuilt fresh at deploy time).
+const targets = requestedTargets
 
 const externalArgs: string[] = []
 for (const ext of frameworkExternal()) {
@@ -42,6 +46,10 @@ for (const ext of frameworkExternal()) {
 
 const failures: string[] = []
 const successes: string[] = []
+
+if (targets.length === 0) {
+  console.log('[server/build] no STACKS_SERVER_TARGETS set — skipping standalone binary compile (library-only build)')
+}
 
 for (const target of targets) {
   const isHost = target === 'host'
@@ -78,7 +86,7 @@ for (const target of targets) {
   throw new Error(`bun build for ${target} exited with code ${exitCode}`)
 }
 
-if (successes.length === 0) {
+if (targets.length > 0 && successes.length === 0) {
   throw new Error(
     `[server/build] all targets failed: ${failures.join(', ')}`,
   )
@@ -88,6 +96,21 @@ console.log(`✓ Server compiled for: ${successes.join(', ')}`)
 if (failures.length > 0) {
   console.log(`  (skipped: ${failures.join(', ')})`)
 }
+
+// The standalone binary above is one artifact; the package also has a library
+// entry (`@stacksjs/server`'s `.` export — maintenanceGate, proxyToBackend,
+// injectGlobalAutoImports, …) that `buddy serve` imports. Build it to
+// dist/index.js so npm consumers resolve it.
+console.log('[server/build] building library entry → ./dist/index.js')
+await Bun.build({
+  entrypoints: ['./src/index.ts'],
+  outdir: './dist',
+  root: './src',
+  target: 'bun',
+  format: 'esm',
+  external: frameworkExternal(),
+  plugins: [dts({ root: './src', outdir: './dist' })],
+})
 
 await outro({
   dir: import.meta.dir,

@@ -6,7 +6,7 @@
  * driver switching between SQLite, MySQL, and PostgreSQL.
  */
 
-import type { QueryBuilder, QueryBuilderConfig, SupportedDialect } from '@stacksjs/query-builder'
+import type { QueryBuilderConfig, StacksDialect } from '@stacksjs/query-builder'
 import { createQueryBuilder, setConfig } from '@stacksjs/query-builder'
 import { env as stacksEnv } from '@stacksjs/env'
 
@@ -27,7 +27,7 @@ export interface DatabaseConnectionConfig {
 
 export interface DatabaseOptions {
   /** The database driver to use */
-  driver: SupportedDialect
+  driver: StacksDialect
   /** Connection configuration */
   connection: DatabaseConnectionConfig
   /** Enable verbose logging */
@@ -76,7 +76,7 @@ export interface DatabaseOptions {
  * ```
  */
 export class Database {
-  private _queryBuilder: QueryBuilder<any> | null = null
+  private _queryBuilder: ReturnType<typeof createQueryBuilder> | null = null
   private _options: DatabaseOptions
   private _initialized = false
 
@@ -100,7 +100,7 @@ export class Database {
   /**
    * Get the current database driver
    */
-  get driver(): SupportedDialect {
+  get driver(): StacksDialect {
     return this._options.driver
   }
 
@@ -122,7 +122,7 @@ export class Database {
    * Get the query builder instance
    * Lazily initializes the connection on first access
    */
-  get query(): QueryBuilder<any> {
+  get query(): ReturnType<typeof createQueryBuilder> {
     if (!this._queryBuilder) {
       this.initialize()
     }
@@ -146,7 +146,9 @@ export class Database {
       hooks: this._options.hooks,
     })
 
-    // Create the query builder instance
+    // Create the query builder instance. stacksjs/stacks#1951 — the wrapped
+    // createQueryBuilder bootstraps fresh sqlite connections with the FK
+    // pragmas, so no explicit applySqlitePragmas call is needed here.
     this._queryBuilder = createQueryBuilder()
     this._initialized = true
   }
@@ -155,7 +157,7 @@ export class Database {
    * Switch to a different database driver
    * This will close the current connection and create a new one
    */
-  switchDriver(driver: SupportedDialect, connection: DatabaseConnectionConfig): void {
+  switchDriver(driver: StacksDialect, connection: DatabaseConnectionConfig): void {
     // Close existing connection if any
     this.close()
 
@@ -192,10 +194,11 @@ export class Database {
    * Create a new Database instance from Stacks config
    */
   static fromConfig(config: {
-    default: SupportedDialect
+    default: StacksDialect
     connections: {
       sqlite?: { database: string }
       mysql?: { name: string, host?: string, port?: number, username?: string, password?: string }
+      singlestore?: { name: string, host?: string, port?: number, username?: string, password?: string }
       postgres?: { name: string, host?: string, port?: number, username?: string, password?: string }
     }
   }, env?: string): Database {
@@ -223,6 +226,22 @@ export class Database {
         break
       }
 
+      // SingleStore connects over the MySQL wire protocol (port 3306). The
+      // dialect stays 'singlestore' end-to-end so bun-query-builder's
+      // SingleStore driver + isMysqlLike behavior apply, and the migration
+      // generator emits distributed-table DDL (no FKs, SHARD KEY).
+      case 'singlestore': {
+        const singlestore = config.connections.singlestore
+        connection = {
+          database: singlestore?.name || 'stacks',
+          host: singlestore?.host || '127.0.0.1',
+          port: singlestore?.port || 3306,
+          username: singlestore?.username || 'root',
+          password: singlestore?.password || '',
+        }
+        break
+      }
+
       case 'postgres': {
         const postgres = config.connections.postgres
         const dbName = postgres?.name || 'stacks'
@@ -236,7 +255,7 @@ export class Database {
         break
       }
 
-      case 'dynamodb' as SupportedDialect:
+      case 'dynamodb' as StacksDialect:
         // DynamoDB has no SQL connection — it's accessed via the
         // dedicated entity-style `dynamo.entity(...)` API instead. Set
         // DB_CONNECTION to sqlite/mysql/postgres if you want the SQL
@@ -271,7 +290,7 @@ export class Database {
    */
   static fromEnv(): Database {
     // Uses the typed env proxy from @stacksjs/env (imported at top of file as stacksEnv)
-    const driver = (stacksEnv.DB_CONNECTION as SupportedDialect) || 'sqlite'
+    const driver = (stacksEnv.DB_CONNECTION as StacksDialect) || 'sqlite'
 
     let connection: DatabaseConnectionConfig
 
@@ -283,6 +302,9 @@ export class Database {
         break
 
       case 'mysql':
+      // SingleStore uses the MySQL port/wire, so its env-derived connection
+      // is identical to MySQL's.
+      case 'singlestore':
         connection = {
           database: stacksEnv.DB_DATABASE || 'stacks',
           host: stacksEnv.DB_HOST || '127.0.0.1',

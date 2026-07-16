@@ -1,9 +1,63 @@
 import type { CLI } from '@stacksjs/types'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { log } from '@stacksjs/cli'
+
+/**
+ * Request-scoped context (query string + parsed cookies) for `<script
+ * server>` blocks in `.stx` pages — mirrors `dev/views.ts`'s dev-only
+ * setup of the same globals. Without this, `globalThis.requestContext`
+ * and `__stxServeSearch` are simply undefined in production: every
+ * cookie-aware or query-param-aware page (auth+team resolution on the
+ * dashboard, filter params on monitors/incidents, etc.) silently reads
+ * nothing and falls back to its unauthenticated/no-filter state, even
+ * for a legitimately signed-in request. `dev/views.ts` sets these up
+ * for `buddy dev`, but `buddy serve` (this file, the actual Hetzner
+ * entrypoint) never did — this was found by an end-to-end login +
+ * dashboard smoke test, not by inspection.
+ *
+ * Plain globals, not `AsyncLocalStorage` — tried that first (mirroring
+ * dev/views.ts's own approach) and confirmed via the same e2e test that
+ * the store is empty by the time a `<script server>` block reads it:
+ * bun-plugin-stx's internal request handling doesn't preserve the async
+ * context across whatever it does between `onRequest` returning and the
+ * page actually rendering. `__stxServeSearch` already uses a plain
+ * global for the exact same reason (and already accepts the same
+ * concurrent-request race this shares) — `__stxServeCookies` follows
+ * that precedent instead of a mechanism that demonstrably doesn't work
+ * in this server.
+ */
+;(globalThis as any).requestContext = {
+  cookie(name: string): string | null {
+    const cookies = (globalThis as { __stxServeCookies?: Record<string, string> }).__stxServeCookies
+    return cookies?.[name] ?? null
+  },
+  url(): string {
+    return (globalThis as { __stxServeSearch?: string }).__stxServeSearch ?? ''
+  },
+}
+
+function parseCookies(req: Request): Record<string, string> {
+  const out: Record<string, string> = {}
+  const header = req.headers.get('cookie') || ''
+  if (!header)
+    return out
+  for (const part of header.split(';')) {
+    const trimmed = part.trim()
+    const eq = trimmed.indexOf('=')
+    if (eq === -1)
+      continue
+    const k = trimmed.slice(0, eq).trim()
+    const v = trimmed.slice(eq + 1).trim()
+    if (!k)
+      continue
+    try { out[k] = decodeURIComponent(v) }
+    catch { out[k] = v }
+  }
+  return out
+}
 
 /**
  * `buddy serve` — boot the production HTTP server.
@@ -14,12 +68,20 @@ import { log } from '@stacksjs/cli'
  * secret-URL + bypass-cookie escape hatch intact. Bun.serve binds 0.0.0.0 by
  * default, so the server is reachable on the host's public interface.
  *
+ * Same-origin `/api/**` requests (and any non-GET/HEAD verb) are
+ * reverse-proxied to the API process — mirroring the dev views server — so
+ * scaffolded `fetch('/api/...')` calls behave identically in production
+ * (stacksjs/stacks#1950). The API runs as a separate process
+ * (core/actions/src/serve/api.ts), deployed as a second systemd service via
+ * the `api` site in config/cloud.ts. Override `API_URL` when the API lives
+ * on another host, or `PORT_API` when only the port differs.
+ *
  * This is the entry the Hetzner deploy runs as a systemd service
  * (`bun storage/framework/core/buddy/src/cli.ts serve`).
  */
 export function serve(buddy: CLI): void {
   buddy
-    .command('serve', 'Start the production HTTP server (STX views + coming-soon/maintenance gate)')
+    .command('serve', 'Start the production HTTP server (STX views + /api proxy + coming-soon/maintenance gate)')
     .option('-p, --port <port>', 'Port to listen on (defaults to PORT env or 3000)')
     .option('--verbose', 'Enable verbose output', { default: false })
     .action(async (options?: { port?: string | number, verbose?: boolean }) => {
@@ -29,7 +91,7 @@ export function serve(buddy: CLI): void {
 
       const port = Number(process.env.PORT) || 3000
 
-      const { overridesReady } = await import('@stacksjs/config')
+      const { config, overridesReady } = await import('@stacksjs/config')
       await overridesReady
 
       const { injectGlobalAutoImports } = await import('@stacksjs/server')
@@ -52,8 +114,9 @@ export function serve(buddy: CLI): void {
         }
         catch { /* try next */ }
       }
-      if (!stxServe)
+      if (!stxServe) {
         ;({ serve: stxServe } = await import('bun-plugin-stx/serve'))
+      }
 
       // Pre-resolve the vendored stx module + site/i18n config so `{t:…}`
       // translation tokens and the lang picker render in production exactly
@@ -62,19 +125,47 @@ export function serve(buddy: CLI): void {
       const { site: siteConfig, i18n: i18nConfig } = await loadStxSiteConfig()
 
       const userViewsPath = 'resources/views'
-      const defaultViewsPath = 'storage/framework/defaults/resources/views'
+      // Framework fallback resources (default views/layouts/components). A
+      // vendored checkout has them at storage/framework/defaults; an app that
+      // consumes the framework from node_modules gets them from the published
+      // @stacksjs/defaults package. Vendored wins so behaviour is unchanged.
+      const defaultsResources = resolveDefaultsResources()
+      const defaultViewsPath = join(defaultsResources, 'views')
       const userLayoutsPath = existsSync('resources/views/layouts') ? 'resources/views/layouts' : 'resources/layouts'
       const userComponentsPath = existsSync('resources/views/components') ? 'resources/views/components' : 'resources/components'
+
+      // Same-origin API target. Scaffolded client code fetches relative
+      // `/api/...` URLs (dashboard stores, CartDrawer, the coming-soon
+      // subscribe form), which the dev server reverse-proxies to the API
+      // process — production must do the same or every login and form
+      // POST 404s on stx-serve (stacksjs/stacks#1950).
+      const apiBase = process.env.API_URL
+        || `http://127.0.0.1:${Number(process.env.PORT_API) || config.ports?.api || 3008}`
 
       log.info(`Starting production server on port ${port}...`)
 
       await stxServe({
         patterns: [userViewsPath, defaultViewsPath],
         port,
-        componentsDir: 'storage/framework/defaults/resources/components',
+        // Never silently drift off the configured port: the reverse
+        // proxy/gateway routes to exactly this port, so stx's fallback bind
+        // on port+1 would serve nothing. Fail loudly instead (systemd
+        // restarts / the deploy health gate catches it).
+        autoIncrementPort: false,
+        // SO_REUSEPORT (stx >= 0.2.81): lets the next release's instance
+        // bind the same port while this one still serves — the overlap
+        // ts-cloud's zero-downtime cutover needs. Enabled for every *deployed*
+        // environment (production, staging, development), since each runs via
+        // the same templated systemd unit + health-gate handoff where the new
+        // release must bind the port before the old one is stopped. Off for
+        // local `serve` runs, where two servers fighting over one port should
+        // fail loudly. Ignored harmlessly by older stx versions.
+        reusePort: ['production', 'staging', 'development']
+          .includes((process.env.APP_ENV || '').toLowerCase()),
+        componentsDir: join(defaultsResources, 'components'),
         layoutsDir: userLayoutsPath,
         partialsDir: userComponentsPath,
-        fallbackLayoutsDir: 'storage/framework/defaults/resources/layouts',
+        fallbackLayoutsDir: join(defaultsResources, 'layouts'),
         fallbackPartialsDir: defaultViewsPath,
         quiet: options?.verbose !== true,
         ...(stxModule && { stxModule }),
@@ -85,13 +176,96 @@ export function serve(buddy: CLI): void {
         // and static assets, so the holding page renders and visitors with a
         // valid bypass cookie pass through.
         onRequest: async (req: Request) => {
-          const { maintenanceGate } = await import('@stacksjs/server')
-          return (await maintenanceGate(req)) ?? undefined
+          const { maintenanceGate, isApiBoundRequest, proxyToBackend } = await import('@stacksjs/server')
+          const gated = await maintenanceGate(req)
+          if (gated)
+            return gated
+
+          // Mirror the dev server's API forwarding: `/api/**` and any
+          // non-GET/HEAD verb belong to bun-router, never stx-serve.
+          // /docs is deliberately NOT proxied — in production it is a
+          // server-static site routed by the rpx gateway, not a dev server.
+          const url = new URL(req.url)
+          if (isApiBoundRequest(req, url.pathname)) {
+            try {
+              return await proxyToBackend(req, apiBase)
+            }
+            catch (error) {
+              log.error(`API proxy to ${apiBase} failed: ${(error as Error).message}`)
+              return new Response('Bad Gateway', { status: 502 })
+            }
+          }
+
+          // stx-native blog: /blog and /blog/<slug> render as stx pages, but
+          // the feed + sitemap are served from content/blog markdown here (no
+          // BunPress). HTML paths return null and fall through to stx.
+          if (existsSync(join(process.cwd(), 'resources/views/blog.stx'))) {
+            const { renderBlogFeed } = await import('@stacksjs/actions/blog')
+            const feed = await renderBlogFeed(req)
+            if (feed)
+              return feed
+          }
+
+          // Stash cookies + query string so server-script blocks rendering
+          // this request can pull them via globalThis.requestContext /
+          // __stxServeSearch — see the doc comment above this function.
+          ;(globalThis as { __stxServeSearch?: string }).__stxServeSearch = url.search
+          ;(globalThis as { __stxServeCookies?: Record<string, string> }).__stxServeCookies = parseCookies(req)
+
+          return undefined
         },
       })
 
       log.success(`Production server listening on http://0.0.0.0:${port}`)
     })
+}
+
+/**
+ * `buddy serve:api` — boot the production API server (bun-router routes).
+ *
+ * The twin of `buddy serve`: where that serves the STX frontend, this runs the
+ * loopback API the frontend proxies `/api` + non-GET requests to. The entry
+ * (`@stacksjs/actions/serve/api`) is resolved through the module graph, so it
+ * works whether the framework is vendored at `storage/framework/core` OR only
+ * installed under `node_modules/@stacksjs/actions`. This keeps deployments from
+ * having to hardcode a `storage/framework/core/...` path in their `start`
+ * command — `./buddy serve:api` resolves the framework wherever it lives.
+ */
+export function serveApi(buddy: CLI): void {
+  buddy
+    .command('serve:api', 'Start the production API server (bun-router routes the frontend proxies /api to)')
+    .option('-p, --port <port>', 'Port to listen on (defaults to PORT env or 3008)')
+    .action(async (options?: { port?: string | number }) => {
+      if (options?.port)
+        process.env.PORT = String(options.port)
+      process.env.APP_ENV = process.env.APP_ENV || 'production'
+
+      // The api entry is a self-booting server script; importing it starts it.
+      // Resolved from node_modules (or the vendored core) via the package name.
+      await import('@stacksjs/actions/serve/api')
+    })
+}
+
+/**
+ * Resolve the framework's default resources root (fallback views/layouts/
+ * components + preloader). A vendored checkout has them at
+ * `storage/framework/defaults/resources` (the source of truth), which wins so
+ * a full checkout behaves exactly as before. An app that consumes the framework
+ * from node_modules has no vendored copy, so fall back to the published
+ * `@stacksjs/defaults` package. Returns the vendored path if neither resolves,
+ * letting stx surface a clear missing-directory error.
+ */
+function resolveDefaultsResources(): string {
+  const vendored = 'storage/framework/defaults/resources'
+  if (existsSync(vendored))
+    return vendored
+  try {
+    const pkgJson = Bun.resolveSync('@stacksjs/defaults/package.json', process.cwd())
+    return join(dirname(pkgJson), 'resources')
+  }
+  catch {
+    return vendored
+  }
 }
 
 async function resolveVendoredStxModule(): Promise<any | undefined> {

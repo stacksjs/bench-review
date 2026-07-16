@@ -1,8 +1,9 @@
 {
   "name": "@stacksjs/i18n",
-  "version": "0.70.45",
+  "version": "0.70.87",
   "description": "Internationalization system for Stacks.js applications",
   "type": "module",
+  "sideEffects": false,
   "license": "MIT",
   "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/i18n#readme",
   "repository": {
@@ -16,16 +17,17 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "bun": "./src/index.ts",
-      "import": "./dist/index.js"
+      "development": "./src/index.ts",
+      "bun": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "scripts": {
     "build": "bun build.ts",
@@ -39,5 +41,15 @@
   },
   "devDependencies": {
     "@stacksjs/development": "workspace:*"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "bun": "./dist/index.js",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      }
+    }
   }
 }

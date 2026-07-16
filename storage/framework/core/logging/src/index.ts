@@ -138,7 +138,11 @@ export function normalizeError(err: unknown, depth = 0): NormalizedError {
   if (err == null)
     return { name: 'Error', message: String(err) }
   try {
-    return { name: 'Error', message: JSON.stringify(err) }
+    // Walk the object first so embedded Errors survive — a bare
+    // `JSON.stringify` would erase them to `{}` (stacksjs/stacks#1956).
+    // This is the path `log.error(msg, contextObject)` and the
+    // `log.struct` error-level emits land on.
+    return { name: 'Error', message: JSON.stringify(normalizeContextValue(err)) }
   }
   catch {
     return { name: 'Error', message: String(err) }
@@ -154,6 +158,38 @@ export function renderNormalizedError(n: NormalizedError): string {
     cause = cause.cause
   }
   return out
+}
+
+/**
+ * Normalize context values so embedded `Error`s survive JSON
+ * serialization (stacksjs/stacks#1956). `JSON.stringify(new Error())`
+ * yields `{}` (message/stack are non-enumerable), so any Error placed
+ * in a context object — `log.warn('…', { error: err })` — was silently
+ * erased from the log line. Walks plain objects and arrays (bounded)
+ * and converts each Error via {@link normalizeError}; everything else
+ * passes through untouched.
+ */
+function normalizeContextValue(value: unknown, depth = 0): unknown {
+  if (value instanceof Error)
+    return normalizeError(value)
+  if (depth >= 4 || value === null || typeof value !== 'object')
+    return value
+  if (Array.isArray(value))
+    return value.map(v => normalizeContextValue(v, depth + 1))
+  // Only walk plain objects — class instances (Date, Map, …) keep
+  // their existing JSON.stringify behavior.
+  const proto = Object.getPrototypeOf(value)
+  if (proto !== Object.prototype && proto !== null)
+    return value
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(value as Record<string, unknown>))
+    out[k] = normalizeContextValue(v, depth + 1)
+  return out
+}
+
+/** Apply {@link normalizeContextValue} to a structured log context. */
+export function normalizeContext(ctx: LogContext): LogContext {
+  return normalizeContextValue(ctx) as LogContext
 }
 
 const logContextStorage = new AsyncLocalStorage<LogContext>()
@@ -253,9 +289,15 @@ async function getLogger(): Promise<Logger> {
 
 // Helper function to format message for logging, including request context
 function formatMessage(...args: unknown[]): string {
-  const base = args.map(arg =>
-    typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg),
-  ).join(' ')
+  // Errors (bare or nested in object args) need normalizing first —
+  // `JSON.stringify(new Error())` is `{}` (stacksjs/stacks#1956).
+  const base = args.map((arg) => {
+    if (arg instanceof Error)
+      return renderNormalizedError(normalizeError(arg))
+    if (typeof arg === 'object' && arg !== null)
+      return JSON.stringify(normalizeContextValue(arg), null, 2)
+    return String(arg)
+  }).join(' ')
 
   // Prepend request ID if available
   const ctx = logContextStorage.getStore()
@@ -282,7 +324,7 @@ export interface Log {
    * works for back-compat but is deprecated — see {@link LogErrorOptions}.
    */
   error: (message: string | Error | unknown, error?: unknown, context?: LogContext) => Promise<void>
-  warn: (arg: string, context?: LogContext) => Promise<void>
+  warn: (arg: string, context?: unknown) => Promise<void>
   warning: (arg: string) => Promise<void>
   debug: (...args: unknown[]) => Promise<void>
   dump: (...args: unknown[]) => Promise<void>
@@ -329,12 +371,21 @@ export interface LogErrorOptions {
   message?: ErrorMessage
 }
 
+const LEGACY_ERROR_OPTION_KEYS: ReadonlySet<string> = new Set(['shouldExit', 'silent', 'message'])
+
 /** Whether a value is the legacy `LogErrorOptions` object (not an Error). */
 function isLegacyErrorOptions(v: unknown): v is LogErrorOptions {
-  return !!v
-    && typeof v === 'object'
-    && !(v instanceof Error)
-    && ('shouldExit' in v || 'silent' in v || ('message' in v && Object.keys(v as object).length <= 3))
+  if (!v || typeof v !== 'object' || v instanceof Error)
+    return false
+  // Legacy options always carry an exit/silence flag. A bare `message`
+  // key is not enough — real contexts like `{ type, message, error }`
+  // matched the old "<= 3 keys with message" heuristic and were
+  // swallowed whole (stacksjs/stacks#1956). Unknown keys also disqualify
+  // so a context that happens to contain `shouldExit` can't trigger the
+  // fatal-exit path.
+  if (!('shouldExit' in v || 'silent' in v))
+    return false
+  return Object.keys(v).every(k => LEGACY_ERROR_OPTION_KEYS.has(k))
 }
 
 export const log: Log = {
@@ -349,9 +400,14 @@ export const log: Log = {
     await logger.success(message)
   },
 
-  warn: async (message: string, context?: LogContext) => {
+  warn: async (message: string, context?: unknown) => {
     const logger = await getLogger()
-    await logger.warn(message, context as Record<string, unknown> | undefined)
+    // Normalize so Errors in the context survive clarity's JSON.stringify
+    // (stacksjs/stacks#1956).
+    const normalized = context === undefined
+      ? undefined
+      : normalizeContextValue(context) as Record<string, unknown>
+    await logger.warn(message, normalized)
   },
 
   warning: async (message: string) => {
@@ -385,7 +441,7 @@ export const log: Log = {
     const mergedCtx = { ...getLogContext(), ...context }
     if (Object.keys(mergedCtx).length > 0) {
       try {
-        line = `${line} ${JSON.stringify(mergedCtx)}`
+        line = `${line} ${JSON.stringify(normalizeContext(mergedCtx))}`
       }
       catch {
         // Non-serializable context — skip rather than throw on the error path.
@@ -444,7 +500,7 @@ export const log: Log = {
     return async (metadata?: LogContext) => {
       const duration = performance.now() - start
       const logger = await getLogger()
-      const meta = metadata ? ` ${JSON.stringify(metadata)}` : ''
+      const meta = metadata ? ` ${JSON.stringify(normalizeContext(metadata))}` : ''
       await logger.info(`${label}: ${duration.toFixed(2)}ms${meta}`)
     }
   },

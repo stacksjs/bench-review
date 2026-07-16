@@ -1,7 +1,7 @@
 {
   "name": "@stacksjs/ui",
   "type": "module",
-  "version": "0.70.45",
+  "version": "0.70.87",
   "description": "The Stacks UI engine.",
   "author": "Chris Breuer",
   "contributors": [
@@ -32,32 +32,38 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "bun": "./src/index.ts",
-      "import": "./dist/index.js"
+      "development": "./src/index.ts",
+      "bun": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./components": {
       "types": "./dist/components.d.ts",
-      "bun": "./src/components.ts",
-      "import": "./dist/components.js"
+      "development": "./src/components.ts",
+      "bun": "./dist/components.js",
+      "import": "./dist/components.js",
+      "default": "./dist/components.js"
     }
   },
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "README.md",
-    "dist",
-    "src"
+    "dist"
   ],
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "bun tsc --noEmit",
     "prepublishOnly": "bun run build"
   },
+  "dependencies": {
+    "@cwcss/crosswind": "^0.2.6",
+    "@stacksjs/components": "^0.2.82"
+  },
   "devDependencies": {
     "@stacksjs/build": "workspace:*",
     "@stacksjs/config": "workspace:*",
-    "better-dx": "^0.2.12",
-    "@stacksjs/router": "workspace:*",
-    "@stacksjs/stx": "^0.2.82"
+    "better-dx": "^0.2.16",
+    "@stacksjs/router": "workspace:*"
   }
 }

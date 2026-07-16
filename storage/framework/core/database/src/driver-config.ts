@@ -6,7 +6,7 @@
  * SQLite, MySQL, and PostgreSQL.
  */
 
-import type { SupportedDialect } from '@stacksjs/query-builder'
+import type { StacksDialect } from '@stacksjs/query-builder'
 import { env } from '@stacksjs/env'
 
 /**
@@ -39,6 +39,33 @@ export interface MysqlConfig {
   charset?: string
   /** Collation */
   collation?: string
+}
+
+/**
+ * SingleStore specific configuration.
+ *
+ * SingleStore (formerly MemSQL) speaks the MySQL wire protocol, so it shares
+ * MySQL's connection shape. It diverges only in DDL (distributed tables with
+ * SHARD KEY / SORT KEY, no foreign keys) — handled by the migration generator,
+ * not by the connection layer.
+ */
+export interface SinglestoreConfig {
+  /** Database name */
+  name: string
+  /** Database host (e.g. the SingleStore Helios/managed endpoint) */
+  host?: string
+  /** Database port (SingleStore listens on 3306, the MySQL port) */
+  port?: number
+  /** Database username */
+  username?: string
+  /** Database password */
+  password?: string
+  /** Table prefix */
+  prefix?: string
+  /** Character set */
+  charset?: string
+  /** Whether to require TLS — managed SingleStore (Helios) requires it */
+  ssl?: boolean
 }
 
 /**
@@ -102,6 +129,7 @@ export interface DynamoDbConfig {
 export interface DatabaseConnections {
   sqlite?: SqliteConfig
   mysql?: MysqlConfig
+  singlestore?: SinglestoreConfig
   postgres?: PostgresConfig
   dynamodb?: DynamoDbConfig
 }
@@ -111,7 +139,7 @@ export interface DatabaseConnections {
  */
 export interface FullDatabaseConfig {
   /** Default database driver */
-  default: SupportedDialect
+  default: StacksDialect
   /** Connection configurations */
   connections: DatabaseConnections
   /** Migrations table name */
@@ -123,7 +151,7 @@ export interface FullDatabaseConfig {
 /**
  * Default configuration values for each driver
  */
-export const driverDefaults: Record<SupportedDialect, Partial<SqliteConfig | MysqlConfig | PostgresConfig | DynamoDbConfig>> = {
+export const driverDefaults: Record<StacksDialect, Partial<SqliteConfig | MysqlConfig | SinglestoreConfig | PostgresConfig | DynamoDbConfig>> = {
   sqlite: {
     database: 'database/stacks.sqlite',
     prefix: '',
@@ -137,6 +165,16 @@ export const driverDefaults: Record<SupportedDialect, Partial<SqliteConfig | Mys
     prefix: '',
     charset: 'utf8mb4',
     collation: 'utf8mb4_unicode_ci',
+  },
+  singlestore: {
+    name: 'stacks',
+    host: '127.0.0.1',
+    port: 3306,
+    username: 'root',
+    password: '',
+    prefix: '',
+    charset: 'utf8mb4',
+    ssl: false,
   },
   postgres: {
     name: 'stacks',
@@ -153,7 +191,7 @@ export const driverDefaults: Record<SupportedDialect, Partial<SqliteConfig | Mys
 /**
  * Get the connection string for a given driver and configuration
  */
-export function getConnectionString(driver: SupportedDialect, config: DatabaseConnections[keyof DatabaseConnections]): string {
+export function getConnectionString(driver: StacksDialect, config: DatabaseConnections[keyof DatabaseConnections]): string {
   switch (driver) {
     case 'sqlite': {
       const sqliteConfig = config as SqliteConfig
@@ -166,6 +204,13 @@ export function getConnectionString(driver: SupportedDialect, config: DatabaseCo
     case 'mysql': {
       const mysqlConfig = config as MysqlConfig
       const { name, host = '127.0.0.1', port = 3306, username = 'root', password = '' } = mysqlConfig
+      return `mysql://${username}:${password}@${host}:${port}/${name}`
+    }
+
+    // SingleStore is MySQL wire-compatible, so it dials over `mysql://`.
+    case 'singlestore': {
+      const ssConfig = config as SinglestoreConfig
+      const { name, host = '127.0.0.1', port = 3306, username = 'root', password = '' } = ssConfig
       return `mysql://${username}:${password}@${host}:${port}/${name}`
     }
 
@@ -183,7 +228,7 @@ export function getConnectionString(driver: SupportedDialect, config: DatabaseCo
 /**
  * Validate driver configuration
  */
-export function validateDriverConfig(driver: SupportedDialect, config: DatabaseConnections[keyof DatabaseConnections]): { valid: boolean, errors: string[] } {
+export function validateDriverConfig(driver: StacksDialect, config: DatabaseConnections[keyof DatabaseConnections]): { valid: boolean, errors: string[] } {
   const errors: string[] = []
 
   switch (driver) {
@@ -199,6 +244,14 @@ export function validateDriverConfig(driver: SupportedDialect, config: DatabaseC
       const mysqlConfig = config as MysqlConfig
       if (!mysqlConfig.name) {
         errors.push('MySQL requires a database name')
+      }
+      break
+    }
+
+    case 'singlestore': {
+      const ssConfig = config as SinglestoreConfig
+      if (!ssConfig.name) {
+        errors.push('SingleStore requires a database name')
       }
       break
     }
@@ -228,14 +281,14 @@ export function mergeWithDefaults<T extends keyof DatabaseConnections>(
   driver: T,
   config: Partial<DatabaseConnections[T]>,
 ): DatabaseConnections[T] {
-  const defaults = driverDefaults[driver as SupportedDialect]
+  const defaults = driverDefaults[driver as StacksDialect]
   return { ...defaults, ...config } as DatabaseConnections[T]
 }
 
 /**
  * Get the appropriate configuration for a driver from environment variables
  */
-export function getConfigFromEnv(driver: SupportedDialect): DatabaseConnections[keyof DatabaseConnections] {
+export function getConfigFromEnv(driver: StacksDialect): DatabaseConnections[keyof DatabaseConnections] {
 
   switch (driver) {
     case 'sqlite':
@@ -253,6 +306,17 @@ export function getConfigFromEnv(driver: SupportedDialect): DatabaseConnections[
         password: env.DB_PASSWORD || '',
         prefix: env.DB_PREFIX || '',
       } as MysqlConfig
+
+    case 'singlestore':
+      return {
+        name: env.DB_DATABASE || 'stacks',
+        host: env.DB_HOST || '127.0.0.1',
+        port: env.DB_PORT ?? 3306,
+        username: env.DB_USERNAME || 'root',
+        password: env.DB_PASSWORD || '',
+        prefix: env.DB_PREFIX || '',
+        ssl: ((env as Record<string, string | undefined>).DB_SSL) === 'true' || ((env as Record<string, string | undefined>).DB_SSL) === '1',
+      } as SinglestoreConfig
 
     case 'postgres':
       return {
@@ -273,10 +337,10 @@ export function getConfigFromEnv(driver: SupportedDialect): DatabaseConnections[
 /**
  * Detect the best available driver based on environment
  */
-export function detectDriver(): SupportedDialect {
+export function detectDriver(): StacksDialect {
   // Check for explicit configuration
   if (env.DB_CONNECTION) {
-    return env.DB_CONNECTION as SupportedDialect
+    return env.DB_CONNECTION as StacksDialect
   }
 
   // Check for PostgreSQL connection info

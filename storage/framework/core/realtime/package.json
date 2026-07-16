@@ -1,7 +1,8 @@
 {
   "name": "@stacksjs/realtime",
   "type": "module",
-  "version": "0.70.45",
+  "sideEffects": false,
+  "version": "0.70.87",
   "description": "The Stacks realtime integration. Built on top of ts-broadcasting.",
   "author": "Chris Breuer",
   "contributors": [
@@ -28,12 +29,16 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "bun": "./src/index.ts",
-      "import": "./dist/index.js"
+      "development": "./src/index.ts",
+      "bun": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./*": {
-      "bun": "./src/*",
-      "import": "./dist/*"
+      "development": "./src/*",
+      "bun": "./dist/*",
+      "import": "./dist/*",
+      "default": "./dist/*"
     }
   },
   "module": "dist/index.js",
@@ -51,6 +56,6 @@
     "ts-broadcasting": "^0.0.5"
   },
   "devDependencies": {
-    "better-dx": "^0.2.12"
+    "better-dx": "^0.2.16"
   }
 }

@@ -52,9 +52,44 @@ function warnOnceAboutMissingTable(): void {
   )
 }
 
-function isMissingTableError(err: unknown): boolean {
-  const msg = (err as { message?: string } | null)?.message ?? ''
-  return msg.includes('no such table') || msg.includes("doesn't exist")
+/**
+ * Does this error mean the backing table simply hasn't been migrated yet?
+ * Exported for direct unit coverage across dialects.
+ *
+ * Each supported database phrases "missing table" differently, and the
+ * suppression layer is fail-open — so a matcher that only knows sqlite/mysql
+ * would let Postgres's wording slip through and hard-fail every send on an
+ * un-migrated Postgres DB (stacksjs/stacks#1976). We scope the Postgres check
+ * to `undefined_table` specifically (SQLSTATE 42P01 / `relation "..." does not
+ * exist`) rather than a bare `does not exist`, so a genuine `column ... does
+ * not exist` schema bug still surfaces instead of being silently swallowed.
+ */
+export function isMissingTableError(err: unknown): boolean {
+  const e = err as { message?: string, code?: string } | null
+  const msg = e?.message ?? ''
+  return e?.code === '42P01' // postgres SQLSTATE: undefined_table
+    || msg.includes('no such table') // sqlite
+    || msg.includes("doesn't exist") // mysql: Table '...' doesn't exist
+    || /relation "[^"]*" does not exist/i.test(msg) // postgres wording
+}
+
+/**
+ * The suppression list is a best-effort compliance safeguard, not a hard
+ * dependency of sending. When its backing store is simply unavailable — the
+ * DB connection dropped, the file can't be opened, no database is configured —
+ * we must NOT let that take down every outbound email. Treat those the same
+ * way as a missing table: warn once, then proceed (fail-open).
+ */
+function isSuppressionStoreUnavailable(err: unknown): boolean {
+  if (isMissingTableError(err))
+    return true
+  const msg = ((err as { message?: string } | null)?.message ?? '').toLowerCase()
+  return msg.includes('connection closed')
+    || msg.includes('unable to open database')
+    || msg.includes('econnrefused')
+    || msg.includes('connection terminated')
+    || msg.includes('no database')
+    || msg.includes('database connection')
 }
 
 /**
@@ -89,7 +124,7 @@ export async function isSuppressed(email: string, type?: SuppressionType): Promi
     return Boolean(row)
   }
   catch (err) {
-    if (isMissingTableError(err)) {
+    if (isSuppressionStoreUnavailable(err)) {
       warnOnceAboutMissingTable()
       return false
     }
@@ -114,7 +149,7 @@ export async function getSuppressions(email: string): Promise<SuppressionRecord[
     return rows ?? []
   }
   catch (err) {
-    if (isMissingTableError(err)) {
+    if (isSuppressionStoreUnavailable(err)) {
       warnOnceAboutMissingTable()
       return []
     }
@@ -151,7 +186,7 @@ export async function suppress(
       .execute()
   }
   catch (err) {
-    if (isMissingTableError(err)) {
+    if (isSuppressionStoreUnavailable(err)) {
       warnOnceAboutMissingTable()
       return
     }
@@ -177,7 +212,7 @@ export async function unsuppress(email: string, type: SuppressionType): Promise<
       .execute()
   }
   catch (err) {
-    if (isMissingTableError(err)) {
+    if (isSuppressionStoreUnavailable(err)) {
       warnOnceAboutMissingTable()
       return
     }

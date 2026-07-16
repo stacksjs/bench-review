@@ -6,27 +6,37 @@
  * the unawaited result).
  *
  * Post-fix:
- *   • Sync `save()` throws a clear error when a setter returns a Promise
- *     (so the failure mode is visible, not silent).
+ *   • The Stacks proxy `save()` wrapper pre-runs the setter pipeline
+ *     synchronously and throws a clear error when a setter returns a
+ *     Promise (so the failure mode is visible, not silent) before
+ *     delegating to bun-query-builder's async save().
  *   • The Stacks proxy adds `saveAsync()` / `updateAsync()` which await
- *     async setters and then delegate to the sync save with setters
+ *     async setters and then delegate to the underlying save with setters
  *     temporarily disabled (so the setter pipeline runs exactly once).
  *
  * We can't run a full integration save() in unit tests (no real table),
  * but we can lock in:
  *   - The proxy exposes `saveAsync` / `updateAsync` on every instance.
- *   - Sync save() throws the new helpful error when a setter returns a Promise.
+ *   - save() throws the new helpful error synchronously when a setter
+ *     returns a Promise.
  *   - Sync setters still work as before (regression guard).
  */
-import { describe, expect, it, beforeAll } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { configureOrm, getDatabase } from 'bun-query-builder'
+import { acquireDbConfigLock } from '@stacksjs/database'
 import { defineModel } from '../src/define-model'
 
 describe('instance mutator pipeline', () => {
   let db: Database
+  // `configureOrm()` mutates the same process-wide bun-query-builder config
+  // singleton `initializeDbConfig()` does (stacksjs/stacks#1862) — hold the
+  // lock for this file's entire lifetime so a sibling file's own config
+  // call (via either entry point) can't repoint our connection mid-run.
+  let releaseDbConfigLock: () => void
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    releaseDbConfigLock = await acquireDbConfigLock()
     configureOrm({ database: ':memory:' })
     db = getDatabase()
     db.run(`CREATE TABLE async_set_users (
@@ -38,6 +48,10 @@ describe('instance mutator pipeline', () => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT
     )`)
+  })
+
+  afterAll(() => {
+    releaseDbConfigLock()
   })
 
   const AsyncSetUser = defineModel({
@@ -119,7 +133,7 @@ describe('instance mutator pipeline', () => {
     expect(row.email).toBe('mixed@case.com')
 
     ;(inst as any).email = 'AGAIN@CASE.COM'
-    ;(inst as any).save()
+    await (inst as any).save()
     const row2 = db.query('SELECT email FROM sync_set_users WHERE id = ?').get((inst as any).id) as any
     expect(row2.email).toBe('again@case.com')
   })

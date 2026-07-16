@@ -25,6 +25,24 @@ export interface ServicesOptions {
     scopes?: string[]
   }
 
+  /**
+   * Sign in with Apple. Apple has no static client secret — the driver
+   * signs a short-lived ES256 JWT from teamId + keyId + privateKey
+   * (the .p8 file's contents) instead.
+   */
+  apple?: {
+    /** The Services ID identifier, e.g. `org.example.web` */
+    clientId: string
+    /** Apple Developer Team ID (10 chars) */
+    teamId: string
+    /** Key ID of the "Sign in with Apple" key */
+    keyId: string
+    /** Contents of the downloaded .p8 private key */
+    privateKey: string
+    redirectUrl: string
+    scopes?: string[]
+  }
+
   facebook?: {
     clientId: string
     clientSecret: string
@@ -168,6 +186,14 @@ export interface ServicesOptions {
   stripe?: {
     secretKey?: string
     publicKey?: string
+    /**
+     * Signing secret for verifying inbound Stripe webhook requests
+     * (`whsec_...`, from the Stripe dashboard's webhook endpoint
+     * config). Required by any app receiving Stripe webhooks —
+     * without it, `stripe.webhooks.constructEvent` has nothing to
+     * verify the `stripe-signature` header against.
+     */
+    webhookSecret?: string
     /**
      * Pinned Stripe API version. Defaults to whatever the bundled SDK
      * was compiled against; override here when rolling forward without

@@ -2,7 +2,11 @@ import { randomBytes } from 'node:crypto'
 import { config } from '@stacksjs/config'
 import { db } from '@stacksjs/database'
 import { mail, template } from '@stacksjs/email'
+import { log } from '@stacksjs/logging'
+import { formatDate } from '@stacksjs/orm'
 import { makeHash, verifyHash } from '@stacksjs/security'
+import { sessionDestroyAll } from '../session-auth'
+import { revokeAllTokens } from '../tokens'
 
 export interface PasswordResetResult {
   success: boolean
@@ -61,6 +65,19 @@ async function sendPasswordChangedNotification(userEmail: string): Promise<void>
         supportEmail,
       },
     })
+
+    // template() swallows missing-template and STX-render failures into
+    // empty strings instead of throwing (template.ts returns
+    // { html: '', text: '' }), which would mail a blank notification with
+    // no information. Send a plain-text notification instead.
+    if (!html && !text) {
+      await mail.send({
+        to: userEmail,
+        subject: `Your ${appName} password has been changed`,
+        text: `Your ${appName} password was changed on ${changedAt}.${supportEmail ? ` If this wasn't you, contact ${supportEmail}.` : ''}`,
+      })
+      return
+    }
 
     await mail.send({
       to: userEmail,
@@ -147,6 +164,16 @@ export function passwordResets(email: string): PasswordResetActions {
           expireMinutes,
         },
       })
+
+      // template() swallows missing-template and STX-render failures into
+      // empty strings instead of throwing (template.ts returns
+      // { html: '', text: '' }), which would mail a blank email with no
+      // reset link. Treat an empty render as failure so the plain-text
+      // fallback below actually fires — guards against a deleted/broken
+      // template (template() now resolves the shipped defaults too,
+      // see stacksjs/stacks#1944).
+      if (!html && !text)
+        throw new Error('password-reset template missing or rendered empty')
 
       await mail.send({
         to: email,
@@ -247,12 +274,37 @@ export function passwordResets(email: string): PasswordResetActions {
 
       const hashedPassword = await makeHash(newPassword, { algorithm: 'bcrypt' })
 
-      // Update password
-      await trx
-        .updateTable('users')
-        .set({ password: hashedPassword })
-        .where('email', '=', email)
-        .executeTakeFirst()
+      // Update password AND stamp password_changed_at so every token /
+      // refresh token issued before this moment is rejected at use-time,
+      // not merely by the post-commit sweep (stacksjs/stacks#1957). The
+      // stamp is UTC 'YYYY-MM-DD HH:MM:SS' (formatDate), the same clock
+      // family as the token rows' CURRENT_TIMESTAMP so comparisons stay
+      // coherent. A future authenticated change-password endpoint MUST
+      // stamp this column too. If the column doesn't exist yet (DB not
+      // migrated), retry the update without the stamp — account recovery
+      // must never break on an un-migrated database (the sweep still runs
+      // post-commit; the binding is simply inert until `buddy migrate`).
+      try {
+        await trx
+          .updateTable('users')
+          .set({ password: hashedPassword, password_changed_at: formatDate(new Date()) } as never)
+          .where('email', '=', email)
+          .executeTakeFirst()
+      }
+      catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        if (/password_changed_at|no such column|unknown column/i.test(message)) {
+          log.warn('[PasswordReset] password_changed_at column missing — run `buddy migrate`; resetting without the credential-version stamp')
+          await trx
+            .updateTable('users')
+            .set({ password: hashedPassword })
+            .where('email', '=', email)
+            .executeTakeFirst()
+        }
+        else {
+          throw err
+        }
+      }
 
       // Delete the used reset token
       await trx
@@ -260,15 +312,41 @@ export function passwordResets(email: string): PasswordResetActions {
         .where('email', '=', email)
         .execute()
 
-      return { success: true as const }
+      return { success: true as const, userId: Number(user.id) }
     })
 
-    // Send password changed notification (async, non-blocking)
-    // This runs after the transaction is committed to ensure the password was actually changed
+    // Post-commit side effects: revocation + notification.
     if (result.success) {
+      // Evict every existing session for the account. Password reset is
+      // the canonical account-recovery action; without this, a previously
+      // stolen refresh token keeps minting fresh access tokens for up to
+      // 30 days after the victim "secures" the account. Must be the
+      // standalone tokens.ts primitive (NOT Auth.revokeAllTokens): the
+      // /auth/refresh exchange checks only the refresh row's `revoked`
+      // flag, so revoking access tokens alone leaves the refresh chain
+      // alive. Awaited un-caught deliberately — if revocation fails, the
+      // request fails loud rather than reporting a "successful" reset
+      // that left the attacker logged in. Runs after the transaction
+      // commits: it uses the global connection (risking SQLITE_BUSY
+      // against a held write lock) and must not fire on rollback.
+      // See stacksjs/stacks#1947.
+      await revokeAllTokens(result.userId)
+
+      // Session cookies are a parallel credential: `sessions` rows are
+      // validated on existence + expires_at alone, never re-checked
+      // against the password hash, so they'd survive the reset for up
+      // to 24h. Same fail-loud, post-commit rationale as above.
+      await sessionDestroyAll(result.userId)
+
+      // Send password changed notification (async, non-blocking)
+      // This runs after the transaction is committed to ensure the password was actually changed
       sendPasswordChangedNotification(email).catch((err) => {
         console.error('[PasswordReset] Failed to send notification:', err)
       })
+
+      // Strip the internal userId so the public PasswordResetResult
+      // shape stays unchanged.
+      return { success: true }
     }
 
     return result

@@ -7,10 +7,12 @@
 
 import type { EnhancedRequest } from '@stacksjs/bun-router'
 import { route } from '@stacksjs/router'
+import { env } from '@stacksjs/env'
 import { projectPath } from '@stacksjs/path'
 import { createQueryBuilder, defaultConfig, setConfig } from '@stacksjs/query-builder'
 import { HttpError } from '@stacksjs/error-handling'
 import { log } from '@stacksjs/logging'
+import { applyCasts, applySorting, buildIndexMeta, buildIndexPaginator, buildReadColumnMap, dropHiddenInputs, filterFillable, mapWriteError, resolveApiMiddleware, resolveIndexPageArgs, stripHidden, toSnakeCase, toSnakeCaseKeys } from './src/auto-crud'
 
 // Initialize the query builder config from the project's optional
 // `config/qb.ts` override (stacksjs/stacks#1930).
@@ -20,17 +22,40 @@ import { log } from '@stacksjs/logging'
 // and a hard `await import(...)` here used to throw `Cannot find
 // module config/qb.ts` and abort the entire ORM-route bootstrap (so
 // every model-backed Action 404'd in production while `buddy dev`
-// masked it against stale local state). Fall back to
-// bun-query-builder's `defaultConfig` (env-driven) when the override
-// is missing so a clean environment boots cleanly.
+// masked it against stale local state).
+//
+// The fallback used to be bun-query-builder's own `defaultConfig`, whose
+// doc comment claims it's "env-driven" but is actually a hardcoded
+// `dialect: 'postgres'` literal — every project running the framework's
+// own zero-config SQLite default (any fresh `buddy new`, since no
+// config/qb.ts is ever scaffolded) got every useApi-generated REST route
+// silently pointed at Postgres, failing with "role \"postgres\" does not
+// exist" the moment anything hit GET /api/{resource}. Derive the fallback
+// from the same DB_CONNECTION / DB_DATABASE_PATH env vars every other
+// data-layer entry point (migrations, the ORM itself) already reads,
+// instead of a package-level default that has never matched this
+// framework's own default database.
 const qbConfigPath = projectPath('config/qb.ts')
 try {
   const projectQbConfig = (await import(qbConfigPath)).default
   setConfig(projectQbConfig ?? defaultConfig)
 }
 catch {
-  log.debug(`[orm] No config/qb.ts override found — using bun-query-builder defaults`)
-  setConfig(defaultConfig)
+  log.debug(`[orm] No config/qb.ts override found — deriving config from DB_CONNECTION`)
+  const dialect = (env.DB_CONNECTION as 'sqlite' | 'mysql' | 'postgres' | undefined) || 'sqlite'
+  setConfig({
+    ...defaultConfig,
+    dialect,
+    database: dialect === 'sqlite'
+      ? { database: env.DB_DATABASE_PATH || 'database/stacks.sqlite' }
+      : {
+          database: env.DB_DATABASE || 'stacks',
+          host: env.DB_HOST || '127.0.0.1',
+          port: env.DB_PORT || (dialect === 'postgres' ? 5432 : 3306),
+          username: env.DB_USERNAME || (dialect === 'postgres' ? 'postgres' : 'root'),
+          password: env.DB_PASSWORD || '',
+        },
+  } as Parameters<typeof setConfig>[0])
 }
 
 // Load all models from app/Models/ (individually, so one broken model doesn't block the rest)
@@ -90,46 +115,6 @@ function getHiddenFields(model: any): string[] {
     .map(([name]: [string, any]) => name)
 }
 
-// Helper: strip hidden fields from a record
-function stripHidden(record: any, hiddenFields: string[]): any {
-  if (!record || hiddenFields.length === 0) return record
-  const result = { ...record }
-  for (const field of hiddenFields) {
-    delete result[field]
-  }
-  return result
-}
-
-// Helper: filter request body to only fillable fields
-function filterFillable(body: any, fillableFields: string[]): Record<string, any> {
-  if (!body || fillableFields.length === 0) return {}
-  const result: Record<string, any> = {}
-  for (const field of fillableFields) {
-    if (field in body) {
-      result[field] = body[field]
-    }
-  }
-  return result
-}
-
-// Built-in cast resolvers — kept in sync with @stacksjs/orm/define-model.
-// A duplicate here is the simplest way to keep auto-CRUD parity with the
-// model-driven path without introducing a circular import.
-const AUTO_CRUD_CASTERS: Record<string, { get: (v: unknown) => unknown, set: (v: unknown) => unknown }> = {
-  string:   { get: v => v != null ? String(v) : null,                                set: v => v != null ? String(v) : null },
-  number:   { get: v => v != null ? Number(v) : null,                                set: v => v != null ? Number(v) : null },
-  integer:  { get: v => v != null ? Math.trunc(Number(v)) : null,                    set: v => v != null ? Math.trunc(Number(v)) : null },
-  float:    { get: v => v != null ? Number.parseFloat(String(v)) : null,             set: v => v != null ? Number.parseFloat(String(v)) : null },
-  boolean:  { get: v => v === 1 || v === '1' || v === true || v === 'true',         set: v => (v === true || v === 1 || v === '1' || v === 'true') ? 1 : 0 },
-  json:     { get: v => v == null ? null : (typeof v === 'string' ? safeJSON(v) : v), set: v => v == null ? null : typeof v === 'string' ? v : JSON.stringify(v) },
-  datetime: { get: v => v ? new Date(v as string) : null,                            set: v => v instanceof Date ? v.toISOString() : v },
-  date:     { get: v => v ? new Date(v as string) : null,                            set: v => v instanceof Date ? (v.toISOString().split('T')[0] as string) : v },
-  array:    { get: v => v == null ? [] : Array.isArray(v) ? v : (typeof v === 'string' ? safeJSONOrEmpty(v) : []), set: v => v == null ? null : Array.isArray(v) ? JSON.stringify(v) : v },
-}
-
-function safeJSON(s: string): unknown { try { return JSON.parse(s) } catch { return s } }
-function safeJSONOrEmpty(_s: string): unknown { try { return JSON.parse(_s) } catch { return [] } }
-
 // Run each declared `validation.rule` against an incoming write payload.
 // Returns { valid: true } or { valid: false, errors }. Per-attribute custom
 // messages from `validation.message` override the rule's default text.
@@ -161,12 +146,6 @@ function validateWriteBody(
     }
   }
   return Object.keys(errors).length === 0 ? { valid: true } : { valid: false, errors }
-}
-
-// Convert PascalCase model name to snake_case for default relation key
-// + FK convention (HostProfile → host_profile, host_profile_id).
-function toSnakeCase(s: string): string {
-  return s.replace(/([a-z\d])([A-Z])/g, '$1_$2').replace(/([A-Z])([A-Z][a-z])/g, '$1_$2').toLowerCase()
 }
 
 // Naive English pluralization for hasMany relation names. Matches
@@ -253,17 +232,6 @@ async function applyIncludes(
   return rows
 }
 
-// Drop attribute keys flagged `hidden: true` from an incoming write body.
-// `hidden` already protects the response shape; this protects the request
-// shape so a curious client can't sneak `payment_intent_id` into a PATCH
-// even when the field is fillable for internal callers.
-function dropHiddenInputs(data: Record<string, any>, hiddenFields: string[]): Record<string, any> {
-  if (!hiddenFields.length) return data
-  const out: Record<string, any> = { ...data }
-  for (const f of hiddenFields) delete out[f]
-  return out
-}
-
 // Apply user-defined `set:` hooks (e.g. User.set.password = bcrypt) before
 // raw DB writes so the auto-CRUD store/update endpoints don't end up storing
 // plaintext where the model declared a transformation. Mirrors the helper
@@ -287,32 +255,17 @@ async function applyDefinedSetters(data: Record<string, any>, model: any): Promi
 
 // Apply set-side casts (input → DB shape) so PATCH /api/cars/{id} with
 // `{ instant_book: true }` writes `1`, matching what model.create() does.
+// applyCasts handles BOTH key spellings (attribute name + snake column).
 function applySetCasts(data: Record<string, any>, model: any): Record<string, any> {
-  const casts: Record<string, string | { get: any, set: any }> = model?.casts ?? {}
-  if (!casts || Object.keys(casts).length === 0 || !data) return data
-  const out: Record<string, any> = { ...data }
-  for (const [attr, castDef] of Object.entries(casts)) {
-    if (Object.prototype.hasOwnProperty.call(out, attr)) {
-      const caster = typeof castDef === 'string' ? AUTO_CRUD_CASTERS[castDef] : castDef
-      if (caster) out[attr] = caster.set(out[attr])
-    }
-  }
-  return out
+  return applyCasts(data, model?.casts, 'set')
 }
 
 // Apply read-side casts (DB shape → JS-typed values) so the auto-CRUD
 // returns `instant_book: true` instead of the raw SQLite text `"1"`.
+// DB rows come back keyed by snake_case columns while casts are declared
+// by attribute name — applyCasts matches either spelling.
 function applyReadCasts(row: any, model: any): any {
-  const casts: Record<string, string | { get: any, set: any }> = model?.casts ?? {}
-  if (!row || typeof row !== 'object' || !casts || Object.keys(casts).length === 0) return row
-  const out: Record<string, any> = { ...row }
-  for (const [attr, castDef] of Object.entries(casts)) {
-    if (Object.prototype.hasOwnProperty.call(out, attr)) {
-      const caster = typeof castDef === 'string' ? AUTO_CRUD_CASTERS[castDef] : castDef
-      if (caster) out[attr] = caster.get(out[attr])
-    }
-  }
-  return out
+  return applyCasts(row, model?.casts, 'get')
 }
 
 // Helper: create JSON response
@@ -396,28 +349,6 @@ function coerceId(raw: unknown): number | string | null {
   return null
 }
 
-// Apply sort parameter to a query builder chain. Comma-separated tokens
-// each optionally `-` prefixed for descending. bun-query-builder's
-// `orderBy` is now compose-aware — chaining multiple calls produces a
-// single `ORDER BY a ASC, b DESC` clause.
-//
-// Examples:
-//   ?sort=name             → ORDER BY name ASC
-//   ?sort=-rating          → ORDER BY rating DESC
-//   ?sort=-rating,name     → ORDER BY rating DESC, name ASC
-function applySorting(query: any, sortParam: string | null, _table: string): any {
-  if (!sortParam) return query
-  const tokens = String(sortParam).split(',').map(t => t.trim()).filter(Boolean)
-  let q = query
-  for (const tok of tokens) {
-    const desc = tok.startsWith('-')
-    const column = desc ? tok.slice(1) : tok
-    if (!/^\w+$/.test(column)) continue
-    q = q.orderBy(column, desc ? 'desc' : 'asc')
-  }
-  return q
-}
-
 // Helper: extract bearer token from a request, falling back to the raw header
 // when the enhanced request hasn't attached a `bearerToken()` method.
 function bearerOf(req: EnhancedRequest): string | null {
@@ -476,12 +407,69 @@ function ownsRow(rowField: unknown, ownerValue: unknown): boolean {
   return String(rowField) === String(ownerValue)
 }
 
+// Does this model carry a direct `team_id` column? Declared attributes are
+// keyed by attribute name (camelCase `teamId`) but the DB column is
+// snake_case `team_id` — accept either spelling, always return the column.
+function teamColumnOf(model: any): string | null {
+  const attrs = model?.attributes || {}
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(attrs, k)
+  return (has('teamId') || has('team_id')) ? 'team_id' : null
+}
+
+// Adapt a raw EnhancedRequest to the `{ bearerToken, cookies }` shape
+// @stacksjs/auth's team resolver expects. The handler can't rely on
+// `req.bearerToken()` being wired here (the auto-CRUD paths read the
+// Authorization header directly via bearerOf), so surface the credential
+// from the header and parse the Cookie header for the session/token cookie.
+function teamAuthRequest(req: EnhancedRequest): { bearerToken: () => string | null, cookies: { get: (name: string) => string | null } } {
+  const token = bearerOf(req)
+  const cookieHeader = (req.headers?.get?.('cookie') as string | null) || ''
+  return {
+    bearerToken: () => token,
+    cookies: {
+      get: (name: string) => {
+        for (const part of cookieHeader.split(';')) {
+          const eq = part.indexOf('=')
+          if (eq === -1) continue
+          if (part.slice(0, eq).trim() === name)
+            return decodeURIComponent(part.slice(eq + 1).trim())
+        }
+        return null
+      },
+    },
+  }
+}
+
+// The ownership config actually enforced for a model. An explicit
+// `model.ownership` always wins. Otherwise any model with a `team_id`
+// column is auto-scoped to the caller's active team — tenant tables are
+// row-isolated with zero per-model config, while a public catalog table
+// (no team_id, no ownership) resolves to `null` and stays un-scoped.
+//
+// The team is resolved from the request's REAL credential (bearer token or
+// session cookie) via @stacksjs/auth — never from a client-supplied field —
+// so a caller can't widen their own scope by POSTing or ?team_id=-ing another
+// team's id. Lazy import mirrors authedUserFromRequest: avoids a boot-time
+// cycle through @stacksjs/auth.
+function effectiveOwnershipConfig(model: any): any | null {
+  if (model?.ownership) return model.ownership
+  const teamCol = teamColumnOf(model)
+  if (!teamCol) return null
+  return {
+    field: teamCol,
+    resolve: async (_user: any, req: EnhancedRequest) => {
+      const { resolveAuthenticatedTeamId } = await import('@stacksjs/auth')
+      return resolveAuthenticatedTeamId(teamAuthRequest(req) as any)
+    },
+  }
+}
+
 async function resolveOwnership(
   model: any,
   user: any,
   req: EnhancedRequest,
 ): Promise<{ enforced: boolean, value: unknown, field: string, bypass: boolean }> {
-  const cfg = model?.ownership
+  const cfg = effectiveOwnershipConfig(model)
   if (!cfg || !cfg.field || typeof cfg.resolve !== 'function')
     return { enforced: false, value: null, field: '', bypass: false }
   const bypass = typeof cfg.bypass === 'function' ? !!cfg.bypass(user, req) : false
@@ -540,25 +528,44 @@ for (const [modelName, model] of Object.entries(models)) {
   const hiddenFields = getHiddenFields(model)
   const basePath = `/api/${uri}`
 
-  // Per-model middleware list, applied to every CRUD route this model
-  // generates. Honors the `useApi.middleware` field declared on the
-  // model trait (e.g. `middleware: ['auth']` for resources that should
-  // never be browsed anonymously). Without this, auto-generated REST
-  // routes are unauthenticated by default — fine for public catalog
-  // tables (products, posts), wrong for anything PII-shaped
-  // (subscribers, customers, orders).
-  const apiMiddleware: string[] = Array.isArray((apiConfig as any).middleware)
-    ? ((apiConfig as any).middleware as string[]).filter(m => typeof m === 'string' && m.length > 0)
-    : (typeof (apiConfig as any).middleware === 'string' && (apiConfig as any).middleware
-        ? [(apiConfig as any).middleware]
-        : [])
+  // Read-path column allowlist: declared model attributes + system columns,
+  // minus anything marked `hidden`, mapped from EITHER spelling (attribute
+  // name or snake_case column) to the real snake_case column. Computed once
+  // per model and shared by `?sort=` and the `?<column>=` filter loop so
+  // neither can target a ghost column (camelCase attribute → 500) nor
+  // enumerate sensitive/hidden columns.
+  const readColumns = buildReadColumnMap(model.attributes, hiddenFields)
 
-  // Local helper: chain `.middleware()` for every entry in `apiMiddleware`.
+  // Per-model middleware, honoring the `useApi.middleware` field declared
+  // on the model trait (e.g. `middleware: ['auth']` for resources that
+  // should never be browsed anonymously). Read routes (index/show) stay
+  // public by default — fine for catalog tables (products, posts). Mutating
+  // routes (store/update/destroy) are secure-by-default: they get `auth`
+  // unless the model explicitly declares `middleware` (an explicit `[]` is
+  // a deliberate opt-out), because `enabledRoutes` defaults to all five and
+  // a bare `useApi: true` used to expose anonymous POST/PUT/PATCH/DELETE.
+  const { read: readMiddleware0, write: writeMiddleware, declared } = resolveApiMiddleware(useApi)
+  const hasMutating = ['store', 'update', 'destroy'].some(r => enabledRoutes.includes(r))
+  if (hasMutating && declared && writeMiddleware.length === 0)
+    log.warn(`[orm] ${modelName}: registering UNAUTHENTICATED mutating routes at ${basePath} (explicit \`middleware: []\` opt-out)`)
+
+  // Row-scoped resource? (explicit `ownership`, or a model with a team_id
+  // column that's auto-team-scoped). If so its index/show handlers below
+  // restrict every row to the caller's team — which requires knowing who is
+  // calling, so force `auth` onto the read routes even though catalog tables
+  // (no team_id, no ownership) stay anonymously browsable. Computed once and
+  // reused by the handlers to gate the (DB-hitting) ownership resolution.
+  const rowScoped = !!effectiveOwnershipConfig(model)
+  const readMiddleware = (rowScoped && !readMiddleware0.includes('auth'))
+    ? ['auth', ...readMiddleware0]
+    : readMiddleware0
+
+  // Local helper: chain `.middleware()` for every entry in `names`.
   // The chainable return value from `route.get/post/...` accepts one
   // name per call, so we fold the list into successive calls.
-  const applyMiddleware = (chain: any): any => {
+  const applyMiddleware = (chain: any, names: string[] = readMiddleware): any => {
     let r = chain
-    for (const name of apiMiddleware) {
+    for (const name of names) {
       if (r && typeof r.middleware === 'function') r = r.middleware(name)
     }
     return r
@@ -569,50 +576,56 @@ for (const [modelName, model] of Object.entries(models)) {
     applyMiddleware(route.get(basePath, async (req: EnhancedRequest) => {
       try {
         const url = new URL(req.url)
-        const page = Number.parseInt(url.searchParams.get('page') || '1', 10)
-        const perPage = Math.min(Number.parseInt(url.searchParams.get('per_page') || '25', 10), 100)
-        const offset = (page - 1) * perPage
+        // Clamped, NaN-safe page/perPage (page >= 1, perPage in [1, 100],
+        // default perPage 15 to match Model.paginate() / resolvePageArgs).
+        const { page, perPage, offset } = resolveIndexPageArgs(url.searchParams)
         const sort = url.searchParams.get('sort')
 
         let query = (db as any).selectFrom(table)
-        query = applySorting(query, sort, table)
+        query = applySorting(query, sort, readColumns)
 
         // Apply query string filters: ?status=active&name=foo filters by column values.
         // Reserved query params (pagination, sort, etc.) are skipped. Filter keys are
-        // validated against the model's declared attribute keys + system columns —
-        // an unknown key is ignored rather than emitted as raw SQL (e.g. `WHERE limit = ?`
-        // would blow up because `limit` is a SQL keyword).
+        // resolved through the readColumns allowlist (either spelling of a declared,
+        // non-hidden attribute → snake_case column) — an unknown key is ignored rather
+        // than emitted as raw SQL (e.g. `WHERE limit = ?` would blow up because `limit`
+        // is a SQL keyword), and hidden columns can't be equality-probed.
         const RESERVED = new Set(['page', 'per_page', 'sort', 'fields', 'search', 'include', 'limit', 'offset', 'with_count', 'withTrashed', 'onlyTrashed'])
-        const SYSTEM_COLUMNS = new Set(['id', 'uuid', 'created_at', 'updated_at', 'deleted_at'])
-        const validColumns = new Set([
-          ...Object.keys(model.attributes ?? {}),
-          ...SYSTEM_COLUMNS,
-        ])
         for (const [key, value] of url.searchParams.entries()) {
           if (RESERVED.has(key) || !value) continue
-          if (validColumns.has(key) && /^[a-z_][a-z0-9_]*$/i.test(key)) {
-            query = query.where(key, '=', value)
+          if (!/^[a-z_][a-z0-9_]*$/i.test(key)) continue
+          const col = readColumns.get(key)
+          if (col) {
+            query = query.where(col, '=', value)
           }
         }
 
-        // Apply search across fillable text fields: ?search=keyword
+        // Apply search across fillable text fields: ?search=keyword.
+        // Fillable names are attribute spellings — map to the snake_case
+        // column so a camelCase fillable doesn't hit a ghost column.
         const searchTerm = url.searchParams.get('search')
         if (searchTerm && fillableFields.length > 0) {
           const textFields = fillableFields.slice(0, 5) // Limit to first 5 fields for performance
           query = query.where((qb: any) => {
             for (const field of textFields) {
-              qb = qb.orWhere(field, 'like', `%${searchTerm}%`)
+              qb = qb.orWhere(toSnakeCase(field), 'like', `%${searchTerm}%`)
             }
             return qb
           })
         }
 
-        // Apply field selection: ?fields=id,name,email
+        // Apply field selection: ?fields=id,name,email. Tokens are mapped
+        // through toSnakeCase so attribute spellings select the real column;
+        // no allowlist here — undeclared-but-real columns (FK `user_id`)
+        // stay selectable, and hidden fields are stripped post-query anyway.
         const fieldsParam = url.searchParams.get('fields')
         if (fieldsParam) {
-          const selectedFields = fieldsParam.split(',').filter(f => /^[a-z_][a-z0-9_]*$/i.test(f.trim()))
+          const selectedFields = fieldsParam.split(',')
+            .map(f => f.trim())
+            .filter(f => /^[a-z_][a-z0-9_]*$/i.test(f))
+            .map(f => toSnakeCase(f))
           if (selectedFields.length > 0) {
-            query = query.select(selectedFields.map((f: string) => f.trim()))
+            query = query.select(selectedFields)
           }
         }
 
@@ -626,8 +639,39 @@ for (const [modelName, model] of Object.entries(models)) {
           query = onlyTrashed ? query.whereNotNull('deleted_at') : query.whereNull('deleted_at')
         }
 
-        const results = await query.limit(perPage).offset(offset).get()
-        let records = (results || []).map((r: any) => stripHidden(applyReadCasts(r, model), hiddenFields))
+        // Row-level ownership scoping. For owned/team tables, restrict the
+        // listing to rows the caller owns — applied AFTER the ?<col>= filter
+        // loop so a `?team_id=<other>` probe can only narrow, never widen,
+        // the caller's own scope. Public tables (rowScoped === false) skip
+        // this entirely and pay no auth-resolution cost.
+        const own = rowScoped
+          ? await resolveOwnership(model, await authedUserFromRequest(req), req)
+          : { enforced: false, value: null as unknown, field: '', bypass: false }
+        if (own.enforced && !own.bypass) {
+          if (own.value == null || (Array.isArray(own.value) && own.value.length === 0)) {
+            // Authed but owns nothing (e.g. no active team membership) — an
+            // empty page, never another tenant's rows. `private, no-store`
+            // so a shared cache can't hand this to a different caller.
+            const emptyPaginator = buildIndexPaginator(url, page, perPage, 0, false, undefined)
+            return new Response(JSON.stringify({
+              data: [],
+              ...emptyPaginator,
+              meta: buildIndexMeta(url, page, perPage, 0, false, undefined),
+            }), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store', Vary: 'Authorization' } })
+          }
+          query = Array.isArray(own.value)
+            ? query.where(own.field, 'in', own.value)
+            : query.where(own.field, '=', own.value)
+        }
+
+        // Simple-paginate probe: fetch one extra row so `has_more_pages`
+        // is known without a COUNT. Slice the probe row off BEFORE casts /
+        // includes so applyIncludes doesn't fire N+1 relation queries for a
+        // row that's about to be discarded.
+        const rawResults = (await query.limit(perPage + 1).offset(offset).get()) || []
+        const hasMore = rawResults.length > perPage
+        const pageRows = hasMore ? rawResults.slice(0, perPage) : rawResults
+        let records = pageRows.map((r: any) => stripHidden(applyReadCasts(r, model), hiddenFields))
 
         const includeParam = url.searchParams.get('include')
         if (includeParam)
@@ -645,7 +689,17 @@ for (const [modelName, model] of Object.entries(models)) {
             // not to a builder you call executeTakeFirst() on. The previous
             // shape silently swallowed a TypeError in this try/catch and
             // total stayed `undefined`, defeating the whole opt-in.
-            const raw = await (db as any).selectFrom(table).count()
+            //
+            // Scope the count to the caller's rows too — an unscoped COUNT
+            // would leak the cross-tenant total even though the page data is
+            // team-filtered.
+            let countQuery = (db as any).selectFrom(table)
+            if (own.enforced && !own.bypass && own.value != null) {
+              countQuery = Array.isArray(own.value)
+                ? countQuery.where(own.field, 'in', own.value)
+                : countQuery.where(own.field, '=', own.value)
+            }
+            const raw = await countQuery.count()
             const n = typeof raw === 'number' ? raw : Number(raw?.count ?? raw)
             if (Number.isFinite(n)) total = n
           } catch {
@@ -659,17 +713,21 @@ for (const [modelName, model] of Object.entries(models)) {
         // less frequently than detail views and SPAs naturally re-hit them
         // on navigation. Authed lists (which include user-specific filter
         // results) carry a `Vary: Authorization` so caches don't merge
-        // them with the public response.
-        respHeaders['Cache-Control'] = 'public, max-age=15, must-revalidate'
+        // them with the public response. Team-scoped listings are per-caller
+        // and must NEVER land in a shared cache, so they go `private, no-store`.
+        respHeaders['Cache-Control'] = (own.enforced && !own.bypass)
+          ? 'private, no-store'
+          : 'public, max-age=15, must-revalidate'
         respHeaders.Vary = 'Authorization'
 
+        const paginator = buildIndexPaginator(url, page, perPage, records.length, hasMore, total)
         return new Response(JSON.stringify({
           data: records,
-          meta: {
-            page,
-            per_page: perPage,
-            ...(total !== undefined && !Number.isNaN(total) ? { total, last_page: Math.ceil(total / perPage) } : {}),
-          },
+          ...paginator,
+          // DEPRECATED: `meta` is kept for one transition release for backward
+          // compat. Read the top-level fields instead (note: meta.page ===
+          // current_page). Removed in a future release. (#1960)
+          meta: buildIndexMeta(url, page, perPage, records.length, hasMore, total),
         }), { status: 200, headers: respHeaders })
       }
       catch (err) {
@@ -709,6 +767,18 @@ for (const [modelName, model] of Object.entries(models)) {
           return jsonResponse({ error: `${modelName} not found` }, 404)
         }
 
+        // Row-level ownership enforcement for owned/team tables. A row that
+        // belongs to another tenant is reported as 404 (not 403) so this
+        // endpoint can't be used to probe which ids exist in other teams.
+        const own = rowScoped
+          ? await resolveOwnership(model, await authedUserFromRequest(req), req)
+          : { enforced: false, value: null as unknown, field: '', bypass: false }
+        if (own.enforced && !own.bypass) {
+          if (own.value == null || !ownsRow((result as Record<string, unknown>)[own.field], own.value)) {
+            return jsonResponse({ error: `${modelName} not found` }, 404)
+          }
+        }
+
         let payload: any = stripHidden(applyReadCasts(result, model), hiddenFields)
 
         // ?include=user,host_profile,car_photos hydrates declared relations.
@@ -735,7 +805,11 @@ for (const [modelName, model] of Object.entries(models)) {
         if (etag) headers.ETag = etag
         // Public caches default to a short TTL — long enough for SPA list/detail
         // hops to share, short enough that a stale row clears within a minute.
-        headers['Cache-Control'] = 'public, max-age=30, must-revalidate'
+        // Team-scoped rows are per-caller and must never be shared-cached.
+        headers['Cache-Control'] = (own.enforced && !own.bypass)
+          ? 'private, no-store'
+          : 'public, max-age=30, must-revalidate'
+        headers.Vary = 'Authorization'
         return new Response(JSON.stringify({ data: payload }), { status: 200, headers })
       }
       catch (err) {
@@ -794,8 +868,12 @@ for (const [modelName, model] of Object.entries(models)) {
         //    so plaintext inputs never reach the DB on POST /api/users.
         // 2) Then the cast pass so booleans/JSON/dates are coerced to the
         //    column shape (mirror of model.create() write path).
+        // 3) LAST, map attribute-name keys to their snake_case column
+        //    spellings — migration drivers snake_case attribute names into
+        //    columns, so a camelCase fillable like `discountType` would
+        //    otherwise target a nonexistent column and 500 the INSERT.
         const hookedData = await applyDefinedSetters(data, model)
-        const writeData = applySetCasts(hookedData, model)
+        const writeData = toSnakeCaseKeys(applySetCasts(hookedData, model))
 
         const result = await (db as any).insertInto(table).values(writeData).execute()
 
@@ -814,14 +892,12 @@ for (const [modelName, model] of Object.entries(models)) {
         return jsonResponse({ data: stripHidden(applyReadCasts(created, model), hiddenFields) }, 201)
       }
       catch (err) {
-        if (err instanceof HttpError) {
-          const body: Record<string, unknown> = { error: err.message }
-          if (err.details !== undefined) body.details = err.details
-          return jsonResponse(body, err.status || 400)
-        }
-        return jsonResponse({ error: `Failed to create ${modelName}`, detail: String(err) }, 500)
+        // Maps HttpError-likes through, unique violations -> 409 (clean
+        // message, no driver text leak), everything else -> 500. See #1957.
+        const { status, body } = mapWriteError(err, modelName, 'create')
+        return jsonResponse(body, status)
       }
-    }))
+    }), writeMiddleware)
   }
 
   // PUT/PATCH /api/{uri}/{id} — update record
@@ -876,7 +952,11 @@ for (const [modelName, model] of Object.entries(models)) {
             return jsonResponse({ error: `Not your ${modelName}` }, 403)
           }
           // Also defend against the request trying to re-parent ownership.
-          if (own.field in data && !ownsRow(data[own.field], own.value)) {
+          // Payload keys are attribute names (possibly camelCase) — compare
+          // via the snake_case column spelling so `hostProfileId` can't
+          // sneak past a `host_profile_id` ownership field.
+          const submittedOwnerKey = Object.keys(data).find(k => toSnakeCase(k) === toSnakeCase(own.field))
+          if (submittedOwnerKey !== undefined && !ownsRow(data[submittedOwnerKey], own.value)) {
             return jsonResponse({ error: `Cannot reassign ${modelName} ownership` }, 403)
           }
         }
@@ -888,9 +968,9 @@ for (const [modelName, model] of Object.entries(models)) {
 
         // Same hook+cast pass as the create path — and crucially the set-hooks
         // must run too, otherwise `PATCH /api/users/{id}` with a password
-        // field would store plaintext.
+        // field would store plaintext. Key mapping runs LAST (see store path).
         const hookedData = await applyDefinedSetters(data, model)
-        const writeData = applySetCasts(hookedData, model)
+        const writeData = toSnakeCaseKeys(applySetCasts(hookedData, model))
 
         await (db as any).updateTable(table).set(writeData).where({ id }).execute()
 
@@ -906,20 +986,17 @@ for (const [modelName, model] of Object.entries(models)) {
         return jsonResponse({ data: stripHidden(applyReadCasts(updated, model), hiddenFields) })
       }
       catch (err) {
-        if (err instanceof HttpError) {
-          const body: Record<string, unknown> = { error: err.message }
-          if (err.details !== undefined) body.details = err.details
-          return jsonResponse(body, err.status || 400)
-        }
-        return jsonResponse({ error: `Failed to update ${modelName}`, detail: String(err) }, 500)
+        // See store handler — same classification, 'update' verb. #1957.
+        const { status, body } = mapWriteError(err, modelName, 'update')
+        return jsonResponse(body, status)
       }
     }
 
     if (!routeExists('PUT', `${basePath}/{id}`)) {
-      applyMiddleware(route.put(`${basePath}/{id}`, updateHandler))
+      applyMiddleware(route.put(`${basePath}/{id}`, updateHandler), writeMiddleware)
     }
     if (!routeExists('PATCH', `${basePath}/{id}`)) {
-      applyMiddleware(route.patch(`${basePath}/{id}`, updateHandler))
+      applyMiddleware(route.patch(`${basePath}/{id}`, updateHandler), writeMiddleware)
     }
   }
 
@@ -973,7 +1050,7 @@ for (const [modelName, model] of Object.entries(models)) {
         }
         return jsonResponse({ error: `Failed to delete ${modelName}`, detail: String(err) }, 500)
       }
-    }))
+    }), writeMiddleware)
   }
 
   // POST /api/{uri}/bulk-delete — delete multiple records (also soft-aware,
@@ -1049,7 +1126,7 @@ for (const [modelName, model] of Object.entries(models)) {
         }
         return jsonResponse({ error: `Failed to bulk delete ${uri}`, detail: String(err) }, 500)
       }
-    }))
+    }), writeMiddleware)
   }
 }
 
