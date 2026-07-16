@@ -28,7 +28,7 @@ export default {
     head: {
       // Fallback title/description for pages that don't set their own via
       // @section('title') / @head (hoisted into the static <head>, stx#1756).
-      title: 'Bench Review — Read & Write Reviews of Judges',
+      title: 'Bench Review: Read and Write Reviews of Judges',
       meta: [
         { name: 'description', content: 'Bench Review is a public directory of judges where attorneys, clerks, and court staff share first-hand reviews. Search judges by name and court.' },
       ],

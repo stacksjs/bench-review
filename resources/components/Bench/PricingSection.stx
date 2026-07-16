@@ -12,7 +12,7 @@
 >
   <div class="mx-auto px-6 lg:px-8 max-w-7xl">
     <div class="mx-auto max-w-4xl text-center">
-      <p class="mt-2 font-semibold text-5xl text-balance text-gray-800 tracking-tight sm:text-6xl">Simple, transparent
+      <p class="mt-2 font-semibold text-5xl text-balance text-gray-900 tracking-tight sm:text-6xl">Simple, transparent
         pricing</p>
     </div>
     <p class="mt-6 mx-auto max-w-2xl font-medium text-center text-gray-600 text-lg text-pretty sm:text-xl/8">Choose
@@ -22,53 +22,53 @@
     <div class="flex justify-center mt-8">
       <div class="flex gap-x-4 items-center">
         <span
-          x-class="[pricingPeriod === 'monthly' ? 'text-gray-800' : 'text-gray-600']"
+          x-class="pricingPeriod() === 'monthly' ? 'text-gray-900' : 'text-gray-500'"
           class="font-medium text-sm">Monthly</span>
-        <button type="button"
-          class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer"
-          x-class="[pricingPeriod === 'yearly' ? 'bg-gray-600' : 'bg-gray-200']" @click="togglePricingPeriod()">
+        <button type="button" aria-label="Toggle yearly billing"
+          class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer"
+          x-class="pricingPeriod() === 'yearly' ? 'bg-gray-900' : 'bg-gray-200'" @click="togglePricingPeriod()">
           <span
             class="inline-block h-5 w-5 bg-white ring-0 rounded-full shadow duration-200 ease-in-out transition transform pointer-events-none"
-            x-class="[pricingPeriod === 'yearly' ? 'translate-x-5' : 'translate-x-0']" />
+            x-class="[pricingPeriod() === 'yearly' ? 'translate-x-5' : 'translate-x-0']" />
         </button>
         <span
-          x-class="[pricingPeriod === 'yearly' ? 'text-gray-800' : 'text-gray-600']"
+          x-class="pricingPeriod() === 'yearly' ? 'text-gray-900' : 'text-gray-500'"
           class="font-medium text-sm">Yearly</span>
       </div>
     </div>
 
     <div class="grid gap-8 grid-cols-1 md:grid-cols-2 mt-10 mx-auto max-w-md md:max-w-2xl isolate">
-      <div class="p-8 bg-white ring-1 ring-gray-200 rounded-3xl">
-        <h3 id="tier-free" class="font-semibold text-gray-800 text-lg/8">Free</h3>
+      <div class="p-8 bg-white ring-1 ring-gray-200 rounded-2xl">
+        <h3 id="tier-free" class="font-semibold text-gray-900 text-lg/8">Free</h3>
         <p class="mt-4 text-gray-600 text-sm/6">Are you a clerk? This is for you.</p>
         <p class="flex gap-x-1 items-baseline mt-6">
-          <span class="font-semibold text-4xl text-gray-800 tracking-tight">$0</span>
+          <span class="font-semibold text-4xl text-gray-900 tracking-tight">$0</span>
           <span class="font-semibold text-gray-600 text-sm/6">/<span x-text="pricingPeriod() === 'monthly' ? 'month' : 'year'"></span></span>
         </p>
         <StxLink to="/register" aria-describedby="tier-free"
-          class="block mt-6 px-2.5 py-1.5 font-semibold text-center text-gray-600 text-sm/6 ring-1 ring-gray-200 ring-inset rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 hover:ring-gray-300">Get
-          started</StxLink>
+          class="block mt-6 px-3 py-2 font-semibold text-center text-gray-700 text-sm/6 ring-1 ring-gray-200 ring-inset rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-900 focus-visible:outline-offset-2 hover:ring-gray-300 active:scale-[0.98] transition">Create
+          a free account</StxLink>
         <ul role="list" class="mt-8 space-y-3 text-gray-600 text-sm/6">
           <li class="flex gap-x-3">
             <Icon name="check" size="20" class="flex-none text-gray-600" />
-            Review judges
+            Write and publish reviews
           </li>
           <li class="flex gap-x-3">
             <Icon name="check" size="20" class="flex-none text-gray-600" />
-            Help democracy
+            Post anonymously
           </li>
         </ul>
       </div>
-      <div class="p-8 bg-white ring-2 ring-gray-600 rounded-3xl">
-        <h3 id="tier-hobby" class="font-semibold text-gray-600 text-lg/8">Professional</h3>
+      <div class="p-8 bg-white ring-2 ring-gray-900 rounded-2xl">
+        <h3 id="tier-hobby" class="font-semibold text-gray-900 text-lg/8">Professional</h3>
         <p class="mt-4 text-gray-600 text-sm/6">For anyone curious about judge reviews.</p>
         <p class="flex gap-x-1 items-baseline mt-6">
-          <span class="font-semibold text-4xl text-gray-800 tracking-tight">$<span x-text="pricingPeriod() === 'monthly' ? '10' : '60'"></span></span>
+          <span class="font-semibold text-4xl text-gray-900 tracking-tight">$<span x-text="pricingPeriod() === 'monthly' ? '10' : '60'"></span></span>
           <span class="font-semibold text-gray-600 text-sm/6">/<span x-text="pricingPeriod() === 'monthly' ? 'month' : 'year'"></span></span>
         </p>
         <StxLink to="/register" aria-describedby="tier-hobby"
-          class="block mt-6 px-2.5 py-1.5 font-semibold text-center text-sm/6 text-white bg-gray-600 hover:bg-gray-500 rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm">Get
-          started</StxLink>
+          class="block mt-6 px-3 py-2 font-semibold text-center text-sm/6 text-white bg-gray-900 hover:bg-gray-800 active:scale-[0.98] rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-900 focus-visible:outline-offset-2 shadow-sm transition">Start
+          Professional</StxLink>
         <ul role="list" class="mt-8 space-y-3 text-gray-600 text-sm/6">
           <li class="flex gap-x-3">
             <Icon name="check" size="20" class="flex-none text-gray-600" />

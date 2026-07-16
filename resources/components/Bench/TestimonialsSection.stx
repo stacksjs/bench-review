@@ -1,74 +1,17 @@
-<div class="relative pb-32 pt-24 sm:pt-32 isolate">
-  <div class="mx-auto px-6 lg:px-8 max-w-7xl">
-    <div class="mx-auto max-w-2xl text-center">
-      <h2 class="font-semibold text-base/7 text-gray-600">Testimonials</h2>
-      <p class="mt-2 font-bold text-4xl text-balance text-gray-900 tracking-tight sm:text-5xl">What legal professionals are saying</p>
-    </div>
-    <div class="grid gap-0 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-16 mx-auto sm:mt-20 text-gray-900 text-sm/6">
-      <figure class="p-8 border-gray-200 border-r-2">
-        <blockquote class="text-gray-900">
-          <p>"This platform has revolutionized how we prepare for court appearances. Being able to read detailed reviews and understand a judge's approach has been invaluable for our practice. The insights shared by other attorneys have helped us better serve our clients."</p>
-        </blockquote>
-        <div class="flex gap-x-4 items-center mt-6 pt-4">
-          <img class="size-10 bg-gray-50 rounded-full grayscale filter" src="https://images.unsplash.com/photo-1550525811-e5869dd03032?ixlib=rb-=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=1024&h=1024&q=80" alt="">
-          <div>
-            <div class="font-semibold">Sarah Chen</div>
-            <div class="text-gray-600">Senior Partner, Chen & Associates</div>
-          </div>
-        </div>
-      </figure>
-
-      <figure class="p-8 border-gray-200 border-r-2">
-        <blockquote class="text-gray-900">
-          <p>"The detailed reviews have been a game-changer for our firm. We can now better prepare our clients for what to expect in court, leading to more successful outcomes."</p>
-        </blockquote>
-        <div class="flex gap-x-4 items-center mt-6">
-          <img class="size-10 bg-gray-50 rounded-full grayscale filter" src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="">
-          <div>
-            <div class="font-semibold">Michael Rodriguez</div>
-            <div class="text-gray-600">Criminal Defense Attorney</div>
-          </div>
-        </div>
-      </figure>
-
-      <figure class="p-8 border-gray-200">
-        <blockquote class="text-gray-900">
-          <p>"As a public defender, this platform has been invaluable. The insights into judicial tendencies and preferences help us better serve our clients and prepare more effective arguments."</p>
-        </blockquote>
-        <div class="flex gap-x-4 items-center mt-6">
-          <img class="size-10 bg-gray-50 rounded-full grayscale filter" src="https://images.unsplash.com/photo-1517841905240-472988babdf9?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="">
-          <div>
-            <div class="font-semibold">Emily Thompson</div>
-            <div class="text-gray-600">Public Defender</div>
-          </div>
-        </div>
-      </figure>
-
-      <figure class="p-8 border-gray-200 border-r-2">
-        <blockquote class="text-gray-900">
-          <p>"The ability to share experiences and learn from other attorneys has made us more effective advocates. This platform has become an essential tool in our practice."</p>
-        </blockquote>
-        <div class="flex gap-x-4 items-center mt-6">
-          <img class="size-10 bg-gray-50 rounded-full grayscale filter" src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="">
-          <div>
-            <div class="font-semibold">David Kim</div>
-            <div class="text-gray-600">Family Law Attorney</div>
-          </div>
-        </div>
-      </figure>
-
-      <figure class="p-8 border-gray-200 border-r-2">
-        <blockquote class="text-gray-900">
-          <p>"The transparency this platform provides is exactly what the legal community needed. It helps level the playing field and ensures better outcomes for all parties involved."</p>
-        </blockquote>
-        <div class="flex gap-x-4 items-center mt-6">
-          <img class="size-10 bg-gray-50 rounded-full grayscale filter" src="https://images.unsplash.com/photo-1519345182560-3f2917c472ef?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="">
-          <div>
-            <div class="font-semibold">James Wilson</div>
-            <div class="text-gray-600">Civil Rights Attorney</div>
-          </div>
-        </div>
-      </figure>
-    </div>
+<!-- A single real, cited quote instead of fabricated testimonials.
+     Brandeis is the intellectual anchor of the product ("sunlight is
+     the best of disinfectants") and reads as credibility, not filler.
+     Swap in genuine user quotes here once real ones exist. -->
+<section class="relative pb-28 pt-24 sm:pt-28 isolate">
+  <div class="mx-auto px-6 lg:px-8 max-w-4xl">
+    <figure class="text-center">
+      <blockquote class="font-medium text-2xl sm:text-3xl leading-snug text-balance text-gray-900">
+        <p>&ldquo;Publicity is justly commended as a remedy for social and industrial diseases. Sunlight is said to be the best of disinfectants; electric light the most efficient policeman.&rdquo;</p>
+      </blockquote>
+      <figcaption class="mt-8 text-gray-600 text-sm">
+        <span class="font-semibold text-gray-900">Justice Louis D. Brandeis</span>
+        <span class="block mt-1">&ldquo;What Publicity Can Do,&rdquo; 1913</span>
+      </figcaption>
+    </figure>
   </div>
-</div>
+</section>
