@@ -7,14 +7,6 @@ declare module "stx/routes" {
     '/admin/moderation': {  }
     '/admin/reviews': {  }
     '/admin/users': {  }
-    '/blog/categories': {  }
-    '/blog/category': {  }
-    '/blog/post': {  }
-    '/checkout/contact': {  }
-    '/checkout/payment': {  }
-    '/checkout/shipping': {  }
-    '/dashboard/custom-page': {  }
-    '/emails/welcome': {  }
     '/judges/review': {  }
     '/judges/signup': {  }
     '/judges/submit': {  }
@@ -23,11 +15,9 @@ declare module "stx/routes" {
     '/about': {  }
     '/admin': {  }
     '/blog': {  }
-    '/cart': {  }
     '/coming-soon': {  }
     '/contact': {  }
     '/court-houses': {  }
-    '/dashboard': {  }
     '/faq': {  }
     '/forgot-password': {  }
     '/guidelines': {  }
@@ -62,7 +52,6 @@ declare module "stx/routes" {
     '/blog/:id': { id: string }
     '/court-houses/:id': { id: string }
     '/judges/:id': { id: string }
-    '/orders/:id': { id: string }
     '/review/:id': { id: string }
     '/user/:id': { id: string }
     '/:all*': { all: string[] }
