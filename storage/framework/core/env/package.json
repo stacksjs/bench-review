@@ -50,7 +50,7 @@
     "prepublishOnly": "bun run build"
   },
   "devDependencies": {
-    "better-dx": "^0.2.16",
+    "better-dx": "^0.2.19",
     "@stacksjs/path": "workspace:*",
     "@stacksjs/validation": "workspace:*"
   }
