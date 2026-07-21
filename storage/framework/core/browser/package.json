@@ -53,12 +53,12 @@
   },
   "dependencies": {
     "@stacksjs/composables": "workspace:*",
-    "@stacksjs/stx": "^0.2.82",
-    "bun-query-builder": "^0.1.47",
+    "@stacksjs/stx": "^0.2.99",
+    "bun-query-builder": "^0.1.57",
     "magic-regexp": "^0.11.0"
   },
   "peerDependencies": {
-    "@stripe/stripe-js": "^9.0.0"
+    "@stripe/stripe-js": "^9.12.0"
   },
   "peerDependenciesMeta": {
     "@stripe/stripe-js": {
@@ -66,8 +66,8 @@
     }
   },
   "devDependencies": {
-    "better-dx": "^0.2.16",
+    "better-dx": "^0.2.19",
     "@stacksjs/utils": "workspace:*",
-    "@stripe/stripe-js": "^9.0.0"
+    "@stripe/stripe-js": "^9.12.0"
   }
 }

@@ -54,7 +54,7 @@
     "@stacksjs/ts-auth": "^0.4.3"
   },
   "devDependencies": {
-    "better-dx": "^0.2.16",
+    "better-dx": "^0.2.19",
     "@stacksjs/error-handling": "workspace:*",
     "@stacksjs/router": "workspace:*"
   }
