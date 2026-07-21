@@ -52,12 +52,12 @@
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@stacksjs/bunpress": "^0.1.12"
+    "@stacksjs/bunpress": "^0.1.15"
   },
   "devDependencies": {
     "@stacksjs/alias": "workspace:*",
     "@stacksjs/config": "workspace:*",
-    "better-dx": "^0.2.16",
+    "better-dx": "^0.2.19",
     "@stacksjs/path": "workspace:*",
     "@stacksjs/server": "workspace:*"
   }

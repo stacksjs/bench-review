@@ -55,7 +55,7 @@
     "prepublishOnly": "bun run build"
   },
   "peerDependencies": {
-    "@stripe/stripe-js": "^8.7.0",
+    "@stripe/stripe-js": "^8.11.0",
     "stripe": "^21.0.1"
   },
   "peerDependenciesMeta": {
@@ -68,9 +68,9 @@
   },
   "devDependencies": {
     "@stacksjs/config": "workspace:*",
-    "better-dx": "^0.2.16",
+    "better-dx": "^0.2.19",
     "@stacksjs/utils": "workspace:*",
-    "@stripe/stripe-js": "^8.7.0",
+    "@stripe/stripe-js": "^8.11.0",
     "stripe": "^21.0.1"
   }
 }
