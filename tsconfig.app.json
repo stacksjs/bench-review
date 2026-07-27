@@ -12,6 +12,12 @@
   //     generator never emits.
   "extends": "./storage/framework/core/tsconfig.json",
   "compilerOptions": {
+    // v0.70.190's base tsconfig dropped the explicit `strict` + `skipLibCheck`
+    // this app config was written to inherit (see note above re: "which
+    // skipLibCheck then ignores"). Pin them here so the app typecheck stays
+    // meaningful (node_modules .d.ts noise stays suppressed) across syncs.
+    "strict": true,
+    "skipLibCheck": true,
     "paths": {
       "Actions/*": ["./app/Actions/*"],
       "Commands/*": ["./app/Commands/*"],
