@@ -3,6 +3,29 @@ import { bold, dim, green, italic, log } from '@stacksjs/cli'
 import { path as p } from '@stacksjs/path'
 import { glob } from '@stacksjs/storage'
 
+/**
+ * Parse every generated declaration before a package can report a successful
+ * build. The invalid emission shapes this used to repair (`method<T>: (…) => …`
+ * and `interface Nameextends Base`) were fixed at the source in dtsx; what
+ * remains here is a pure publish-time safety net that fails the build if any
+ * `.d.ts` does not parse.
+ */
+export async function validateDeclarations(dir: string): Promise<void> {
+  const files = await glob([p.resolve(dir, 'dist', '**/*.d.ts')], { absolute: true })
+  const transpiler = new Bun.Transpiler({ loader: 'ts', target: 'bun' })
+
+  for (const file of files) {
+    const source = await Bun.file(file).text()
+
+    try {
+      transpiler.transformSync(source)
+    }
+    catch (cause) {
+      throw new Error(`Invalid declaration generated at ${file}: ${cause instanceof Error ? cause.message : String(cause)}`)
+    }
+  }
+}
+
 export async function outro(options: {
   dir: string
   startTime: number
@@ -27,6 +50,8 @@ export async function outro(options: {
     console.log(firstLog)
     throw new Error(`Build failed: ${firstLog}`)
   }
+
+  await validateDeclarations(options.dir)
 
   // loop over all the files in the dist directory and log them and their size
   const files = await glob([p.resolve(options.dir, 'dist', '**/*')], { absolute: true })
@@ -76,7 +101,7 @@ export async function intro(options: { dir: string, pkgName?: string, styled?: b
  *
  * Pass extra package-specific entries as `extras` and they'll be merged in.
  *
- * Notably absent: `sharp`, `vue-component-meta`, `@aws-sdk/*`. We don't ship
+ * Notably absent: `sharp`, template metadata compilers, and `@aws-sdk/*`. We don't ship
  * any of those — image work goes through the in-house `ts-images` (formerly
  * `imgx`), template metadata is parsed by our own STX-aware extractor, and
  * AWS interactions go through `ts-cloud` / our wrappers. If a build error

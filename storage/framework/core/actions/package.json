@@ -2,7 +2,7 @@
   "name": "@stacksjs/actions",
   "type": "module",
   "sideEffects": false,
-  "version": "0.70.87",
+  "version": "0.70.190",
   "description": "The Stacks actions.",
   "author": "Chris Breuer",
   "contributors": [
@@ -62,19 +62,20 @@
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
+    "@stacksjs/config": "workspace:*",
     "@stacksjs/bumpx": "^0.2.6",
-    "@stacksjs/bunpress": "^0.1.12",
+    "@stacksjs/bunpress": "^0.1.18",
     "@stacksjs/logsmith": "^0.2.3",
-    "@stacksjs/ts-cloud": "^0.7.17",
+    "@stacksjs/registry": "workspace:*",
+    "@stacksjs/ts-cloud": "^0.7.60",
     "@stacksjs/ts-md": "^0.1.1"
   },
   "devDependencies": {
     "@stacksjs/api": "workspace:*",
     "@stacksjs/cli": "workspace:*",
-    "@stacksjs/config": "workspace:*",
     "@stacksjs/database": "workspace:*",
     "@stacksjs/tlsx": "^0.13.2",
-    "better-dx": "^0.2.16",
+    "better-dx": "^0.2.17",
     "@stacksjs/dns": "workspace:*",
     "@stacksjs/enums": "workspace:*",
     "@stacksjs/env": "workspace:*",
@@ -88,7 +89,7 @@
     "@stacksjs/validation": "workspace:*"
   },
   "peerDependencies": {
-    "pickier": "^0.1.28"
+    "pickier": "^0.1.35"
   },
   "peerDependenciesMeta": {
     "pickier": {

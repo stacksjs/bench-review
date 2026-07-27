@@ -3,7 +3,7 @@ import { execSync, log, parseOptions } from '@stacksjs/cli'
 import { path as p } from '@stacksjs/path'
 import { versionBump } from '@stacksjs/bumpx'
 import { generateChangelog, loadLogsmithConfig } from '@stacksjs/logsmith'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
 const options = parseOptions() as { dryRun?: boolean, bump?: string, verbose?: boolean } | undefined
@@ -234,6 +234,50 @@ await writeChangelog()
 // Consumer-app releases have no meta to pin, so this is framework-only.
 if (!isDryRun && isFrameworkRelease)
   pinMetaCoreDeps(nextVersion)
+
+// The package-version fan-out above changes hundreds of workspace manifests.
+// Keep the root Bun lockfile synchronized in the same release commit; otherwise
+// every post-release CI job using `bun install --frozen-lockfile` fails before
+// lint, typecheck, or tests can run.
+if (!isDryRun && existsSync(p.projectPath('bun.lock'))) {
+  const lockPath = p.projectPath('bun.lock')
+  const previousLock = readFileSync(lockPath)
+
+  // Bun updates package resolutions in place, but it does not rewrite stale
+  // workspace manifest snapshots after the release changes lockstep ranges.
+  // Regenerate the canonical lockfile so frozen installs see the same workspace
+  // state as the manifests. Restore the previous lock if resolution fails.
+  unlinkSync(lockPath)
+  try {
+    await execSync(['bun', 'install', '--lockfile-only'], {
+      cwd: p.projectPath(),
+      stdin: 'inherit',
+    })
+  }
+  catch (error) {
+    writeFileSync(lockPath, previousLock)
+    throw error
+  }
+
+  // CI runs Bun 1.3.x, which only parses lockfileVersion 1. A maintainer
+  // releasing with Bun 1.4.x regenerates v2 here, which then fails every
+  // post-release `bun install --frozen-lockfile` job before lint/typecheck/test
+  // can run (see .github/scripts/check-lockfile-version.ts, the PR-side guard that
+  // release commits bypass). Refuse to ship a lockfile CI cannot read: restore
+  // the previous one and abort with an actionable message.
+  const expectedLockfileVersion = 1
+  const regeneratedLock = readFileSync(lockPath, 'utf8')
+  const versionMatch = regeneratedLock.match(/"lockfileVersion"\s*:\s*(\d+)/)
+  const producedVersion = versionMatch ? Number(versionMatch[1]) : null
+  if (producedVersion !== expectedLockfileVersion) {
+    writeFileSync(lockPath, previousLock)
+    throw new Error(
+      `Release aborted: regenerating bun.lock produced lockfileVersion ${producedVersion ?? 'unknown'}, `
+      + `but CI's Bun (1.3.x) requires v${expectedLockfileVersion}. You are releasing with a newer Bun `
+      + `(1.4.x writes v2). Re-run the release with Bun 1.3.x (e.g. via \`bunx bun@1.3.14\`) so CI can parse the lockfile.`,
+    )
+  }
+}
 
 function pinMetaCoreDeps(version: string): void {
   const metaPath = p.frameworkPath('core/package.json')

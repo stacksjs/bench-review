@@ -287,17 +287,24 @@ async function getLogger(): Promise<Logger> {
   return _logger!
 }
 
-// Helper function to format message for logging, including request context
-function formatMessage(...args: unknown[]): string {
+// Helper function to format message for logging, including request context.
+// Exported for direct unit testing of arg handling (stacksjs/stacks#2047).
+export function formatMessage(...args: unknown[]): string {
   // Errors (bare or nested in object args) need normalizing first —
   // `JSON.stringify(new Error())` is `{}` (stacksjs/stacks#1956).
-  const base = args.map((arg) => {
-    if (arg instanceof Error)
-      return renderNormalizedError(normalizeError(arg))
-    if (typeof arg === 'object' && arg !== null)
-      return JSON.stringify(normalizeContextValue(arg), null, 2)
-    return String(arg)
-  }).join(' ')
+  const base = args
+    // Drop `undefined` args so a call with a missing trailing context/format
+    // arg — e.g. `log.warn(`... database "${name}"`, ctx)` where `ctx` is
+    // undefined — doesn't leave a stray " undefined" at the end of the line
+    // (stacksjs/stacks#2047). `null` is kept: it's usually a deliberate value.
+    .filter(arg => arg !== undefined)
+    .map((arg) => {
+      if (arg instanceof Error)
+        return renderNormalizedError(normalizeError(arg))
+      if (typeof arg === 'object' && arg !== null)
+        return JSON.stringify(normalizeContextValue(arg), null, 2)
+      return String(arg)
+    }).join(' ')
 
   // Prepend request ID if available
   const ctx = logContextStorage.getStore()
@@ -358,12 +365,13 @@ export interface Log {
 export type ErrorMessage = string
 
 /**
- * @deprecated stacksjs/stacks#1932 — the old union form
- * (`{…} | any | Error`) included `| any`, which collapsed the whole
- * union and let `log.error(msg, anything)` type-check while silently
- * dropping the error. Prefer `log.error(message, error?, context?)`.
- * This explicit object shape is retained only for the legacy
- * `{ shouldExit }` fatal path.
+ * Options for the fatal path: `log.error(message, { shouldExit: true })`.
+ *
+ * Kept as an explicit object shape rather than folded into a union with
+ * `Error`. The old union included `| any`, which collapsed the whole thing and
+ * let `log.error(msg, anything)` type check while silently dropping the error
+ * (stacksjs/stacks#1932). For ordinary reporting use
+ * `log.error(message, error?, context?)`.
  */
 export interface LogErrorOptions {
   shouldExit: boolean
@@ -402,11 +410,17 @@ export const log: Log = {
 
   warn: async (message: string, context?: unknown) => {
     const logger = await getLogger()
+    // No context → call with a single arg. Passing a nullish second arg makes
+    // clarity stringify it and append a stray " undefined" / " null" to the
+    // line (e.g. `log.warn('… All data will be lost.')`, or `log.warn(msg,
+    // null)`). `== null` catches both. Matches `warning`.
+    if (context == null) {
+      await logger.warn(message)
+      return
+    }
     // Normalize so Errors in the context survive clarity's JSON.stringify
     // (stacksjs/stacks#1956).
-    const normalized = context === undefined
-      ? undefined
-      : normalizeContextValue(context) as Record<string, unknown>
+    const normalized = normalizeContextValue(context) as Record<string, unknown>
     await logger.warn(message, normalized)
   },
 

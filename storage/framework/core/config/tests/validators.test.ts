@@ -52,7 +52,7 @@ describe('validateConfig (stacksjs/stacks#1874 F-6)', () => {
     } as any)
     expect(issues).toHaveLength(1)
     expect(issues[0].path).toBe('database.default')
-    expect(issues[0].message).toContain('expected one of [sqlite, mysql, postgres, dynamodb]')
+    expect(issues[0].message).toContain('unknown database driver')
   })
 
   test('catches a wrong-type top-level section', () => {
@@ -86,6 +86,27 @@ describe('validateConfig (stacksjs/stacks#1874 F-6)', () => {
     } as any)
     expect(issues).toHaveLength(1)
     expect(issues[0].path).toBe('queue.default')
+    expect(issues[0].message).toContain('is unsupported')
+  })
+
+  test('rejects advertised but non-operational database drivers', () => {
+    const issues = validateConfig({ database: { default: 'dynamodb' } } as any)
+    expect(issues).toHaveLength(1)
+    expect(issues[0].message).toContain('is unsupported')
+  })
+
+  test('validates feature flag driver and missing behavior', () => {
+    expect(validateConfig({
+      featureFlags: { default: 'memory', missing: 'throw' },
+    } as any)).toEqual([])
+
+    const issues = validateConfig({
+      featureFlags: { default: 'redis', missing: 'ignore' },
+    } as any)
+    expect(issues.map(issue => issue.path)).toEqual([
+      'featureFlags.default',
+      'featureFlags.missing',
+    ])
   })
 
   test('accumulates issues from multiple sections', () => {

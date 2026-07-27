@@ -2,7 +2,7 @@
   "name": "@stacksjs/cli",
   "type": "module",
   "sideEffects": false,
-  "version": "0.70.87",
+  "version": "0.70.190",
   "description": "TypeScript framework for CLI artisans. Build beautiful console apps with ease.",
   "author": "Chris Breuer",
   "contributors": [
@@ -63,12 +63,12 @@
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@stacksjs/clapp": "^0.2.8"
+    "@stacksjs/clapp": "^0.2.12"
   },
   "devDependencies": {
     "@stacksjs/collections": "workspace:*",
     "@stacksjs/config": "workspace:*",
-    "better-dx": "^0.2.16",
+    "better-dx": "^0.2.17",
     "@stacksjs/error-handling": "workspace:*",
     "@stacksjs/logging": "workspace:*",
     "@stacksjs/path": "workspace:*",

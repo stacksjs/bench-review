@@ -2,7 +2,7 @@
   "name": "@stacksjs/auth",
   "type": "module",
   "sideEffects": false,
-  "version": "0.70.87",
+  "version": "0.70.190",
   "description": "A more simplistic way to authenticate.",
   "author": "Chris Breuer",
   "contributors": [
@@ -51,10 +51,11 @@
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
+    "@stacksjs/bun-router": "^0.0.20",
     "@stacksjs/ts-auth": "^0.4.3"
   },
   "devDependencies": {
-    "better-dx": "^0.2.16",
+    "better-dx": "^0.2.17",
     "@stacksjs/error-handling": "workspace:*",
     "@stacksjs/router": "workspace:*"
   }

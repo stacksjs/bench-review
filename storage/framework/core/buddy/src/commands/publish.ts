@@ -13,6 +13,10 @@ interface PublishOptions {
   verbose?: boolean
 }
 
+interface UnpublishOptions extends PublishOptions {
+  all?: boolean
+}
+
 export function publish(buddy: CLI): void {
   const descriptions = {
     command: 'Publish a Stacks default into your userland (app/) directory so you can customize it',
@@ -21,9 +25,12 @@ export function publish(buddy: CLI): void {
     middleware: 'Publish a default middleware from storage/framework/defaults/app/Middleware/ to app/Middleware/',
     action: 'Publish a default action from storage/framework/defaults/app/Actions/ to app/Actions/',
     core: 'Publish a framework package source from node_modules/@stacksjs/<pkg>/ into storage/framework/core/<pkg>/ for editing',
+    unpublishCore: 'Drop a vendored storage/framework/core/<pkg>/ and go back to the installed @stacksjs/<pkg>',
+    all: 'Unvendor the whole framework: remove storage/framework/core and resolve every @stacksjs package from the `stacks` dependency in package.json',
     name: 'The name of the resource to publish (e.g. Cart, User)',
     pkg: 'The name of the framework package (e.g. router, orm, faker — without @stacksjs/ prefix)',
     force: 'Overwrite an existing userland file',
+    forceUnpublish: 'Delete the vendored source even when it has uncommitted changes',
     verbose: 'Enable verbose output',
   }
 
@@ -89,6 +96,25 @@ export function publish(buddy: CLI): void {
     .option('--verbose', descriptions.verbose, { default: false })
     .action(async (pkg: string, options: PublishOptions) => {
       await publishCorePackage(pkg, !!options.force)
+    })
+
+  buddy
+    .command('unpublish:core [pkg]', descriptions.unpublishCore)
+    .option('--all', descriptions.all, { default: false })
+    .option('--force', descriptions.forceUnpublish, { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (pkg: string | undefined, options: UnpublishOptions) => {
+      if (options.all) {
+        await unvendorFramework(!!options.force)
+        return
+      }
+
+      if (!pkg) {
+        log.error('Usage: buddy unpublish:core <pkg>   (or --all to move the whole framework to node_modules)')
+        process.exit(ExitCode.FatalError)
+      }
+
+      await unpublishCorePackage(pkg, !!options.force)
     })
 
   buddy
@@ -290,4 +316,283 @@ async function publishResource(ctx: PublishContext): Promise<void> {
   await fs.promises.copyFile(sourcePath, targetPath)
 
   log.success(`Published ${kind} ${italic(name)} → ${italic(targetPath.replace(`${process.cwd()}/`, ''))}`)
+}
+
+/**
+ * Remove one vendored core package so the project resolves the installed
+ * `@stacksjs/<pkg>` again. The exact inverse of `publish:core <pkg>`.
+ */
+async function unpublishCorePackage(pkg: string, force: boolean): Promise<void> {
+  const shortName = normalizeCoreName(pkg)
+  const targetDir = path.frameworkPath(`core/${shortName}`)
+  const rel = (p: string) => p.replace(`${process.cwd()}/`, '')
+
+  if (!existsSync(targetDir)) {
+    log.info(`Not vendored: ${italic(rel(targetDir))} — nothing to do.`)
+    return
+  }
+
+  // Removing the override is only safe if something is left to resolve. An
+  // app that vendored a package and never installed it would simply lose it.
+  const installed = resolve(process.cwd(), 'node_modules', '@stacksjs', shortName)
+  if (!existsSync(installed) && !force) {
+    log.error(`@stacksjs/${shortName} is not installed, so removing the vendored copy would leave nothing to resolve.`)
+    log.info(`Run \`bun add @stacksjs/${shortName}\` first, or pass --force to remove it anyway.`)
+    process.exit(ExitCode.FatalError)
+  }
+
+  await assertNoUncommittedChanges(targetDir, force)
+
+  await fs.promises.rm(targetDir, { recursive: true, force: true })
+
+  log.success(`Unpublished ${italic(rel(targetDir))} — @stacksjs/${shortName} now resolves from node_modules.`)
+}
+
+/**
+ * Move a project off the vendored framework entirely.
+ *
+ * A `buddy new` scaffold ships the whole framework source under
+ * `storage/framework/core` and wires it up as a Bun workspace. That layout is
+ * for working ON Stacks. An app that only works WITH Stacks wants the same
+ * packages from npm, which is what the single `stacks` dependency in
+ * package.json pulls in — it depends on every `@stacksjs/*` package at a
+ * matching version.
+ *
+ * Both layouts are supported everywhere (the `buddy` launcher, `runAction`,
+ * and the alias map all fall back from vendored source to the installed
+ * package), so this is purely a matter of rewriting the three places that
+ * point AT the vendored copy, then deleting it.
+ */
+async function unvendorFramework(force: boolean): Promise<void> {
+  const coreDir = path.frameworkPath('core')
+  const rel = (p: string) => p.replace(`${process.cwd()}/`, '')
+
+  if (!existsSync(coreDir)) {
+    log.info('No storage/framework/core in this project — already on the installed packages.')
+    return
+  }
+
+  const corePkgPath = resolve(coreDir, 'package.json')
+  if (!existsSync(corePkgPath)) {
+    log.error(`${rel(coreDir)} has no package.json, so its version cannot be determined.`)
+    log.info('Unvendor the packages individually with `buddy unpublish:core <pkg>` instead.')
+    process.exit(ExitCode.FatalError)
+  }
+
+  const corePkg = JSON.parse(await fs.promises.readFile(corePkgPath, 'utf-8')) as {
+    name?: string
+    version?: string
+    dependencies?: Record<string, string>
+  }
+  const version = corePkg.version
+  if (!version) {
+    log.error(`${rel(corePkgPath)} has no version field.`)
+    process.exit(ExitCode.FatalError)
+  }
+
+  await assertNoUncommittedChanges(coreDir, force)
+
+  // 1. package.json: the workspace link becomes a version range, and the
+  //    workspace globs that point into core stop matching anything real.
+  const rootPkgPath = resolve(process.cwd(), 'package.json')
+  const rootPkgRaw = await fs.promises.readFile(rootPkgPath, 'utf-8')
+  const rootPkg = JSON.parse(rootPkgRaw) as {
+    dependencies?: Record<string, string>
+    devDependencies?: Record<string, string>
+    scripts?: Record<string, string>
+    workspaces?: string[]
+  }
+
+  const depName = corePkg.name ?? 'stacks'
+  const range = `^${version}`
+
+  // Everything the vendored workspace was providing. Any `workspace:` range on
+  // one of these names has to become a version range, wherever it is declared:
+  // once the directory is gone bun fails the whole install with
+  // `Workspace dependency "<name>" not found` rather than falling back to npm.
+  const provided = new Set<string>([depName, ...Object.keys(corePkg.dependencies ?? {}).filter(name => name.startsWith('@stacksjs/'))])
+  for (const entry of await readdir(coreDir, { withFileTypes: true })) {
+    if (entry.isDirectory())
+      provided.add(`@stacksjs/${entry.name}`)
+  }
+
+  let repointed = 0
+  const repointWorkspaceRanges = (pkg: { dependencies?: Record<string, string>, devDependencies?: Record<string, string>, peerDependencies?: Record<string, string> }): boolean => {
+    let touched = false
+    for (const field of ['dependencies', 'devDependencies', 'peerDependencies'] as const) {
+      const deps = pkg[field]
+      if (!deps)
+        continue
+
+      for (const [name, spec] of Object.entries(deps)) {
+        if (!spec.startsWith('workspace:') || !provided.has(name))
+          continue
+
+        deps[name] = range
+        touched = true
+        repointed++
+      }
+    }
+    return touched
+  }
+
+  repointWorkspaceRanges(rootPkg)
+
+  // The app has to declare the framework itself, or nothing pulls it in.
+  if (!rootPkg.dependencies?.[depName] && !rootPkg.devDependencies?.[depName])
+    rootPkg.dependencies = { ...rootPkg.dependencies, [depName]: range }
+
+  // Scripts that run the vendored CLI by path (`bun
+  // ./storage/framework/core/buddy/src/cli.ts lint`) point at a file that is
+  // about to stop existing. The `./buddy` shim resolves whichever CLI the
+  // project actually has, so it is right in both layouts — and a script like
+  // `bun buddy lint` in CI fails hard otherwise, days after the unvendor.
+  let rewrittenScripts = 0
+  for (const [name, script] of Object.entries(rootPkg.scripts ?? {})) {
+    if (!/storage\/framework\/core\/buddy\/src\/cli\.ts/.test(script))
+      continue
+
+    rootPkg.scripts![name] = script.replace(
+      /\bbunx?\s+(?:--bun\s+)?\.?\/?storage\/framework\/core\/buddy\/src\/cli\.ts/g,
+      './buddy',
+    )
+    rewrittenScripts++
+  }
+
+  if (Array.isArray(rootPkg.workspaces)) {
+    rootPkg.workspaces = rootPkg.workspaces.filter(glob => !isCoreWorkspaceGlob(glob))
+    if (rootPkg.workspaces.length === 0)
+      delete rootPkg.workspaces
+  }
+
+  await fs.promises.writeFile(rootPkgPath, `${JSON.stringify(rootPkg, null, 2)}\n`)
+
+  // The workspace members that survive (libs, views, the framework package
+  // itself) commonly depend on the framework with `workspace:*` too.
+  for (const glob of rootPkg.workspaces ?? []) {
+    for (const memberPkgPath of globSync(`${glob.replace(/\/$/, '')}/package.json`, { cwd: process.cwd(), absolute: true })) {
+      const raw = await fs.promises.readFile(memberPkgPath, 'utf-8')
+      const memberPkg = JSON.parse(raw)
+      if (repointWorkspaceRanges(memberPkg))
+        await fs.promises.writeFile(memberPkgPath, `${JSON.stringify(memberPkg, null, 2)}\n`)
+    }
+  }
+
+  // 2. bunfig.toml preloads point at source files inside core. Rewrite them to
+  //    package specifiers: `storage/framework/core/env/plugin.ts` is the same
+  //    module as `@stacksjs/env/plugin.js`, which the package's `./*` export
+  //    maps onto its build output.
+  const bunfigPath = resolve(process.cwd(), 'bunfig.toml')
+  let rewrittenPreloads = 0
+  if (existsSync(bunfigPath)) {
+    const bunfig = await fs.promises.readFile(bunfigPath, 'utf-8')
+    const next = bunfig.replace(
+      /(["'])\.?\/?storage\/framework\/core\/([\w-]+)\/([^"']+?)\.ts\1/g,
+      (_match, quote: string, pkgName: string, subpath: string) => {
+        rewrittenPreloads++
+        return `${quote}@stacksjs/${pkgName}/${subpath}.js${quote}`
+      },
+    )
+
+    if (next !== bunfig)
+      await fs.promises.writeFile(bunfigPath, next)
+  }
+
+  // 3. The vendored source itself, and any node_modules symlink still
+  //    pointing into it. Those links survive the directory they point at and
+  //    then resolve to nothing, so an import of that package fails with a
+  //    missing module rather than falling back to the published copy.
+  await fs.promises.rm(coreDir, { recursive: true, force: true })
+
+  const scopedDir = resolve(process.cwd(), 'node_modules/@stacksjs')
+  let danglingRemoved = 0
+  if (existsSync(scopedDir)) {
+    for (const entry of await readdir(scopedDir, { withFileTypes: true })) {
+      if (!entry.isSymbolicLink())
+        continue
+
+      const link = resolve(scopedDir, entry.name)
+      if (existsSync(link))
+        continue
+
+      await fs.promises.rm(link, { force: true })
+      danglingRemoved++
+    }
+  }
+
+  log.success(`Removed ${italic(rel(coreDir))}`)
+  log.info(`package.json now depends on ${depName}@${range}`)
+  if (repointed > 0)
+    log.info(`Repointed ${repointed} workspace: range${repointed === 1 ? '' : 's'} to ${range}`)
+  if (danglingRemoved > 0)
+    log.info(`Removed ${danglingRemoved} node_modules symlink${danglingRemoved === 1 ? '' : 's'} left pointing into it`)
+  if (rewrittenScripts > 0)
+    log.info(`Repointed ${rewrittenScripts} package.json script${rewrittenScripts === 1 ? '' : 's'} to ./buddy`)
+  if (rewrittenPreloads > 0)
+    log.info(`Rewrote ${rewrittenPreloads} bunfig.toml preload path${rewrittenPreloads === 1 ? '' : 's'} to package specifiers`)
+
+  log.info('Installing the published packages...')
+  const install = Bun.spawn(['bun', 'install'], { cwd: process.cwd(), stdout: 'inherit', stderr: 'inherit' })
+  const code = await install.exited
+  if (code !== 0) {
+    log.error('`bun install` failed. package.json and bunfig.toml were updated; re-run the install once the failure is resolved.')
+    process.exit(ExitCode.FatalError)
+  }
+
+  log.success('This project now runs on the published Stacks packages.')
+  log.info('Vendor an individual package again any time with `buddy publish:core <pkg>`.')
+}
+
+/** Accepts `router`, `@stacksjs/router`, or `core/router`. */
+function normalizeCoreName(pkg: string): string {
+  const shortName = pkg.replace(/^@stacksjs\//, '').replace(/^core\//, '')
+
+  if (!shortName || shortName.includes('/') || shortName.includes('..')) {
+    process.stderr.write(`Invalid package name: ${pkg}\n`)
+    process.stderr.write('  Use a short name like `router` or the fully qualified `@stacksjs/router`.\n')
+    process.exit(ExitCode.FatalError)
+  }
+
+  return shortName
+}
+
+/** True for the workspace globs that only ever match vendored core packages. */
+function isCoreWorkspaceGlob(glob: string): boolean {
+  const normalized = glob.replace(/^\.\//, '').replace(/\/$/, '')
+  return normalized === 'storage/framework/core' || normalized.startsWith('storage/framework/core/')
+}
+
+/**
+ * Refuse to delete vendored source that carries edits which exist nowhere
+ * else. Vendoring exists so the framework CAN be edited in place, so a
+ * `git status` on the directory is the difference between "removing a copy"
+ * and "losing work".
+ */
+async function assertNoUncommittedChanges(dir: string, force: boolean): Promise<void> {
+  if (force)
+    return
+
+  try {
+    const proc = Bun.spawn(['git', 'status', '--porcelain', '--', dir], {
+      cwd: process.cwd(),
+      stdout: 'pipe',
+      stderr: 'ignore',
+    })
+    const output = await new Response(proc.stdout).text()
+    if (await proc.exited !== 0)
+      return // not a git repo, or git is unavailable: nothing to compare against
+
+    const changed = output.split('\n').filter(Boolean)
+    if (changed.length === 0)
+      return
+
+    log.error(`${changed.length} uncommitted change${changed.length === 1 ? '' : 's'} under ${italic(dir.replace(`${process.cwd()}/`, ''))}:`)
+    for (const line of changed.slice(0, 10)) log.info(`  ${line}`)
+    if (changed.length > 10) log.info(`  ... and ${changed.length - 10} more`)
+    log.info('Commit or stash them first, or pass --force to delete them anyway.')
+    process.exit(ExitCode.FatalError)
+  }
+  catch {
+    // git unavailable — proceed, the caller opted into this.
+  }
 }

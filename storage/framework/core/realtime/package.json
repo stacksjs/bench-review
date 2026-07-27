@@ -2,7 +2,7 @@
   "name": "@stacksjs/realtime",
   "type": "module",
   "sideEffects": false,
-  "version": "0.70.87",
+  "version": "0.70.190",
   "description": "The Stacks realtime integration. Built on top of ts-broadcasting.",
   "author": "Chris Breuer",
   "contributors": [
@@ -53,9 +53,9 @@
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "ts-broadcasting": "^0.0.5"
+    "ts-broadcasting": "^0.0.8"
   },
   "devDependencies": {
-    "better-dx": "^0.2.16"
+    "better-dx": "^0.2.17"
   }
 }

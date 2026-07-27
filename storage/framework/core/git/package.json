@@ -2,7 +2,7 @@
   "name": "@stacksjs/git",
   "type": "module",
   "sideEffects": false,
-  "version": "0.70.87",
+  "version": "0.70.190",
   "description": "The Stacks git utilities & conventions.",
   "author": "Chris Breuer",
   "contributors": [
@@ -52,9 +52,10 @@
     "typecheck": "bun tsc --noEmit",
     "prepublishOnly": "bun run build"
   },
+  "dependencies": {
+    "cz-git": "^1.13.1"
+  },
   "devDependencies": {
-    "@stacksjs/gitlint": "^0.1.5",
-    "@stacksjs/gitit": "^0.2.5",
-    "bun-git-hooks": "^0.3.1"
+    "better-dx": "^0.2.17"
   }
 }

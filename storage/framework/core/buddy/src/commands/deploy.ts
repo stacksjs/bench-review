@@ -1,18 +1,19 @@
 import type { CLI, DeployOptions } from '@stacksjs/types'
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import process from 'node:process'
 import { runAction } from '@stacksjs/actions'
 import { italic, onUnknownSubcommand, outro, prompts, runCommand } from "@stacksjs/cli"
 import { app, dns as dnsConfig, email as emailConfig, cloud as cloudConfig } from '@stacksjs/config'
 import { addDomain, hasUserDomainBeenAddedToCloud, syncDnsConfig } from '@stacksjs/dns'
+import { loadProjectDnsConfig } from '../config'
 import { encryptEnv, env } from '@stacksjs/env'
 import { Action } from '@stacksjs/enums'
 import { path as p } from '@stacksjs/path'
 import { ExitCode } from '@stacksjs/types'
 import { getErrorCode, getErrorMessage } from '@stacksjs/utils'
-import { ensureAppKey, ensureEnvIsSet, ensurePantryDependencies, ensurePantryInstalled } from './setup'
+import { ensureAppKey, ensureEnvIsSet } from './setup'
 
 // Use console.log for clean output without timestamps
 const log = {
@@ -123,9 +124,6 @@ async function findPantryMailBinary(): Promise<string | null> {
 
 async function ensureDeployPrerequisites(verbose = false): Promise<void> {
   const cwd = p.projectPath()
-
-  await ensurePantryInstalled()
-  await ensurePantryDependencies(cwd)
 
   await ensureEnvIsSet({ cwd, verbose })
   await ensureAppKey(cwd)
@@ -571,15 +569,16 @@ function fmtDuration(secs: number): string {
 }
 
 /**
- * Poll `check()` until it stops throwing or the timeout elapses, emitting a
- * heartbeat every ~30s so a multi-minute wait never looks frozen (and, when
- * backgrounded, so the caller can see it is still alive).
+ * Poll `check()` (awaited each attempt, so it may be sync or async) until it
+ * stops throwing or the timeout elapses, emitting a heartbeat every ~30s so a
+ * multi-minute wait never looks frozen (and, when backgrounded, so the caller
+ * can see it is still alive).
  */
 async function pollUntil(opts: {
   label: string
   timeoutSecs: number
   intervalMs?: number
-  check: () => void
+  check: () => unknown | Promise<unknown>
   timeoutMessage: (elapsedSecs: number) => string
 }): Promise<void> {
   log.info(`${opts.label} (up to ${fmtDuration(opts.timeoutSecs)})...`)
@@ -588,7 +587,7 @@ async function pollUntil(opts: {
   let lastHeartbeat = 0
   for (;;) {
     try {
-      opts.check()
+      await opts.check()
       return
     }
     catch {
@@ -615,33 +614,24 @@ async function pollUntil(opts: {
  *   TS_CLOUD_SSH_WAIT_SECS   (default 480 = 8m)  — SSH reachability
  *   TS_CLOUD_BOOT_WAIT_SECS  (default 720 = 12m) — cloud-init + bun on PATH
  */
-async function waitForRemoteReady(ip: string, verbose: boolean): Promise<void> {
-  const { execSync } = await import('node:child_process')
-  // Cloud providers recycle IPs, so a freshly-provisioned box often reuses an IP
-  // whose OLD host key is still in ~/.ssh/known_hosts. `accept-new` only accepts
-  // brand-new hosts — a *changed* key fails verification and the readiness check
-  // wrongly reports "SSH not reachable". Ignore the known_hosts file entirely for
-  // this ephemeral check (matches the actual deploy's SSH args).
-  const sshArgs = [
-    '-o', 'StrictHostKeyChecking=no',
-    '-o', 'UserKnownHostsFile=/dev/null',
-    '-o', 'BatchMode=yes',
-    '-o', 'ConnectTimeout=10',
-    `root@${ip}`,
-  ]
+async function waitForRemoteReady(ip: string): Promise<void> {
+  const { sshExecOrThrow } = await import('@stacksjs/ts-cloud')
 
-  const run = (remote: string): string =>
-    execSync(`ssh ${sshArgs.map(a => `'${a}'`).join(' ')} '${remote.replace(/'/g, `'\\''`)}'`, {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', verbose ? 'inherit' : 'pipe'],
-    })
+  // Delegate the SSH exec to ts-cloud's helper. It disables host-key checking
+  // (StrictHostKeyChecking=no, UserKnownHostsFile=/dev/null), the same args the
+  // real deploy uses. That also covers the recycled-IP case: cloud providers
+  // reuse an IP whose OLD host key still sits in ~/.ssh/known_hosts, and a
+  // changed key would otherwise fail verification and wrongly report "SSH not
+  // reachable". ConnectTimeout=10 matches the previous inline check.
+  const run = (remote: string): Promise<string> =>
+    sshExecOrThrow(ip, remote, { user: 'root', connectTimeoutSec: 10 })
 
   // 1) Wait for SSH to accept connections (server may still be booting).
   const sshWaitSecs = readWaitSecs('TS_CLOUD_SSH_WAIT_SECS', 8 * 60)
   await pollUntil({
     label: 'Waiting for SSH to come up',
     timeoutSecs: sshWaitSecs,
-    check: () => { run('true') },
+    check: () => run('true'),
     timeoutMessage: elapsed =>
       `SSH did not become reachable on ${ip} within ${fmtDuration(sshWaitSecs)} (waited ${elapsed}s). `
       + `The box may still be booting — raise TS_CLOUD_SSH_WAIT_SECS and retry.`,
@@ -651,7 +641,7 @@ async function waitForRemoteReady(ip: string, verbose: boolean): Promise<void> {
   // 2) Block on cloud-init, then confirm bun landed on PATH.
   log.info('Waiting for cloud-init (installing bun + caddy)...')
   try {
-    run('cloud-init status --wait || true')
+    await run('cloud-init status --wait || true')
   }
   catch (err) {
     log.debug('cloud-init status --wait returned non-zero (continuing):', err)
@@ -661,13 +651,34 @@ async function waitForRemoteReady(ip: string, verbose: boolean): Promise<void> {
   await pollUntil({
     label: 'Waiting for the bun runtime',
     timeoutSecs: bootWaitSecs,
-    check: () => { run('test -x /usr/local/bin/bun') },
+    check: () => run('test -x /usr/local/bin/bun'),
     timeoutMessage: elapsed =>
       `bun runtime did not appear at /usr/local/bin/bun within ${fmtDuration(bootWaitSecs)} (waited ${elapsed}s). `
       + `cloud-init may have failed — SSH in and check /var/log/cloud-init-output.log; `
       + `raise TS_CLOUD_BOOT_WAIT_SECS for slow regions.`,
   })
   log.success('Server is ready (bun installed)')
+}
+
+/**
+ * The projects attached to this box, from `cloud.tenants` in `config/cloud.ts`.
+ *
+ * Each deploys from its own repository with its own env file, so none of their
+ * values belong in this project's. This list is what makes a `TENANT_` prefix
+ * meaningful — with nothing declared, nothing is ever treated as foreign,
+ * because `STRIPE_` and `AWS_` are indistinguishable from a slug prefix.
+ */
+async function resolveDeclaredTenants(): Promise<string[]> {
+  try {
+    const { config } = await import('@stacksjs/config')
+    const tenants = (config as { cloud?: { tenants?: unknown } }).cloud?.tenants
+    return Array.isArray(tenants) ? tenants.filter((slug): slug is string => typeof slug === 'string') : []
+  }
+  catch {
+    // A cloud config that will not load is the deploy's problem to report, not
+    // this helper's — fall back to shipping everything, as before.
+    return []
+  }
 }
 
 /**
@@ -689,11 +700,24 @@ async function waitForRemoteReady(ip: string, verbose: boolean): Promise<void> {
  * ciphertext it never had a chance to decrypt (no DOTENV_PRIVATE_KEY_* in
  * that 2-key set).
  *
+ * Keys namespaced to another tenant on this box (`cloud.tenants` in
+ * `config/cloud.ts`) are dropped here, before anything is shipped. Those
+ * projects deploy from their own repositories with their own env files and
+ * never need the owner's copy — and because ts-cloud treats `site.env` as the
+ * complete `.env`, leaving them in writes one tenant's secrets into an
+ * unrelated site's `.env` on disk.
+ *
  * Returns `{}` (not an error) when the file doesn't exist or fails to
  * parse — an app with no `.env.production` yet shouldn't block deploying
  * with whatever `site.env` overrides it does have.
+ *
+ * @param environment - Which `.env.<environment>` to read.
+ * @param tsCloudConfig - The deploy target's ts-cloud config, read for `project.slug`.
  */
-export async function resolveDeployEnvValues(environment: 'production' | 'staging' | 'development'): Promise<Record<string, string>> {
+export async function resolveDeployEnvValues(
+  environment: 'production' | 'staging' | 'development',
+  tsCloudConfig?: { project?: { slug?: string } },
+): Promise<Record<string, string>> {
   const fileName = environment === 'production'
     ? '.env.production'
     : environment === 'staging'
@@ -721,7 +745,22 @@ export async function resolveDeployEnvValues(environment: 'production' | 'stagin
         continue
       values[key] = String(value)
     }
-    return values
+
+    const { foreignTenantKeys, partitionTenantEnv } = await import('@stacksjs/env')
+    const partition = partitionTenantEnv(values, {
+      self: tsCloudConfig?.project?.slug,
+      tenants: await resolveDeclaredTenants(),
+    })
+
+    for (const { tenant, keys } of foreignTenantKeys(partition)) {
+      log.warn(
+        `[deploy] Skipping ${keys.length} '${tenant}' key(s) in ${fileName} — they belong to that tenant's own `
+        + `repository, and shipping them writes its secrets into this project's site .env files. `
+        + `Remove them with: buddy env:check --file ${fileName}. Keys: ${keys.join(', ')}`,
+      )
+    }
+
+    return partition.own
   }
   catch (error) {
     log.debug(`[deploy] Failed to resolve ${fileName} for site env merging:`, error)
@@ -1141,7 +1180,7 @@ async function runHetznerDeploy(args: {
     // ts-cloud app server existed (e.g. uptime-status), making adoption
     // ambiguous and leaving the pin the only resolver.
     const stackName = tsCloudConfig.project?.stackName || `${tsCloudConfig.project?.slug || 'app'}-${environment}`
-    const stateDir = join(process.cwd(), '.ts-cloud', 'state')
+    const stateDir = join(process.cwd(), 'storage', 'cloud', 'state')
     mkdirSync(stateDir, { recursive: true })
     writeFileSync(join(stateDir, `${stackName}.json`), `${JSON.stringify({
       stackName,
@@ -1170,7 +1209,7 @@ async function runHetznerDeploy(args: {
     process.exit(ExitCode.FatalError)
   }
 
-  await waitForRemoteReady(ip, verbose)
+  await waitForRemoteReady(ip)
 
   // Package each site as source-only: dependencies are NOT shipped. They are
   // installed on the server from the committed lockfile via the site's
@@ -1210,17 +1249,34 @@ async function runHetznerDeploy(args: {
     // files — it only strips the ~130MB of built docs/blog from source tarballs
     // that never serve them. (frontend-dist is kept: `dist` != `frontend-dist`.)
     'dist',
-    // stx's build cache + generated route manifest (`.stx/routes.ts`). It MUST
-    // be regenerated on the server from the shipped `resources/views` — shipping
-    // a stale/empty manifest makes production `stx serve` trust it and serve 404
+    // stx's build cache + generated route manifest (`routes.ts`). It MUST be
+    // regenerated on the server from the shipped `resources/views` — shipping a
+    // stale/empty manifest makes production `stx serve` trust it and serve 404
     // on every view route (e.g. `/`). Absent, stx-serve rescans and rebuilds it.
+    // (`.stx` too: a checkout that predates the move to storage/ still has one.)
+    relative(p.projectPath(), p.stxPath()).replace(/\/$/, ''),
     '.stx',
+    // ts-cloud's local state: the dashboard credentials and session signing key
+    // live here. They belong to the machine running the deploy and must never
+    // ride along in the tarball — the box mints its own under the dashboard
+    // site's shared directory.
+    relative(p.projectPath(), p.cloudStatePath()).replace(/\/$/, ''),
+    '.ts-cloud',
+    // Migration lock, temp bundles, CLI scratch — machine-local, never useful
+    // on the box.
+    relative(p.projectPath(), p.frameworkRuntimePath()).replace(/\/$/, ''),
     'tmp',
     'temp',
     '.DS_Store',
     '*.log',
+    // Local env files are machine-local secrets — never ship them. The box
+    // gets its env from ts-cloud's generated EnvironmentFile (merged decrypted
+    // .env.production + site env), symlinked over release/.env at deploy time.
+    '.env',
     '.env.local',
+    '.env.keys',
     '.env.production.bak',
+    '.env.production.plain',
   ].flatMap(p => [`--exclude='${p}'`, `--exclude='*/${p}'`])
 
   if (onlySite && !sites[onlySite]) {
@@ -1288,7 +1344,7 @@ async function runHetznerDeploy(args: {
   // `env` overrides — see resolveDeployEnvValues' doc comment for why this
   // has to happen here (ts-cloud has no idea .env.production/decryption
   // exist) rather than inside ts-cloud itself.
-  const resolvedDeployEnv = await resolveDeployEnvValues(environment)
+  const resolvedDeployEnv = await resolveDeployEnvValues(environment, tsCloudConfig)
   const sitesWithResolvedEnv = mergeSiteDeployEnv(sites, resolvedDeployEnv)
 
   // Also apply the decrypted values to THIS (local, deploying) process' env —
@@ -1449,6 +1505,16 @@ export interface MailTenantResult {
 }
 
 /**
+ * Mail tenancy is an explicit deployment capability. The merged Stacks config
+ * always contains framework email defaults, so checking `emailConfig` alone
+ * would register the framework's own default domain for every application that
+ * does not provide `config/email.ts`.
+ */
+export function hasExplicitEmailConfig(projectRoot = p.projectPath()): boolean {
+  return existsSync(join(projectRoot, 'config', 'email.ts'))
+}
+
+/**
  * Reconcile this app's mail configuration onto the mail server running on the
  * box, straight from `config/email.ts`. Declarative, additive, idempotent:
  *
@@ -1505,10 +1571,49 @@ async function resolveAttachTargetBox(
  * DKIM public key), or null when there is nothing to reconcile / it failed.
  */
 export async function provisionMailTenant(ip: string, logger: typeof log): Promise<MailTenantResult | null> {
+  if (!hasExplicitEmailConfig())
+    return null
+
   const cfg: any = emailConfig || {}
+  // Mail explicitly disabled for this app (config/email.ts `server.enabled:
+  // false`): skip the shared-mail tenant reconcile entirely — no local-domain
+  // registration, DKIM key, mailboxes, or mail DNS. Without this gate the
+  // reconcile keyed off `cfg.domain`/`from.address` alone, so an app with no
+  // mail intent still mutated the SHARED mail server + its own MX records.
+  if (cfg.server?.enabled === false)
+    return null
+
   const domain: string | undefined = cfg.domain
     || (typeof cfg.from?.address === 'string' && cfg.from.address.includes('@') ? cfg.from.address.split('@')[1] : undefined)
-  const forwards: Record<string, string[]> = (cfg.forwards && typeof cfg.forwards === 'object') ? cfg.forwards : {}
+  const declaredForwards: Record<string, string[]> = (cfg.forwards && typeof cfg.forwards === 'object') ? cfg.forwards : {}
+
+  /*
+   * An alias with no mailbox of its own needs its bare local part as the key.
+   *
+   * The server looks a forward up by the mailbox it delivered to: the full
+   * address when that address is a registered mailbox, and the bare local
+   * part when it is not. So `'akki@example.com': ['someone@example.com']`
+   * — the obvious way to write an alias — silently did nothing, and the mail
+   * piled up in a mailbox nobody reads.
+   *
+   * Both keys are written for an address that has no declared mailbox. The
+   * bare one is not domain-scoped, so it is only added when nothing else has
+   * claimed it: on a shared server another tenant may already own that local
+   * part.
+   */
+  const forwards: Record<string, string[]> = { ...declaredForwards }
+  const declaredBoxes = new Set(domain ? resolveMailboxes(cfg.mailboxes, domain).map(b => b.address) : [])
+  for (const [key, targets] of Object.entries(declaredForwards)) {
+    const at = key.indexOf('@')
+    if (at === -1 || declaredBoxes.has(key))
+      continue
+
+    const localPart = key.slice(0, at)
+    if (key.slice(at + 1) !== domain || forwards[localPart])
+      continue
+
+    forwards[localPart] = targets
+  }
   const hasForwards = Object.keys(forwards).length > 0
   const boxes = domain ? resolveMailboxes(cfg.mailboxes, domain) : []
 
@@ -1528,7 +1633,12 @@ export async function provisionMailTenant(ip: string, logger: typeof log): Promi
     + 'from config/email.ts (merge-based — hand edits to other keys are preserved).'
   const readmeB64 = Buffer.from(readme).toString('base64')
   // address<TAB>password per mailbox, base64'd as one blob for the shell hop.
-  const boxesB64 = boxes.length ? Buffer.from(boxes.map(b => `${b.address}\t${b.password}`).join('\n')).toString('base64') : ''
+  //
+  // The trailing newline matters: `while read` returns non-zero on a final
+  // line with no terminator and leaves the loop before the body runs, so the
+  // LAST mailbox in config/email.ts was silently never created. It reported
+  // success either way, because the caller only counts the MADE lines.
+  const boxesB64 = boxes.length ? Buffer.from(`${boxes.map(b => `${b.address}\t${b.password}`).join('\n')}\n`).toString('base64') : ''
 
   // One idempotent, merge-based reconcile script. Emits keyed lines the caller
   // parses: MAILHOST:, DKIMPUB:, MADE:<addr>, and a final MAILTENANT:<state>.
@@ -1596,28 +1706,125 @@ if [ -n "$BOXES_B64" ] && [ -x "$MS" ]; then
     fi
   done
 fi
+# 3b) Put the tenant's own mail hostname on the mail certificate.
+#
+# A person setting up Mail.app types mail.<their domain>, not the shared host.
+# Without that name on the certificate the client says "unable to verify
+# account name or password", which sounds like a wrong password and is really
+# a wrong hostname.
+#
+# acme:renew cannot do this: it renews an existing certificate with the SAN
+# list already inside it and skips names that have no certificate file of
+# their own. Adding a name takes an acme:issue for the union of the names
+# already on the certificate plus this one.
+CERTFILE=/etc/bun-gateway/certs/mail.stacksjs.com.crt
+RENEW=/opt/mail/renew-mail-cert.sh
+if [ -n "$DOMAIN" ] && [ -f "$CERTFILE" ] && [ -d /opt/tlsx ]; then
+  MAILHOSTNAME="mail.$DOMAIN"
+  CURRENT=$(openssl x509 -in "$CERTFILE" -noout -text 2>/dev/null | grep -A1 'Subject Alternative Name' | tail -1 | tr -d ' ' | sed 's/DNS://g')
+  case ",$CURRENT," in
+    *",$MAILHOSTNAME,"*) : ;;
+    *)
+      ALL="$CURRENT,$MAILHOSTNAME"
+      if (cd /opt/tlsx && /usr/local/bin/bun run packages/tlsx/bin/cli.ts acme:issue -d "$ALL" --method http-01 --webroot /var/www/acme-challenge --dir /etc/bun-gateway/certs --prod) >/tmp/.mailtenant-cert 2>&1; then
+        install -m 644 /etc/bun-gateway/certs/mail.stacksjs.com.crt /etc/letsencrypt/live/mail.stacksjs.com/fullchain.pem
+        install -m 640 -g mail-server /etc/bun-gateway/certs/mail.stacksjs.com.key /etc/letsencrypt/live/mail.stacksjs.com/privkey.pem
+        systemctl restart mail || true
+        # Keep the scheduled renewal issuing the same set, or the name drops
+        # off the certificate at the next renewal.
+        [ -f "$RENEW" ] && ! grep -q "$MAILHOSTNAME" "$RENEW" && sed -i "s|acme:renew -d \"|acme:renew -d \"$MAILHOSTNAME,|" "$RENEW" 2>/dev/null
+        echo "CERTHOST:$MAILHOSTNAME"
+      else
+        echo "CERTFAIL:$(tail -c 200 /tmp/.mailtenant-cert | tr '\\n' ' ')"
+      fi
+      rm -f /tmp/.mailtenant-cert
+      ;;
+  esac
+fi
 # 4) Merge auto-forward rules into forwards.json (live-reloaded; no restart).
 if [ -n "$FWD_B64" ] && [ -x /usr/local/bin/bun ]; then
   echo "$FWD_B64" | base64 -d > /tmp/.mailtenant-fwd.json
   echo "$README_B64" | base64 -d > /tmp/.mailtenant-readme.txt
+  # \`let\`, not \`const\`: both of these were const with an assignment inside a
+  # try, which Bun rejects at parse time ("this assignment will throw because
+  # X is a constant"). The whole snippet therefore never ran, stderr was sent
+  # to /dev/null, and every reconcile since has reported forwards=nochange
+  # while forwards.json sat untouched.
   /usr/local/bin/bun --bun -e '
     const fs=require("fs"); const f="/opt/mail/forwards.json";
-    const cur={}; try{cur=JSON.parse(fs.readFileSync(f,"utf8"))}catch{}
+    let cur={}; try{cur=JSON.parse(fs.readFileSync(f,"utf8"))}catch{}
     const add=JSON.parse(fs.readFileSync("/tmp/.mailtenant-fwd.json","utf8"));
     const readme=fs.readFileSync("/tmp/.mailtenant-readme.txt","utf8");
     const merged={...cur}; delete merged._readme;
     for(const [k,v] of Object.entries(add)) merged[k]=v;
     const out={_readme:readme,...merged};
     const s=JSON.stringify(out,null,2)+"\\n";
-    const prev=""; try{prev=fs.readFileSync(f,"utf8")}catch{}
+    let prev=""; try{prev=fs.readFileSync(f,"utf8")}catch{}
     if(s!==prev){ fs.writeFileSync(f,s); process.stdout.write("FWDCHANGED"); }
-  ' > /tmp/.mailtenant-res 2>/dev/null || true
+  ' > /tmp/.mailtenant-res 2>/tmp/.mailtenant-err || true
+# A merge that failed is worth one line, not silence: the rules decide where
+# mail goes.
+if [ -s /tmp/.mailtenant-err ]; then echo "FWDERR:$(head -c 200 /tmp/.mailtenant-err | tr '\\n' ' ')"; fi
+rm -f /tmp/.mailtenant-err
   chown mail-server:mail-server "$FJSON" 2>/dev/null || true
   chmod 644 "$FJSON" 2>/dev/null || true
   rm -f /tmp/.mailtenant-fwd.json /tmp/.mailtenant-readme.txt
 fi
 FWD_STATE=nochange; grep -q FWDCHANGED /tmp/.mailtenant-res 2>/dev/null && FWD_STATE=updated; rm -f /tmp/.mailtenant-res
-# 5) Restart only when the startup-read env actually changed (domain or DKIM key).
+# 5) Keep the shared daemon recoverable if it crashes or stops accepting mail.
+mkdir -p /etc/systemd/system/mail.service.d
+cat > /etc/systemd/system/mail.service.d/reliability.conf <<'EOF'
+[Unit]
+StartLimitIntervalSec=60
+StartLimitBurst=10
+
+[Service]
+Restart=always
+RestartSec=2
+TimeoutStartSec=30
+TimeoutStopSec=30
+LimitCORE=infinity
+EOF
+cat > /usr/local/sbin/mail-health-check <<'EOF'
+#!/bin/sh
+set -eu
+exec 9>/run/mail-health-check.lock
+flock -n 9 || exit 0
+systemctl is-active --quiet mail || { systemctl restart mail; exit 0; }
+for port in 25 143 587 993; do
+  ss -H -ltn "sport = :$port" | grep -q . || {
+    logger -t mail-health "required TCP port $port is not listening; restarting mail"
+    systemctl restart mail
+    exit 0
+  }
+done
+EOF
+chmod 755 /usr/local/sbin/mail-health-check
+cat > /etc/systemd/system/mail-health.service <<'EOF'
+[Unit]
+Description=Check the Stacks mail daemon listeners
+After=mail.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/mail-health-check
+EOF
+cat > /etc/systemd/system/mail-health.timer <<'EOF'
+[Unit]
+Description=Check the Stacks mail daemon every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+systemctl daemon-reload
+systemctl enable --now mail-health.timer >/dev/null 2>&1
+# 6) Restart only when the startup-read env actually changed (domain or DKIM key).
 if [ "$ENV_CHANGED" = 1 ]; then systemctl restart mail 2>/dev/null || true; echo "MAILTENANT:env-changed+restarted,forwards=$FWD_STATE"; else echo "MAILTENANT:current,forwards=$FWD_STATE"; fi`
 
   try {
@@ -1627,12 +1834,40 @@ if [ "$ENV_CHANGED" = 1 ]; then systemctl restart mail 2>/dev/null || true; echo
       stdio: ['pipe', 'pipe', 'pipe'],
     })
     const line = (out.match(/MAILTENANT:[^\n]*/) || [])[0] || 'MAILTENANT:done'
-    const mailHost = (out.match(/MAILHOST:([^\n]*)/) || [])[1]?.trim() || `mail.${domain}`
+    const mailHostFromOut = (out.match(/MAILHOST:([^\n]*)/) || [])[1]?.trim()
+    const mailHost = mailHostFromOut || `mail.${domain}`
     const dkimPubB64 = (out.match(/DKIMPUB:([^\n]*)/) || [])[1]?.trim() || undefined
     const madeAddrs = new Set([...out.matchAll(/MADE:([^\n]+)/g)].flatMap(m => m[1] ? [m[1].trim()] : []))
     const created = boxes.filter(b => madeAddrs.has(b.address)).map(b => ({ address: b.address, password: b.password }))
 
     logger.success(`Mail routing reconciled (${line.replace('MAILTENANT:', '')})`)
+
+    // A mailbox the server refused is worth saying out loud. This used to be
+    // swallowed: only MADE lines were read, so a declared mailbox that never
+    // appeared looked exactly like one that already existed.
+    const failed = [...out.matchAll(/FAIL:([^\n]+)/g)].flatMap(m => m[1] ? [m[1].trim()] : [])
+    if (failed.length)
+      logger.warn(`Mail: the server refused ${failed.length} mailbox(es): ${failed.join(', ')}`)
+
+    const forwardError = (out.match(/FWDERR:([^\n]*)/) || [])[1]?.trim()
+    if (forwardError)
+      logger.warn(`Mail: the forward rules were not merged: ${forwardError}`)
+
+    const certHost = (out.match(/CERTHOST:([^\n]*)/) || [])[1]?.trim()
+    if (certHost)
+      logger.success(`Mail: ${certHost} added to the mail certificate — clients can use it as the server name`)
+
+    const certError = (out.match(/CERTFAIL:([^\n]*)/) || [])[1]?.trim()
+    if (certError)
+      logger.warn(`Mail: could not issue a certificate for mail.${domain} (clients should use ${mailHostFromOut || 'the shared mail host'}): ${certError}`)
+
+    // Declared, not created, not reported as existing: the reconcile never
+    // saw it. Silence here is how a missing mailbox reaches production.
+    const seen = new Set([...madeAddrs, ...[...out.matchAll(/EXISTS:([^\n]+)/g)].flatMap(m => m[1] ? [m[1].trim()] : [])])
+    const unaccounted = boxes.filter(b => !seen.has(b.address)).map(b => b.address)
+    if (unaccounted.length)
+      logger.warn(`Mail: ${unaccounted.length} declared mailbox(es) were not reconciled: ${unaccounted.join(', ')}`)
+
     if (created.length) {
       logger.info(`Mail: created ${created.length} mailbox(es) — credentials below (save them; shown once):`)
       for (const b of created)
@@ -1700,6 +1935,27 @@ export async function reconcileMailDns(res: MailTenantResult, ip: string, logger
     })
     return r.json().catch(() => ({}))
   }
+
+  // Confirm the zone is ours before touching it. `upsert` deletes every record
+  // of a name+type before recreating it, so pointing this at the wrong domain
+  // is destructive — and a project that never edited the scaffold's
+  // `config/email.ts` inherits `domain: 'stacksjs.com'`, which aims this
+  // routine straight at somebody else's MX. A read-only retrieve says whether
+  // these credentials actually administer the zone.
+  const ownership = await call(`dns/retrieve/${domain}`, {})
+  if (ownership?.status !== 'SUCCESS') {
+    logger.warn(
+      `Mail DNS skipped: ${domain} is not administered by these Porkbun credentials `
+      + `(${ownership?.message || 'domain not in this account'}).`,
+    )
+    logger.info(`Set \`domain\` in config/email.ts to a zone you own, or add these records for ${domain} by hand:`)
+    logger.info(`  MX    @                 10 ${mailHost}`)
+    logger.info(`  TXT   @                 ${spf}`)
+    if (dkim) logger.info(`  TXT   mail._domainkey   ${dkim}`)
+    logger.info(`  TXT   _dmarc            ${dmarc}`)
+    return
+  }
+
   // Idempotent upsert: delete every record of this name+type, then recreate.
   const upsert = async (type: string, name: string, content: string, extra: Record<string, unknown> = {}): Promise<void> => {
     const sub = name === '@' ? '' : `/${name}`
@@ -1715,7 +1971,16 @@ export async function reconcileMailDns(res: MailTenantResult, ip: string, logger
     if (dkim)
       await upsert('TXT', 'mail._domainkey', dkim)
     await upsert('TXT', '_dmarc', dmarc)
-    logger.success(`Mail DNS published for ${domain} (MX→${mailHost}, SPF, DKIM, DMARC)`)
+
+    // `mail.<domain>` pointing at the box, because that is the hostname a
+    // person types into Mail.app or Outlook. Without it the name resolved to
+    // the registrar's parking page and the client reported "unable to verify
+    // account name or password" — which sounds like a bad password and is
+    // really a bad hostname. The certificate for it is arranged separately;
+    // until it exists, clients should use the shared host.
+    await upsert('A', 'mail', ip)
+
+    logger.success(`Mail DNS published for ${domain} (MX→${mailHost}, SPF, DKIM, DMARC, mail.${domain}→${ip})`)
   }
   catch (err) {
     logger.warn(`Mail DNS reconcile skipped for ${domain}: ${getErrorMessage(err)}`)
@@ -1733,21 +1998,55 @@ export async function reconcileMailDns(res: MailTenantResult, ip: string, logger
 // records) for every site domain, using the shared provider-agnostic
 // syncDnsConfig from @stacksjs/dns. Create-only and never destructive, so it is
 // safe to run on every deploy; a no-op when config/dns.ts declares no records.
+/**
+ * Return the application zones that should receive config/dns.ts records.
+ * Redirect-only domains still receive their managed apex/www A records through
+ * reconcileHetznerDns, but must not inherit the primary app's MX, SPF, or site
+ * verification records.
+ */
+export function configDnsDomains(sites: Record<string, any>): string[] {
+  const domains = new Set<string>()
+  for (const site of Object.values(sites)) {
+    if (!site?.redirect && site?.domain && typeof site.domain === 'string')
+      domains.add(site.domain.replace(/^www\./, ''))
+  }
+  return [...domains]
+}
+
+/**
+ * Infer a DNS provider from a zone's authoritative nameservers.
+ *
+ * Provider API probes are intentionally the primary detection mechanism, but
+ * some registrars disable record API access per-domain. In that state the
+ * provider still owns the zone and should receive the attempted write so the
+ * deploy reports the real authorization error instead of incorrectly calling
+ * the zone externally managed.
+ */
+export function dnsProviderNameFromNameservers(nameservers: string[]): 'porkbun' | 'cloudflare' | 'route53' | 'godaddy' | null {
+  const normalized = nameservers.map(name => name.toLowerCase().replace(/\.$/, ''))
+
+  if (normalized.some(name => name.endsWith('.porkbun.com')))
+    return 'porkbun'
+  if (normalized.some(name => name.endsWith('.ns.cloudflare.com')))
+    return 'cloudflare'
+  if (normalized.some(name => /(^|\.)awsdns-\d+\.(?:com|net|org|co\.uk)$/.test(name)))
+    return 'route53'
+  if (normalized.some(name => name.endsWith('.domaincontrol.com')))
+    return 'godaddy'
+
+  return null
+}
+
 async function reconcileConfigDns(sites: Record<string, any>, logger: typeof log): Promise<void> {
+  const projectDnsConfig = await loadProjectDnsConfig(dnsConfig)
   const declared = (['a', 'aaaa', 'cname', 'mx', 'txt'] as const)
-    .reduce((total, key) => total + (Array.isArray((dnsConfig as any)?.[key]) ? (dnsConfig as any)[key].length : 0), 0)
+    .reduce((total, key) => total + (Array.isArray((projectDnsConfig as any)?.[key]) ? (projectDnsConfig as any)[key].length : 0), 0)
   if (declared === 0)
     return
 
-  const domains = new Set<string>()
-  for (const site of Object.values(sites)) {
-    if (site?.domain && typeof site.domain === 'string')
-      domains.add(site.domain.replace(/^www\./, ''))
-  }
-
-  for (const domain of domains) {
+  for (const domain of configDnsDomains(sites)) {
     try {
-      const result = await syncDnsConfig(domain, dnsConfig)
+      const result = await syncDnsConfig(domain, projectDnsConfig)
       if (!result.provider)
         continue // no registrar credentials resolved for this domain; skip quietly
       if (result.created || result.failed)
@@ -1756,6 +2055,39 @@ async function reconcileConfigDns(sites: Record<string, any>, logger: typeof log
     catch (err) {
       logger.warn(`DNS (config/dns.ts) reconcile for ${domain} failed: ${err instanceof Error ? err.message : String(err)}`)
     }
+  }
+}
+
+/**
+ * Best-effort post-write check that an A record for `fqdn → ip` exists at
+ * the provider. Returns true when the provider offers no list API or the
+ * listing itself fails — verification must never turn a possibly-good
+ * write into a false alarm; it exists to catch phantom successes (an
+ * upsert that edited the wrong record) at providers that CAN list their
+ * zone (Porkbun at minimum).
+ */
+async function verifyDnsRecord(provider: any, domain: string, fqdn: string, ip: string): Promise<boolean> {
+  try {
+    if (typeof provider?.listRecords !== 'function')
+      return true
+
+    // List WITHOUT a type filter: the typed listing maps to provider
+    // endpoints like Porkbun's retrieveByNameType, whose subdomain-less
+    // form returns apex records only — filtering by 'A' server-side made
+    // verification blind to every non-apex record and produced false
+    // "record is missing" warnings on healthy zones. Retrieve the full
+    // zone and match type/name/content client-side instead.
+    const res = await provider.listRecords(domain)
+    if (!res?.success || !Array.isArray(res.records))
+      return true
+
+    return res.records.some((r: any) => {
+      const name = typeof r?.name === 'string' ? r.name.replace(/\.$/, '') : ''
+      return r?.type === 'A' && name === fqdn && r?.content === ip
+    })
+  }
+  catch {
+    return true
   }
 }
 
@@ -1775,6 +2107,8 @@ async function reconcileHetznerDns(sites: Record<string, any>, ip: string, logge
     providerConfigs.push({ provider: 'porkbun', apiKey: process.env.PORKBUN_API_KEY, secretKey: process.env.PORKBUN_SECRET_KEY })
   if (process.env.CLOUDFLARE_API_TOKEN)
     providerConfigs.push({ provider: 'cloudflare', apiToken: process.env.CLOUDFLARE_API_TOKEN })
+  if (process.env.GODADDY_API_KEY && process.env.GODADDY_API_SECRET)
+    providerConfigs.push({ provider: 'godaddy', apiKey: process.env.GODADDY_API_KEY, apiSecret: process.env.GODADDY_API_SECRET, environment: process.env.GODADDY_ENVIRONMENT })
   if (process.env.AWS_ACCESS_KEY_ID || process.env.AWS_PROFILE)
     providerConfigs.push({ provider: 'route53' })
 
@@ -1785,7 +2119,11 @@ async function reconcileHetznerDns(sites: Record<string, any>, ip: string, logge
     return
   }
 
-  const { detectDnsProvider } = await import('@stacksjs/ts-cloud') as any
+  const {
+    createDnsProvider,
+    detectDnsProvider,
+    removeStaleServerAddressRecords,
+  } = await import('@stacksjs/ts-cloud') as any
   logger.info('Reconciling DNS records...')
 
   // Best-effort A-record lookup so externally managed domains that already
@@ -1800,9 +2138,25 @@ async function reconcileHetznerDns(sites: Record<string, any>, ip: string, logge
     }
   }
 
+  const resolveAuthoritativeNameservers = async (domain: string): Promise<string[]> => {
+    try {
+      const { resolveNs } = await import('node:dns/promises')
+      return await resolveNs(domain)
+    }
+    catch {
+      return []
+    }
+  }
+
   for (const domain of domains) {
     try {
-      const provider = await detectDnsProvider(domain, providerConfigs)
+      let provider = await detectDnsProvider(domain, providerConfigs)
+      if (!provider) {
+        const providerName = dnsProviderNameFromNameservers(await resolveAuthoritativeNameservers(domain))
+        const providerConfig = providerConfigs.find(config => config.provider === providerName)
+        if (providerConfig)
+          provider = createDnsProvider(providerConfig)
+      }
       if (!provider) {
         // No configured provider owns this zone — the records may still be
         // correct (managed at the registrar). Only warn when they aren't.
@@ -1820,11 +2174,35 @@ async function reconcileHetznerDns(sites: Record<string, any>, ip: string, logge
       }
       for (const sub of ['', 'www']) {
         const fqdn = sub ? `${sub}.${domain}` : domain
-        const res = await provider.upsertRecord(domain, { name: sub, type: 'A', content: ip, ttl: 600 })
-        if (res?.success === false)
-          logger.warn(`  DNS: ${fqdn} → ${ip} failed: ${res.error || 'unknown error'}`)
-        else
+        // Pass the full fqdn as the record name — the provider derives the
+        // zone root from `domain` and strips it back off the name. Passing
+        // '' for the apex made subdomain sites (dashboard.hq.training)
+        // upsert the ZONE APEX instead of their own record: the provider
+        // edited hq.training's A record, returned success, and deploy
+        // printed a phantom ✓ for a record that never existed (this was
+        // the hq.training production TLS blocker — LE could not resolve
+        // the host to validate http-01).
+        const res = await provider.upsertRecord(domain, { name: fqdn, type: 'A', content: ip, ttl: 600 })
+        if (res?.success === false) {
+          // ts-cloud providers report failures as { success: false,
+          // message } — read both fields before giving up on detail.
+          logger.warn(`  DNS: ${fqdn} → ${ip} failed: ${res.error || res.message || 'unknown error'}`)
+          continue
+        }
+        // An upsert may update only one of multiple records with the same
+        // hostname. Remove the remaining stale addresses so DNS cannot
+        // round-robin traffic back to an old host (and its stale TLS cert).
+        const cleanupWarnings = await removeStaleServerAddressRecords(provider, domain, fqdn, ip)
+        for (const warning of cleanupWarnings)
+          logger.warn(`  DNS: ${fqdn} cleanup: ${warning}`)
+        // Post-write verification against the provider API. Upsert paths
+        // have produced phantom successes, so only print ✓ once the
+        // record is confirmed to exist. Best-effort: providers without a
+        // usable list API are trusted (see verifyDnsRecord).
+        if (await verifyDnsRecord(provider, domain, fqdn, ip))
           logger.success(`  DNS: ${fqdn} → ${ip} (${provider.name})`)
+        else
+          logger.warn(`  DNS: ${fqdn} → ${ip} reported success at ${provider.name} but no matching A record exists — create it manually: A ${fqdn} → ${ip}`)
       }
     }
     catch (err: any) {
@@ -3222,7 +3600,7 @@ exports.handler = async (event) => {
       // Port configuration
       const smtpPort = emailConfig?.server?.ports?.smtp || 25
       const smtpsPort = emailConfig?.server?.ports?.smtps || 465
-      const submissionPort = emailConfig?.server?.ports?.submission || emailConfig?.server?.ports?.smtpStartTls || 587
+      const submissionPort = emailConfig?.server?.ports?.submission || 587
       const imapPort = emailConfig?.server?.ports?.imap || 143
       const imapsPort = emailConfig?.server?.ports?.imaps || 993
       const pop3Port = emailConfig?.server?.ports?.pop3 || 110

@@ -6,11 +6,76 @@ import { createHash, createHmac, randomBytes } from 'crypto'
 import { readFileSync, existsSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 
+export function resolveDirectMailHost(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  let configured = env.MAIL_SERVER_HOST
+    || ((env.HCLOUD_TOKEN || env.HETZNER_API_TOKEN) ? env.MAIL_HOST : undefined)
+  if (configured && ['127.0.0.1', 'localhost', 'mailpit'].includes(configured))
+    configured = env.MAIL_DOMAIN ? `mail.${env.MAIL_DOMAIN}` : undefined
+  if (!configured || configured === '127.0.0.1' || configured === 'localhost')
+    return undefined
+  return configured.replace(/^https?:\/\//, '').split('/')[0]?.split(':')[0]
+}
+
+export function sanitizeLineCount(value?: string): string {
+  const count = Number.parseInt(value || '50', 10)
+  return String(Number.isFinite(count) ? Math.min(5000, Math.max(1, count)) : 50)
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
+async function resolveOperationalMailHost(): Promise<string | undefined> {
+  if (process.env.MAIL_SERVER_HOST)
+    return resolveDirectMailHost()
+  const token = process.env.HCLOUD_TOKEN || process.env.HETZNER_API_TOKEN
+  if (!token)
+    return undefined
+  const appName = (process.env.APP_NAME || 'stacks').toLowerCase().replace(/[^a-z0-9-]/g, '-')
+  try {
+    const response = await fetch(`https://api.hetzner.cloud/v1/servers?name=${encodeURIComponent(`${appName}-production-app`)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const data = await response.json() as any
+    const ip = data.servers?.[0]?.public_net?.ipv4?.ip
+    if (ip)
+      return ip
+  }
+  catch {
+    // Fall back to the configured mail hostname below.
+  }
+  const configured = resolveDirectMailHost()
+  if (configured)
+    return configured
+  const { email } = await import('@stacksjs/config')
+  return (email as any)?.domain ? `mail.${(email as any).domain}` : undefined
+}
+
 export function mailCommands(buddy: CLI): void {
   buddy
     .command('mail:provision', 'Provision this app\'s mail from config/email.ts onto the shared mail server (domain + DKIM + mailboxes + MX/SPF/DKIM/DMARC DNS). Reusable + idempotent; the same reconcile buddy deploy runs.')
     .option('--ip <ip>', 'Mail server IP (defaults to the A record of config.email.domain)')
-    .action(async (options: { ip?: string }) => {
+    .action(async (options: { ip?: string, env?: string }) => {
+      // Mailbox passwords come from `MAIL_PASSWORD_<LOCALPART>`, which belong in
+      // the target environment's encrypted env file — but nothing here loaded
+      // that file, so `mail:provision --env production` read the development
+      // env, found no passwords, and skipped every mailbox while still
+      // reporting success and advising you to set the very variables it had
+      // just ignored. Load the target environment's decrypted secrets first,
+      // exactly as `buddy deploy` does, so the two paths provision alike.
+      const environment = options.env || process.env.APP_ENV || 'production'
+      process.env.APP_ENV = environment
+      const envFile = `.env.${environment}`
+      if (existsSync(envFile)) {
+        try {
+          const { loadEnv } = await import('@stacksjs/env')
+          loadEnv({ path: envFile, env: environment, keysFile: '.env.keys', overload: true, quiet: true })
+        }
+        catch (err) {
+          log.warn(`Could not load ${envFile}: ${getErrorMessage(err)}`)
+        }
+      }
+
       const { email: emailConfig } = await import('@stacksjs/config')
       const domain: string | undefined = (emailConfig as any)?.domain
       if (!domain) {
@@ -288,9 +353,28 @@ export function mailCommands(buddy: CLI): void {
       const domain = process.env.APP_DOMAIN || process.env.MAIL_DOMAIN || 'stacksjs.com'
       const mailHost = `mail.${domain}`
       const email = emailAddress || `chris@${domain}`
-      const username = email.includes('@') ? email.split('@')[0]! : email
-      const envKey = `MAIL_PASSWORD_${username.toUpperCase()}`
-      const password = process.env[envKey]
+      const localPart = email.includes('@') ? email.split('@')[0]! : email
+
+      // The IMAP/SMTP username is the FULL address. Mailboxes are provisioned
+      // per-domain (`user:local create <addr>`) precisely so two tenants can
+      // both have a `chris`, so a bare local part authenticates as nobody here
+      // and the client reports a bad password. Handing someone the wrong
+      // username is worse than handing them nothing.
+      const username = email
+
+      // Matches the provisioner's key derivation: every character that cannot
+      // appear in an env var name becomes `_`. Without this, `no-reply` looked
+      // for `MAIL_PASSWORD_NO-REPLY`, which is not a legal name and never
+      // matched the `MAIL_PASSWORD_NO_REPLY` the deploy actually reads.
+      const envKey = `MAIL_PASSWORD_${localPart.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`
+      const rawPassword = process.env[envKey]
+
+      // A value that is still ciphertext means this machine holds no private
+      // key for `.env.production`. Printing it would look like a password and
+      // fail every login attempt.
+      const isCiphertext = typeof rawPassword === 'string' && rawPassword.replace(/^["']/, '').startsWith('encrypted:')
+      const password = isCiphertext ? undefined : rawPassword
+
 
       console.log('')
       console.log('==========================================================')
@@ -305,6 +389,8 @@ export function mailCommands(buddy: CLI): void {
 
       if (password) {
         console.log(`  Password:    ${password}`)
+      } else if (isCiphertext) {
+        console.log(`  Password:    (encrypted — this machine has no private key for .env.production)`)
       } else {
         console.log(`  Password:    (not set — add ${envKey} to .env.production)`)
       }
@@ -323,6 +409,22 @@ export function mailCommands(buddy: CLI): void {
     .option('--filter <pattern>', 'Filter logs by pattern (e.g. AUTH, LOGIN, error)')
     .action(async (options: { lines?: string; follow?: boolean; filter?: string }) => {
       loadEnvFiles()
+
+      const directHost = await resolveOperationalMailHost()
+      if (directHost) {
+        const lines = sanitizeLineCount(options.lines)
+        const filter = options.filter ? options.filter.replace(/[^a-zA-Z0-9_.@\s-]/g, '') : ''
+        const command = `journalctl -u mail --no-pager -n ${lines}${filter ? ` | grep -iE ${shellQuote(filter)}` : ''}`
+        try {
+          const output = execSync(`ssh -o BatchMode=yes -o ConnectTimeout=10 root@${shellQuote(directHost)} ${shellQuote(command)}`, { encoding: 'utf8' })
+          console.log(output)
+          process.exit(ExitCode.Success)
+        }
+        catch (error) {
+          log.error(`Failed to fetch logs from ${directHost}: ${getErrorMessage(error)}`)
+          process.exit(ExitCode.FatalError)
+        }
+      }
 
       const region = process.env.AWS_REGION || 'us-east-1'
       const appName = (process.env.APP_NAME || 'stacks').toLowerCase().replace(/[^a-z0-9-]/g, '-')
@@ -350,7 +452,7 @@ export function mailCommands(buddy: CLI): void {
 
         log.info(`Found instance: ${instanceId}`)
 
-        const lines = options.lines || '50'
+        const lines = sanitizeLineCount(options.lines)
         const sanitizedFilter = options.filter ? options.filter.replace(/[^a-zA-Z0-9_.@\s-]/g, '') : ''
         const filterCmd = sanitizedFilter
           ? ` | grep -iE '${sanitizedFilter}'`
@@ -433,6 +535,20 @@ export function mailCommands(buddy: CLI): void {
     .command('mail:status', 'Show mail server status')
     .action(async () => {
       loadEnvFiles()
+
+      const directHost = await resolveOperationalMailHost()
+      if (directHost) {
+        const command = 'systemctl is-active mail; systemctl show mail -p NRestarts -p ActiveEnterTimestamp --value; ss -H -ltn | grep -E "(:(25|143|465|587|993))\\b"; systemctl is-enabled mail-health.timer; systemctl is-active mail-health.timer'
+        try {
+          const output = execSync(`ssh -o BatchMode=yes -o ConnectTimeout=10 root@${shellQuote(directHost)} ${shellQuote(command)}`, { encoding: 'utf8' })
+          console.log(output)
+          process.exit(ExitCode.Success)
+        }
+        catch (error) {
+          log.error(`Mail server ${directHost} is unhealthy: ${getErrorMessage(error)}`)
+          process.exit(ExitCode.FatalError)
+        }
+      }
 
       const region = process.env.AWS_REGION || 'us-east-1'
       const appName = (process.env.APP_NAME || 'stacks').toLowerCase().replace(/[^a-z0-9-]/g, '-')
@@ -731,18 +847,34 @@ export function mailCommands(buddy: CLI): void {
 function loadEnvFiles(): void {
   const envPath = '.env.production'
   if (existsSync(envPath)) {
-    const content = readFileSync(envPath, 'utf-8')
-    for (const line of content.split('\n')) {
-      const eq = line.indexOf('=')
-      if (eq > 0 && !line.startsWith('#')) {
-        const key = line.slice(0, eq).trim()
-        const value = line.slice(eq + 1).trim()
-        if (!process.env[key]) {
-          process.env[key] = value
+    // Decrypt on the way in. This used to slice the file on `=` and assign the
+    // raw right-hand side, which for an `encrypted:v2:...` value is the
+    // CIPHERTEXT — so `mail:credentials` printed a 300-character blob where the
+    // password goes, and anyone who pasted it into a mail client got a login
+    // failure that looks like a wrong password. A mailbox password belongs in
+    // the encrypted env; reading it back has to undo that.
+    try {
+      const { loadEnv } = require('@stacksjs/env') as typeof import('@stacksjs/env')
+      loadEnv({ path: envPath, env: 'production', keysFile: '.env.keys', overload: false, quiet: true })
+    }
+    catch {
+      // No private key on this machine (CI, a colleague's checkout): fall back
+      // to the plain values so unencrypted entries still load. Encrypted ones
+      // stay ciphertext, which the caller reports rather than prints as a
+      // usable secret.
+      const content = readFileSync(envPath, 'utf-8')
+      for (const line of content.split('\n')) {
+        const eq = line.indexOf('=')
+        if (eq > 0 && !line.startsWith('#')) {
+          const key = line.slice(0, eq).trim()
+          const value = line.slice(eq + 1).trim()
+          if (!process.env[key])
+            process.env[key] = value
         }
       }
     }
   }
+
 
   // Load AWS credentials from ~/.aws/credentials if not in env
   if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {

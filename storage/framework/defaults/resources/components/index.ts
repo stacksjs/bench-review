@@ -4,10 +4,13 @@
  * Complete dashboard components for building modern admin interfaces.
  */
 
-// Layout Components
-export { default as DashboardLayout } from './DashboardLayout.vue'
-export { default as SidebarModern } from './SidebarModern.vue'
-export { default as NavbarModern } from './NavbarModern.vue'
+// Layout components
+export { default as DashboardLayout } from './Dashboard/DashboardLayout.stx'
+export { default as NavbarModern } from './Dashboard/NavbarModern.stx'
+export { default as SidebarModern } from './Dashboard/SidebarModern.stx'
 
-// UI Components (re-export from UI folder)
-export * from './UI'
+// Dashboard and UI components
+export * from './Dashboard'
+export { default as Audio } from './Audio.stx'
+export { default as Image } from './Image.stx'
+export { default as Video } from './Video.stx'

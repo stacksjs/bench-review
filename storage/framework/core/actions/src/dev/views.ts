@@ -53,8 +53,20 @@ function currentRequestContext(): StacksRequestContext | undefined {
   url(): string {
     return currentRequestContext()?.url ?? ''
   },
+  /** Just the query string, including the leading `?`. Mirrors production. */
+  search(): string {
+    const url = currentRequestContext()?.url
+    if (!url)
+      return ''
+
+    const mark = url.indexOf('?')
+    return mark === -1 ? '' : url.slice(mark)
+  },
   locale(): string {
-    return currentRequestContext()?.locale ?? 'de'
+    // 'en' rather than 'de' as the fallback: this is what a page sees when
+    // the request carried no locale at all, and the framework has no reason
+    // to assume German.
+    return currentRequestContext()?.locale ?? 'en'
   },
 }
 
@@ -109,20 +121,20 @@ async function startDefaultServer() {
 
   const userViewsPath = 'resources/views'
   const defaultViewsPath = 'storage/framework/defaults/resources/views'
-  // Layouts and partials live alongside views by default
-  // (resources/views/layouts, resources/views/components). The legacy
-  // resources/layouts and resources/components paths still exist on
-  // older scaffolds, so we let stx-serve fall back to those via the
-  // `fallbackLayoutsDir` / `fallbackPartialsDir` options.
+  // Layouts and partials are distinct resources. Prefer the
+  // framework-standard resources/* paths while retaining the older
+  // resources/views/* and root partials locations for existing apps.
   const userLayoutsPath = await firstExistingPath([
     'resources/views/layouts',
     'resources/layouts',
   ]) ?? 'resources/views/layouts'
   const defaultLayoutsPath = 'storage/framework/defaults/resources/layouts'
-  const userComponentsPath = await firstExistingPath([
-    'resources/views/components',
+  const userPartialsPath = await firstExistingPath([
+    'resources/partials',
+    'resources/views/partials',
+    'partials',
     'resources/components',
-  ]) ?? 'resources/views/components'
+  ])
   const preferredPort = Number(process.env.PORT) || 3000
   const apiPort = Number(process.env.PORT_API) || 3008
   const docsPort = Number(process.env.PORT_DOCS) || config.ports?.docs || 3006
@@ -142,7 +154,9 @@ async function startDefaultServer() {
     // gives us discovery without enumerating every namespace.
     componentsDir: 'storage/framework/defaults/resources/components',
     layoutsDir: userLayoutsPath,
-    partialsDir: userComponentsPath,
+    // Modern Stacks apps keep include fragments in resources/components;
+    // omit only when no conventional include directory exists.
+    ...(userPartialsPath && { partialsDir: userPartialsPath }),
     fallbackLayoutsDir: defaultLayoutsPath,
     fallbackPartialsDir: defaultViewsPath,
     quiet: true,
@@ -237,11 +251,34 @@ async function firstExistingPath(candidates: string[]): Promise<string | null> {
   // break projects whose layouts/components live at the legacy paths
   // (`resources/{layouts,components}/`) instead of the canonical
   // `resources/views/{layouts,components}/`.
-  for (const candidate of candidates) {
-    if (existsSync(projectPath(candidate)))
+  //
+  // A directory that exists but holds no templates loses to one that does.
+  // The scaffold ships two sample partials in `resources/partials/`, so a
+  // project keeping its own in `resources/views/partials/` had the empty-ish
+  // legacy directory win purely by being listed first, and every
+  // `@include('foo.stx')` resolved under the wrong root. Falling through to
+  // the directory with the templates in it is what the author meant in every
+  // case where only one of the candidates is populated.
+  const existing = candidates.filter(candidate => existsSync(projectPath(candidate)))
+  if (existing.length === 0)
+    return null
+
+  for (const candidate of existing) {
+    if (containsTemplates(projectPath(candidate)))
       return candidate
   }
-  return null
+
+  return existing[0]!
+}
+
+/** True when the directory holds at least one `.stx` file, at any depth. */
+function containsTemplates(dir: string): boolean {
+  try {
+    return [...new Bun.Glob('**/*.stx').scanSync({ cwd: dir, onlyFiles: true })].length > 0
+  }
+  catch {
+    return false
+  }
 }
 
 function fallbackI18nFromSite(site: { i18n: { locales: string[], defaultLocale?: string, pickerSelector?: string, labels?: Record<string, string> } }) {

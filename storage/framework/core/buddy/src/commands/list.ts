@@ -1,4 +1,5 @@
 import type { CLI, CliOptions } from '@stacksjs/types'
+import type { Command } from '@stacksjs/clapp'
 import process from 'node:process'
 import { log } from '@stacksjs/logging'
 import { onUnknownSubcommand } from "@stacksjs/cli"
@@ -12,6 +13,7 @@ export function list(buddy: CLI): void {
     namespace: 'Filter commands by namespace (e.g., make, env, db)',
     grouped: 'Group commands by category',
     format: 'Output format (text, json)',
+    json: 'Output the complete command inventory as JSON',
   }
 
   buddy
@@ -21,6 +23,7 @@ export function list(buddy: CLI): void {
     .option('-n, --namespace [namespace]', descriptions.namespace)
     .option('-g, --grouped', descriptions.grouped, { default: true })
     .option('--format [format]', descriptions.format, { default: 'text' })
+    .option('-J, --json', descriptions.json, { default: false })
     .option('--verbose', descriptions.verbose, { default: false })
     .example('buddy list')
     .example('buddy list --filter=make')
@@ -28,6 +31,7 @@ export function list(buddy: CLI): void {
     .example('buddy list --namespace=env')
     .example('buddy list --no-grouped')
     .example('buddy list --format=json')
+    .example('buddy list --json')
     .action(async (options: CliOptions) => {
       log.debug('Running `buddy list` ...', options)
 
@@ -41,7 +45,7 @@ export function list(buddy: CLI): void {
       if ((options as any).filter) {
         const filterStr = String((options as any).filter).toLowerCase()
         filteredCommands = commands.filter((cmd: any) => {
-          const name = cmd.name || ''
+          const name = canonicalCommandName(cmd)
           const desc = cmd.description || ''
           return name.toLowerCase().includes(filterStr) || desc.toLowerCase().includes(filterStr)
         })
@@ -57,7 +61,7 @@ export function list(buddy: CLI): void {
       }
 
       if (filteredCommands.length === 0) {
-        if ((options as any).format === 'json') {
+        if (usesJsonOutput(options)) {
           console.log(JSON.stringify({ commands: [], total: 0 }, null, 2))
         }
         else {
@@ -70,12 +74,10 @@ export function list(buddy: CLI): void {
       }
 
       // Handle JSON output format
-      if ((options as any).format === 'json') {
-        const jsonOutput = filteredCommands.map((cmd: any) => ({
-          name: cmd.name || '',
-          description: cmd.description || '',
-          aliases: cmd.aliasNames || [],
-        }))
+      if (usesJsonOutput(options)) {
+        const jsonOutput = filteredCommands
+          .map(commandInventoryEntry)
+          .sort((a, b) => a.name.localeCompare(b.name))
         console.log(JSON.stringify({ commands: jsonOutput, total: jsonOutput.length }, null, 2))
         return
       }
@@ -85,7 +87,7 @@ export function list(buddy: CLI): void {
         const groups = new Map<string, any[]>()
 
         for (const cmd of filteredCommands) {
-          const name = cmd.name || ''
+          const name = canonicalCommandName(cmd)
           if (!name) continue
 
           // Extract group from command name (e.g., "env:get" -> "env", "make:model" -> "make")
@@ -133,10 +135,10 @@ export function list(buddy: CLI): void {
           console.log(bold(`${group}:`))
 
           // Sort commands within group
-          cmds.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+          cmds.sort((a, b) => canonicalCommandName(a).localeCompare(canonicalCommandName(b)))
 
           for (const cmd of cmds) {
-            const name = (cmd.name || '').padEnd(20)
+            const name = canonicalCommandName(cmd).padEnd(20)
             const desc = cmd.description || ''
             console.log(`  ${green(name)} ${dim(desc)}`)
           }
@@ -151,10 +153,10 @@ export function list(buddy: CLI): void {
         console.log('')
 
         // Sort commands alphabetically
-        filteredCommands.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        filteredCommands.sort((a, b) => canonicalCommandName(a).localeCompare(canonicalCommandName(b)))
 
         for (const cmd of filteredCommands) {
-          const name = (cmd.name || '').padEnd(20)
+          const name = canonicalCommandName(cmd).padEnd(20)
           const desc = cmd.description || ''
           console.log(`  ${green(name)} ${dim(desc)}`)
         }
@@ -167,4 +169,70 @@ export function list(buddy: CLI): void {
     })
 
   onUnknownSubcommand(buddy, "list")
+}
+
+export interface BuddyCommandInventoryOption {
+  name: string
+  flags: string[]
+  description: string
+  required: boolean
+  boolean: boolean
+  negated: boolean
+  default?: unknown
+}
+
+export interface BuddyCommandInventoryEntry {
+  name: string
+  description: string
+  aliases: string[]
+  namespace?: string
+  usage: string
+  arguments: Array<{
+    name: string
+    required: boolean
+    variadic: boolean
+  }>
+  options: BuddyCommandInventoryOption[]
+  examples: string[]
+}
+
+export function commandInventoryEntry(command: Command): BuddyCommandInventoryEntry {
+  const entry: BuddyCommandInventoryEntry = {
+    name: canonicalCommandName(command),
+    description: command.description,
+    aliases: [...command.aliasNames],
+    usage: command.usageLine,
+    arguments: command.args.map(argument => ({
+      name: argument.value,
+      required: argument.required,
+      variadic: argument.variadic,
+    })),
+    options: command.options.map(option => ({
+      name: option.name,
+      flags: declaredOptionFlags(option.rawName),
+      description: option.description,
+      required: option.required === true,
+      boolean: option.isBoolean === true,
+      negated: option.negated,
+      ...(option.config.default === undefined ? {} : { default: option.config.default }),
+    })),
+    examples: command.examples.map(example => typeof example === 'string' ? example : example('buddy')),
+  }
+
+  if (command.namespace)
+    entry.namespace = command.namespace
+
+  return entry
+}
+
+function canonicalCommandName(command: Command): string {
+  return command.namespace ? `${command.namespace}:${command.name}` : command.name
+}
+
+function declaredOptionFlags(rawName: string): string[] {
+  return [...rawName.matchAll(/-{1,2}([\w-]+)/g)].map(match => match[1]!)
+}
+
+function usesJsonOutput(options: CliOptions): boolean {
+  return (options as any).json === true || (options as any).format === 'json'
 }

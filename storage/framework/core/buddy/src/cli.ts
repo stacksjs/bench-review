@@ -2,49 +2,38 @@ import type { CLI } from '@stacksjs/cli'
 import process from 'node:process'
 import { cli, log } from '@stacksjs/cli'
 import { path as p } from '@stacksjs/path'
+import { registerGlobalOptions } from './global-options'
+import { shouldSkipAppKeyCheck } from './project-setup'
+
+// Enforce the minimum supported Bun version before anything else runs, so an
+// outdated runtime fails fast with a clear message instead of an obscure error
+// deep inside a command. Fail open when the version cannot be determined: the
+// guard must never brick an exotic setup.
+try {
+  const { isSupportedBunVersion, minimumBunVersion } = await import('@stacksjs/utils')
+  const currentBunVersion = typeof Bun !== 'undefined' ? Bun.version : process.versions.bun
+
+  if (currentBunVersion && !isSupportedBunVersion(currentBunVersion)) {
+    console.error(`[buddy] Bun v${minimumBunVersion} or later is required (current: v${currentBunVersion}). Run: bun upgrade`)
+    process.exit(1)
+  }
+}
+catch {
+  // Version could not be determined or compared; let the CLI continue and
+  // surface real errors if the runtime is genuinely too old.
+}
 
 // Get the command being run to determine what to load
 const args = process.argv.slice(2)
 const requestedCommand = args[0] || 'help'
 const isHelpFlag = args.includes('--help') || args.includes('-h')
 // Pure version queries: print version and exit, no command surface needed.
-const isVersionOnly = ['--version', '-v', 'version'].includes(requestedCommand)
+const isVersionOnly = ['--version', '-V', 'version'].includes(requestedCommand)
 // Help mode: `./buddy`, `./buddy help`, `./buddy --help`, or `./buddy <cmd> --help`.
 // We still need the full command registry so help output lists every command,
 // but we can skip the APP_KEY check and other project-setup work.
 const isHelpMode = requestedCommand === 'help' || (isHelpFlag && args.length <= 2)
-const skipAppKeyCheck = [
-  'build',
-  'lint',
-  'lint:fix',
-  'test',
-  'test:types',
-  'test:unit',
-  'test:feature',
-  'typecheck',
-  'types:fix',
-  'types:generate',
-  'clean',
-  'fresh',
-  'about',
-  'doctor',
-  'setup',
-  'setup:ssl',
-  'setup:oh-my-zsh',
-  'deploy',
-  'serve',
-  // `new` / `create` scaffold a brand-new project from any cwd, so the host
-  // project's APP_KEY check would either spuriously fail (no .env in cwd) or,
-  // worse, write a key into an unrelated directory.
-  'new',
-  'create',
-  'migrate',
-  'seed',
-  'generate',
-  'make',
-  'key:generate',
-  'scaffold:crud',
-].some(cmd => requestedCommand === cmd || requestedCommand.startsWith(`${cmd}:`)) || isHelpFlag || isHelpMode
+const skipAppKeyCheck = shouldSkipAppKeyCheck(requestedCommand, { isHelpFlag, isHelpMode })
 const needsFullSetup = !isVersionOnly
 
 // Setup global error handlers (skip for minimal commands for performance)
@@ -70,6 +59,13 @@ if (needsFullSetup) {
 
 async function main() {
   const buddy = cli('buddy')
+  // `upgrade` intentionally reuses `-V, --version <version>` for the target
+  // framework release. Registering Buddy's process-wide version flag there
+  // makes clapp consume the option globally and reject the documented
+  // space-separated target value.
+  registerGlobalOptions(buddy, {
+    version: requestedCommand !== 'upgrade' && requestedCommand !== 'update',
+  })
 
   // Enable theme support
   // buddy.themes() // TODO: Re-enable after clapp npm package is updated with themes() method
@@ -88,6 +84,10 @@ async function main() {
 
   // Skip expensive setup for commands that don't need it
   if (needsFullSetup) {
+    // Keep the runtime directories under storage/ wired up. Cheap (a handful of
+    // lstat calls), idempotent, and never throws — see ensureRuntimeDirectories.
+    p.ensureRuntimeDirectories()
+
     const { loadCommands, getCommandsToLoad, markLoaded } = await import('./lazy-commands.ts')
 
     // Load required commands for setup and key generation, then tell the
@@ -136,7 +136,7 @@ async function main() {
     await showInteractiveMenu(buddy)
   }
   else {
-    buddy.parse()
+    await parseOrExit(buddy)
   }
 
   // Apply theme if specified
@@ -188,7 +188,32 @@ async function showInteractiveMenu(buddy: CLI) {
   else {
     // Run the selected command
     process.argv = ['bun', 'buddy', choice]
-    buddy.parse()
+    await parseOrExit(buddy)
+  }
+}
+
+/**
+ * clapp throws ClappError for usage problems (unknown option, missing
+ * argument). Left unhandled, the rejection lands in the process-level
+ * handler and prints a full stack trace for a simple typo. Render usage
+ * errors as a one-line message plus the command's usage line instead.
+ * The duck-typed check works against every clapp version that carries
+ * exitCode/isUsageError (the isClappError() export only exists in newer
+ * releases).
+ */
+async function parseOrExit(buddy: CLI): Promise<void> {
+  try {
+    await buddy.parse()
+  }
+  catch (error: any) {
+    const isUsageError = error?.name === 'ClappError' || error?.isUsageError === true
+    if (!isUsageError)
+      throw error
+
+    process.stderr.write(`${error.message}\n`)
+    if (error.usage)
+      process.stderr.write(`${error.usage}\n`)
+    process.exit(typeof error.exitCode === 'number' ? error.exitCode : 2)
   }
 }
 

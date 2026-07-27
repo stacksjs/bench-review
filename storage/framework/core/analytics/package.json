@@ -2,7 +2,7 @@
   "name": "@stacksjs/analytics",
   "type": "module",
   "sideEffects": false,
-  "version": "0.70.87",
+  "version": "0.70.190",
   "description": "Stacks Analytics. Privacy-friendly.",
   "author": "Chris Breuer",
   "contributors": [
@@ -52,6 +52,6 @@
     "prepublishOnly": "bun run build"
   },
   "devDependencies": {
-    "better-dx": "^0.2.16"
+    "better-dx": "^0.2.17"
   }
 }

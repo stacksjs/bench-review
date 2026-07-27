@@ -89,7 +89,7 @@ export {
   breakpointsQuasar,
   breakpointsSematic,
   breakpointsTailwind,
-  breakpointsVuetify,
+  breakpointsMaterialDesign,
   useBreakpoints,
 } from './useBreakpoints'
 
@@ -304,7 +304,7 @@ export {
   useArrayUnique,
 } from './useArrayUtils'
 
-// Aliases (matching VueUse naming)
+// Familiar aliases for common composable names
 export { computedAsync as asyncComputed } from './computedAsync'
 export { computedEager as eagerComputed } from './computedEager'
 export { useDebouncedRef as debouncedRef } from './useDebouncedRef'

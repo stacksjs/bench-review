@@ -213,6 +213,7 @@ export type BuildOption =
   | 'webComponents'
   | 'elements'
   | 'functions'
+  | 'desktop'
   | 'docs'
   | 'views'
   | 'stacks'
@@ -233,7 +234,6 @@ export type CreateBooleanOption =
   | 'ui'
   | 'components'
   | 'web-components'
-  | 'vue'
   | 'views'
   | 'functions'
   | 'api'
@@ -314,7 +314,7 @@ export type UpgradeOptions = {
 } & CliOptions
 
 export type ExamplesString = 'version'
-export type ExamplesBoolean = 'components' | 'vue' | 'webComponents' | 'elements' | 'all' | 'force'
+export type ExamplesBoolean = 'components' | 'webComponents' | 'elements' | 'all' | 'force'
 export type ExamplesOption = ExamplesString & ExamplesBoolean
 export type ExamplesOptions = {
   [key in ExamplesString]: string
@@ -368,7 +368,9 @@ export type DomainsOptions = CliOptions & {
   contactType?: string
 }
 
-export interface CleanOptions extends CliOptions {}
+export interface CleanOptions extends CliOptions {
+  force?: boolean
+}
 
 export interface CloudCliOptions extends CliOptions {
   ssh?: boolean
@@ -377,10 +379,13 @@ export interface CloudCliOptions extends CliOptions {
   invalidateCache?: boolean
   paths?: string
   diff?: boolean
+  force?: boolean
+  yes?: boolean
 }
 export interface CommitOptions extends CliOptions {}
 export interface FreshOptions extends CliOptions {
   dryRun?: boolean
+  force?: boolean
   quiet?: boolean
 }
 

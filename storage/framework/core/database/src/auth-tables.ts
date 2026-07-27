@@ -67,6 +67,11 @@ export function usersTwoFactorColumnsSql(sql: SqlHelpers): string[] {
   return [
     `ALTER TABLE users ADD COLUMN two_factor_secret VARCHAR(255)`,
     `ALTER TABLE users ADD COLUMN two_factor_enabled BOOLEAN NOT NULL DEFAULT ${sql.boolFalse}`,
+    // TOTP replay guard (stacksjs/stacks#1985): the last consumed time-step,
+    // so a valid code can't be reused within its ~30s validity window. NULL =
+    // never used (accepted on first verify). BIGINT for headroom on the
+    // floor(unixSeconds / 30) counter.
+    `ALTER TABLE users ADD COLUMN two_factor_last_used_step BIGINT`,
   ]
 }
 
@@ -91,7 +96,9 @@ export function usersStripeIdSql(): string {
  * password_changed_at, two_factor_secret, two_factor_enabled,
  * stripe_id), each independently try/catch-swallowed so one
  * already-existing column (or a not-yet-existing `users` table) never
- * skips the others. Exported so `buddy migrate`/`migrate:fresh` can
+ * skips the others. The schema-diff guard mirrors this set in
+ * `managed-columns.ts` (`USERS_GUARANTEED_COLUMNS`) so the differ never
+ * proposes dropping them (stacksjs/stacks#2075) — keep the two in sync. Exported so `buddy migrate`/`migrate:fresh` can
  * call it a second time after the numbered model migrations run — see
  * the call site in {@link migrateAuthTables} for why a single call
  * isn't enough.

@@ -7,7 +7,8 @@
  * or per-project build script.
  */
 
-export type ExtensionTarget = 'chrome' | 'firefox'
+export type ExtensionTarget = 'chrome' | 'firefox' | 'safari'
+export type SafariPlatform = 'macos' | 'ios'
 
 /** A content script mapped into the manifest's `content_scripts`. */
 export interface ContentScript {
@@ -63,8 +64,13 @@ export interface ManifestOverrides {
   hostPermissions?: string[]
   optionalPermissions?: string[]
   minimumChromeVersion?: string
-  /** Firefox `browser_specific_settings.gecko.strict_min_version`. */
+  /** Firefox `browser_specific_settings.gecko.strict_min_version`. @default '142.0' */
   firefoxMinVersion?: string
+  /**
+   * Safari `browser_specific_settings.safari.strict_min_version`.
+   * @default '18.4' (first Safari with MAIN-world content scripts + match_about_blank)
+   */
+  safariMinVersion?: string
   contentSecurityPolicy?: string
   webAccessibleResources?: Array<{ resources: string[], matches: string[] }>
   /** Anything else spread into the manifest as-is. */
@@ -81,12 +87,143 @@ export interface BuildContext {
   cwd: string
 }
 
+export interface ChromeWebStoreConfig {
+  /** Publisher identifier from the Chrome Web Store Developer Dashboard. */
+  publisherId: string
+  /** Existing Chrome Web Store item/extension identifier. */
+  itemId: string
+  /** Publish immediately after approval or leave staged. @default DEFAULT_PUBLISH */
+  publishType?: 'DEFAULT_PUBLISH' | 'STAGED_PUBLISH'
+  /** Initial percentage rollout. @default the dashboard's current setting */
+  deployPercentage?: number
+  /** Request expedited review for an eligible DNR-only update. @default false */
+  skipReview?: boolean
+}
+
+export interface FirefoxAddonsConfig {
+  /** AMO publication channel. @default listed */
+  channel?: 'listed' | 'unlisted'
+  /** SPDX-style AMO license slug used for a new listing, for example MIT. */
+  license?: string
+  /** AMO Firefox category slugs used for a new listing. */
+  categories?: string[]
+  /** Localized listing homepage. */
+  homepage?: string
+  /** Localized support email. */
+  supportEmail?: string
+  /** Whether the extension requires payment. @default false */
+  requiresPayment?: boolean
+  /** Directory for signed XPI and submission artifacts. @default web-ext-artifacts */
+  artifactsDir?: string
+}
+
+export type SafariScreenshotDisplayType = 'APP_DESKTOP' | 'APP_IPHONE_67' | 'APP_IPAD_PRO_3GEN_129'
+export type SafariAppStoreReleaseType = 'MANUAL' | 'AFTER_APPROVAL' | 'SCHEDULED'
+export type SafariAgeRatingFrequency = 'NONE' | 'INFREQUENT_OR_MILD' | 'FREQUENT_OR_INTENSE'
+
+export interface SafariAppStoreReviewContact {
+  firstName: string
+  lastName: string
+  phone: string
+  email: string
+  /** Instructions that help App Review find and exercise the extension. */
+  notes?: string
+}
+
+/** App Store age-rating answers. Omitted answers default to no content. */
+export interface SafariAppStoreAgeRating {
+  advertising?: boolean
+  alcoholTobaccoOrDrugUseOrReferences?: SafariAgeRatingFrequency
+  contests?: SafariAgeRatingFrequency
+  gambling?: boolean
+  gamblingSimulated?: SafariAgeRatingFrequency
+  gunsOrOtherWeapons?: SafariAgeRatingFrequency
+  healthOrWellnessTopics?: boolean
+  lootBox?: boolean
+  medicalOrTreatmentInformation?: SafariAgeRatingFrequency
+  messagingAndChat?: boolean
+  parentalControls?: boolean
+  profanityOrCrudeHumor?: SafariAgeRatingFrequency
+  ageAssurance?: boolean
+  sexualContentGraphicAndNudity?: SafariAgeRatingFrequency
+  sexualContentOrNudity?: SafariAgeRatingFrequency
+  socialMedia?: boolean
+  socialMediaAgeRestricted?: boolean
+  horrorOrFearThemes?: SafariAgeRatingFrequency
+  matureOrSuggestiveThemes?: SafariAgeRatingFrequency
+  unrestrictedWebAccess?: boolean
+  userGeneratedContent?: boolean
+  violenceCartoonOrFantasy?: SafariAgeRatingFrequency
+  violenceRealisticProlongedGraphicOrSadistic?: SafariAgeRatingFrequency
+  violenceRealistic?: SafariAgeRatingFrequency
+}
+
+/** Metadata and assets managed through the official App Store Connect API. */
+export interface SafariAppStoreConfig {
+  /** Metadata locale. @default the app's primary locale */
+  locale?: string
+  subtitle: string
+  privacyPolicyUrl: string
+  description: string
+  keywords: string
+  supportUrl: string
+  marketingUrl?: string
+  promotionalText?: string
+  whatsNew?: string
+  copyright: string
+  /** App Store category identifier, for example UTILITIES. */
+  primaryCategory: string
+  /** Whether the app displays or accesses third-party content. */
+  contentRightsDeclaration: 'DOES_NOT_USE_THIRD_PARTY_CONTENT' | 'USES_THIRD_PARTY_CONTENT'
+  /** Customer price in the base territory. Use '0' for a free app. */
+  price: string
+  /** ISO 3166-1 alpha-3 base territory. @default USA */
+  baseTerritory?: string
+  /** Automatically release once App Review approves the version. @default AFTER_APPROVAL */
+  releaseType?: SafariAppStoreReleaseType
+  /** Make the app available in every current and future territory. @default true */
+  availableInNewTerritories?: boolean
+  /** Declare that the app does not use the advertising identifier. @default false */
+  usesIdfa?: boolean
+  /** Export-compliance answer applied to uploaded builds. @default false */
+  usesNonExemptEncryption?: boolean
+  ageRating?: SafariAppStoreAgeRating
+  reviewContact: SafariAppStoreReviewContact
+  /** Screenshot files keyed by Apple's display type. Paths are relative to the project root. */
+  screenshots: Partial<Record<SafariScreenshotDisplayType, string[]>>
+  /** Submit complete versions to App Review after upload. @default false */
+  submitForReview?: boolean
+}
+
 export interface ExtensionConfig {
   /** Display name (`manifest.name`). */
   name: string
   description: string
   /** Firefox add-on id (`browser_specific_settings.gecko.id`). Required to ship on Firefox. */
   geckoId?: string
+  /** Chrome Web Store API v2 publication settings. */
+  chromeWebStore?: ChromeWebStoreConfig
+  /** Mozilla Add-ons (AMO) v5 publication settings. */
+  firefoxAddons?: FirefoxAddonsConfig
+  /**
+   * Base bundle identifier of the Safari container app
+   * (`extension:safari:init`); the appex uses `<safariBundleId>.Extension`.
+   */
+  safariBundleId?: string
+  /** Apple Developer team used to sign and publish the Safari container app. */
+  safariTeamId?: string
+  /** Apple platforms packaged for Safari. iOS also covers iPadOS. @default ['macos'] */
+  safariPlatforms?: SafariPlatform[]
+  /** macOS App Store category UTI, for example public.app-category.utilities. */
+  safariAppCategory?: string
+  /** App Store listing metadata, screenshots, compliance, and review automation. */
+  safariAppStore?: SafariAppStoreConfig
+  /**
+   * Build-output files to keep out of the Safari appex Resources when syncing
+   * (e.g. marketing-site pages that are built into dist but are not part of
+   * the extension). Paths relative to the outdir.
+   */
+  safariExclude?: string[]
   /** Targets to build. @default ['chrome', 'firefox'] */
   targets?: ExtensionTarget[]
 
@@ -98,6 +235,8 @@ export interface ExtensionConfig {
   pages?: ExtensionPages
   /** `<size, path>` icons (paths relative to outdir, sourced from `public`). */
   icons?: Record<number, string>
+  /** Neutral browser-toolbar icons (`action.default_icon`), separate from store/app branding. */
+  actionIcons?: Record<number, string>
   /** Directory of static assets copied verbatim into the build (icons, stubs, …). */
   public?: string
   /** Extra `<destInOutdir, srcPath>` files copied into the build (e.g. shared CSS). */
@@ -107,7 +246,7 @@ export interface ExtensionConfig {
 
   manifest?: ManifestOverrides
 
-  /** Per-target output dir. @default chrome→`dist`, firefox→`dist-firefox` */
+  /** Per-target output dir. @default chrome→`dist`, firefox→`dist-firefox`, safari→`dist-safari` */
   outdir?: Partial<Record<ExtensionTarget, string>> | string
 
   /** Hooks for app-specific post-processing the generic build can't express. */

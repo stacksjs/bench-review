@@ -5,10 +5,10 @@ import readline from 'node:readline'
 import process from 'node:process'
 import { bold, cyan, dim, green, intro, log, onUnknownSubcommand, outro, prompts, runCommand, yellow } from "@stacksjs/cli"
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Action } from '@stacksjs/enums'
-import { libsPath, projectPath } from '@stacksjs/path'
+import { libsPath, projectPath, stxPath } from '@stacksjs/path'
 import { ExitCode } from '@stacksjs/types'
 import { version } from '../../package.json'
 
@@ -69,6 +69,71 @@ async function actions(): Promise<typeof import('@stacksjs/actions')> {
   return _actions
 }
 
+export const interactiveDevChoices = [
+  { value: 'all', title: 'All' },
+  { value: 'frontend', title: 'Frontend' },
+  { value: 'api', title: 'Backend' },
+  { value: 'dashboard', title: 'Dashboard' },
+  { value: 'desktop', title: 'Desktop' },
+  { value: 'native', title: 'Native App' },
+  { value: 'components', title: 'Components' },
+  { value: 'docs', title: 'Documentation' },
+] as const
+
+type InteractiveDevSelection = typeof interactiveDevChoices[number]['value']
+type InteractiveDevRunners = Record<InteractiveDevSelection, () => Promise<unknown>>
+
+export async function dispatchInteractiveDevSelection(
+  selection: string,
+  runners: InteractiveDevRunners,
+): Promise<boolean> {
+  if (!Object.hasOwn(runners, selection))
+    return false
+
+  await runners[selection as InteractiveDevSelection]()
+  return true
+}
+
+export function resolvePrettyDevDomain(appUrl: string | undefined, nativeMode = false): string | null {
+  if (!appUrl || nativeMode)
+    return null
+
+  try {
+    const url = new URL(/^https?:\/\//i.test(appUrl) ? appUrl : `https://${appUrl}`)
+    const hostname = url.hostname.toLowerCase()
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '0.0.0.0')
+      return null
+    return hostname
+  }
+  catch {
+    return null
+  }
+}
+
+export function shouldUsePrettyDevUrls(input: {
+  domain: string | null
+  localhostOnly: boolean
+  proxyManagedExternally: boolean
+  systemAuthorized: boolean
+}): boolean {
+  return input.domain !== null
+    && !input.localhostOnly
+    && (input.proxyManagedExternally || input.systemAuthorized)
+}
+
+async function canStartPrettyDevProxy(): Promise<boolean> {
+  if (await waitForHttpsProxy(443, 150))
+    return true
+
+  try {
+    const { authorizeSystemAccess } = await importDevelopmentRpx()
+    return authorizeSystemAccess({ interactive: false })
+  }
+  catch {
+    return false
+  }
+}
+
 export function dev(buddy: CLI): void {
   const descriptions = {
     dev: 'Start development server',
@@ -78,7 +143,6 @@ export function dev(buddy: CLI): void {
     native: 'Start the app in a native Craft window',
     dashboard: 'Start the Dashboard development server',
     api: 'Start the local API development server',
-    email: 'Start the Email development server',
     docs: 'Start the Documentation development server',
     systemTray: 'Start the System Tray development server',
     interactive: 'Get asked which development server to start',
@@ -92,7 +156,6 @@ export function dev(buddy: CLI): void {
     .command('dev [server]', descriptions.dev) // server is optional because options can be used
     .option('-f, --frontend', descriptions.frontend)
     .option('-a, --api', descriptions.api)
-    .option('-e, --email', descriptions.email)
     .option('-c, --components', descriptions.components)
     .option('-d, --dashboard', descriptions.dashboard)
     .option('-k, --desktop', descriptions.desktop)
@@ -164,39 +227,23 @@ export function dev(buddy: CLI): void {
           type: 'select',
           name: 'value',
           message: descriptions.select,
-          choices: [
-            { value: 'all', title: 'All' },
-            { value: 'frontend', title: 'Frontend' },
-            { value: 'api', title: 'Backend' },
-            { value: 'dashboard', title: 'Dashboard' },
-            { value: 'desktop', title: 'Desktop' },
-            { value: 'native', title: 'Native App' },
-            { value: 'email', title: 'Email' },
-            { value: 'components', title: 'Components' },
-            { value: 'docs', title: 'Documentation' },
-          ],
+          choices: interactiveDevChoices,
         })
 
         const selectedValue: string = answer.value
+        const a = await actions()
+        const handled = await dispatchInteractiveDevSelection(selectedValue, {
+          all: () => startDevelopmentServer(options, perf),
+          frontend: () => a.runFrontendDevServer(options),
+          api: () => a.runApiDevServer(options),
+          dashboard: () => a.runDashboardDevServer(options),
+          desktop: () => a.runDesktopDevServer(options),
+          native: () => startDevelopmentServer({ ...options, native: true }, perf),
+          components: () => a.runComponentsDevServer(options),
+          docs: () => a.runDocsDevServer(options),
+        })
 
-        if (selectedValue === 'components') {
-          await (await actions()).runComponentsDevServer(options)
-        }
-        else if (selectedValue === 'api') {
-          await (await actions()).runApiDevServer(options)
-        }
-        else if (selectedValue === 'dashboard') {
-          await (await actions()).runDashboardDevServer(options)
-        }
-        else if (selectedValue === 'native') {
-          await startDevelopmentServer({ ...options, native: true }, perf)
-        }
-        // else if (selectedValue === 'email')
-        //   await runEmailDevServer(options)
-        else if (selectedValue === 'docs') {
-          await (await actions()).runDocsDevServer(options)
-        }
-        else {
+        if (!handled) {
           log.error('Invalid option during interactive mode')
           process.exit(ExitCode.InvalidArgument)
         }
@@ -218,7 +265,7 @@ export function dev(buddy: CLI): void {
 
       const perf = await intro('buddy dev:components')
       const result = await runCommand('bun run dev', {
-        cwd: libsPath('components/vue'),
+        cwd: libsPath('components/stx'),
         // silent: !options.verbose,
       })
 
@@ -363,7 +410,7 @@ export function dev(buddy: CLI): void {
 export async function startDevelopmentServer(_options: DevOptions, _startTime?: number): Promise<void> {
   const options = _options
   const startedAt = _startTime
-  const appUrl = process.env.APP_URL
+  const appUrl = process.env.APP_URL ?? 'stacks.localhost'
   const nativeMode = options.native === true
   // When rpx's on-demand sites launch `./buddy dev`, rpx already owns the reverse
   // proxy, TLS and the shared :443 daemon — and injects PORT/PORT_API/PORT_DOCS
@@ -372,32 +419,92 @@ export async function startDevelopmentServer(_options: DevOptions, _startTime?: 
   // which would otherwise fight rpx and could even restart the daemon that's
   // serving the request that booted us.
   const proxyManagedExternally = process.env.STACKS_PROXY_MANAGED === '1'
-  const frontendPort = Number(process.env.PORT) || 3000
-  const apiPort = Number(process.env.PORT_API) || 3008
-  const docsPort = Number(process.env.PORT_DOCS) || 3006
-  const dashboardPort = Number(process.env.PORT_ADMIN) || 3002
+  const preferredFrontendPort = Number(process.env.PORT) || 3000
+  const preferredApiPort = Number(process.env.PORT_API) || 3008
+  const preferredDocsPort = Number(process.env.PORT_DOCS) || 3006
+  const preferredDashboardPort = Number(process.env.PORT_ADMIN) || 3002
+
+  // Free up the ports THIS project left behind before deciding what to bind:
+  // an orphan from a previous `./buddy dev` in this same project is ours to
+  // reclaim, and reclaiming it keeps the port numbers stable across restarts.
+  // Anything still listening afterwards belongs to someone else.
+  if (process.env.STACKS_DEV_NO_KILL !== '1') {
+    await cleanupStaleDevProcesses([
+      preferredFrontendPort,
+      preferredApiPort,
+      preferredDocsPort,
+      preferredDashboardPort,
+    ])
+  }
+
+  // A port held by ANOTHER project (a second app's `./buddy dev`, or any
+  // unrelated server) is not ours to kill. Binding is what actually fails
+  // there, and the frontend server does not gate the readiness banner — so
+  // before this, `./buddy dev` printed a cheerful `➜ Frontend: :3000` while
+  // that URL served the *other* project's site and this one's frontend was
+  // never up. Step to the next free port instead, and say so.
+  //
+  // Under rpx (`STACKS_PROXY_MANAGED`) the ports are assigned to us by the
+  // daemon that is already proxying to them, so they are taken as given.
+  const portShifts: string[] = []
+  const claimPort = async (label: string, preferred: number): Promise<number> => {
+    if (proxyManagedExternally)
+      return preferred
+
+    const port = await findAvailablePort(preferred)
+    if (port !== preferred)
+      portShifts.push(`${label} :${preferred} → :${port}`)
+
+    return port
+  }
+
+  const frontendPort = await claimPort('Frontend', preferredFrontendPort)
+  const apiPort = await claimPort('API', preferredApiPort)
+  const docsPort = await claimPort('Docs', preferredDocsPort)
+  const dashboardPort = await claimPort('Dashboard', preferredDashboardPort)
+
+  // Child dev actions (`dev/views.ts`, `dev/api.ts`, `dev/docs.ts`) each read
+  // their port from the environment, so the resolved values have to be
+  // published here or they would go back to the occupied defaults.
+  process.env.PORT = String(frontendPort)
+  process.env.PORT_API = String(apiPort)
+  process.env.PORT_DOCS = String(docsPort)
+  process.env.PORT_ADMIN = String(dashboardPort)
+
   // Dashboard is opt-in. It boots a separate stx-serve process + a craft
   // window when ts-craft is installed, both of which are heavyweight and
   // unnecessary for most app development sessions. Use
   // `STACKS_DEV_DASHBOARD=1 ./buddy dev` (or `./buddy dev:dashboard` to
   // run it standalone) when you actually want the dashboard up.
   const includeDashboard = process.env.STACKS_DEV_DASHBOARD === '1'
-  const appLooksCustom = !nativeMode && appUrl && appUrl !== 'localhost' && !appUrl.includes('localhost:')
-  const domain = appLooksCustom ? appUrl.replace(/^https?:\/\//, '') : null
+  const domain = resolvePrettyDevDomain(appUrl, nativeMode)
+  const appLooksCustom = domain !== null
+  // Pretty https URLs from APP_URL are the default dev experience, even when
+  // the domain is public: rpx maps it to 127.0.0.1 (/etc/hosts plus a
+  // domain-scoped resolver) and serves it with a locally trusted cert,
+  // Valet-style. `STACKS_DEV_LOCALHOST=1` opts out (CI, or when the live
+  // domain must keep resolving to production from this machine) and the
+  // banner falls back to plain localhost URLs.
+  const localhostOnly = process.env.STACKS_DEV_LOCALHOST === '1'
+  const prettyUrlsRequested = appLooksCustom && !localhostOnly
+  const systemAuthorized = !prettyUrlsRequested || proxyManagedExternally
+    ? true
+    : await canStartPrettyDevProxy()
+  const usePrettyUrls = shouldUsePrettyDevUrls({
+    domain,
+    localhostOnly,
+    proxyManagedExternally,
+    systemAuthorized,
+  })
+  const prettySetupRequired = prettyUrlsRequested && !usePrettyUrls
   // Only manage the proxy/TLS/daemon ourselves when rpx isn't already doing it.
-  const hasCustomDomain = appLooksCustom && !proxyManagedExternally
-  const dashboardDomain = domain ? `dashboard.${domain}` : null
-  const frontendUrl = domain ? `https://${domain}` : `http://localhost:${frontendPort}`
-  const apiUrl = domain ? `https://${domain}/api` : `http://localhost:${apiPort}`
-  const docsUrl = domain ? `https://${domain}/docs` : `http://localhost:${docsPort}`
+  const hasCustomDomain = usePrettyUrls && !proxyManagedExternally
+  const displayedDomain = usePrettyUrls ? domain : null
+  const dashboardDomain = displayedDomain ? `dashboard.${displayedDomain}` : null
+  const frontendUrl = displayedDomain ? `https://${displayedDomain}` : `http://localhost:${frontendPort}`
+  const apiUrl = displayedDomain ? `https://${displayedDomain}/api` : `http://localhost:${apiPort}`
+  const docsUrl = displayedDomain ? `https://${displayedDomain}/docs` : `http://localhost:${docsPort}`
   const dashboardUrl = dashboardDomain ? `https://${dashboardDomain}` : `http://localhost:${dashboardPort}`
-  const managedPorts = [
-    frontendPort,
-    apiPort,
-    docsPort,
-    ...(includeDashboard ? [dashboardPort] : []),
-  ]
-
   // Signal subprocesses that the main dev server manages the reverse proxy,
   // so they don't start their own (which would conflict on port 443).
   // Suppress early Crosswind/STX/auth config noise — `printDevEngineNotes()` prints after "ready in".
@@ -406,19 +513,17 @@ export async function startDevelopmentServer(_options: DevOptions, _startTime?: 
 
   // Minimal header while backends boot — URLs print once everything is ready.
   console.log()
+  if (prettySetupRequired) {
+    console.log(`  ${yellow('⚠')}  ${yellow('Pretty URL setup required')} ${dim('- using localhost for this session')}`)
+    console.log(`  ${dim('    ')}${dim('Run `./buddy setup:ssl` once, then restart `./buddy dev`.')}`)
+    console.log()
+  }
+  if (portShifts.length > 0) {
+    console.log(`  ${yellow('⚠')}  ${yellow('Ports in use by another process')} ${dim(`- ${portShifts.join(', ')}`)}`)
+    console.log()
+  }
   console.log(`  ${bold(cyan('stacks'))} ${dim(`v${version}`)}  ${dim('starting…')}`)
   console.log()
-
-  // Pre-flight: clean up orphaned bun processes from prior dev runs that
-  // didn't shut down cleanly (`pkill -9` from a foreground terminal exits
-  // the parent but leaves detached children holding `:3000`/`:3002`/etc).
-  // Without this, the readiness probe sees stale listeners and reports
-  // "ready in 0.0s" while the *new* backends never bind because their
-  // ports are already taken. Skipped when `STACKS_DEV_NO_KILL` is set
-  // (e.g. in CI where there's nothing to clean up).
-  if (process.env.STACKS_DEV_NO_KILL !== '1') {
-    await cleanupStaleDevProcesses(managedPorts)
-  }
 
   // Mint TLS + start the rpx daemon in parallel with backend boot. Awaiting here
   // would delay every dev server; readiness waits on this promise before writing
@@ -426,6 +531,10 @@ export async function startDevelopmentServer(_options: DevOptions, _startTime?: 
   const rpxTlsPreflight = hasCustomDomain && domain
     ? prepareRpxTlsForDev({ domain, includeDashboard, options })
     : Promise.resolve()
+  // Opted out of pretty URLs: make sure no loopback override from a previous
+  // pretty-URL session keeps the domain pointed at this machine.
+  if (localhostOnly && domain && !proxyManagedExternally)
+    void removeStalePublicDomainOverrides(domain, includeDashboard, options.verbose ?? false).catch(() => { /* best-effort */ })
   // The HTTPS proxy is optional. This preflight is only awaited later (inside the
   // readiness handler, behind the frontend port probe), so without a handler
   // attached now an early failure — e.g. falling back to an @stacksjs/rpx build
@@ -450,21 +559,39 @@ export async function startDevelopmentServer(_options: DevOptions, _startTime?: 
     if (isExiting) return
     isExiting = true
     closeNativeApp?.()
-    void unregisterRpxProxies(activeRpxRegistryIds)
-    activeRpxRegistryIds.length = 0
-    try { process.kill(-process.pid, 'SIGTERM') }
-    catch {
-      // Process group may not exist (e.g., not session leader) — try the
-      // current process only. Worst case the inner SIGKILL below cleans up.
-      try { process.kill(0, 'SIGTERM') } catch { /* ignore */ }
-    }
-    setTimeout(() => {
-      try { process.kill(0, 'SIGKILL') }
-      catch { process.exit(1) }
-    }, SHUTDOWN_GRACE_MS).unref()
+    // Teardown order matters: an unawaited deregistration loses the race
+    // against the group SIGTERM, leaving this session's rpx registry entry
+    // behind - the root daemon then re-applies the /etc/hosts + resolver
+    // overrides on every restart and a public APP_URL stays pointed at this
+    // machine (and its dead proxy) after the dev session ended. Give the
+    // deregistration and the public-domain override removal a bounded head
+    // start, then proceed with the group kill.
+    const rpxTeardown = (async () => {
+      try {
+        await unregisterRpxProxies(activeRpxRegistryIds)
+        activeRpxRegistryIds.length = 0
+        if (hasCustomDomain && domain)
+          await removeStalePublicDomainOverrides(domain, includeDashboard, options.verbose ?? false)
+      }
+      catch { /* best-effort teardown */ }
+    })()
+    const teardownDeadline = new Promise<void>(resolve => setTimeout(resolve, SHUTDOWN_GRACE_MS))
+    void Promise.race([rpxTeardown, teardownDeadline]).finally(() => {
+      try { process.kill(-process.pid, 'SIGTERM') }
+      catch {
+        // Process group may not exist (e.g., not session leader) - try the
+        // current process only. Worst case the inner SIGKILL below cleans up.
+        try { process.kill(0, 'SIGTERM') } catch { /* ignore */ }
+      }
+      setTimeout(() => {
+        try { process.kill(0, 'SIGKILL') }
+        catch { process.exit(1) }
+      }, SHUTDOWN_GRACE_MS).unref()
+    })
   }
   process.on('SIGINT', cleanup)
   process.on('SIGTERM', cleanup)
+  process.on('SIGHUP', cleanup)
 
   // Start all servers silently — unified banner above handles output
   const quietOpts = { ...options, quiet: true }
@@ -478,8 +605,13 @@ export async function startDevelopmentServer(_options: DevOptions, _startTime?: 
   // still start by default, but they boot in the background and shouldn't hold
   // up the readiness banner. This keeps `ready in` reporting when the app is
   // actually usable; the auxiliary URLs come up moments later.
+  // Gate the "ready" banner on the API server — the core every Stacks app runs
+  // and the one requests actually need. Like the docs and dashboard servers
+  // above, the frontend server boots in the background and its URL comes up
+  // moments later, so it must not hold the banner: an app whose whole site is
+  // served by the API never binds a separate frontend port, and gating on that
+  // port forced a fixed ~30s wait (readinessTimeoutMs) every boot. See stacksjs/stacks#2036.
   const ports = [
-    { name: 'Frontend', port: frontendPort },
     { name: 'API', port: apiPort },
   ]
   const readinessTimeoutMs = 30000
@@ -552,7 +684,7 @@ export async function startDevelopmentServer(_options: DevOptions, _startTime?: 
         nativeMode,
         // Under rpx management we don't probe :443 ourselves, but rpx *is* serving
         // the pretty https URLs — advertise them rather than the localhost fallback.
-        hasCustomDomain: !!appLooksCustom,
+        hasCustomDomain: !!appLooksCustom && !localhostOnly,
         proxyReachable: proxyManagedExternally ? true : proxyReachable,
         frontendUrl,
         apiUrl,
@@ -677,32 +809,33 @@ function printDevReadyBanner(input: {
     dashboardDomain,
   } = input
   const verbose = options.verbose ?? false
-  const showLocalUrls = verbose || options.withLocalhost === true
 
-  // Advertise the pretty https://<domain> URLs only when the proxy is actually
-  // up; otherwise show the working http://localhost links so nothing 404s.
+  // The pretty https://<domain> URLs are the headline whenever the proxy is
+  // actually serving them; the raw localhost ports drop to a dim fallback line
+  // for bypassing the proxy. Without a reachable proxy the localhost dev
+  // servers stay the primary, honest URLs.
   const useProxy = hasCustomDomain && proxyReachable
   const feUrl = useProxy ? frontendUrl : `http://localhost:${frontendPort}`
   const apUrl = useProxy ? apiUrl : `http://localhost:${apiPort}`
   const dcUrl = useProxy ? docsUrl : `http://localhost:${docsPort}`
-  const blogUrl = `${feUrl.replace(/\/$/, '')}/blog`
+  const dbUrl = useProxy ? dashboardUrl : `http://localhost:${dashboardPort}`
+  const blogUrl = `${feUrl}/blog`
 
   console.log()
   console.log(`  ${green('➜')}  ${bold('Frontend')}:    ${cyan(feUrl)}`)
-  if (showLocalUrls && useProxy)
-    console.log(`  ${dim('➜')}  ${dim('Local')}:       ${dim(`http://localhost:${frontendPort}`)}`)
   if (nativeMode)
-    console.log(`  ${green('➜')}  ${bold('Native')}:      ${cyan(`Craft → http://localhost:${frontendPort}`)}`)
+    console.log(`  ${green('➜')}  ${bold('Native')}:      ${cyan(`Craft → ${feUrl}`)}`)
   console.log(`  ${green('➜')}  ${bold('API')}:         ${cyan(apUrl)}`)
-  if (showLocalUrls && useProxy)
-    console.log(`  ${dim('➜')}  ${dim('Local API')}:   ${dim(`http://localhost:${apiPort}`)}`)
   console.log(`  ${green('➜')}  ${bold('Docs')}:        ${cyan(dcUrl)}`)
-  if (showLocalUrls && useProxy)
-    console.log(`  ${dim('➜')}  ${dim('Local docs')}:  ${dim(`http://localhost:${docsPort}`)}`)
   if (blogIsConfigured())
     console.log(`  ${green('➜')}  ${bold('Blog')}:        ${cyan(blogUrl)}`)
   if (includeDashboard)
-    console.log(`  ${green('➜')}  ${bold('Dashboard')}:   ${cyan(dashboardUrl)}`)
+    console.log(`  ${green('➜')}  ${bold('Dashboard')}:   ${cyan(dbUrl)}`)
+  if (useProxy) {
+    console.log(`  ${dim('➜')}  ${dim('Direct')}:      ${dim(`http://localhost:${frontendPort} (bypasses the proxy)`)}`)
+    if (includeDashboard && dashboardDomain)
+      console.log(`  ${dim('➜')}  ${dim('Direct')}:      ${dim(`http://localhost:${dashboardPort} (dashboard, bypasses the proxy)`)}`)
+  }
   if (isComingSoonMode()) {
     console.log()
     console.log(`  ${yellow('●')}  ${bold(yellow('Coming soon mode'))} ${dim('— visitors see the holding page; bypass with the coming-soon secret.')}`)
@@ -719,7 +852,8 @@ function printDevReadyBanner(input: {
 
 /** Post-ready notes from frontend tooling (Crosswind, STX routes) in a consistent style. */
 function printDevEngineNotes(): void {
-  const routesFile = join(projectPath(), '.stx/routes.ts')
+  const routesFile = stxPath('routes.ts')
+  const routesLabel = relative(projectPath(), routesFile)
   const crosswindConfig = join(projectPath(), 'config/crosswind.ts')
   const hasCrosswind = existsSync(crosswindConfig)
     || existsSync(join(projectPath(), 'crosswind.config.ts'))
@@ -732,10 +866,10 @@ function printDevEngineNotes(): void {
       const source = readFileSync(routesFile, 'utf8')
       const routeCount = (source.match(/pattern:/g) ?? []).length
       if (routeCount > 0)
-        console.log(`  ${green('[stx]')} ${dim(`Generated ${routeCount} routes → .stx/routes.ts`)}`)
+        console.log(`  ${green('[stx]')} ${dim(`Generated ${routeCount} routes → ${routesLabel}`)}`)
     }
     catch {
-      console.log(`  ${green('[stx]')} ${dim('Routes manifest → .stx/routes.ts')}`)
+      console.log(`  ${green('[stx]')} ${dim(`Routes manifest → ${routesLabel}`)}`)
     }
   }
 }
@@ -1009,6 +1143,68 @@ async function probeDevServerHttp(port: number): Promise<boolean> {
   return false
 }
 
+/**
+ * Return `preferred` if nothing is listening on it, otherwise the next free
+ * port above it.
+ *
+ * A port counts as taken if EITHER check says so, because neither alone is
+ * sufficient:
+ *
+ *   - Binding catches the case where nothing accepts connections yet but the
+ *     address is reserved, and it is the operation that actually has to
+ *     succeed. `reusePort: false` matters here: with SO_REUSEPORT a second
+ *     bind succeeds against a live listener and the kernel then load-balances
+ *     between two different apps on one port.
+ *   - Connecting catches a listener bound to a different address family than
+ *     the probe. A server on `[::]:3000` does not necessarily block a bind on
+ *     `0.0.0.0:3000`, so the bind alone reports a busy port as free and the
+ *     dev server goes on to fail its real bind.
+ */
+async function findAvailablePort(preferred: number, attempts = 20): Promise<number> {
+  for (let port = preferred; port < preferred + attempts; port++) {
+    if (await portIsFree(port))
+      return port
+  }
+
+  // Everything in the window is taken. Hand back the preferred port so the
+  // caller fails on the real bind with the real error rather than here.
+  return preferred
+}
+
+async function portIsFree(port: number): Promise<boolean> {
+  for (const host of ['127.0.0.1', '::1']) {
+    if (await someoneIsListening(port, host))
+      return false
+  }
+
+  let server: { stop: (force?: boolean) => void } | undefined
+  try {
+    server = Bun.serve({ port, hostname: '0.0.0.0', reusePort: false, fetch: () => new Response() })
+  }
+  catch {
+    return false
+  }
+
+  server.stop(true)
+  return true
+}
+
+async function someoneIsListening(port: number, host: string): Promise<boolean> {
+  const { connect } = await import('node:net')
+
+  return new Promise<boolean>((resolve) => {
+    const socket = connect({ port, host })
+    const finish = (listening: boolean) => {
+      socket.destroy()
+      resolve(listening)
+    }
+
+    socket.setTimeout(300, () => finish(false))
+    socket.once('connect', () => finish(true))
+    socket.once('error', () => finish(false))
+  })
+}
+
 async function waitForPort(port: number, timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
@@ -1058,158 +1254,6 @@ async function waitForHttpsProxy(port: number, timeoutMs: number): Promise<boole
 const RPX_SSL_DIR = join(homedir(), '.stacks', 'ssl')
 const RPX_ROOT_CA_PATH = join(RPX_SSL_DIR, 'rpx-root-ca.crt')
 const RPX_HOST_CERT_PATH = join(RPX_SSL_DIR, 'rpx.localhost.crt')
-const LOGIN_KEYCHAIN = join(homedir(), 'Library/Keychains/login.keychain-db')
-
-function normalizeSha256Fingerprint(raw: string): string {
-  const value = raw.includes('=') ? raw.split('=').pop()! : raw
-  return value.replace(/SHA-256\s+hash:\s*/gi, '').replace(/:/g, '').trim().toUpperCase()
-}
-
-function readCertFingerprint(certPath: string): string | null {
-  try {
-    const out = execSync(`openssl x509 -noout -fingerprint -sha256 -in "${certPath}"`, { encoding: 'utf8' })
-    return normalizeSha256Fingerprint(out)
-  }
-  catch {
-    return null
-  }
-}
-
-/**
- * True when the on-disk rpx Root CA fingerprint appears in a keychain Chrome/Safari use.
- */
-function isRpxRootCaInKeychain(caPath: string): boolean {
-  const fp = readCertFingerprint(caPath)
-  if (!fp)
-    return false
-
-  const keychains = [
-    '/Library/Keychains/System.keychain',
-    LOGIN_KEYCHAIN,
-  ]
-
-  for (const keychain of keychains) {
-    try {
-      const listing = execSync(`security find-certificate -a -Z "${keychain}" 2>/dev/null || true`, { encoding: 'utf8' })
-      for (const line of listing.split('\n')) {
-        if (line.toUpperCase().includes('SHA-256') && normalizeSha256Fingerprint(line) === fp)
-          return true
-      }
-    }
-    catch { /* try next keychain */ }
-  }
-
-  return false
-}
-
-function execSudoSh(command: string): void {
-  const sudoPassword = process.env.SUDO_PASSWORD
-  const escaped = command.replace(/'/g, `'\\''`)
-  if (sudoPassword)
-    execSync(`echo '${sudoPassword}' | sudo -S sh -c '${escaped}' 2>/dev/null`, { stdio: ['pipe', 'pipe', 'pipe'] })
-  else
-    execSync(`sudo -n sh -c '${escaped}'`, { stdio: ['pipe', 'pipe', 'pipe'] })
-}
-
-/** Chrome/Edge need SSL + basic trust policies — plain trustRoot often leaves "trust settings: 0". */
-const MACOS_CA_TRUST_FLAGS = '-d -r trustRoot -p ssl -p basic'
-
-function listRpxRootCaHashesInKeychain(keychain: string): string[] {
-  const listing = execSync(
-    `security find-certificate -a -c "rpx.localhost" -Z "${keychain}" 2>/dev/null || true`,
-    { encoding: 'utf8' },
-  )
-  const hashes: string[] = []
-  for (const line of listing.split('\n')) {
-    const match = line.match(/SHA-256 hash:\s*([A-F0-9]+)/i)
-    if (match)
-      hashes.push(match[1]!.toUpperCase())
-  }
-  return hashes
-}
-
-function pruneStaleRpxRootCas(caPath: string): void {
-  if (process.platform !== 'darwin')
-    return
-
-  const keep = readCertFingerprint(caPath)
-  if (!keep)
-    return
-
-  for (const keychain of ['/Library/Keychains/System.keychain', LOGIN_KEYCHAIN]) {
-    for (const hash of listRpxRootCaHashesInKeychain(keychain)) {
-      if (hash === keep)
-        continue
-      try {
-        if (keychain.startsWith('/Library'))
-          execSudoSh(`security delete-certificate -Z ${hash} "${keychain}"`)
-        else
-          execSync(`security delete-certificate -Z ${hash} "${keychain}"`, { stdio: 'ignore' })
-      }
-      catch { /* already removed */ }
-    }
-  }
-}
-
-function isRpxRootCaTrustedForSsl(caPath: string, serverName: string): boolean {
-  if (process.platform !== 'darwin')
-    return isRpxRootCaInKeychain(caPath)
-
-  try {
-    const out = execSync(
-      `security verify-cert -c "${caPath}" -s "${serverName}" -l -L -R ssl 2>&1`,
-      { encoding: 'utf8' },
-    )
-    return out.includes('successful')
-  }
-  catch {
-    return false
-  }
-}
-
-function trustRpxRootCaForBrowsers(caPath: string, serverName: string): boolean {
-  if (process.platform !== 'darwin')
-    return false
-
-  pruneStaleRpxRootCas(caPath)
-
-  try {
-    execSync(
-      `security add-trusted-cert ${MACOS_CA_TRUST_FLAGS} -k "${LOGIN_KEYCHAIN}" "${caPath}"`,
-      { stdio: 'ignore' },
-    )
-  }
-  catch { /* may already exist — re-apply trust below */ }
-
-  try {
-    execSudoSh(`security add-trusted-cert ${MACOS_CA_TRUST_FLAGS} -k /Library/Keychains/System.keychain "${caPath}"`)
-  }
-  catch {
-    return false
-  }
-
-  return isRpxRootCaTrustedForSsl(caPath, serverName)
-    || isRpxRootCaInKeychain(caPath)
-}
-
-/**
- * True when :443 presents a chain signed by the current ~/.stacks/ssl/rpx-root-ca.crt.
- */
-function isLiveHttpsChainValid(domain: string): boolean {
-  if (!existsSync(RPX_ROOT_CA_PATH))
-    return false
-
-  try {
-    const out = execSync(
-      `echo | openssl s_client -connect ${domain}:443 -servername ${domain} -CAfile "${RPX_ROOT_CA_PATH}" 2>/dev/null | grep "Verify return code"`,
-      { encoding: 'utf8', timeout: 4000 },
-    )
-    return out.includes(': 0 (ok)')
-  }
-  catch {
-    return false
-  }
-}
 
 function buildDevelopmentTlsHostnames(domain: string, includeDashboard: boolean): string[] {
   // App domain must be first — it becomes the cert CN. Safari/Chrome surface CN in
@@ -1221,43 +1265,6 @@ function buildDevelopmentTlsHostnames(domain: string, includeDashboard: boolean)
   ]
 }
 
-function readCertCommonName(certPath: string): string | null {
-  try {
-    const subject = execSync(`openssl x509 -in "${certPath}" -noout -subject -nameopt RFC2253`, { encoding: 'utf8' })
-    const match = subject.match(/CN=([^,/]+)/)
-    return match?.[1]?.trim() ?? null
-  }
-  catch {
-    return null
-  }
-}
-
-async function buildDevelopmentTlsOptions(domain: string, includeDashboard: boolean, verbose: boolean) {
-  const hostnames = buildDevelopmentTlsHostnames(domain, includeDashboard)
-  try {
-    const { getRegistryDir, readAll } = await importDevelopmentRpx()
-    const entries = await readAll(getRegistryDir(), false)
-    for (const entry of entries) {
-      const host = entry.to?.trim()
-      if (host && !hostnames.includes(host))
-        hostnames.push(host)
-    }
-  }
-  catch { /* registry unreadable — app hostnames only */ }
-
-  return {
-    https: {
-      certPath: RPX_HOST_CERT_PATH,
-      keyPath: join(RPX_SSL_DIR, 'rpx.localhost.key'),
-      caCertPath: join(RPX_SSL_DIR, 'rpx.localhost.ca.crt'),
-      commonName: domain,
-    },
-    verbose,
-    regenerateUntrustedCerts: true,
-    proxies: hostnames.map(to => ({ from: 'localhost:1', to })),
-  } as Parameters<typeof import('@stacksjs/rpx').generateCertificate>[0]
-}
-
 /**
  * Mint (if needed), trust, and align the rpx daemon TLS material with APP_URL.
  * Chrome requires each `<app>.localhost` hostname in the cert SAN — `*.localhost`
@@ -1267,29 +1274,36 @@ async function ensureRpxDevelopmentHttps(
   domain: string,
   options: DevOptions,
   includeDashboard: boolean,
+  trustCertificate = true,
 ): Promise<void> {
   const verbose = options.verbose ?? false
   const {
+    buildRegistryTlsProxyOptions,
+    certIncludesSanHostnames,
     checkExistingCertificates,
     clearSslConfigCache,
     forceTrustCertificate,
     generateCertificate,
+    getRegistryDir,
     isDaemonRunning,
+    isRootCaTrustedForSsl,
+    readAll,
+    readCertCommonName,
     stopDaemon,
+    trustRootCaForBrowsers,
+    verifyHttpsChain,
   } = await importDevelopmentRpx()
 
   const hostnames = buildDevelopmentTlsHostnames(domain, includeDashboard)
-  const tlsOptions = await buildDevelopmentTlsOptions(domain, includeDashboard, verbose)
+  const entries = await readAll(getRegistryDir(), false).catch(() => [])
+  for (const entry of entries) {
+    const host = entry.to?.trim()
+    if (host && !hostnames.includes(host))
+      hostnames.push(host)
+  }
+  const tlsOptions = buildRegistryTlsProxyOptions(hostnames, domain, verbose)
 
-  const hostnameInCert = hostnames.every((host) => {
-    try {
-      const text = execSync(`openssl x509 -in "${RPX_HOST_CERT_PATH}" -noout -text`, { encoding: 'utf8' })
-      return text.includes(`DNS:${host}`)
-    }
-    catch {
-      return false
-    }
-  })
+  const hostnameInCert = certIncludesSanHostnames(RPX_HOST_CERT_PATH, hostnames)
   const cnMatchesApp = readCertCommonName(RPX_HOST_CERT_PATH) === domain
 
   let certRegenerated = false
@@ -1300,11 +1314,11 @@ async function ensureRpxDevelopmentHttps(
     certRegenerated = true
   }
 
-  let trusted = isRpxRootCaTrustedForSsl(RPX_ROOT_CA_PATH, domain)
-  if (!trusted) {
-    trusted = trustRpxRootCaForBrowsers(RPX_ROOT_CA_PATH, domain)
+  let trusted = isRootCaTrustedForSsl(RPX_ROOT_CA_PATH, domain, { verbose })
+  if (!trusted && trustCertificate) {
+    trusted = trustRootCaForBrowsers(RPX_ROOT_CA_PATH, { serverName: domain, verbose })
       || await forceTrustCertificate(RPX_ROOT_CA_PATH, { serverName: domain, verbose })
-      || isRpxRootCaTrustedForSsl(RPX_ROOT_CA_PATH, domain)
+      || isRootCaTrustedForSsl(RPX_ROOT_CA_PATH, domain, { verbose })
     if (trusted)
       console.log(`  ${green('✓')}  ${dim('HTTPS')}:         ${dim('Local CA trusted — reload the browser if you still see a warning')}`)
     else
@@ -1314,7 +1328,9 @@ async function ensureRpxDevelopmentHttps(
     console.log(`  ${green('✓')}  ${dim('HTTPS')}:         ${dim('Local certificate trusted for SSL')}`)
   }
 
-  const chainOk = isLiveHttpsChainValid(domain)
+  const chainOk = existsSync(RPX_ROOT_CA_PATH)
+    ? await verifyHttpsChain(domain, RPX_ROOT_CA_PATH)
+    : false
 
   // Stop a running daemon only when TLS material changed — registerRpxProxiesForDomain
   // starts the daemon afterward. Do not stop merely because chainOk is false while
@@ -1409,6 +1425,68 @@ async function unregisterRpxProxies(ids: string[]): Promise<void> {
 }
 
 /**
+ * Undo rpx overrides a previous dev session left behind for a PUBLIC domain:
+ * the `127.0.0.1 <domain>` lines in /etc/hosts and the root-owned
+ * /etc/resolver/<domain> file pointing at rpx's local DNS. The public-domain
+ * guard only prevents NEW overrides; without this cleanup one stale install
+ * keeps the live domain hijacked on this Mac (every browser and curl hits a
+ * dead local proxy instead of production). Best-effort throughout: removal
+ * needs sudo (SUDO_PASSWORD or cached credentials), never throws, and logs the
+ * exact manual command when it cannot finish.
+ */
+async function removeStalePublicDomainOverrides(domain: string, includeDashboard: boolean, verbose: boolean): Promise<void> {
+  const { checkHosts, removeHosts, resolverFilePath, contentLooksLikeRpxResolver } = await importDevelopmentRpx()
+
+  const hosts = [domain, ...(includeDashboard ? [`dashboard.${domain}`] : [])]
+
+  // /etc/hosts is world-readable, so checking first keeps a deliberately
+  // hand-written (non-rpx) entry from being rewritten for no reason.
+  const present = await checkHosts(hosts, verbose).catch(() => hosts.map(() => false))
+  const staleHosts = hosts.filter((_, i) => present[i] === true)
+  if (staleHosts.length > 0) {
+    await removeHosts(staleHosts, verbose).catch(() => { /* best-effort */ })
+    const remaining = await checkHosts(staleHosts, verbose).catch(() => staleHosts.map(() => true))
+    if (remaining.some(Boolean))
+      log.warn(`Stale /etc/hosts entries still point ${staleHosts.join(', ')} at loopback. Remove them with: sudo nano /etc/hosts`)
+    else
+      log.info(`Removed stale /etc/hosts entries for ${staleHosts.join(', ')} (left by a previous dev session)`)
+  }
+
+  // /etc/resolver/<domain> is root-owned. rpx exposes the path and the
+  // ownership probe but no per-domain remover, so unlink it here, and only
+  // when the content proves rpx manages the file. rpx scopes resolver files
+  // to the last two domain labels (dashboard.<apex> shares the apex file).
+  if (process.platform !== 'darwin')
+    return
+
+  const labels = domain.split('.')
+  const basename = labels.length >= 2 ? labels.slice(-2).join('.') : domain
+  const resolverPath = resolverFilePath(basename)
+  let isRpxManaged = false
+  try {
+    isRpxManaged = contentLooksLikeRpxResolver(readFileSync(resolverPath, 'utf8'))
+  }
+  catch { /* no stale resolver file */ }
+  if (!isRpxManaged)
+    return
+
+  const quotedPath = `'${resolverPath.replace(/'/g, `'\\''`)}'`
+  const rm = process.env.SUDO_PASSWORD
+    ? `printf '%s\n' "$SUDO_PASSWORD" | sudo -S rm -f ${quotedPath}`
+    : `sudo -n rm -f ${quotedPath}`
+  try {
+    execSync(rm, { stdio: ['pipe', 'ignore', 'ignore'] })
+    log.info(`Removed stale rpx DNS resolver ${resolverPath} (left by a previous dev session)`)
+    // Make the live domain resolve again immediately instead of waiting out
+    // the system DNS cache. Best-effort on the cached sudo timestamp.
+    execSync('sudo -n dscacheutil -flushcache; sudo -n killall -HUP mDNSResponder; true', { stdio: ['pipe', 'ignore', 'ignore'] })
+  }
+  catch {
+    log.warn(`A stale rpx DNS resolver still hijacks ${domain}. Remove it with: sudo rm ${resolverPath}`)
+  }
+}
+
+/**
  * Update /etc/hosts and align TLS material while backends boot. The daemon is
  * started in `registerRpxProxiesForDomain` once HTTP ports are ready.
  */
@@ -1416,9 +1494,12 @@ async function prepareRpxTlsForDev(input: {
   domain: string
   includeDashboard: boolean
   options: DevOptions
+  skipHosts?: boolean
+  trustCertificate?: boolean
 }): Promise<void> {
-  const { domain, includeDashboard, options } = input
+  const { domain, includeDashboard, options, skipHosts = false, trustCertificate = true } = input
   const verbose = options.verbose ?? false
+
   const hosts = [
     domain,
     ...(includeDashboard ? [`dashboard.${domain}`] : []),
@@ -1435,7 +1516,7 @@ async function prepareRpxTlsForDev(input: {
 
   // `.test` / custom dev TLDs: prefer domain-scoped macOS resolver files + the
   // rpx DNS server on :15353 (RFC 6761 `.localhost` skips this path).
-  const dnsDomains = hostsNeedingFile.length > 0
+  const dnsDomains = !skipHosts && hostsNeedingFile.length > 0
     ? hosts
     : []
   if (dnsDomains.length > 0) {
@@ -1444,14 +1525,64 @@ async function prepareRpxTlsForDev(input: {
       log.warn(`Dev DNS not configured for ${dnsDomains.join(', ')} — falling back to /etc/hosts`)
   }
 
-  if (hostsNeedingFile.length > 0) {
+  if (!skipHosts && hostsNeedingFile.length > 0) {
     await addHosts(hostsNeedingFile, verbose).catch((err) => {
       log.warn(`Could not update /etc/hosts for ${hostsNeedingFile.join(', ')}: ${(err as Error).message}`)
       log.warn('Add 127.0.0.1 entries manually or set SUDO_PASSWORD in .env')
     })
   }
 
-  await ensureRpxDevelopmentHttps(domain, options, includeDashboard)
+  await ensureRpxDevelopmentHttps(domain, options, includeDashboard, trustCertificate)
+}
+
+export async function setupPrettyDevEnvironment(input: {
+  domain?: string
+  skipHosts?: boolean
+  skipTrust?: boolean
+  verbose?: boolean
+}): Promise<boolean> {
+  const domain = resolvePrettyDevDomain(input.domain ?? process.env.APP_URL ?? 'stacks.localhost')
+  if (!domain) {
+    log.info('APP_URL already uses localhost; no pretty URL setup is needed')
+    return true
+  }
+
+  const rpx = await importDevelopmentRpx()
+  if (!rpx.authorizeSystemAccess({ interactive: process.stdin.isTTY === true && process.stdout.isTTY === true })) {
+    log.error('Pretty URL setup needs administrator authorization to bind ports 80 and 443 and trust the local CA')
+    return false
+  }
+
+  await prepareRpxTlsForDev({
+    domain,
+    includeDashboard: process.env.STACKS_DEV_DASHBOARD === '1',
+    options: { verbose: input.verbose } as DevOptions,
+    skipHosts: input.skipHosts,
+    trustCertificate: !input.skipTrust,
+  })
+
+  const spawnEnv: Record<string, string> = {}
+  if (process.env.SUDO_PASSWORD)
+    spawnEnv.SUDO_PASSWORD = process.env.SUDO_PASSWORD
+  if (input.verbose)
+    spawnEnv.RPX_VERBOSE = '1'
+  const rpxEntry = resolveRpxEntryPath()
+  if (rpxEntry)
+    spawnEnv.RPX_MODULE = rpxEntry
+
+  await startRpxDaemonIfNeeded({
+    spawnCommand: await resolveRpxDaemonSpawnCommand(),
+    spawnEnv,
+    verbose: input.verbose ?? false,
+    stopRpx: rpx.stopDaemon,
+  })
+
+  const ready = await waitForHttpsProxy(443, 5000)
+  if (ready)
+    log.success(`Pretty URLs are ready at https://${domain}`)
+  else
+    log.error('rpx did not become reachable on port 443')
+  return ready
 }
 
 async function startRpxDaemonIfNeeded(input: {
@@ -1461,8 +1592,15 @@ async function startRpxDaemonIfNeeded(input: {
   stopRpx: (opts: { timeoutMs: number }) => Promise<unknown>
 }): Promise<void> {
   const { ensureDaemonRunning, isDaemonRunning: isRpxUp } = await importDevelopmentRpx()
-  if (await isRpxUp())
-    return
+  if (await isRpxUp()) {
+    // A live pid file is not proof the daemon serves :443 — a previous run can
+    // leave a bootstrap process that never elevated (bad sudo, port busy), and
+    // reusing it means the proxy simply never comes up. Only reuse the daemon
+    // when the port actually answers; otherwise stop it and respawn below.
+    if (await waitForHttpsProxy(443, 1500))
+      return
+    await input.stopRpx({ timeoutMs: 5000 }).catch(() => { /* stale */ })
+  }
 
   const spawnOpts = {
     spawnCommand: input.spawnCommand,
@@ -1544,6 +1682,7 @@ async function registerRpxProxiesForDomain(input: {
       to: proxy.to,
       cwd: process.cwd(),
       createdAt,
+      pid: process.pid,
       pathRewrites: proxy.pathRewrites,
     }, undefined, verbose)
     if (!activeRpxRegistryIds.includes(proxy.id))

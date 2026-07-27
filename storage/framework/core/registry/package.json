@@ -2,7 +2,7 @@
   "name": "@stacksjs/registry",
   "type": "module",
   "sideEffects": false,
-  "version": "0.70.87",
+  "version": "0.70.190",
   "description": "The Stacks Registry.",
   "author": "Chris Breuer",
   "contributors": [
@@ -37,12 +37,15 @@
     "README.md",
     "dist"
   ],
+  "dependencies": {
+    "@stacksjs/types": "workspace:*"
+  },
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "bun tsc --noEmit",
     "prepublishOnly": "bun run build"
   },
   "devDependencies": {
-    "better-dx": "^0.2.16"
+    "better-dx": "^0.2.17"
   }
 }

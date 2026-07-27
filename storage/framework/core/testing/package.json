@@ -2,7 +2,7 @@
   "name": "@stacksjs/testing",
   "type": "module",
   "sideEffects": false,
-  "version": "0.70.87",
+  "version": "0.70.190",
   "description": "The Stacks way of testing.",
   "author": "Chris Breuer",
   "contributors": [
@@ -71,11 +71,11 @@
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@stacksjs/ts-cloud": "^0.7.17"
+    "@stacksjs/ts-cloud": "^0.7.60"
   },
   "devDependencies": {
     "@stacksjs/config": "workspace:*",
     "@stacksjs/database": "workspace:*",
-    "better-dx": "^0.2.16"
+    "better-dx": "^0.2.17"
   }
 }

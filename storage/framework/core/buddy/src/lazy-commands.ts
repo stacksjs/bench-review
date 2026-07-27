@@ -16,6 +16,7 @@ interface CommandLoader {
 const commandRegistry: Record<string, CommandLoader> = {
   'about': { path: './commands/about.ts', exportName: 'about' },
   'add': { path: './commands/add.ts', exportName: 'add' },
+  'ai:context': { path: './commands/ai-context.ts', exportName: 'aiContext' },
   'auth': { path: './commands/auth.ts', exportName: 'auth' },
   'build': { path: './commands/build.ts', exportName: 'build' },
   'cd': { path: './commands/cd.ts', exportName: 'cd' },
@@ -27,6 +28,8 @@ const commandRegistry: Record<string, CommandLoader> = {
   'config:migrate': { path: './commands/config-migrate.ts', exportName: 'configMigrate' },
   'configure': { path: './commands/configure.ts', exportName: 'configure' },
   'create': { path: './commands/create.ts', exportName: 'create' },
+  // create.ts registers the command as `new [name]`.
+  'new': { path: './commands/create.ts', exportName: 'create' },
   'deploy': { path: './commands/deploy.ts', exportName: 'deploy' },
   'dev': { path: './commands/dev.ts', exportName: 'dev' },
   'dns': { path: './commands/dns.ts', exportName: 'dns' },
@@ -40,6 +43,13 @@ const commandRegistry: Record<string, CommandLoader> = {
   'extension:init': { path: './commands/extension.ts', exportName: 'extension' },
   'extension:build': { path: './commands/extension.ts', exportName: 'extension' },
   'extension:package': { path: './commands/extension.ts', exportName: 'extension' },
+  'extension:chrome:publish': { path: './commands/extension.ts', exportName: 'extension' },
+  'extension:chrome:status': { path: './commands/extension.ts', exportName: 'extension' },
+  'extension:firefox:publish': { path: './commands/extension.ts', exportName: 'extension' },
+  'extension:safari:init': { path: './commands/extension.ts', exportName: 'extension' },
+  'extension:safari:provision': { path: './commands/extension.ts', exportName: 'extension' },
+  'extension:safari:app': { path: './commands/extension.ts', exportName: 'extension' },
+  'extension:safari:publish': { path: './commands/extension.ts', exportName: 'extension' },
   // Feature install / uninstall — single file registers all pairs.
   'dashboard:install': { path: './commands/features.ts', exportName: 'features' },
   'dashboard:uninstall': { path: './commands/features.ts', exportName: 'features' },
@@ -61,6 +71,9 @@ const commandRegistry: Record<string, CommandLoader> = {
   'install': { path: './commands/install.ts', exportName: 'install' },
   'key': { path: './commands/key.ts', exportName: 'key' },
   'lint': { path: './commands/lint.ts', exportName: 'lint' },
+  // lint.ts also registers the `format` pair (pickier formatter).
+  'format': { path: './commands/lint.ts', exportName: 'lint' },
+  'format:check': { path: './commands/lint.ts', exportName: 'lint' },
   'list': { path: './commands/list.ts', exportName: 'list' },
   'mail': { path: './commands/mail.ts', exportName: 'mailCommands' },
   'mail:preview': { path: './commands/mail.ts', exportName: 'mailCommands' },
@@ -68,7 +81,13 @@ const commandRegistry: Record<string, CommandLoader> = {
   'down': { path: './commands/maintenance.ts', exportName: 'maintenance' },
   'up': { path: './commands/maintenance.ts', exportName: 'maintenance' },
   'status': { path: './commands/maintenance.ts', exportName: 'maintenance' },
+  // maintenance.ts also registers the coming-soon pair and `launch`.
+  'coming-soon': { path: './commands/maintenance.ts', exportName: 'maintenance' },
+  'coming-soon:status': { path: './commands/maintenance.ts', exportName: 'maintenance' },
+  'launch': { path: './commands/maintenance.ts', exportName: 'maintenance' },
   'make': { path: './commands/make.ts', exportName: 'make' },
+  // make.ts also registers `scaffold:crud`.
+  'scaffold:crud': { path: './commands/make.ts', exportName: 'make' },
   'migrate': { path: './commands/migrate.ts', exportName: 'migrate' },
   'migrate:fresh': { path: './commands/migrate.ts', exportName: 'migrate' },
   'migrate:switch': { path: './commands/migrate.ts', exportName: 'migrate' },
@@ -78,6 +97,10 @@ const commandRegistry: Record<string, CommandLoader> = {
   'package': { path: './commands/package.ts', exportName: 'packageCommands' },
   'phone': { path: './commands/phone.ts', exportName: 'phone' },
   'ports': { path: './commands/ports.ts', exportName: 'ports' },
+  'link:core': { path: './commands/link.ts', exportName: 'link' },
+  'user:add': { path: './commands/user.ts', exportName: 'user' },
+  'user:list': { path: './commands/user.ts', exportName: 'user' },
+  'unlink:core': { path: './commands/link.ts', exportName: 'link' },
   'prepublish': { path: './commands/prepublish.ts', exportName: 'prepublish' },
   'projects': { path: './commands/projects.ts', exportName: 'projects' },
   'publish': { path: './commands/publish.ts', exportName: 'publish' },
@@ -90,8 +113,13 @@ const commandRegistry: Record<string, CommandLoader> = {
   'release': { path: './commands/release.ts', exportName: 'release' },
   'route': { path: './commands/route.ts', exportName: 'route' },
   'saas': { path: './commands/saas.ts', exportName: 'saas' },
+  // saas.ts registers the command as `stripe:setup`.
+  'stripe:setup': { path: './commands/saas.ts', exportName: 'saas' },
   'schedule': { path: './commands/schedule.ts', exportName: 'schedule' },
   'search': { path: './commands/search.ts', exportName: 'search' },
+  // search.ts also registers the `search-engine` pair.
+  'search-engine:update': { path: './commands/search.ts', exportName: 'search' },
+  'search-engine:settings': { path: './commands/search.ts', exportName: 'search' },
   'seed': { path: './commands/seed.ts', exportName: 'seed' },
   // `seed:roles` alias also lazy-loads commands/seed.ts (which registers
   // both `seed` and `seed:roles` subcommands when its exported `seed()`
@@ -101,6 +129,11 @@ const commandRegistry: Record<string, CommandLoader> = {
   'serve': { path: './commands/serve.ts', exportName: 'serve' },
   'serve:api': { path: './commands/serve.ts', exportName: 'serveApi' },
   'setup': { path: './commands/setup.ts', exportName: 'setup' },
+  // setup.ts registers the whole `setup:*` family.
+  'setup:ai': { path: './commands/setup.ts', exportName: 'setup' },
+  'setup:ssl': { path: './commands/setup.ts', exportName: 'setup' },
+  'setup:oh-my-zsh': { path: './commands/setup.ts', exportName: 'setup' },
+  'ai:setup': { path: './commands/setup.ts', exportName: 'setup' },
   'share': { path: './commands/share.ts', exportName: 'share' },
   'stack': { path: './commands/stacks.ts', exportName: 'stacks' },
   'sms': { path: './commands/sms.ts', exportName: 'sms' },
@@ -111,6 +144,34 @@ const commandRegistry: Record<string, CommandLoader> = {
   'undeploy': { path: './commands/cloud.ts', exportName: 'cloud' }, // Alias for cloud:remove
   'upgrade': { path: './commands/upgrade.ts', exportName: 'upgrade' },
   'version': { path: './commands/version.ts', exportName: 'version' },
+
+  // Protocol governance (framework-repo tooling; registrar in commands/protocol.ts,
+  // tooling under commands/protocol/, evidence DATA under .github/protocol/).
+  'protocol:conformance': { path: './commands/protocol.ts', exportName: 'protocol' },
+  'protocol:sync': { path: './commands/protocol.ts', exportName: 'protocol' },
+  'protocol:check': { path: './commands/protocol.ts', exportName: 'protocol' },
+  'protocol:manifest': { path: './commands/protocol.ts', exportName: 'protocol' },
+  'protocol:manifest:check': { path: './commands/protocol.ts', exportName: 'protocol' },
+  'protocol:release': { path: './commands/protocol.ts', exportName: 'protocol' },
+  'protocol:release:check': { path: './commands/protocol.ts', exportName: 'protocol' },
+  'protocol:drivers': { path: './commands/protocol.ts', exportName: 'protocol' },
+  'protocol:drivers:check': { path: './commands/protocol.ts', exportName: 'protocol' },
+  'protocol:drivers:test': { path: './commands/protocol.ts', exportName: 'protocol' },
+  'protocol:desktop': { path: './commands/protocol.ts', exportName: 'protocol' },
+  'protocol:desktop:check': { path: './commands/protocol.ts', exportName: 'protocol' },
+  'protocol:pantry': { path: './commands/protocol.ts', exportName: 'protocol' },
+  'protocol:pantry:check': { path: './commands/protocol.ts', exportName: 'protocol' },
+  'protocol:craft': { path: './commands/protocol.ts', exportName: 'protocol' },
+  'protocol:craft:check': { path: './commands/protocol.ts', exportName: 'protocol' },
+
+  // Docs freshness (framework-repo tooling; registrar in commands/docs.ts,
+  // tooling under commands/docs/).
+  'docs:buddy': { path: './commands/docs.ts', exportName: 'docs' },
+  'docs:buddy:check': { path: './commands/docs.ts', exportName: 'docs' },
+  'docs:artifacts': { path: './commands/docs.ts', exportName: 'docs' },
+  'docs:artifacts:check': { path: './commands/docs.ts', exportName: 'docs' },
+  'docs:links': { path: './commands/docs.ts', exportName: 'docs' },
+  'docs:links:check': { path: './commands/docs.ts', exportName: 'docs' },
 }
 
 // Commands that are commonly used together (for batch loading optimization)
@@ -280,17 +341,19 @@ export function getCommandsToLoad(args: string[]): string[] {
     return ['list', ...Object.keys(commandRegistry).filter(k => k !== 'list')]
   }
 
-  // Check if it's a known command
-  if (commandRegistry[baseCommand]) {
-    return [baseCommand]
+  // Check the exact full command name first. Colon commands can live in a
+  // different module than their base command (e.g. `queue:install` is
+  // registered by features.ts while `queue` loads queue.ts, and
+  // `migrate:project` lives in migrate-project.ts), so the full name must
+  // win over the base-name fallback below.
+  if (commandRegistry[requestedCommand]) {
+    return [requestedCommand]
   }
 
-  // Check if it's a namespaced command like 'make:model'
-  if (requestedCommand.includes(':')) {
-    const namespace = baseCommand
-    if (commandRegistry[namespace]) {
-      return [namespace]
-    }
+  // Fall back to the base command's module for namespaced commands like
+  // 'make:model' whose subcommands are all registered by make.ts.
+  if (commandRegistry[baseCommand]) {
+    return [baseCommand]
   }
 
   // Unknown command — load full surface so the user sees every option in the

@@ -4,7 +4,7 @@ This package contains the Stacks UI engine.
 
 ## ☘️ Features
 
-- 🍀 **Vue-powered** _extendable & native access to the ecosystem_
+- 🍀 **STX-powered** _extendable & native access to the ecosystem_
 - 🎨 **Style with ease** _via a blazingly fast utility-first CSS framework, powered by Headwind_
 - 🍍 **Simple data storage** _accessed via an intuitive API_
 - Written in modern ESM/TypeScript
@@ -47,7 +47,7 @@ For help, discussion about best practices, or any other conversation that would 
 
 For casual chit-chat with others using this package:
 
-[Join the Stacks Discord Server](https://discord.gg/stacksjs)
+[Join the Stacks Discord Server](https://stacksjs.com/discord)
 
 ## 🙏🏼 Credits
 

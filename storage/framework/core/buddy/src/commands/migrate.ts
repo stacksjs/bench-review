@@ -4,7 +4,7 @@ import process from 'node:process'
 import { confirm, intro, log, onUnknownSubcommand, outro, text } from "@stacksjs/cli"
 import { Action } from '@stacksjs/enums'
 import { hasTTY, isCI } from '@stacksjs/env'
-import { appPath, frameworkPath, projectPath } from '@stacksjs/path'
+import { appPath, frameworkPath, frameworkRuntimePath, projectPath } from '@stacksjs/path'
 import { ExitCode } from '@stacksjs/types'
 
 // Lazy-load @stacksjs/actions to keep `buddy --help` cheap. The barrel
@@ -26,7 +26,7 @@ async function runAction(...args: Parameters<typeof import('@stacksjs/actions').
  * any DB-level advisory lock and works on every supported OS.
  */
 function acquireMigrationLock(): { acquired: boolean, release: () => void } {
-  const lockDir = projectPath('.stacks')
+  const lockDir = frameworkRuntimePath()
   const lockFile = `${lockDir}/migrations.lock`
   try {
     if (!existsSync(lockDir)) mkdirSync(lockDir, { recursive: true })
@@ -64,7 +64,7 @@ function acquireMigrationLock(): { acquired: boolean, release: () => void } {
  * doesn't see stale state.
  */
 function readMigrateMarker(): { appliedCount: number } | null {
-  const file = projectPath('.stacks/last-migrate-result.json')
+  const file = frameworkRuntimePath('last-migrate-result.json')
   if (!existsSync(file)) return null
   try {
     const raw = readFileSync(file, 'utf8')
@@ -147,7 +147,7 @@ async function reportMissingForeignKeys(): Promise<void> {
     const more = result.missing.length > 5 ? `\n  + ${result.missing.length - 5} more — run \`./buddy doctor\` for the full list.` : ''
     log.warn(
       `${result.missing.length} of ${result.declared.length} declared foreign keys are missing from the live schema:\n${sample}${more}\n`
-      + `If you just flipped DB_CONNECTION, the FK ALTER migrations may be sitting on disk but unapplied — run \`./buddy migrate:fresh\` against the new database (will reset data) or replay the alter-*.sql files manually.`,
+      + `The model-backed create migrations may be stale for this database — run \`./buddy migrate:fresh\` to regenerate and replay them from the model attributes (this resets data).`,
     )
   }
   catch (err) {
@@ -329,6 +329,7 @@ function currentDatabaseLabel(): string {
 export function migrate(buddy: CLI): void {
   const descriptions = {
     migrate: 'Migrates your database',
+    fresh: 'Drop all tables and re-run every migration (destroys all data)',
     project: 'Target a specific project',
     verbose: 'Enable verbose output',
     auth: 'Also migrate auth tables (oauth_clients, oauth_access_tokens, oauth_refresh_tokens, password_resets)',
@@ -385,7 +386,8 @@ export function migrate(buddy: CLI): void {
           }
         }
         catch (error) {
-          log.error('Failed to preview migrations:', error)
+          // await: guarantee the error flushes before the outro + exit below.
+          await log.error('Failed to preview migrations:', error)
         }
         await outro('Diff complete — no changes applied.', { startTime: perf, useSeconds: true })
         process.exit(ExitCode.Success)
@@ -403,6 +405,9 @@ export function migrate(buddy: CLI): void {
         }
         else {
           const APP_ENV = process.env.APP_ENV || 'local'
+          // Flush buffered async logs (e.g. the intro banner) so they paint
+          // before this prompt instead of under it (see migrate:fresh below).
+          await log.flush()
           const proceed = await confirm({
             message: `Run migrations against the ${APP_ENV} database "${currentDatabaseLabel()}"?`,
             initial: true,
@@ -420,7 +425,10 @@ export function migrate(buddy: CLI): void {
       // the migration table by both inserting the same row name.
       const lock = acquireMigrationLock()
       if (!lock.acquired) {
-        log.error('Another migration is already running (.stacks/migrations.lock exists). Wait for it to finish, or remove the lockfile if it is stale.')
+        // syncError, not the async log.error: process.exit below fires before
+        // an async logger flushes, so an async call would exit 1 with no
+        // message — leaving a stale lockfile looking like a silent crash.
+        log.syncError('Another migration is already running (storage/framework/runtime/migrations.lock exists). Wait for it to finish, or remove the lockfile if it is stale.')
         process.exit(ExitCode.FatalError)
       }
 
@@ -434,9 +442,9 @@ export function migrate(buddy: CLI): void {
         process.exit(ExitCode.Success)
       }
 
-      // Auth/oauth/notification/RBAC tables migrate by default, and run
-      // BEFORE the numbered model migrations (not after — see
-      // stacksjs/stacks#1952 for why this used to run last). Migration
+      // Auth/oauth tables migrate by default, and run BEFORE the numbered
+      // model migrations (not after — see stacksjs/stacks#1952 for why this
+      // used to run last). Migration
       // 0000000098-revoke-legacy-long-lived-tokens.sql (and any future
       // migration touching oauth_access_tokens/oauth_refresh_tokens)
       // assumes these framework tables already exist; on a brand new
@@ -453,38 +461,46 @@ export function migrate(buddy: CLI): void {
         // every time. Errors still surface via log.error below.
         log.debug('Migrating auth tables...')
         try {
-          const { migrateAuthTables, migrateNotificationTables, migrateRbacTables } = await import('@stacksjs/database')
+          const { migrateAuthTables } = await import('@stacksjs/database')
           const authResult = await migrateAuthTables({ verbose: options.verbose })
 
           if (!authResult.success) {
             log.error(`Failed to migrate auth tables: ${authResult.error}`)
           }
 
-          // Notification tables (stacksjs/stacks#1937) — the `database`
-          // channel + preference layer need these; previously unshipped.
-          const notifResult = await migrateNotificationTables({ verbose: options.verbose })
-          if (!notifResult.success) {
-            log.error(`Failed to migrate notification tables: ${notifResult.error}`)
-          }
-
-          // RBAC tables (stacksjs/stacks#1941 Phase A) — roles,
-          // permissions, and the three pivot tables the RBAC store
-          // reads. Schema was documented in rbac-store-bqb.ts but the
-          // migration never shipped.
-          const rbacResult = await migrateRbacTables({ verbose: options.verbose })
-          if (!rbacResult.success) {
-            log.error(`Failed to migrate RBAC tables: ${rbacResult.error}`)
-          }
         }
         catch (error) {
-          log.error('Failed to migrate auth/notification/RBAC tables:', error)
+          log.error('Failed to migrate auth tables:', error)
         }
       }
 
       const result = await runAction(Action.Migrate, options).finally(() => lock.release())
 
       if (result.isErr) {
-        log.error('Model migrations failed.')
+        log.error('Model migrations failed — applying notification/RBAC table guarantees before exiting.')
+      }
+
+      // Notification and RBAC guarantees run AFTER model migrations so an app
+      // model with the same table name remains authoritative. In particular,
+      // pre-creating `notification_preferences` used to suppress the generated
+      // model migration and silently discard its user_id foreign key. These
+      // guarantees are still attempted before the failure exit below (#1952).
+      if (options.auth !== false) {
+        try {
+          const { migrateNotificationTables, migrateRbacTables } = await import('@stacksjs/database')
+          const notifResult = await migrateNotificationTables({ verbose: options.verbose })
+          if (!notifResult.success) {
+            log.error(`Failed to migrate notification tables: ${notifResult.error}`)
+          }
+
+          const rbacResult = await migrateRbacTables({ verbose: options.verbose })
+          if (!rbacResult.success) {
+            log.error(`Failed to migrate RBAC tables: ${rbacResult.error}`)
+          }
+        }
+        catch (error) {
+          log.error('Failed to migrate notification/RBAC tables:', error)
+        }
       }
 
       // Surface the model-migration failure only after the guarantee
@@ -571,7 +587,7 @@ export function migrate(buddy: CLI): void {
     })
 
   buddy
-    .command('migrate:fresh', descriptions.migrate)
+    .command('migrate:fresh', descriptions.fresh)
     .alias('db:fresh')
     .option('-d, --diff', 'Show the SQL that would be run', { default: false })
     .option('-p, --project [project]', descriptions.project, { default: false })
@@ -601,7 +617,9 @@ export function migrate(buddy: CLI): void {
 
       // Hard kill-switch — the command refuses to run at all.
       if (guards.migrateFresh === 'disabled') {
-        log.error(
+        // await: this carries the actionable detail (how to re-enable); the
+        // outro one-liner below isn't enough on its own, so guarantee it flushes.
+        await log.error(
           `\`buddy migrate:fresh\` is disabled by your migration safety guards (it DROPS every table).\n`
           + `  Target: ${APP_ENV} database "${dbLabel}"\n`
           + `  To allow it, set database.safety.migrateFresh to 'allow' in config/database.ts,\n`
@@ -619,12 +637,17 @@ export function migrate(buddy: CLI): void {
           const hint = guards.migrateFresh === 'confirm'
             ? 'Guard is "confirm": migrate:fresh must be run interactively.'
             : 'Re-run with --force to drop the database non-interactively.'
-          log.error(`Refusing to drop the ${APP_ENV} database "${dbLabel}" in a non-interactive environment. ${hint}`)
+          await log.error(`Refusing to drop the ${APP_ENV} database "${dbLabel}" in a non-interactive environment. ${hint}`)
           await outro('migrate:fresh cancelled.', { startTime: perf, useSeconds: true })
           process.exit(ExitCode.FatalError)
         }
 
         log.warn(`This will DROP ALL TABLES in the ${APP_ENV} database "${dbLabel}" and rebuild them from scratch. All data will be lost.`)
+        // Drain buffered async log writes (this warn + the intro banner) so they
+        // paint BEFORE the synchronous prompt below. The clarity logger flushes
+        // on its own tick, so without this the warning lands *under* clapp's
+        // text() prompt and the command looks hung waiting for input.
+        await log.flush()
         const typed = await text({ message: `Type the database name "${dbLabel}" to confirm (blank to cancel):` })
         if (typed.trim() !== dbLabel) {
           await outro('migrate:fresh cancelled — confirmation did not match.', { startTime: perf, useSeconds: true })

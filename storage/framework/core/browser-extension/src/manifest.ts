@@ -8,7 +8,7 @@ export interface GeneratedManifest {
   description: string
   version: string
   minimum_chrome_version?: string
-  action?: { default_title?: string, default_popup?: string }
+  action?: { default_title?: string, default_popup?: string, default_icon?: Record<string, string> }
   options_page?: string
   background?: { service_worker: string, type?: 'module' } | { scripts: string[], type?: 'module' }
   browser_specific_settings?: {
@@ -16,6 +16,10 @@ export interface GeneratedManifest {
       id: string
       strict_min_version: string
       data_collection_permissions: { required: ['none'] }
+    }
+  } | {
+    safari: {
+      strict_min_version: string
     }
   }
   permissions?: string[]
@@ -46,11 +50,15 @@ export function contentScriptOut(entry: string, out?: string): string {
 /**
  * Generate an MV3 manifest for a target from the extension config. Chrome uses
  * a `service_worker` background + `minimum_chrome_version`; Firefox uses a
- * `scripts` event page + `browser_specific_settings.gecko` (required by AMO).
+ * `scripts` event page + `browser_specific_settings.gecko` (required by AMO);
+ * Safari uses a classic (non-module) `service_worker` +
+ * `browser_specific_settings.safari` (15.4+ runs MV3 service workers, and the
+ * bundles are classic IIFEs, so the module hint is dropped).
  */
 export function generateManifest(config: ExtensionConfig, opts: { version: string, target?: ExtensionTarget }): GeneratedManifest {
   const target = opts.target ?? 'chrome'
   const isFirefox = target === 'firefox'
+  const isSafari = target === 'safari'
   const m = config.manifest ?? {}
 
   const manifest: GeneratedManifest = {
@@ -60,27 +68,44 @@ export function generateManifest(config: ExtensionConfig, opts: { version: strin
     version: opts.version,
   }
 
-  if (!isFirefox && m.minimumChromeVersion)
+  if (!isFirefox && !isSafari && m.minimumChromeVersion)
     manifest.minimum_chrome_version = m.minimumChromeVersion
 
-  if (config.pages?.popup)
-    manifest.action = { default_title: config.name, default_popup: 'popup.html' }
+  if (config.pages?.popup || config.actionIcons) {
+    manifest.action = {
+      default_title: config.name,
+      ...(config.pages?.popup ? { default_popup: 'popup.html' } : {}),
+      ...(config.actionIcons
+        ? { default_icon: Object.fromEntries(Object.entries(config.actionIcons).map(([size, path]) => [String(size), path])) }
+        : {}),
+    }
+  }
   if (config.pages?.options)
     manifest.options_page = 'options.html'
 
   if (config.background) {
     manifest.background = isFirefox
       ? { scripts: ['background.js'], type: 'module' }
-      : { service_worker: 'background.js', type: 'module' }
+      : isSafari
+        ? { service_worker: 'background.js' }
+        : { service_worker: 'background.js', type: 'module' }
   }
 
   if (isFirefox && config.geckoId) {
     manifest.browser_specific_settings = {
       gecko: {
         id: config.geckoId,
-        strict_min_version: m.firefoxMinVersion ?? '128.0',
+        strict_min_version: m.firefoxMinVersion ?? '142.0',
         // AMO requires a data-collection declaration for new add-ons.
         data_collection_permissions: { required: ['none'] },
+      },
+    }
+  }
+
+  if (isSafari) {
+    manifest.browser_specific_settings = {
+      safari: {
+        strict_min_version: m.safariMinVersion ?? '18.4',
       },
     }
   }

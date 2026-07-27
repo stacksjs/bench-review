@@ -1,8 +1,8 @@
 {
   "name": "@stacksjs/browser-extension",
   "type": "module",
-  "version": "0.70.87",
-  "description": "Build MV3 browser extensions (Chrome + Firefox) the Stacks way — manifest, content/background scripts, DNR rules, packaging, all config-driven.",
+  "version": "0.70.190",
+  "description": "Build MV3 browser extensions (Chrome, Firefox, Safari) the Stacks way — manifest, content/background scripts, DNR rules, packaging, Safari container app, all config-driven.",
   "author": "Chris Breuer",
   "contributors": [
     "Chris Breuer <chris@stacksjs.com>"
@@ -22,6 +22,7 @@
     "browser-extension",
     "chrome-extension",
     "firefox-extension",
+    "safari-extension",
     "manifest-v3",
     "mv3",
     "declarativeNetRequest",
@@ -48,14 +49,23 @@
   "types": "dist/index.d.ts",
   "files": [
     "README.md",
-    "dist"
+    "dist",
+    "safari-template"
   ],
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "bun tsc --noEmit",
     "prepublishOnly": "bun run build"
   },
+  "peerDependencies": {
+    "web-ext": ">=8"
+  },
+  "peerDependenciesMeta": {
+    "web-ext": {
+      "optional": true
+    }
+  },
   "devDependencies": {
-    "better-dx": "^0.2.16"
+    "better-dx": "^0.2.17"
   }
 }

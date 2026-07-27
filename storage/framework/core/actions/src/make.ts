@@ -8,9 +8,9 @@ import { localUrl } from '@stacksjs/config'
 import { Action } from '@stacksjs/enums'
 import { handleError } from '@stacksjs/error-handling'
 import { log } from '@stacksjs/logging'
-import { frameworkPath, path as p, resolve } from '@stacksjs/path'
+import { path as p, resolve } from '@stacksjs/path'
 import { createFolder, doesFolderExist, writeTextFile } from '@stacksjs/storage'
-import { kebabCase, pascalCase, template } from '@stacksjs/strings'
+import { camelCase, kebabCase, pascalCase, template } from '@stacksjs/strings'
 import { runAction } from './helpers'
 import { CODE_TEMPLATES } from './templates'
 
@@ -146,15 +146,16 @@ export async function createAction(options: MakeOptions): Promise<void> {
 
 export async function createComponent(options: MakeOptions): Promise<void> {
   const name = options.name
-  await createFileWithTemplate(p.userComponentsPath(`${name}.vue`), 'component', name)
+  await createFileWithTemplate(p.userComponentsPath(componentFileName(name)), 'component', name)
+}
+
+export function componentFileName(name: string): string {
+  return `${name}.stx`
 }
 
 export function makeDatabase(options: MakeOptions): void {
   try {
-    const name = options.name
-    log.info(`Creating your ${italic(name)} database...`)
     createDatabase(options)
-    log.success(`Created ${italic(name)} database`)
   }
   catch (error) {
     log.error('There was an error creating your database', error)
@@ -163,15 +164,32 @@ export function makeDatabase(options: MakeOptions): void {
 }
 
 export function createDatabase(options: MakeOptions): void {
-  log.debug('createDatabase options', options)
+  const name = pascalCase(options.name || 'MyModel')
+
+  // Stacks has no standalone "create a database" step: the default SQLite
+  // connection is a single file that `buddy migrate` creates on demand, and
+  // every table is derived from a model. Report the real workflow instead of
+  // printing a fake success message (stacksjs/stacks#2001). Uses console.log
+  // (sync, flushes before exit) rather than log.info (async-buffered, can be
+  // dropped by the process.exit in the umbrella `buddy make` command).
+  // eslint-disable-next-line no-console
+  console.log(`
+  Stacks manages the database through models and migrations, so there is no separate database to create.
+
+  To add a "${name}" table:
+    1. buddy make:model ${name}
+    2. buddy generate:migrations
+    3. buddy migrate
+
+  To use a different database engine or file, edit the connections in \`config/database.ts\`.
+`)
 }
 
-export function factory(options: MakeOptions): void {
+export async function factory(options: MakeOptions): Promise<void> {
   try {
     const name = options.name
     log.info(`Creating your ${italic(name)} factory...`)
-    createDatabase(options)
-    log.success(`Created ${italic(name)} factory`)
+    await createFactory(options)
   }
   catch (error) {
     log.error('There was an error creating your factory', error)
@@ -320,7 +338,11 @@ export async function makePage(options: MakeOptions): Promise<void> {
 
 export async function createPage(options: MakeOptions): Promise<void> {
   const name = options.name
-  await createFileWithTemplate(p.userViewsPath(`${name}.vue`), 'page', name)
+  await createFileWithTemplate(p.userViewsPath(pageFileName(name)), 'page', name)
+}
+
+export function pageFileName(name: string): string {
+  return `${name}.stx`
 }
 
 export async function makeFunction(options: MakeOptions): Promise<void> {
@@ -338,7 +360,10 @@ export async function makeFunction(options: MakeOptions): Promise<void> {
 
 export async function createFunction(options: MakeOptions): Promise<void> {
   const name = options.name
-  await createFileWithTemplate(p.userFunctionsPath(`${name}.ts`), 'function', name)
+  // The template interpolates the name as a JS identifier, so a kebab-case
+  // name like `hello-world` would produce invalid code (`const hello-world`).
+  // The file keeps the kebab name; the identifier is camelCased.
+  await createFileWithTemplate(p.userFunctionsPath(`${name}.ts`), 'function', camelCase(name))
 }
 
 export async function makeLanguage(options: MakeOptions): Promise<void> {
@@ -372,7 +397,7 @@ export async function makeStack(options: MakeOptions): Promise<void> {
 
     // Create directory structure
     await createFolder(stackDir)
-    const dirs = ['app/Actions', 'app/Models', 'config', 'database/migrations', 'resources/views', 'resources/components', 'resources/functions', 'routes', 'public']
+    const dirs = ['app/Actions', 'app/Models', 'config', 'database/migrations', 'resources/views', 'resources/components', 'resources/functions', 'resources/partials', 'routes', 'public']
     for (const dir of dirs) {
       await createFolder(resolve(stackDir, dir))
     }
@@ -387,10 +412,10 @@ export async function makeStack(options: MakeOptions): Promise<void> {
     log.info('')
     log.info(`  cd ${name}`)
     log.info('  # Add your models, actions, views, etc.')
-    log.info('  # Then publish: bun publish')
+    log.info('  # Push the repository, then submit its GitHub source to the Stacks registry.')
     log.info('')
     log.info('  Users install it with:')
-    log.info(`  buddy stack:install ${name}`)
+    log.info(`  buddy add ${shortName}`)
   }
   catch (error) {
     log.error('There was an error creating your stack', error)
@@ -424,19 +449,26 @@ export async function createNotification(options: MakeOptions): Promise<boolean>
 
 export async function createMigration(options: MakeOptions): Promise<void> {
   const optionName = options.name
-  // const table = options.tableName
-  const table = 'dummy-name'
 
   if (!optionName[0])
     throw new Error('options.name is required and cannot be empty')
 
-  const name = optionName[0].toUpperCase() + optionName.slice(1)
-  const path = frameworkPath(`database/migrations/${name}.ts`)
+  // Follow the scaffold-crud convention: a timestamped, kebab-cased file in
+  // the project's own database/migrations directory (stacksjs/stacks#2001).
+  // The previous version wrote into the framework's storage directory, which
+  // made `buddy make:migration` look like a no-op from the user's project.
+  const fileName = `${Date.now()}-${kebabCase(optionName)}.ts`
+  const path = p.userMigrationsPath(fileName)
+
+  // Derive the stub table from `create_<table>_table` style names. Anything
+  // else gets a placeholder the user edits before running `buddy migrate`.
+  const snake = kebabCase(optionName).replace(/-/g, '_')
+  const table = /^create_(.+)_table$/.exec(snake)?.[1] ?? 'table_name'
 
   try {
     await createFileWithTemplate(path, 'migration', table)
 
-    log.success(`Successfully created your migration file at stacks/database/migrations/${name}.ts`)
+    log.success(`Migration created: ${italic(`database/migrations/${fileName}`)}`)
   }
   catch (error: any) {
     log.error(error)

@@ -2,7 +2,7 @@
   "name": "@stacksjs/queue",
   "type": "module",
   "sideEffects": false,
-  "version": "0.70.87",
+  "version": "0.70.190",
   "description": "The Stacks Queue system powered by bun-queue.",
   "author": "Chris Breuer",
   "contributors": [
@@ -57,9 +57,9 @@
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@stacksjs/bun-queue": "^0.1.0"
+    "@stacksjs/bun-queue": "^0.1.8"
   },
   "devDependencies": {
-    "better-dx": "^0.2.16"
+    "better-dx": "^0.2.17"
   }
 }

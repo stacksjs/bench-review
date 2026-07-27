@@ -14,17 +14,20 @@ export interface UpgradeContext {
  * Resolve the target channel and git ref from CLI options and persisted channel.
  * Priority: --version > --canary > --stable > persisted channel
  *
- * Branch model: `main` is the bleeding-edge "dump everything" branch; `stable`
- * is the vetted branch that PRs are merged into from `main` once main is proven.
- * So the `stable` channel tracks the `stable` branch (vetted) and the `canary`
- * channel tracks the `main` branch (bleeding edge). A pinned `--version` still
- * resolves to the matching `vX` tag.
+ * Release model: `main` is the bleeding-edge "dump everything" branch, and each
+ * release is cut as a `vX.Y.Z` git tag (see `.github/workflows/release.yml`,
+ * which triggers on `push: tags: ['v*']`). There is deliberately no long-lived
+ * `stable` branch. So the `canary` channel tracks the `main` branch (bleeding
+ * edge) and the `stable` channel tracks the latest published `vX.Y.Z` tag —
+ * passed in as `latestStableRef` because resolving it needs the network, which
+ * this pure function stays free of. A pinned `--version` resolves directly to
+ * the matching `vX` tag.
  */
 export function resolveUpgradeContext(options: {
   version?: string
   canary?: boolean
   stable?: boolean
-}, currentChannel: 'stable' | 'canary'): UpgradeContext {
+}, currentChannel: 'stable' | 'canary', latestStableRef: string): UpgradeContext {
   const targetVersion = options.version
 
   if (targetVersion) {
@@ -40,8 +43,8 @@ export function resolveUpgradeContext(options: {
   }
 
   if (options.stable) {
-    // stable tracks the vetted `stable` branch.
-    return { channel: 'stable', ref: 'stable' }
+    // stable tracks the latest published release tag.
+    return { channel: 'stable', ref: latestStableRef }
   }
 
   if (currentChannel === 'canary') {
@@ -50,7 +53,67 @@ export function resolveUpgradeContext(options: {
     return { channel: 'canary', ref: 'main' }
   }
 
-  return { channel: 'stable', ref: 'stable' }
+  return { channel: 'stable', ref: latestStableRef }
+}
+
+/** Compare two [major, minor, patch] tuples. Returns >0 if `a` is newer. */
+function compareVersionParts(a: [number, number, number], b: [number, number, number]): number {
+  return a[0] - b[0] || a[1] - b[1] || a[2] - b[2]
+}
+
+/**
+ * Pick the highest stable release tag from a list of tag names. Only clean
+ * `vMAJOR.MINOR.PATCH` tags qualify — pre-releases (`v1.0.0-beta.1`), annotated
+ * deref entries (`…^{}`), and non-version tags are ignored. Returns null when
+ * nothing qualifies.
+ */
+export function pickLatestStableTag(tags: string[]): string | null {
+  const re = /^v(\d+)\.(\d+)\.(\d+)$/
+  let best: { tag: string, parts: [number, number, number] } | null = null
+
+  for (const tag of tags) {
+    const m = re.exec(tag.trim())
+    if (!m) continue
+    const parts: [number, number, number] = [Number(m[1]), Number(m[2]), Number(m[3])]
+    if (!best || compareVersionParts(parts, best.parts) > 0)
+      best = { tag: tag.trim(), parts }
+  }
+
+  return best?.tag ?? null
+}
+
+/**
+ * Resolve the latest published stable release tag (e.g. `"v0.70.163"`) by
+ * listing the remote's `v*` tags. The stable channel installs this tag rather
+ * than a branch, because releases are cut as tags and no `stable` branch
+ * exists. Returns null if the tags can't be listed (offline / no git), letting
+ * the caller fall back to the currently-installed version.
+ */
+export async function resolveLatestStableTag(): Promise<string | null> {
+  try {
+    const proc = Bun.spawn({
+      // `--refs` drops the `^{}` dereferenced annotated-tag entries, leaving
+      // clean `refs/tags/vX.Y.Z` lines.
+      cmd: ['git', 'ls-remote', '--tags', '--refs', 'https://github.com/stacksjs/stacks.git', 'v*'],
+      stdout: 'pipe',
+      stderr: 'pipe',
+    })
+    const out = await new Response(proc.stdout).text()
+    if ((await proc.exited) !== 0)
+      return null
+
+    const tags = out
+      .split('\n')
+      .map(line => line.split('\t')[1]?.replace('refs/tags/', ''))
+      .filter((t): t is string => !!t)
+
+    return pickLatestStableTag(tags)
+  }
+  catch {
+    // git missing / offline — fail soft; the caller falls back to the
+    // installed version tag.
+    return null
+  }
 }
 
 /**
@@ -58,7 +121,7 @@ export function resolveUpgradeContext(options: {
  * `subPath` is relative to the repo root (e.g. `storage/framework/core`).
  */
 export function buildTemplateString(ref: string, subPath = 'storage/framework/core'): string {
-  return `github:stacksjs/stacks#${ref}/${subPath}`
+  return `github:stacksjs/stacks/${subPath}#${ref}`
 }
 
 /**
@@ -153,6 +216,17 @@ export function writeSyncedVersion(versionFilePath: string, ch: 'stable' | 'cana
   catch {
     // best-effort
   }
+}
+
+/**
+ * Decide whether the upgrade must protect framework-managed paths from local
+ * edits. The initial process always owns this preflight unless the user passed
+ * `--force`. An internal restart runs only after that validated parent has
+ * intentionally replaced those paths, so checking again would reject the
+ * upgrade's own writes as if they belonged to the user.
+ */
+export function shouldCheckDirtyManagedPaths(args: { force: boolean, alreadyRestarted: boolean }): boolean {
+  return !args.force && !args.alreadyRestarted
 }
 
 /**
@@ -258,6 +332,8 @@ export interface ManagedPath {
   subPath: string
   /** True for single-file targets (e.g. the root `buddy` script). */
   isFile?: boolean
+  /** Restore executable mode after archive extraction/copy. */
+  executable?: boolean
   /** Directory entries to skip when copying — generated/cache files we don't want to overwrite. */
   skip?: string[]
   /** Human label shown in the upgrade summary. */
@@ -280,8 +356,8 @@ export const MANAGED_PATHS: ManagedPath[] = [
     // Don't clobber it during update.
     skip: ['node_modules', 'dist', '.DS_Store', '.discovered-models.json'],
   },
-  { localPath: 'buddy', subPath: 'buddy', label: 'buddy', isFile: true },
-  { localPath: 'bootstrap', subPath: 'bootstrap', label: 'bootstrap', isFile: true },
+  { localPath: 'buddy', subPath: 'buddy', label: 'buddy', isFile: true, executable: true },
+  { localPath: 'bootstrap', subPath: 'bootstrap', label: 'bootstrap', isFile: true, executable: true },
 ]
 
 /**
@@ -319,6 +395,17 @@ export function detectLocalStacks(projectRoot: string): string | null {
   }
 
   return null
+}
+
+/**
+ * Local checkout auto-detection is a development convenience for channel
+ * upgrades. A pinned version must resolve the published git tag instead: the
+ * local checkout may be ahead of that tag while still reporting the same
+ * package version, which would install unreleased code under a released label.
+ * An explicit --from remains authoritative because the caller selected it.
+ */
+export function shouldAutoDetectLocalStacks(options: { from?: string, version?: string }): boolean {
+  return !options.from && !options.version
 }
 
 /**
@@ -429,6 +516,57 @@ export function diffSnapshots(
   }
 
   return { added, changed, removed, unchanged }
+}
+
+export interface DetailedChangeSummary extends ChangeSummary {
+  /** Relative paths present upstream but not locally (a sync would add them). */
+  addedFiles: string[]
+  /** Relative paths whose upstream content differs from local (a sync would change them). */
+  changedFiles: string[]
+  /** Relative paths no longer shipped upstream. The sync never deletes, so these stay in place. */
+  removedFiles: string[]
+}
+
+/**
+ * Like `diffSnapshots`, but also returns the sorted relative file lists behind
+ * the counts. Used by the `--dry-run` preview, which diffs the local target
+ * against the upgrade SOURCE (local checkout or temp-dir download) instead of
+ * against a post-sync tree, so it can show exactly which files a real sync
+ * would add or change without writing anything.
+ */
+export function diffSnapshotsDetailed(
+  before: Map<string, SnapshotEntry>,
+  after: Map<string, SnapshotEntry>,
+): DetailedChangeSummary {
+  const addedFiles: string[] = []
+  const changedFiles: string[] = []
+  const removedFiles: string[] = []
+  let unchanged = 0
+
+  for (const [rel, info] of after) {
+    const prev = before.get(rel)
+    if (!prev) addedFiles.push(rel)
+    else if (prev.size !== info.size || prev.hash !== info.hash) changedFiles.push(rel)
+    else unchanged++
+  }
+
+  for (const rel of before.keys()) {
+    if (!after.has(rel)) removedFiles.push(rel)
+  }
+
+  addedFiles.sort()
+  changedFiles.sort()
+  removedFiles.sort()
+
+  return {
+    added: addedFiles.length,
+    changed: changedFiles.length,
+    removed: removedFiles.length,
+    unchanged,
+    addedFiles,
+    changedFiles,
+    removedFiles,
+  }
 }
 
 async function hashFile(absPath: string): Promise<bigint> {

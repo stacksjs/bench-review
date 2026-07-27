@@ -1,7 +1,7 @@
 {
   "name": "@stacksjs/path",
   "type": "module",
-  "version": "0.70.87",
+  "version": "0.70.190",
   "description": "The Stacks path.",
   "author": "Chris Breuer",
   "contributors": [
@@ -46,7 +46,7 @@
     "prepublishOnly": "bun run build"
   },
   "devDependencies": {
-    "better-dx": "^0.2.16"
+    "better-dx": "^0.2.17"
   },
   "sideEffects": false
 }

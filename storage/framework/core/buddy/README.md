@@ -35,7 +35,7 @@ curl -Ssf stacksjs.com/install | sh # wip
 
 # alternatively, if Bun >= v1.1.11 is installed already
 # you may also get started via
-bunx stacks new my-project
+panx @stacksjs/buddy new my-project
 ```
 
 ## Usage
@@ -79,7 +79,7 @@ buddy --help # view help menu
 # `command --help` flag to review the help menu
 
 buddy install # installs dependencies
-buddy add # adds a stack or dependency
+buddy add calendar # pulls a registered project-shaped stack into this project
 buddy fresh # fresh reinstall of all deps
 buddy clean # removes all deps
 buddy setup # sets up the project initially
@@ -126,7 +126,7 @@ buddy build:views # builds SSG views
 buddy build:desktop # builds Desktop application
 buddy build:library # builds any or all libraries
 buddy build:functions # builds function library
-buddy build:components # builds Vue component library & Web Component library
+buddy build:components # builds the STX component library and Web Component library
 buddy build:web-components # builds framework agnostic Web Component library (i.e. Custom Elements)
 buddy build:all # builds all your code
 
@@ -154,7 +154,7 @@ buddy make:factory cars # creates a Car factory file
 buddy make:table cars # bootstraps a cars data table
 buddy make:notification welcome-email # bootstraps a welcome-email notification
 buddy make:lang de # bootstraps a lang/de.yml language file
-buddy make:stack my-project # shares logic with `bunx stacks new my-project`
+buddy make:stack my-project # scaffolds a project-shaped registry stack
 
 buddy migrate # runs database migrations
 buddy migrate:dns # sets the ./config/dns.ts file
@@ -192,7 +192,6 @@ buddy cloud:add --jump-box # adds a jump box to your cloud setup
 
 # select the example to run (follow CLI prompts)
 buddy example # prompts you to select which example to run
-buddy example:vue # runs the Vue example
 buddy example:web-components # runs the Web Component example
 
 # you likely won’t need to run these commands as they are auto-triggered, but they are available
@@ -250,7 +249,7 @@ _Develop dynamic UIs with helpers for atomic design, and much more._
 - 🖥️ **Desktop** _transforms your web app into a desktop app, plus more_
 - 📝 **Documentation** _markdown-based documentation, auto-generated_
 - 📚 **Library** _auto-builds & manages component & function libraries_
-- ⚡️ Powered by Bun, Tauri, Headwind, Vite, VitePress and Vue
+- ⚡️ Powered by Bun, STX, Tauri, Crosswind, and BunPress
 
 ### Backend Development
 
@@ -274,7 +273,6 @@ _Develop serverless (or server) functions with countless helpers to build scalab
 - 💾 **Storage** _a secure-by-default File API that feels right_
 - 🧪 **Tinker** _a powerful TypeScript REPL_
 - 🌪️ **Validation** _e2e type-safety (true frontend & backend harmony)_
-- 🎯 **X-Ray** _all you need to debug, log & analyze_
 
 ### Cloud Development
 
@@ -314,7 +312,7 @@ Convention over configuration, while staying wholly configurable. _No more boile
 - 🚗 **Auto Imports** _your components & functions, including date, string, array, & object helpers_
 - ⏩ **Code Snippets** _goodbye to the boilerplate code—thank you Sarah Drasner_
 - 🔤 **Spell Checker** _be notified once there are typos_
-- 🛠️ **Essential Utilities** _powers at your fingertips. Collections, VueUse, and more_
+- 🛠️ **Essential Utilities** _powers at your fingertips. Collections, STX composables, and more_
 - 👥 **Team Management** _manage your team & their permissions_
 - 🧪 **Streamlined Testing** _unit & e2e tests powered by Bun, Vitest & Playwright_
 
@@ -346,7 +344,7 @@ For help, discussion about best practices, or any other conversation that would 
 
 For casual chit-chat with others using this package:
 
-[Join the Stacks Discord Server](https://discord.gg/stacksjs)
+[Join the Stacks Discord Server](https://stacksjs.com/discord)
 
 ## Postcardware
 

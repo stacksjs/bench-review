@@ -1,6 +1,6 @@
 /**
  * i18n bag passed to STX email templates at render time. Stacks emails
- * are STX, not vue-email — keys/values are user-defined per template.
+ * are STX templates, so keys and values are user-defined per template.
  * The shape is intentionally open: each template declares its own
  * placeholders and the renderer interpolates them as-is.
  */
@@ -27,10 +27,8 @@ export interface EmailFilterRule {
 }
 
 export interface MailboxConfig {
-  /** Email address (preferred) - e.g., 'chris@stacksjs.com' */
+  /** Email address - e.g., 'chris@stacksjs.com' */
   email?: string
-  /** @deprecated Use 'email' instead */
-  address?: string
   displayName?: string
   /**
    * Password for IMAP/SMTP authentication.
@@ -111,11 +109,6 @@ export interface MailServerPortsConfig {
    * @default 995
    */
   pop3s?: number
-
-  /**
-   * @deprecated Use 'submission' instead
-   */
-  smtpStartTls?: number
 }
 
 export interface MailServerFeaturesConfig {
@@ -394,7 +387,7 @@ export interface EmailMessage {
   replyTo?: EmailAddress | EmailAddress[] | string | string[]
   /** Email subject line */
   subject: string
-  /** Path to email template (Vue component) */
+  /** Path to the STX email template */
   template?: string
   /** Direct HTML content for the email body */
   html?: string

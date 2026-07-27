@@ -2,7 +2,7 @@
   "name": "@stacksjs/browser",
   "type": "module",
   "sideEffects": false,
-  "version": "0.70.87",
+  "version": "0.70.190",
   "description": "Stacks core frontend/browser functionalities.",
   "author": "Chris Breuer",
   "contributors": [
@@ -53,12 +53,12 @@
   },
   "dependencies": {
     "@stacksjs/composables": "workspace:*",
-    "@stacksjs/stx": "^0.2.82",
-    "bun-query-builder": "^0.1.47",
+    "@stacksjs/stx": "^0.2.100",
+    "bun-query-builder": "^0.1.59",
     "magic-regexp": "^0.11.0"
   },
   "peerDependencies": {
-    "@stripe/stripe-js": "^9.0.0"
+    "@stripe/stripe-js": "^9.10.0"
   },
   "peerDependenciesMeta": {
     "@stripe/stripe-js": {
@@ -66,8 +66,8 @@
     }
   },
   "devDependencies": {
-    "better-dx": "^0.2.16",
+    "better-dx": "^0.2.17",
     "@stacksjs/utils": "workspace:*",
-    "@stripe/stripe-js": "^9.0.0"
+    "@stripe/stripe-js": "^9.10.0"
   }
 }

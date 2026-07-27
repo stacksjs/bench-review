@@ -31,11 +31,37 @@ import { log } from '@stacksjs/cli'
  */
 ;(globalThis as any).requestContext = {
   cookie(name: string): string | null {
+    // stx builds a per-request snapshot and refreshes this mirror
+    // immediately before each server script runs, so it is the accurate
+    // source even when a concurrent request has already moved on. The
+    // hook-set global below is the fallback for stx versions that predate
+    // it. Preferring the snapshot matters most for the thing cookies are
+    // usually carrying: whoever is signed in.
+    const snapshot = (globalThis as { __stxServeContext?: { cookies?: Record<string, string> } }).__stxServeContext
+    if (snapshot?.cookies && name in snapshot.cookies)
+      return snapshot.cookies[name] ?? null
+
     const cookies = (globalThis as { __stxServeCookies?: Record<string, string> }).__stxServeCookies
     return cookies?.[name] ?? null
   },
+  // The full request URL, as the dev server has always returned — production
+  // used to return only the query string, so a page that did
+  // `new URL(requestContext.url())` worked in development and threw on the
+  // box. `search()` is the query string for callers that only want that.
   url(): string {
-    return (globalThis as { __stxServeSearch?: string }).__stxServeSearch ?? ''
+    const snapshot = (globalThis as { __stxServeContext?: { url?: string, search?: string } }).__stxServeContext
+    return snapshot?.url || snapshot?.search || (globalThis as { __stxServeSearch?: string }).__stxServeSearch || ''
+  },
+  search(): string {
+    const snapshot = (globalThis as { __stxServeContext?: { search?: string } }).__stxServeContext
+    return snapshot?.search ?? (globalThis as { __stxServeSearch?: string }).__stxServeSearch ?? ''
+  },
+  // The dev server has always exposed this; production had not, so a page
+  // that branched on the locale worked under `buddy dev` and threw
+  // "requestContext.locale is not a function" on the box.
+  locale(): string {
+    const snapshot = (globalThis as { __stxServeContext?: { locale?: string | null } }).__stxServeContext
+    return snapshot?.locale ?? 'en'
   },
 }
 
@@ -60,6 +86,80 @@ function parseCookies(req: Request): Record<string, string> {
 }
 
 /**
+ * Resolve the project's includes directory.
+ *
+ * A configured `config/stx.ts#partialsDir` wins outright. The convention list
+ * below is only a fallback for apps that never set one, and it cannot stand in
+ * for the config: the candidates are probed for existence in order, so an app
+ * that keeps its includes in `resources/components` but also has an unrelated
+ * `resources/partials` directory silently resolved to the wrong one and every
+ * `@include` failed with ENOENT at runtime.
+ *
+ * The configured value is relative to the stx root (`resources`), matching how
+ * stx itself reads it, but an app-root-relative path is accepted too so either
+ * spelling resolves.
+ */
+export function resolveUserPartialsPath(cwd = process.cwd(), configuredDir?: string): string | undefined {
+  if (configuredDir) {
+    const configured = [
+      join(cwd, 'resources', configuredDir),
+      join(cwd, configuredDir),
+    ].find(candidate => existsSync(candidate))
+
+    if (configured)
+      return configured
+  }
+
+  const candidates = [
+    'resources/partials',
+    'resources/views/partials',
+    'partials',
+    'resources/components',
+  ]
+
+  // A directory that exists but holds no templates loses to one that does.
+  // The scaffold ships two sample partials in `resources/partials/`, so a
+  // project keeping its own in `resources/views/partials/` had the wrong
+  // directory win purely by being listed first, and every `@include('x.stx')`
+  // failed with ENOENT in production while the same include worked in dev.
+  const existing = candidates.filter(candidate => existsSync(join(cwd, candidate)))
+  if (existing.length === 0)
+    return undefined
+
+  const populated = existing.find(candidate => containsTemplates(join(cwd, candidate)))
+  return join(cwd, populated ?? existing[0]!)
+}
+
+/** True when the directory holds at least one `.stx` file, at any depth. */
+function containsTemplates(dir: string): boolean {
+  try {
+    return [...new Bun.Glob('**/*.stx').scanSync({ cwd: dir, onlyFiles: true })].length > 0
+  }
+  catch {
+    return false
+  }
+}
+
+/**
+ * Read `partialsDir` off the app's stx config. Failure is non-fatal: without
+ * it {@link resolveUserPartialsPath} falls back to the conventions.
+ */
+export async function loadStxPartialsDir(cwd = process.cwd()): Promise<string | undefined> {
+  const configPath = join(cwd, 'config/stx.ts')
+  if (!existsSync(configPath))
+    return undefined
+
+  try {
+    const mod = await import(configPath)
+    const dir = mod.default?.partialsDir
+    return typeof dir === 'string' && dir.length > 0 ? dir : undefined
+  }
+  catch {
+    return undefined
+  }
+}
+
+/**
  * `buddy serve` — boot the production HTTP server.
  *
  * Renders the project's STX views (resources/views) via stx-serve and applies
@@ -79,6 +179,29 @@ function parseCookies(req: Request): Record<string, string> {
  * This is the entry the Hetzner deploy runs as a systemd service
  * (`bun storage/framework/core/buddy/src/cli.ts serve`).
  */
+/**
+ * Locate the scaffold-defaults CSRF middleware, the same way the API router
+ * does: a vendored checkout has it on disk and wins, a node_modules app has no
+ * `storage/framework` at all and resolves the published `@stacksjs/defaults`
+ * package instead. Without the fallback the page server silently stops seeding
+ * CSRF cookies on exactly the deploy shape that can't be debugged by reading
+ * the repo.
+ */
+function resolveCsrfMiddlewarePath(): string {
+  const rel = 'app/Middleware/Csrf.ts'
+  const vendored = join(process.cwd(), 'storage/framework/defaults', rel)
+  if (existsSync(vendored))
+    return vendored
+
+  try {
+    const pkgJson = Bun.resolveSync('@stacksjs/defaults/package.json', process.cwd())
+    return `${pkgJson.slice(0, pkgJson.lastIndexOf('/'))}/${rel}`
+  }
+  catch {
+    return vendored
+  }
+}
+
 export function serve(buddy: CLI): void {
   buddy
     .command('serve', 'Start the production HTTP server (STX views + /api proxy + coming-soon/maintenance gate)')
@@ -132,7 +255,7 @@ export function serve(buddy: CLI): void {
       const defaultsResources = resolveDefaultsResources()
       const defaultViewsPath = join(defaultsResources, 'views')
       const userLayoutsPath = existsSync('resources/views/layouts') ? 'resources/views/layouts' : 'resources/layouts'
-      const userComponentsPath = existsSync('resources/views/components') ? 'resources/views/components' : 'resources/components'
+      const userPartialsPath = resolveUserPartialsPath(process.cwd(), await loadStxPartialsDir())
 
       // Same-origin API target. Scaffolded client code fetches relative
       // `/api/...` URLs (dashboard stores, CartDrawer, the coming-soon
@@ -164,7 +287,9 @@ export function serve(buddy: CLI): void {
           .includes((process.env.APP_ENV || '').toLowerCase()),
         componentsDir: join(defaultsResources, 'components'),
         layoutsDir: userLayoutsPath,
-        partialsDir: userComponentsPath,
+        // Omit the override only when the app has no Stacks include directory,
+        // allowing bun-plugin-stx to fall back to its own project config.
+        ...(userPartialsPath && { partialsDir: userPartialsPath }),
         fallbackLayoutsDir: join(defaultsResources, 'layouts'),
         fallbackPartialsDir: defaultViewsPath,
         quiet: options?.verbose !== true,
@@ -213,6 +338,30 @@ export function serve(buddy: CLI): void {
           ;(globalThis as { __stxServeCookies?: Record<string, string> }).__stxServeCookies = parseCookies(req)
 
           return undefined
+        },
+
+        // Seed the CSRF double-submit cookie on safe-method page responses.
+        //
+        // The API router already seeds it, but pages are rendered HERE, and a
+        // browser only ever loads a page first. So a visitor who opened
+        // /login and submitted the form had no cookie to echo, and the
+        // default-on CSRF middleware rejected the POST with 403 — sign-in was
+        // impossible for anyone whose first request wasn't an API GET. The
+        // token has to ride the HTML that carries the form.
+        onResponse: async (req: Request, response: Response) => {
+          const method = req.method.toUpperCase()
+          if (method !== 'GET' && method !== 'HEAD')
+            return
+
+          try {
+            const { seedCsrfCookieIfMissing } = await import(resolveCsrfMiddlewarePath())
+            return seedCsrfCookieIfMissing(req, response)
+          }
+          catch (error) {
+            // Never fail a page render over a cookie — the CSRF middleware
+            // still rejects unsafe requests, so this is fail-closed.
+            log.debug(`CSRF cookie seeding skipped: ${(error as Error).message}`)
+          }
         },
       })
 

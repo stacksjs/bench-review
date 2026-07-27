@@ -2,7 +2,7 @@
   "name": "@stacksjs/utils",
   "type": "module",
   "sideEffects": false,
-  "version": "0.70.87",
+  "version": "0.70.190",
   "description": "The Stacks helper functions.",
   "author": "Chris Breuer",
   "contributors": [
@@ -65,7 +65,7 @@
     "@stacksjs/arrays": "workspace:*",
     "@stacksjs/cli": "workspace:*",
     "@stacksjs/config": "workspace:*",
-    "better-dx": "^0.2.16",
+    "better-dx": "^0.2.17",
     "filesize": "^11.0.22",
     "markdown-table": "^3.0.4",
     "@stacksjs/lint": "workspace:*",

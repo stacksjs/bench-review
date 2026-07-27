@@ -32,6 +32,11 @@ custom-cli
 .idea
 .stacks
 .stx
+# stx working dir relocated here in v0.70.190 — ignore its build caches and
+# copied assets, keep only the generated route manifests (tracked for deploy).
+storage/framework/stx/*
+!storage/framework/stx/routes.ts
+!storage/framework/stx/route-types.d.ts
 .qb
 .claude
 pantry

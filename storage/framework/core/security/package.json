@@ -2,7 +2,7 @@
   "name": "@stacksjs/security",
   "type": "module",
   "sideEffects": false,
-  "version": "0.70.87",
+  "version": "0.70.190",
   "description": "The Stacks framework security.",
   "author": "Chris Breuer",
   "contributors": [
@@ -56,7 +56,7 @@
   },
   "devDependencies": {
     "@stacksjs/config": "workspace:*",
-    "better-dx": "^0.2.16",
+    "better-dx": "^0.2.17",
     "@stacksjs/env": "workspace:*",
     "@stacksjs/types": "workspace:*",
     "@stacksjs/validation": "workspace:*"

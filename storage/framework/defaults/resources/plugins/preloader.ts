@@ -36,7 +36,13 @@ const fastCommands = [
   'scaffold:crud',
 ]
 const isRepl = !process.argv[1]
-const skipPreloader = isRepl || (args.length > 0 && fastCommands.some(cmd => args[0] === cmd || args[0].startsWith(`${cmd}:`)))
+// Dependency installation runs package lifecycle scripts before Bun has finished
+// linking every workspace package. Loading @stacksjs/env (or the wider auto-import
+// graph) from a postinstall script can therefore fail even though the install is
+// otherwise valid. Postinstall scripts are bootstrap work and must stay independent
+// of the application runtime preloader.
+const isPostinstall = process.env.npm_lifecycle_event === 'postinstall'
+const skipPreloader = isRepl || isPostinstall || (args.length > 0 && fastCommands.some(cmd => args[0] === cmd || args[0].startsWith(`${cmd}:`)))
 
 if (!skipPreloader) {
   // Detect production/deployment commands and set environment accordingly BEFORE loading env files
@@ -65,27 +71,54 @@ if (!skipPreloader) {
     process.env.APP_ENV = 'production'
     process.env.NODE_ENV = 'production'
   }
+}
 
-  // Load .env files with encryption support using our native Bun plugin
-  const { autoLoadEnv } = await import('@stacksjs/env')
+// Decrypt and load .env files for real command invocations. This is gated on
+// isRepl / isPostinstall ONLY, not on the fast-command `skipPreloader`: fast
+// commands (migrate, build, seed, ...) DO need decrypted config, which the old
+// `skipPreloader` gate wrongly denied them (an encrypted `.env.<env>` never
+// decrypted for those commands even with the key present). See stacksjs/stacks#2048.
+//
+// Postinstall still skips: @stacksjs/env may not be linked yet mid-install, so
+// importing it there can fail (see the isPostinstall note above). The REPL keeps
+// its original skip. The heavy auto-import graph below stays gated separately via
+// `skipAutoImports`.
+if (!isRepl && !isPostinstall) {
+  // Resolve the vendored source first; the package fallback covers non-standard
+  // layouts where defaults is consumed outside the framework layout.
+  const envPackage = '@stacksjs/' + 'env'
+  const { autoLoadEnv } = await import('../../../core/env/src/plugin.ts')
+    .catch(() => import(envPackage))
 
-  // Auto-load .env files based on environment
-  // Set quiet: true to prevent duplicate logging across multiple processes
+  // Pass the resolved env so deploy commands deterministically select their
+  // matching `.env.<env>` file. autoLoadEnv discovers `.env.keys` by default,
+  // replaces ciphertext that Bun preloaded, and preserves genuine shell/CI
+  // overrides while applying environment-specific file precedence. quiet: true
+  // prevents duplicate logging across multiple processes.
+  autoLoadEnv({ quiet: true, env: process.env.APP_ENV })
+
+  // Tell stx and ts-cloud where their state lives before anything imports them.
+  // Both keep it under `storage/` in a Stacks app rather than in a dot-directory
+  // at the project root, both take the location from their own config, and both
+  // read an environment variable ahead of that config — which is also what
+  // carries the answer into every process a command spawns. Setting it here
+  // means no boot order can leave a library writing to `.stx` / `.ts-cloud`.
   //
-  // keysFile MUST be passed here: autoLoadEnv only resolves a decryption
-  // private key from a keys FILE when explicitly told which one to read —
-  // without it, an encrypted .env.production (DOTENV_PUBLIC_KEY_PRODUCTION
-  // + `encrypted:...` values) loads with every encrypted value left as raw
-  // ciphertext in process.env, silently breaking anything that reads
-  // process.env.SOME_SECRET directly (e.g. deploy-time credentials like
-  // HCLOUD_TOKEN/PORKBUN_API_KEY) with no error — it just looks like a
-  // bogus/expired credential downstream.
-  // Pass the resolved env so autoLoadEnv reads `.env.<env>` with the matching
-  // `DOTENV_PRIVATE_KEY_<ENV>` (it defaults to `development` otherwise), and
-  // overload so this decrypted pass overrides the still-encrypted values the
-  // earlier `@stacksjs/env/plugin.js` bunfig preload seeds into process.env
-  // (loadEnv won't overwrite already-set vars without it).
-  autoLoadEnv({ quiet: true, keysFile: '.env.keys', env: process.env.APP_ENV, overload: true })
+  // Guarded because this preload runs before ANY command: an app resolving
+  // `@stacksjs/path` from npm can legitimately be on a published version that
+  // predates this helper, and a bare call there throws
+  // `applyRuntimeDirectoryEnv is not a function` out of a bunfig preload,
+  // which takes down every `buddy` invocation including the `install` and
+  // `upgrade` that would fix it. Falling through leaves stx and ts-cloud on
+  // their own defaults, which is degraded but recoverable.
+  const pathPkg = '@stacksjs/' + 'path'
+  const { applyRuntimeDirectoryEnv } = await import('../../../core/path/src/index.ts')
+    .catch(() => import(pathPkg))
+
+  if (typeof applyRuntimeDirectoryEnv === 'function')
+    applyRuntimeDirectoryEnv()
+  else
+    console.warn('[stacks] installed @stacksjs/path has no applyRuntimeDirectoryEnv; stx and ts-cloud will use their default state directories. Run `buddy upgrade` to refresh the framework packages.')
 }
 
 // stx template engine plugin
@@ -101,7 +134,9 @@ if (!skipPreloader) {
 // explicitly when needed — see #1835 root cause 3.
 export async function loadAutoImports() {
   const { Glob } = await import('bun')
-  const path = await import('@stacksjs/path')
+  const pathPackage = '@stacksjs/' + 'path'
+  const path = await import('../../../core/path/src/index.ts')
+    .catch(() => import(pathPackage))
 
   // CRITICAL: Never overwrite these built-in globals
   const protectedGlobals = new Set([
@@ -313,7 +348,8 @@ if (!skipAutoImports) {
 
   // Run package auto-discovery after all imports are loaded
   try {
-    const { discoverPackages } = await import('@stacksjs/actions')
+    const actionsPackage = '@stacksjs/' + 'actions'
+    const { discoverPackages } = await import(actionsPackage)
     await discoverPackages()
   }
   catch {

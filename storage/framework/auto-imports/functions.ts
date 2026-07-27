@@ -3,6 +3,8 @@
 export { courtHouses, judges, categories, reviews, trendingJudges, recentActivity, blogPosts } from '../../../resources/functions/sample'
 export { isDark, toggleDark, preferredDark } from '../../../resources/functions/dark'
 export { useAuth } from '../../../resources/functions/auth'
+export { fetchBlogPosts, fetchBlogPost, saveBlogPost, deleteBlogPost } from '../defaults/functions/blog'
+export type { BlogPost, BlogPostDraft, BlogListResponse } from '../defaults/functions/blog'
 export { useDirectUpload } from '../defaults/functions/uploads'
 export type { PresignResponse, DirectUploadResult, UseDirectUploadOptions, UseDirectUploadHandle } from '../defaults/functions/uploads'
 export { useAnalytics } from '../defaults/functions/analytics'

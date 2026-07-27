@@ -1,7 +1,7 @@
 {
   "name": "@stacksjs/slug",
   "type": "module",
-  "version": "0.70.87",
+  "version": "0.70.190",
   "description": "The Stacks slug functionality.",
   "author": "Chris Breuer",
   "contributors": [
@@ -50,10 +50,13 @@
     "typecheck": "bun tsc --noEmit",
     "prepublishOnly": "bun run build"
   },
+  "dependencies": {
+    "ts-slug": "^0.1.0"
+  },
   "devDependencies": {
     "@stacksjs/cli": "workspace:*",
     "@stacksjs/database": "workspace:*",
-    "better-dx": "^0.2.16",
+    "better-dx": "^0.2.17",
     "@stacksjs/path": "workspace:*",
     "@stacksjs/strings": "workspace:*",
     "@stacksjs/utils": "workspace:*"

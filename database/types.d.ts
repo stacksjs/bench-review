@@ -28,6 +28,8 @@ declare module '@stacksjs/database' {
       updated_at: string | null
       name: string
       email: string
+      bio: string
+      avatar: string
       user_id: number
     }
     board_columns: {
@@ -98,6 +100,33 @@ declare module '@stacksjs/database' {
       spent: number
       start_date: string
       end_date: string
+    }
+    card_comments: {
+      // columns
+      id: number
+      uuid: string
+      created_at: string
+      updated_at: string | null
+      card_id: number
+      user_id: number
+      body: string
+    }
+    cards: {
+      // columns
+      id: number
+      uuid: string
+      created_at: string
+      updated_at: string | null
+      column_id: number
+      board_id: number
+      title: string
+      description: string
+      position: number
+      created_by_user_id: number
+      due_date: string
+      archived: boolean
+      board_column_id: number
+      user_id: number
     }
     cart_items: {
       // columns

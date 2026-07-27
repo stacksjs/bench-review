@@ -47,6 +47,8 @@ declare global {
   const BoardColumn: BenchModelStatic<DatabaseSchema['board_columns']>
   const Campaign: BenchModelStatic<DatabaseSchema['campaigns']>
   const CampaignSend: BenchModelStatic<DatabaseSchema['campaign_sends']>
+  const Card: BenchModelStatic<DatabaseSchema['cards']>
+  const CardComment: BenchModelStatic<DatabaseSchema['card_comments']>
   const Cart: BenchModelStatic<DatabaseSchema['carts']>
   const CartItem: BenchModelStatic<DatabaseSchema['cart_items']>
   const Category: BenchModelStatic<DatabaseSchema['categories']>

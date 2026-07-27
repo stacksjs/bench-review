@@ -20,6 +20,7 @@ export * from './tokens'
 export * from './gate'
 export * from './policy'
 export * from './authorizable'
+export * from './permissions'
 
 // Role-Based Access Control (RBAC)
 export * from './rbac'
@@ -32,6 +33,9 @@ export * from './email-verification'
 
 // Session-based Authentication (SPA Cookie Auth)
 export * from './session-auth'
+
+// Cookie-carried access tokens, for server-rendered pages.
+export * from './cookie-auth'
 
 // TOTP (Two-Factor Authentication) - re-export from ts-auth
 export {

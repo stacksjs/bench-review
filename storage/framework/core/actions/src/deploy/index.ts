@@ -1357,7 +1357,7 @@ SVCEOF`,
           } else {
             // Serverless mode: Deploy the TypeScript SMTP proxy (existing behavior)
             const smtpServerSrc = resolvePath(p.projectPath('storage/framework/core/cloud/src/imap/smtp-server.ts'))
-            const bundleOutDir = joinPath(p.projectPath(), '.stacks/tmp/smtp-bundle')
+            const bundleOutDir = p.frameworkRuntimePath('tmp/smtp-bundle')
             execSync(`bun build ${smtpServerSrc} --target=bun --outdir=${bundleOutDir}`, { stdio: 'pipe' })
 
             const bundlePath = joinPath(bundleOutDir, 'smtp-server.js')
@@ -1734,7 +1734,7 @@ SERVICEFILE`,
       html404Content = read404(docs404Path, 'utf-8')
       if (isVerbose) log.debug('  Using BunPress-generated 404.html')
     } else {
-      // Generate a default VitePress-style 404 page
+      // Generate the default BunPress 404 page
       html404Content = `<!DOCTYPE html>
 <html lang="en">
 <head>

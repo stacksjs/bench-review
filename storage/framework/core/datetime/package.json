@@ -1,7 +1,7 @@
 {
   "name": "@stacksjs/datetime",
   "type": "module",
-  "version": "0.70.87",
+  "version": "0.70.190",
   "description": "The Stacks datetime helpers.",
   "author": "Chris Breuer",
   "contributors": [
@@ -53,7 +53,7 @@
     "prepublishOnly": "bun run build"
   },
   "devDependencies": {
-    "better-dx": "^0.2.16",
+    "better-dx": "^0.2.17",
     "@stacksjs/utils": "workspace:*"
   },
   "sideEffects": false

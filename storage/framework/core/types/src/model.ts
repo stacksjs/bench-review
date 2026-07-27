@@ -13,6 +13,16 @@ import type { SearchOptions } from './search-engine'
  */
 export type Model = Partial<ModelOptions>
 
+export type OnForeignKeyAction = 'cascade' | 'set null' | 'restrict' | 'no action'
+
+export interface ForeignKeyConfig {
+  table: string
+  column?: string
+  onDelete?: OnForeignKeyAction
+  onUpdate?: OnForeignKeyAction
+  nullable?: boolean
+}
+
 export interface BaseRelation {
   foreignKey?: string
   relationName?: string
@@ -187,20 +197,15 @@ export interface ModelOptions extends Base {
     softDeletable?: boolean | SoftDeleteOptions // useSoftDeletes alias
     categorizable?: boolean // defaults to false
     taggable?: boolean // defaults to false
-    commentables?: boolean // defaults to false
+    commentable?: boolean // defaults to false
     useAuth?: boolean | UserAuthOptions // defaults to false
     authenticatable?: boolean | UserAuthOptions // useAuth alias
     /**
-     * @deprecated stacksjs/stacks#1929 — the `useSeeder` trait only
-     * existed to drive the auto-walker, which is removed from
-     * `./buddy seed` (stacksjs/stacks#1919). Seeding is now owned by
-     * class seeders: a `database/seeders/<Model>Seeder.ts` file calling
-     * `factory.generate(Model, { count })`. Run `./buddy seed:scaffold`
-     * to codemod existing traits into seeder files (and strip the
-     * trait). This field is scheduled for removal in the next major.
+     * Seed this model's table from its per-attribute `factory` functions when
+     * `./buddy seed` runs. `{ count }` sets how many rows, `{ fixtures }`
+     * pins specific rows over the generated ones.
      */
     useSeeder?: boolean | SeedOptions // defaults to a count of 10
-    /** @deprecated alias of {@link useSeeder} — see stacksjs/stacks#1929. */
     seedable?: boolean | SeedOptions // useSeeder alias
     useSearch?: boolean | SearchOptions // defaults to false
     useSocials?: SocialOptions // defaults to false
@@ -252,14 +257,19 @@ export interface ModelOptions extends Base {
 }
 
 export interface Attribute {
-  type?: string
+  /** Require a value and emit a NOT NULL database column. */
+  required?: boolean
+  /** Explicit database nullability override. */
   nullable?: boolean
+  type?: string
   default?: string | number | boolean | Date
   unique?: boolean
   order?: number
   hidden?: boolean
   fillable?: boolean
   guarded?: boolean
+  /** Disable, infer, or explicitly configure a foreign-key constraint. */
+  foreignKey?: boolean | ForeignKeyConfig
   factory?: (faker: Faker) => any
   validation: {
     rule: ValidationType
@@ -292,6 +302,17 @@ export interface CompositeIndex {
 export interface AttributesElements {
   [key: string]: Attribute
 }
+
+/**
+ * The attribute VALUES of one model row, as handed to a computed getter or
+ * setter: `salutationName: (attributes: Attributes) => …`.
+ *
+ * Not to be confused with `AttributesElements`, which is the map of attribute
+ * DEFINITIONS on a model. Built-in models have imported this name since they
+ * were written; it was simply never exported, so every one of them was a
+ * TS2724 the moment @stacksjs/types started shipping declarations.
+ */
+export type Attributes = Record<string, any>
 
 export interface RelationConfig {
   relationship: string

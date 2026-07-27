@@ -16,32 +16,6 @@ interface RequestData {
 }
 
 /**
- * Loose route-param shape kept around for back-compat with code that
- * predates {@link RequestInstance}'s `TParams` generic. New code should
- * rely on the path-extracted `TParams` instead — see {@link ExtractParams}.
- *
- * @deprecated Use {@link ExtractParams}-driven typing on the action /
- *   route signature instead. URL route params are always strings at
- *   runtime; the `string | number` here misled callers into thinking
- *   the framework coerced numbers automatically (it doesn't —
- *   `Number(request.params.id)` is the correct pattern).
- */
-type RouteParams = { [key: string]: string | number } | null
-
-/**
- * Legacy hard-coded list of param names treated as `number` by
- * {@link RequestInstance.getParam}. The name-match heuristic is
- * brittle (`'judgeId'`, `'user_id'`, etc. all silently fall through
- * to `string`) and will be retired in a future release.
- *
- * @deprecated The name-match returns `number` for these specific keys
- *   only — pass the value through {@link Number} or
- *   {@link RequestInstance.getParamAsInt} for explicit, predictable
- *   coercion. See stacksjs/stacks#1851 Phase 3.
- */
-type NumericField = 'id' | 'age' | 'count' | 'quantity' | 'amount' | 'price' | 'total' | 'score' | 'rating' | 'duration' | 'size' | 'weight' | 'height' | 'width' | 'length' | 'distance' | 'speed' | 'temperature' | 'volume' | 'capacity' | 'density' | 'pressure' | 'force' | 'energy' | 'power' | 'frequency' | 'voltage' | 'current' | 'resistance' | 'time' | 'date' | 'year' | 'month' | 'day' | 'hour' | 'minute' | 'second' | 'millisecond' | 'microsecond' | 'nanosecond'
-
-/**
  * Cookie-access helper exposed via `request.cookies` on
  * {@link RequestInstance}. The methods mirror bun-router's
  * `CookieAccessor` — duplicated locally so this package doesn't
@@ -141,12 +115,12 @@ export interface Collection<T> {
  * Safe validated data wrapper (Laravel-style)
  */
 export interface SafeData<T extends Record<string, any> = Record<string, any>> {
-  only: <K extends keyof T>(keys: K[]) => Pick<T, K>
-  except: <K extends keyof T>(keys: K[]) => Omit<T, K>
-  merge: <U extends Record<string, unknown>>(data: U) => T & U
-  all: () => T
-  has: (key: keyof T) => boolean
-  get: <K extends keyof T>(key: K) => T[K]
+  only<K extends keyof T>(keys: K[]): Pick<T, K>
+  except<K extends keyof T>(keys: K[]): Omit<T, K>
+  merge<U extends Record<string, unknown>>(data: U): T & U
+  all(): T
+  has(key: keyof T): boolean
+  get<K extends keyof T>(key: K): T[K]
 }
 
 /**
@@ -292,13 +266,13 @@ export interface RequestInstance<
    * Get only specified keys — returns a precisely picked type
    * @example request.only(['title', 'views']) // { title: string, views: number }
    */
-  only: <K extends keyof TFields & string>(keys: K[]) => Pick<TFields, K>
+  only<K extends keyof TFields & string>(keys: K[]): Pick<TFields, K>
 
   /**
    * Get all except specified keys — returns a precisely omitted type
    * @example request.except(['id', 'created_at']) // omits those fields
    */
-  except: <K extends keyof TFields & string>(keys: K[]) => Omit<TFields, K>
+  except<K extends keyof TFields & string>(keys: K[]): Omit<TFields, K>
 
   /**
    * Check if input has a key (or all keys if array) — keys narrowed to model fields
@@ -328,7 +302,7 @@ export interface RequestInstance<
   /**
    * Merge additional data into input — accepts partial model fields
    */
-  merge: (data: Partial<TFields>) => void
+  merge(data: Partial<TFields>): void
 
   /**
    * Get all input keys — returns model field names when model-aware
@@ -343,49 +317,49 @@ export interface RequestInstance<
    * Get string input
    * @example request.string('title')
    */
-  string: (key: keyof TFields & string, defaultValue?: string) => string
+  string(key: keyof TFields & string, defaultValue?: string): string
 
   /**
    * Get integer input
    * @example request.integer('views', 0)
    */
-  integer: (key: keyof TFields & string, defaultValue?: number) => number
+  integer(key: keyof TFields & string, defaultValue?: number): number
 
   /**
    * Get float input
    * @example request.float('price', 0.0)
    */
-  float: (key: keyof TFields & string, defaultValue?: number) => number
+  float(key: keyof TFields & string, defaultValue?: number): number
 
   /**
    * Get boolean input
    * @example request.boolean('is_active', false)
    */
-  boolean: (key: keyof TFields & string, defaultValue?: boolean) => boolean
+  boolean(key: keyof TFields & string, defaultValue?: boolean): boolean
 
   /**
    * Get input as array
    * @example request.array('tags')
    */
-  array: <T = unknown>(key: keyof TFields & string) => T[]
+  array<T = unknown>(key: keyof TFields & string): T[]
 
   /**
    * Parse date input
    * @example request.date('published_at')
    */
-  date: (key: keyof TFields & string, format?: string) => Date | null
+  date(key: keyof TFields & string, format?: string): Date | null
 
   /**
    * Parse enum input
    * @example request.enum('status', StatusEnum)
    */
-  enum: <T extends Record<string, string | number>>(key: keyof TFields & string, enumType: T) => T[keyof T] | null
+  enum<T extends Record<string, string | number>>(key: keyof TFields & string, enumType: T): T[keyof T] | null
 
   /**
    * Get input as collection
    * @example request.collect('items')
    */
-  collect: <T = unknown>(key: keyof TFields & string) => Collection<T>
+  collect<T = unknown>(key: keyof TFields & string): Collection<T>
 
   // ==========================================================================
   // Validation Methods — returns typed model fields when model-aware
@@ -421,18 +395,18 @@ export interface RequestInstance<
    * Execute callback when input has a value
    * @example request.whenHas('title', (value) => console.log(value))
    */
-  whenHas: <T>(key: keyof TFields & string, callback: (value: T) => void, defaultCallback?: () => void) => void
+  whenHas<T>(key: keyof TFields & string, callback: (value: T) => void, defaultCallback?: () => void): void
 
   /**
    * Execute callback when input is filled
    * @example request.whenFilled('title', (value) => console.log(value))
    */
-  whenFilled: <T>(key: keyof TFields & string, callback: (value: T) => void, defaultCallback?: () => void) => void
+  whenFilled<T>(key: keyof TFields & string, callback: (value: T) => void, defaultCallback?: () => void): void
 
   /**
    * Check if input matches a value
    */
-  isValue: (key: keyof TFields & string, value: unknown) => boolean
+  isValue(key: keyof TFields & string, value: unknown): boolean
 
   // ==========================================================================
   // File Methods — not narrowed to model fields (files are independent)
@@ -491,14 +465,11 @@ export interface RequestInstance<
     defaultValue?: D,
   ) => K extends keyof TParams ? TParams[K] : (string | D)
   /**
-   * @deprecated Use {@link param} for typed param lookups, or
-   *   `Number(request.params.id)` for explicit numeric coercion.
-   *   The name-match heuristic returning `number` for {@link NumericField}
-   *   keys (`id`, `count`, `amount`, …) is brittle: it silently falls
-   *   through to `string` for `judgeId`, `user_id`, etc.
-   *   See stacksjs/stacks#1851 Phase 3.
+   * Reads a route parameter. Always a string - the router does no coercion.
+   * Prefer {@link param} for `TParams`-typed lookups, and
+   * {@link getParamAsInt} (or `Number(...)`) when you want a number.
    */
-  getParam: <K extends string>(key: K) => K extends NumericField ? number : string
+  getParam: (key: string) => string
   route: (key: string) => number | string | null
   getParams: () => TParams
   getParamAsInt: (key: string) => number | null
@@ -510,22 +481,22 @@ export interface RequestInstance<
   /**
    * Get old input (for form repopulation)
    */
-  old: <T = unknown>(key: keyof TFields & string, defaultValue?: T) => T
+  old<T = unknown>(key: keyof TFields & string, defaultValue?: T): T
 
   /**
    * Flash input to session for form repopulation
    */
-  flashInput: (keys?: (keyof TFields & string)[]) => void
+  flashInput(keys?: (keyof TFields & string)[]): void
 
   /**
    * Flash only specific keys
    */
-  flashInputOnly: (keys: (keyof TFields & string)[]) => void
+  flashInputOnly(keys: (keyof TFields & string)[]): void
 
   /**
    * Flash except specific keys
    */
-  flashInputExcept: (keys: (keyof TFields & string)[]) => void
+  flashInputExcept(keys: (keyof TFields & string)[]): void
 
   // ==========================================================================
   // Utility Methods

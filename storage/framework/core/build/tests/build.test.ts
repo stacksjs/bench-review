@@ -79,6 +79,37 @@ describe('build module', () => {
       fs.rmSync(tmpDir, { recursive: true, force: true })
     }
   })
+
+  test('accepts valid declarations unchanged', async () => {
+    const { validateDeclarations } = await import('../src/index')
+    const tmpDir = `/tmp/stacks-build-declarations-${Date.now()}`
+    const fs = await import('node:fs')
+    fs.mkdirSync(`${tmpDir}/dist`, { recursive: true })
+    const valid = `export declare const Arr: {\n  toArray: <T>(value: T) => T;\n}\ndeclare module 'pkg' {\n  interface Request extends Base {}\n}\n`
+    fs.writeFileSync(`${tmpDir}/dist/index.d.ts`, valid)
+    try {
+      await validateDeclarations(tmpDir)
+      // Valid files are left byte-for-byte intact — no repair pass exists.
+      expect(fs.readFileSync(`${tmpDir}/dist/index.d.ts`, 'utf8')).toBe(valid)
+    }
+    finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
+
+  test('rejects declarations that remain invalid', async () => {
+    const { validateDeclarations } = await import('../src/index')
+    const tmpDir = `/tmp/stacks-build-invalid-declarations-${Date.now()}`
+    const fs = await import('node:fs')
+    fs.mkdirSync(`${tmpDir}/dist`, { recursive: true })
+    fs.writeFileSync(`${tmpDir}/dist/index.d.ts`, 'export interface Broken { value: string value2: number }')
+    try {
+      expect(validateDeclarations(tmpDir)).rejects.toThrow('Invalid declaration generated')
+    }
+    finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('build utils', () => {

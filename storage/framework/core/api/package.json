@@ -2,7 +2,7 @@
   "name": "@stacksjs/api",
   "type": "module",
   "sideEffects": false,
-  "version": "0.70.87",
+  "version": "0.70.190",
   "description": "The Stacks array utilities.",
   "author": "Chris Breuer",
   "contributors": [
@@ -50,12 +50,12 @@
   ],
   "scripts": {
     "build": "bun build.ts",
-    "generate-types": "open-api ./../../api/openapi.json --output ./../../api/api-types.ts",
+    "generate-types": "bun src/generate-types.ts",
     "typecheck": "bun tsc --noEmit",
     "prepublishOnly": "bun run build"
   },
   "devDependencies": {
-    "better-dx": "^0.2.16",
+    "better-dx": "^0.2.17",
     "@stacksjs/utils": "workspace:*"
   }
 }
