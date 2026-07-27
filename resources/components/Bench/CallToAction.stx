@@ -6,10 +6,10 @@
         Create a free account to read judge reviews, follow the courts you appear in, and share your own experience.
       </p>
       <div class="flex gap-x-6 items-center justify-center mt-10">
-        <StxLink to="/register" class="px-5 py-3 font-semibold text-sm text-white bg-gray-900 hover:bg-gray-800 active:scale-[0.98] rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-900 focus-visible:outline-offset-2 shadow-sm transition">
+        <StxLink to="/register" class="px-5 py-3 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 shadow-sm shadow-blue-600/25 transition">
           Create an account
         </StxLink>
-        <StxLink to="/about" class="font-semibold leading-6 text-gray-900 hover:text-gray-700 text-sm transition-colors">
+        <StxLink to="/about" class="font-semibold leading-6 text-blue-700 hover:text-blue-900 text-sm transition-colors">
           Learn more <span aria-hidden="true">→</span>
         </StxLink>
       </div>

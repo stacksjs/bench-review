@@ -4,7 +4,8 @@
      Swap in genuine user quotes here once real ones exist. -->
 <section class="relative pb-28 pt-24 sm:pt-28 isolate">
   <div class="mx-auto px-6 lg:px-8 max-w-4xl">
-    <figure class="text-center">
+    <figure class="rounded-3xl bg-gradient-to-b from-blue-50 to-white ring-1 ring-blue-100 px-8 py-16 sm:px-16 text-center">
+      <div class="mx-auto mb-8 h-1 w-10 rounded-full bg-blue-600" aria-hidden="true"></div>
       <blockquote class="font-medium text-2xl sm:text-3xl leading-snug text-balance text-gray-900">
         <p>&ldquo;Publicity is justly commended as a remedy for social and industrial diseases. Sunlight is said to be the best of disinfectants; electric light the most efficient policeman.&rdquo;</p>
       </blockquote>

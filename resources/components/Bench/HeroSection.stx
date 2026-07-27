@@ -1,5 +1,12 @@
 <section>
   <div class="relative isolate">
+    <!-- Ambient brand light behind the hero. Sits under a real hero
+         image (below), so this is depth, not a gradient-blob stand-in.
+         pointer-events-none + aria-hidden keeps it purely decorative. -->
+    <div class="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
+      <div class="absolute -top-20 right-0 h-80 w-80 rounded-full bg-blue-400/20 blur-3xl"></div>
+      <div class="absolute top-40 -left-24 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl"></div>
+    </div>
     <div class="overflow-hidden">
       <div class="mx-auto pb-32 pt-8 px-6 sm:pt-12 lg:pt-16 lg:px-8 max-w-7xl">
         <div class="lg:flex gap-x-14 lg:items-center mx-auto lg:mx-0 max-w-2xl lg:max-w-none">
@@ -10,8 +17,8 @@
               Like Glassdoor, but for the judiciary: reviews of judges from the clerks, attorneys, and court staff who appear before them.</p>
             <div class="flex gap-x-6 items-center mt-10">
               <StxLink to="/judges"
-                class="px-5 py-3 font-semibold text-sm text-white bg-gray-900 hover:bg-gray-800 active:scale-[0.98] rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-900 focus-visible:outline-offset-2 shadow-sm transition">Browse judges</StxLink>
-              <StxLink to="/review" class="font-semibold text-gray-700 hover:text-gray-900 text-sm/6 transition-colors">Write a review <span
+                class="px-5 py-3 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 shadow-sm shadow-blue-600/25 transition">Browse judges</StxLink>
+              <StxLink to="/review" class="font-semibold text-blue-700 hover:text-blue-900 text-sm/6 transition-colors">Write a review <span
                   aria-hidden="true">→</span></StxLink>
             </div>
           </div>

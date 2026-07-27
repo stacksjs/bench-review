@@ -25,8 +25,8 @@
           x-class="pricingPeriod() === 'monthly' ? 'text-gray-900' : 'text-gray-500'"
           class="font-medium text-sm">Monthly</span>
         <button type="button" aria-label="Toggle yearly billing"
-          class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer"
-          x-class="pricingPeriod() === 'yearly' ? 'bg-gray-900' : 'bg-gray-200'" @click="togglePricingPeriod()">
+          class="inline-flex relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 duration-200 ease-in-out transition-colors cursor-pointer"
+          x-class="pricingPeriod() === 'yearly' ? 'bg-blue-600' : 'bg-gray-200'" @click="togglePricingPeriod()">
           <span
             class="inline-block h-5 w-5 bg-white ring-0 rounded-full shadow duration-200 ease-in-out transition transform pointer-events-none"
             x-class="[pricingPeriod() === 'yearly' ? 'translate-x-5' : 'translate-x-0']" />
@@ -46,20 +46,21 @@
           <span class="font-semibold text-gray-600 text-sm/6">/<span x-text="pricingPeriod() === 'monthly' ? 'month' : 'year'"></span></span>
         </p>
         <StxLink to="/register" aria-describedby="tier-free"
-          class="block mt-6 px-3 py-2 font-semibold text-center text-gray-700 text-sm/6 ring-1 ring-gray-200 ring-inset rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-900 focus-visible:outline-offset-2 hover:ring-gray-300 active:scale-[0.98] transition">Create
+          class="block mt-6 px-3 py-2 font-semibold text-center text-gray-700 text-sm/6 ring-1 ring-gray-200 ring-inset rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 hover:ring-blue-300 hover:text-blue-700 active:scale-[0.98] transition">Create
           a free account</StxLink>
         <ul role="list" class="mt-8 space-y-3 text-gray-600 text-sm/6">
           <li class="flex gap-x-3">
-            <Icon name="check" size="20" class="flex-none text-gray-600" />
+            <Icon name="check" size="20" class="flex-none text-blue-600" />
             Write and publish reviews
           </li>
           <li class="flex gap-x-3">
-            <Icon name="check" size="20" class="flex-none text-gray-600" />
+            <Icon name="check" size="20" class="flex-none text-blue-600" />
             Post anonymously
           </li>
         </ul>
       </div>
-      <div class="p-8 bg-white ring-2 ring-gray-900 rounded-2xl">
+      <div class="relative p-8 bg-white ring-2 ring-blue-600 rounded-2xl">
+        <span class="absolute -top-3 right-6 inline-flex items-center px-3 py-1 font-semibold text-xs text-white bg-blue-600 rounded-full shadow-sm shadow-blue-600/25">Most popular</span>
         <h3 id="tier-hobby" class="font-semibold text-gray-900 text-lg/8">Professional</h3>
         <p class="mt-4 text-gray-600 text-sm/6">For anyone curious about judge reviews.</p>
         <p class="flex gap-x-1 items-baseline mt-6">
@@ -67,19 +68,19 @@
           <span class="font-semibold text-gray-600 text-sm/6">/<span x-text="pricingPeriod() === 'monthly' ? 'month' : 'year'"></span></span>
         </p>
         <StxLink to="/register" aria-describedby="tier-hobby"
-          class="block mt-6 px-3 py-2 font-semibold text-center text-sm/6 text-white bg-gray-900 hover:bg-gray-800 active:scale-[0.98] rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-900 focus-visible:outline-offset-2 shadow-sm transition">Start
+          class="block mt-6 px-3 py-2 font-semibold text-center text-sm/6 text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 shadow-sm shadow-blue-600/25 transition">Start
           Professional</StxLink>
         <ul role="list" class="mt-8 space-y-3 text-gray-600 text-sm/6">
           <li class="flex gap-x-3">
-            <Icon name="check" size="20" class="flex-none text-gray-600" />
+            <Icon name="check" size="20" class="flex-none text-blue-600" />
             Read any judge review
           </li>
           <li class="flex gap-x-3">
-            <Icon name="check" size="20" class="flex-none text-gray-600" />
+            <Icon name="check" size="20" class="flex-none text-blue-600" />
             Powerful search tools
           </li>
           <li class="flex gap-x-3">
-            <Icon name="check" size="20" class="flex-none text-gray-600" />
+            <Icon name="check" size="20" class="flex-none text-blue-600" />
             Advanced analytics & statistics
           </li>
         </ul>

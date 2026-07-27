@@ -35,29 +35,29 @@
                 type="text"
                 x-model="mobileSearchQuery"
                 placeholder="Search judges or courts..."
-                class="block pl-9 pr-3 py-2 w-full text-gray-900 sm:text-sm placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-200 ring-inset rounded-lg focus:ring-2 focus:ring-gray-600 focus:ring-inset"
+                class="block pl-9 pr-3 py-2 w-full text-gray-900 sm:text-sm placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-200 ring-inset rounded-lg focus:ring-2 focus:ring-blue-600 focus:ring-inset"
               >
             </div>
           </form>
 
-          <StxLink to="/judges" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Find Judges</StxLink>
-          <StxLink to="/court-houses" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Court Houses</StxLink>
-          <StxLink to="/review" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Write a Review</StxLink>
-          <StxLink to="/reviews" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Reviews</StxLink>
+          <StxLink to="/judges" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-blue-50 hover:text-blue-700 rounded-lg">Find Judges</StxLink>
+          <StxLink to="/court-houses" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-blue-50 hover:text-blue-700 rounded-lg">Court Houses</StxLink>
+          <StxLink to="/review" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-blue-50 hover:text-blue-700 rounded-lg">Write a Review</StxLink>
+          <StxLink to="/reviews" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-blue-50 hover:text-blue-700 rounded-lg">Reviews</StxLink>
           <div :if="isAuthenticated">
-            <StxLink to="/notifications" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Notifications</StxLink>
-            <StxLink to="/profile" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Profile</StxLink>
-            <StxLink to="/settings" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Settings</StxLink>
+            <StxLink to="/notifications" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-blue-50 hover:text-blue-700 rounded-lg">Notifications</StxLink>
+            <StxLink to="/profile" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-blue-50 hover:text-blue-700 rounded-lg">Profile</StxLink>
+            <StxLink to="/settings" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-blue-50 hover:text-blue-700 rounded-lg">Settings</StxLink>
           </div>
-          <StxLink to="/judges/submit" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Submit a Judge</StxLink>
+          <StxLink to="/judges/submit" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:bg-blue-50 hover:text-blue-700 rounded-lg">Submit a Judge</StxLink>
         </div>
         <div class="py-6">
           <div :if="!isAuthenticated()">
-            <StxLink to="/register" class="block -mx-3 px-3 py-2.5 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Register</StxLink>
-            <StxLink to="/login" class="block -mx-3 px-3 py-2.5 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Log in</StxLink>
+            <StxLink to="/register" class="block -mx-3 mb-2 px-3 py-2.5 font-semibold text-center text-base/7 text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-lg shadow-sm shadow-blue-600/25 transition">Register</StxLink>
+            <StxLink to="/login" class="block -mx-3 px-3 py-2.5 font-semibold text-base/7 text-gray-900 hover:bg-blue-50 hover:text-blue-700 rounded-lg">Log in</StxLink>
           </div>
           <div :else>
-            <StxLink to="/logout" class="block -mx-3 px-3 py-2.5 font-semibold text-base/7 text-gray-900 hover:bg-gray-50 rounded-lg">Log out</StxLink>
+            <StxLink to="/logout" class="block -mx-3 px-3 py-2.5 font-semibold text-base/7 text-gray-900 hover:bg-blue-50 hover:text-blue-700 rounded-lg">Log out</StxLink>
           </div>
         </div>
       </div>
