@@ -20,7 +20,6 @@ declare global {
   const isDark: typeof autoImports.isDark
   const toggleDark: typeof autoImports.toggleDark
   const preferredDark: typeof autoImports.preferredDark
-  const useAuth: typeof autoImports.useAuth
 }
 
 export {}
