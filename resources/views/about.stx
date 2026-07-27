@@ -63,7 +63,7 @@
       <h3 class="font-bold text-2xl text-gray-900">Ready to contribute?</h3>
       <p class="mt-4 text-gray-600">Join the legal professionals helping to keep the bench accountable.</p>
       <div class="flex gap-4 items-center justify-center mt-8">
-        <StxLink to="/register" class="px-4 py-2.5 font-semibold text-sm text-white bg-gray-900 hover:bg-gray-800 active:scale-[0.98] rounded-lg shadow-sm transition">
+        <StxLink to="/register" class="px-4 py-2.5 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-lg shadow-sm transition">
           Create an account
         </StxLink>
         <StxLink to="/contact" class="font-semibold text-gray-700 text-sm hover:text-gray-900 transition-colors">

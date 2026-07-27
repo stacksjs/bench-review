@@ -22,7 +22,7 @@
       <p class="mt-1 text-gray-500 text-sm">{{ `Active judges currently sitting at ${court.name}` }}</p>
     </div>
     <div class="hidden sm:block">
-      <select class="pl-3 pr-10 py-2 text-gray-900 sm:text-sm bg-white ring-1 ring-gray-300 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset">
+      <select class="pl-3 pr-10 py-2 text-gray-900 sm:text-sm bg-white ring-1 ring-gray-300 ring-inset rounded-md focus:ring-2 focus:ring-blue-600 focus:ring-inset">
         <option>All Departments</option>
         <option>Criminal</option>
         <option>Civil</option>

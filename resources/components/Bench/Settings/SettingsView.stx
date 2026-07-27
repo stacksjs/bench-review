@@ -345,7 +345,7 @@
               x-model="fullName"
               autocomplete="name"
               @focus="nameError.set(false)"
-              class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
+              class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 shadow-sm"
               x-class="nameError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-300'"
             >
           </div>
@@ -373,7 +373,7 @@
             type="button"
             @click="saveProfile()"
             x-disabled="saveStatus === 'saving'"
-            class="inline-flex items-center justify-center px-4 py-2 font-semibold text-sm text-white bg-gray-900 hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md transition-colors shadow-sm"
+            class="inline-flex items-center justify-center px-4 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md transition-colors shadow-sm"
           >
             <svg :if="saveStatus() === 'saving'" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
             <span>{{ saveStatus === 'saving' ? 'Saving…' : 'Save changes' }}</span>
@@ -396,7 +396,7 @@
             x-model="currentPassword"
             autocomplete="current-password"
             @focus="currentPasswordError.set(false)"
-            class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
+            class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 shadow-sm"
             x-class="currentPasswordError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-300'"
           >
         </div>
@@ -410,7 +410,7 @@
               x-model="newPassword"
               autocomplete="new-password"
               @focus="newPasswordError.set(false)"
-              class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
+              class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 shadow-sm"
               x-class="newPasswordError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-300'"
             >
             <p class="mt-1.5 text-gray-500 text-xs">Use at least 8 characters.</p>
@@ -424,7 +424,7 @@
               x-model="confirmPassword"
               autocomplete="new-password"
               @focus="confirmPasswordError.set(false)"
-              class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
+              class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 shadow-sm"
               x-class="confirmPasswordError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-300'"
             >
           </div>
@@ -439,7 +439,7 @@
             type="button"
             @click="savePassword()"
             x-disabled="pwStatus === 'saving'"
-            class="inline-flex items-center justify-center px-4 py-2 font-semibold text-sm text-white bg-gray-900 hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md transition-colors shadow-sm"
+            class="inline-flex items-center justify-center px-4 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md transition-colors shadow-sm"
           >
             <svg :if="pwStatus() === 'saving'" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
             <span>{{ pwStatus === 'saving' ? 'Updating…' : 'Update password' }}</span>
@@ -467,7 +467,7 @@
               x-model="credentialType"
               x-disabled="credentialStatus === 'saving'"
               @focus="credTypeError.set(false)"
-              class="block mt-1 px-3 py-2 w-full text-sm bg-white border rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
+              class="block mt-1 px-3 py-2 w-full text-sm bg-white border rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               x-class="credTypeError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-300'"
             >
               <option value="">— Select —</option>
@@ -486,7 +486,7 @@
               x-disabled="credentialStatus === 'saving'"
               @focus="credStateError.set(false)"
               placeholder="CA, NY, FEDERAL"
-              class="block mt-1 px-3 py-2 w-full text-sm bg-white border rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
+              class="block mt-1 px-3 py-2 w-full text-sm bg-white border rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               x-class="credStateError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-300'"
               maxlength="7"
             >
@@ -510,7 +510,7 @@
             type="button"
             @click="saveCredentialClaim()"
             x-disabled="credentialStatus === 'saving'"
-            class="inline-flex items-center justify-center px-4 py-2 font-semibold text-white text-sm bg-gray-900 hover:bg-gray-800 rounded-md disabled:opacity-50"
+            class="inline-flex items-center justify-center px-4 py-2 font-semibold text-white text-sm bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
           >
             <svg :if="credentialStatus() === 'saving'" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
             <span>{{ credentialStatus === 'saving' ? 'Submitting…' : 'Submit claim for verification' }}</span>

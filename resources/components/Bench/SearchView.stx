@@ -76,7 +76,7 @@
           type="text"
           x-model="search.query"
           placeholder="Search judges, courts, or locations..."
-          class="block pl-12 pr-32 py-4 w-full text-gray-900 sm:text-base placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-200 ring-inset rounded-xl focus:ring-2 focus:ring-gray-600 focus:ring-inset shadow-sm"
+          class="block pl-12 pr-32 py-4 w-full text-gray-900 sm:text-base placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-200 ring-inset rounded-xl focus:ring-2 focus:ring-blue-600 focus:ring-inset shadow-sm"
         >
         <div class="flex absolute inset-y-0 right-0 items-center pr-2">
           <button
@@ -136,7 +136,7 @@
         <p class="mt-4 font-medium text-gray-900">{{ `No results for &quot;${search.query}&quot;` }}</p>
         <p class="mt-1 text-gray-500 text-sm">Try a different name, court, or location.</p>
         <div class="flex gap-3 items-center justify-center mt-5">
-          <StxLink to="/judges" class="inline-flex items-center px-4 py-2 font-medium text-white text-sm bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors">Browse judges</StxLink>
+          <StxLink to="/judges" class="inline-flex items-center px-4 py-2 font-medium text-white text-sm bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">Browse judges</StxLink>
           <StxLink to="/court-houses" class="inline-flex items-center px-4 py-2 font-medium text-gray-700 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">Browse court houses</StxLink>
         </div>
       </div>

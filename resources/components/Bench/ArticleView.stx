@@ -517,7 +517,7 @@
        visible during sticky-header interactions. Width is the live
        percentage from the scroll handler. -->
   <div class="fixed inset-x-0 top-0 z-50 h-1 bg-transparent" style="pointer-events: none">
-    <div class="h-full bg-amber-500 transition-all duration-100 ease-out" x-style="`width: ${readingProgress}%`"></div>
+    <div class="h-full bg-blue-600 transition-all duration-100 ease-out" x-style="`width: ${readingProgress}%`"></div>
   </div>
 
   <!-- Loading state -->
@@ -527,7 +527,7 @@
 
   <!-- 404 state -->
   <div :if="reviewsStore.currentNotFound" class="mx-auto pb-32 pt-32 px-4 sm:px-6 lg:px-8 max-w-2xl text-center">
-    <p class="font-medium text-amber-600 text-xs tracking-widest uppercase">404 — not found</p>
+    <p class="font-medium text-blue-600 text-xs tracking-widest uppercase">404 — not found</p>
     <h1 class="mt-4 font-serif font-bold text-4xl text-gray-900 tracking-tight">Review not found</h1>
     <p class="mt-4 text-base text-gray-500">The review you're looking for either doesn't exist or hasn't been published yet.</p>
     <StxLink x-to="`/reviews`" class="inline-block mt-8 font-semibold text-gray-900 text-sm hover:underline underline-offset-4">
@@ -582,7 +582,7 @@
       x-class="editError() ? '' : 'hidden'">{{ editError() }}</div>
 
     <!-- Topic chip -->
-    <p class="font-medium text-amber-600 text-center text-xs tracking-widest uppercase">{{ reviewTypeLabel }}</p>
+    <p class="font-medium text-blue-600 text-center text-xs tracking-widest uppercase">{{ reviewTypeLabel }}</p>
 
     <!-- Hero title — large serif, tight tracking, generous bottom margin -->
     <h1 class="mt-4 font-serif font-bold leading-[1.1] text-4xl sm:text-5xl lg:text-6xl text-center text-gray-900 tracking-tight">{{ title }}</h1>
@@ -630,7 +630,7 @@
       />
       <div
         :if="!judgeImage"
-        class="flex items-center justify-center h-12 w-12 font-semibold text-amber-700 text-sm bg-amber-50 ring-1 ring-amber-200/60 rounded-full">{{ judgeInitials }}</div>
+        class="flex items-center justify-center h-12 w-12 font-semibold text-blue-700 text-sm bg-blue-50 ring-1 ring-blue-200/60 rounded-full">{{ judgeInitials }}</div>
       <div class="min-w-0 flex-1">
         <p class="font-semibold text-gray-900 text-sm">
           <span class="text-gray-400 font-normal">Review of</span>
@@ -683,10 +683,10 @@
          via x-class so the inner x-html binding stays subscribed across
          load/SPA-nav — same pattern as the other conditional sections. -->
     <div
-      class="mt-12 p-6 border-l-4 border-amber-500 rounded-r-lg bg-amber-50/60"
+      class="mt-12 p-6 border-l-4 border-blue-500 rounded-r-lg bg-blue-50/60"
       x-class="hasJudgeResponse() ? '' : 'hidden'"
     >
-      <p class="font-semibold text-amber-800 text-xs tracking-widest uppercase">Official response</p>
+      <p class="font-semibold text-blue-800 text-xs tracking-widest uppercase">Official response</p>
       <p class="mt-1 font-semibold text-gray-900 text-sm">{{ `From ${judgeResponseName()}` }}</p>
       <div class="article-body mt-3 text-base text-gray-800" x-html="judgeResponseBody"></div>
     </div>
@@ -704,14 +704,14 @@
         x-model="judgeResponseDraft"
         rows="4"
         placeholder="Write your official response…"
-        class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
+        class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
       ></textarea>
       <div class="flex items-center gap-x-3 mt-2">
         <button
           type="button"
           @click="postJudgeResponse()"
           x-disabled="judgeResponding"
-          class="px-4 py-2 font-semibold text-white text-sm bg-gray-900 hover:bg-gray-800 rounded-md disabled:opacity-50">{{ judgeResponding() ? 'Posting…' : 'Post response' }}</button>
+          class="px-4 py-2 font-semibold text-white text-sm bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50">{{ judgeResponding() ? 'Posting…' : 'Post response' }}</button>
         <span class="text-red-700 text-xs" x-class="judgeRespondError() ? '' : 'hidden'">{{ judgeRespondError() }}</span>
       </div>
     </div>
@@ -736,7 +736,7 @@
             @click="toggleLike()"
             x-disabled="likePending"
             class="inline-flex items-center gap-2 px-4 py-2 font-medium text-sm rounded-full border transition-all disabled:opacity-60 disabled:cursor-wait"
-            x-class="liked ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'"
+            x-class="liked ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'"
             aria-pressed="false"
           >
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
@@ -772,7 +772,7 @@
         <div
           :if="likeAuthPrompt"
           role="status"
-          class="px-3 py-1.5 text-amber-800 text-xs bg-amber-50 border border-amber-200 rounded-md"
+          class="px-3 py-1.5 text-blue-800 text-xs bg-blue-50 border border-blue-200 rounded-md"
         >
           <StxLink to="/login" class="font-semibold underline underline-offset-2">Sign in</StxLink>
           to mark this review as helpful.
@@ -836,7 +836,7 @@
             x-model="flagDetails"
             rows="3"
             placeholder="Give us more context — only the moderator sees this."
-            class="block mt-1 px-3 py-2 w-full text-gray-900 sm:leading-6 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
+            class="block mt-1 px-3 py-2 w-full text-gray-900 sm:leading-6 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
           ></textarea>
         </div>
 

@@ -124,7 +124,7 @@
     ...it,
     cls: it.gap
       ? 'text-gray-400 border-transparent pointer-events-none'
-      : (it.active ? 'bg-gray-900 text-white border-gray-900' : 'text-gray-700 border-gray-300 hover:bg-gray-50'),
+      : (it.active ? 'bg-blue-600 text-white border-blue-600' : 'text-gray-700 border-gray-300 hover:bg-gray-50'),
   })))
   function goToPage(n: number): void {
     if (n < 1 || n > lastPage() || n === currentPage()) return
@@ -171,7 +171,7 @@
     <!-- Page header -->
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p class="font-medium text-amber-600 text-xs tracking-widest uppercase">Your contributions</p>
+        <p class="font-medium text-blue-600 text-xs tracking-widest uppercase">Your contributions</p>
         <h1 class="mt-2 font-serif font-bold text-3xl text-gray-900 sm:text-4xl tracking-tight">My reviews</h1>
         <p class="mt-2 text-gray-500 text-sm">Everything you've submitted — across every status. Click a row to read, edit, or delete.</p>
       </div>
@@ -179,7 +179,7 @@
         <StxLink to="/profile" class="inline-flex items-center px-3 py-2 font-medium text-gray-700 text-sm bg-white border border-gray-200 rounded-md hover:bg-gray-50">
           ← Profile
         </StxLink>
-        <StxLink to="/review" class="inline-flex items-center px-3 py-2 font-medium text-white text-sm bg-gray-900 rounded-md hover:bg-gray-800">
+        <StxLink to="/review" class="inline-flex items-center px-3 py-2 font-medium text-white text-sm bg-blue-600 rounded-md hover:bg-blue-700">
           Write a review
         </StxLink>
       </div>
@@ -195,7 +195,7 @@
         role="tab"
         @click="setFilter('all')"
         class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
-        x-class="statusFilter === 'all' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+        x-class="statusFilter === 'all' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >
         All
         <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="statusFilter === 'all' ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-600'">{{ counts.all }}</span>
@@ -205,7 +205,7 @@
         role="tab"
         @click="setFilter('pending')"
         class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
-        x-class="statusFilter === 'pending' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+        x-class="statusFilter === 'pending' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >
         Pending
         <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="statusFilter === 'pending' ? 'bg-white/15 text-white' : 'bg-amber-50 text-amber-700'">{{ counts.pending }}</span>
@@ -215,7 +215,7 @@
         role="tab"
         @click="setFilter('published')"
         class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
-        x-class="statusFilter === 'published' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+        x-class="statusFilter === 'published' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >
         Published
         <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="statusFilter === 'published' ? 'bg-white/15 text-white' : 'bg-emerald-50 text-emerald-700'">{{ counts.published }}</span>
@@ -225,7 +225,7 @@
         role="tab"
         @click="setFilter('rejected')"
         class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
-        x-class="statusFilter === 'rejected' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+        x-class="statusFilter === 'rejected' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >
         Declined
         <span class="px-1.5 py-0.5 tabular-nums text-xs rounded" x-class="statusFilter === 'rejected' ? 'bg-white/15 text-white' : 'bg-red-50 text-red-700'">{{ counts.rejected }}</span>
@@ -264,7 +264,7 @@
     <div :if="profileStore.loaded && filtered.length === 0" class="mt-10 p-10 text-center bg-white border border-gray-200 rounded-lg">
       <p class="font-semibold text-gray-900 text-base">{{ emptyTitle }}</p>
       <p class="mt-2 mx-auto max-w-md text-gray-500 text-sm">{{ emptyHint }}</p>
-      <StxLink to="/review" class="inline-flex items-center mt-6 px-4 py-2 font-medium text-white text-sm bg-gray-900 rounded-md hover:bg-gray-800">
+      <StxLink to="/review" class="inline-flex items-center mt-6 px-4 py-2 font-medium text-white text-sm bg-blue-600 rounded-md hover:bg-blue-700">
         Write a review
       </StxLink>
     </div>

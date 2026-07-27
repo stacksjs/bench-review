@@ -21,7 +21,7 @@
   const overlayClass = derived<string>(() =>
     confirmStore.open() ? 'fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/40' : 'hidden')
   const acceptClass = derived<string>(() =>
-    confirmStore.danger() ? 'bg-red-600 hover:bg-red-500' : 'bg-gray-900 hover:bg-gray-800')
+    confirmStore.danger() ? 'bg-red-600 hover:bg-red-500' : 'bg-blue-600 hover:bg-blue-700')
 </script>
 
 <div

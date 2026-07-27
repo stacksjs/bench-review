@@ -195,7 +195,7 @@
       placeholder="Add a comment — context, clarification, or a respectful pushback."
       @input="commentFieldError.set(false)"
       @focus="commentFieldError.set(false)"
-      class="block w-full px-3 py-2 text-gray-900 sm:text-sm bg-white border rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
+      class="block w-full px-3 py-2 text-gray-900 sm:text-sm bg-white border rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
       x-class="commentFieldError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-300'"
     ></textarea>
 
@@ -206,14 +206,14 @@
 
     <div class="flex flex-wrap items-center justify-between gap-2 mt-3">
       <label class="flex gap-2 items-center text-gray-600 text-xs cursor-pointer">
-        <input type="checkbox" x-model="commentAnon" class="h-4 w-4 text-gray-900 border-gray-300 rounded focus:ring-2 focus:ring-gray-900">
+        <input type="checkbox" x-model="commentAnon" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-600">
         Post anonymously
       </label>
       <button
         type="button"
         @click="submitComment()"
         x-disabled="commentSubmitting"
-        class="inline-flex items-center justify-center px-4 py-2 font-semibold text-white text-sm bg-gray-900 hover:bg-gray-800 rounded-md disabled:opacity-50"
+        class="inline-flex items-center justify-center px-4 py-2 font-semibold text-white text-sm bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
       >
         <svg :if="commentSubmitting()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
         <span>{{ commentSubmitting() ? 'Posting…' : 'Post comment' }}</span>
@@ -258,7 +258,7 @@
   <ul :else class="space-y-4 mt-6">
     <li :for="c in comments" class="p-4 bg-white border border-gray-100 rounded-lg">
       <div class="flex items-start gap-3">
-        <span class="inline-flex flex-none items-center justify-center h-8 w-8 font-semibold text-amber-700 text-xs bg-amber-50 ring-1 ring-amber-200/60 rounded-full">{{ initialFor(c.author && c.author.name) }}</span>
+        <span class="inline-flex flex-none items-center justify-center h-8 w-8 font-semibold text-blue-700 text-xs bg-blue-50 ring-1 ring-blue-200/60 rounded-full">{{ initialFor(c.author && c.author.name) }}</span>
         <div class="flex-1 min-w-0">
           <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <!-- Linked when we have a real reviewer id (non-anonymous); plain text otherwise. -->

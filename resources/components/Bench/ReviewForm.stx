@@ -390,7 +390,7 @@
       from your profile.
     </p>
     <div class="mt-6 flex flex-wrap gap-3 items-center justify-center">
-      <StxLink to="/my-reviews?status=pending" class="px-4 py-2 font-semibold text-sm text-white bg-gray-900 hover:bg-gray-700 rounded-md transition-colors shadow-sm">View my reviews</StxLink>
+      <StxLink to="/my-reviews?status=pending" class="px-4 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors shadow-sm">View my reviews</StxLink>
       <StxLink x-to="`/judges/${submitted().judgeId}/profile`" class="px-4 py-2 font-semibold text-gray-700 text-sm bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 rounded-md transition-colors">Back to the judge</StxLink>
       <StxLink to="/review" class="px-4 py-2 font-semibold text-gray-700 text-sm bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 rounded-md transition-colors">Write another</StxLink>
     </div>
@@ -490,7 +490,7 @@
             x-disabled="!judge"
             placeholder="Brief summary of your experience"
             class="block px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border rounded-md focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-            x-class="titleError() ? 'border-red-500 ring-2 ring-red-300' : 'border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-200'"
+            x-class="titleError() ? 'border-red-500 ring-2 ring-red-300' : 'border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'"
           >
         </div>
       </div>
@@ -555,11 +555,11 @@
          staff, junior attorneys) often genuinely needs this; for
          everyone else, leaving it off boosts the future verified-
          credentials badge (#37) on their review. -->
-    <label class="flex gap-3 items-start mb-5 p-4 bg-amber-50/50 border border-amber-200/60 rounded-md cursor-pointer hover:bg-amber-50">
+    <label class="flex gap-3 items-start mb-5 p-4 bg-blue-50/50 border border-blue-200/60 rounded-md cursor-pointer hover:bg-blue-50">
       <input
         type="checkbox"
         x-model="anonymized"
-        class="mt-0.5 h-4 w-4 text-gray-900 border-gray-300 rounded focus:ring-2 focus:ring-gray-900 focus:ring-offset-0"
+        class="mt-0.5 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-600 focus:ring-offset-0"
       >
       <div class="flex-1">
         <p class="font-semibold text-gray-900 text-sm">Post this review anonymously</p>
@@ -585,10 +585,10 @@
         data-submit-review
         @click="handleSubmit()"
         x-disabled="!judge() || reviewsStore.submitting()"
-        class="inline-flex items-center justify-center px-5 py-2 font-semibold text-sm text-white rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-900 focus-visible:outline-offset-2 shadow-sm"
+        class="inline-flex items-center justify-center px-5 py-2 font-semibold text-sm text-white rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 shadow-sm"
         x-class="[
           judge() && !reviewsStore.submitting()
-            ? 'bg-gray-900 hover:bg-gray-700'
+            ? 'bg-blue-600 hover:bg-blue-700'
             : 'bg-gray-300 cursor-not-allowed'
         ]"
       ><svg :if="reviewsStore.submitting()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg><span>{{ reviewsStore.submitting() ? 'Submitting…' : 'Submit Review' }}</span></button>

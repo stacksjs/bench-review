@@ -273,14 +273,14 @@
               x-model="responseDraft"
               rows="4"
               placeholder="Enter the judge's official response…"
-              class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm bg-white border border-gray-300 rounded-md focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
+              class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
             ></textarea>
             <div class="flex gap-x-2 mt-2">
               <button
                 type="button"
                 @click="saveResponse(review)"
                 x-disabled="savingResponse"
-                class="inline-flex items-center justify-center px-3 py-1.5 font-semibold text-white text-xs bg-gray-900 hover:bg-gray-800 rounded disabled:opacity-50"
+                class="inline-flex items-center justify-center px-3 py-1.5 font-semibold text-white text-xs bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50"
               >
                 <svg :if="savingResponse()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
                 <span>{{ savingResponse() ? 'Saving…' : 'Save response' }}</span>

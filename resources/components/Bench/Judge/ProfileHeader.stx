@@ -147,7 +147,7 @@
           x-class="[
             isFollowing
               ? 'bg-white text-gray-900 ring-1 ring-gray-300 hover:bg-gray-50 focus-visible:outline-gray-300'
-              : 'bg-gray-900 text-white hover:bg-gray-700 focus-visible:outline-gray-900'
+              : 'bg-blue-600 text-white hover:bg-blue-700 focus-visible:outline-blue-600'
           ]"
         >{{ followPending ? '…' : (isFollowing ? 'Following' : 'Follow') }}</button>
 
