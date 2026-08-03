@@ -20,7 +20,7 @@ The Stacks framework first looks for files in this `app/` directory. If a file i
 
 To override the default `PostIndexAction`, create:
 
-```
+```txt
 app/Actions/Cms/PostIndexAction.ts
 ```
 

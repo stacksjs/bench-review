@@ -7,22 +7,29 @@
   // The claim rides the credential rails (POST /api/me/judge-claim) and an
   // admin verifies identity before the judge can respond to reviews.
 
+  interface JudgeResult {
+    id: number
+    name: string
+    location?: string
+    court?: { name: string }
+  }
+
   const authStore = useStore('auth')
   const isAuthed = authStore.isAuthenticated
   const toast = useStore('toast')
 
   const query = state('')
-  const results = state([])
+  const results = state<JudgeResult[]>([])
   const searching = state(false)
-  const selected = state(null)
+  const selected = state<JudgeResult | null>(null)
   const submitting = state(false)
   const phase = state('idle') // 'idle' | 'claimed' | 'error'
   const errorMsg = state('')
   const claimedName = state('')
 
   let searchTimer = 0
-  function onSearch(e) {
-    const value = (e.target).value
+  function onSearch(e: Event): void {
+    const value = (e.target as HTMLInputElement).value
     query.set(value)
     selected.set(null)
     if (typeof window !== 'undefined')
@@ -52,7 +59,7 @@
     }
   }
 
-  function pick(judge) {
+  function pick(judge: JudgeResult): void {
     selected.set(judge)
     results.set([])
     query.set(judge.name)

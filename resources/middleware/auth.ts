@@ -20,6 +20,7 @@ import type { MiddlewareContext } from 'bun-plugin-stx/serve'
  * Returning a `Response` short-circuits the request (typical: 302 to
  * /login via `ctx.redirect`). Returning `null` lets the page render.
  */
+// eslint-disable-next-line pickier/no-unused-vars -- `req` is fixed by the middleware signature; only `ctx` is used
 export default function authMiddleware(req: Request, ctx: MiddlewareContext): Response | null {
   // The cookie name MUST stay in lock-step with the SPA store's
   // `AUTH_COOKIE` (resources/stores/auth.ts) and

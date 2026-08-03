@@ -31,6 +31,7 @@ defineStore('confirm', () => {
   const cancelLabel = state<string>('Cancel')
   const danger = state<boolean>(false)
 
+  // eslint-disable-next-line pickier/no-unused-vars -- param name documents the callback shape
   let resolver: ((ok: boolean) => void) | null = null
 
   function settle(ok: boolean): void {

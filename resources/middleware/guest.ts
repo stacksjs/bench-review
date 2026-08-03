@@ -12,6 +12,7 @@ import type { MiddlewareContext } from 'bun-plugin-stx/serve'
  *       definePageMeta({ middleware: ['guest'] })
  *     </script>
  */
+// eslint-disable-next-line pickier/no-unused-vars -- `req` is fixed by the middleware signature; only `ctx` is used
 export default function guestMiddleware(req: Request, ctx: MiddlewareContext): Response | null {
   const token = ctx.cookies['auth-token']
   if (token) {

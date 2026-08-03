@@ -95,7 +95,7 @@
     justifyRight: 'Align right',
   }
 
-  function applyToolbarIcons(toolbarEl) {
+  function applyToolbarIcons(toolbarEl: HTMLElement): void {
     if (!toolbarEl) return
     toolbarEl.querySelectorAll('button[data-action]').forEach((btn) => {
       const action = btn.getAttribute('data-action')
@@ -146,7 +146,7 @@
     justifyRight: 'justifyRight',
   }
 
-  function attachCaretFixHandlers(toolbarEl, editable) {
+  function attachCaretFixHandlers(toolbarEl: HTMLElement, editable: HTMLElement): void {
     if (!toolbarEl) return
     toolbarEl.querySelectorAll('button[data-action]').forEach((btn) => {
       if (btn.__benchClickPatched) return
@@ -233,7 +233,7 @@
     h3: 'h3',
     quote: 'blockquote',
   }
-  function closestBlockTag(editable) {
+  function closestBlockTag(editable: HTMLElement): string {
     const sel = window.getSelection()
     if (!sel || sel.rangeCount === 0) return ''
     const node = sel.getRangeAt(0).startContainer
@@ -246,7 +246,7 @@
     }
     return ''
   }
-  function attachBlockFormatHandlers(toolbarEl, editable) {
+  function attachBlockFormatHandlers(toolbarEl: HTMLElement, editable: HTMLElement): void {
     if (!toolbarEl) return
     toolbarEl.querySelectorAll('button[data-action]').forEach((btn) => {
       if (btn.__benchBlockPatched) return
@@ -278,7 +278,7 @@
     })
   }
 
-  function mountRichTextHost(host) {
+  function mountRichTextHost(host: HTMLElement): void {
     // Idempotency guard — MutationObserver below can fire multiple times
     // for the same host (attribute changes, child additions); don't
     // re-instantiate.
