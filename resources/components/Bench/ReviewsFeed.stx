@@ -69,6 +69,62 @@
     }
   }
 
+  // ── Reader: report/flag a review (bench-review#27) ───────────────
+  //
+  // One shared dialog for the whole feed, parameterized by which card
+  // opened it (flagTargetId). Anonymous-friendly. Mirrors the article
+  // page's report flow; the POST lives in the reviews store.
+  const flagTargetId = state<number>(0)
+  const flagOpen = state<boolean>(false)
+  const flagReason = state<string>('off_topic')
+  const flagDetails = state<string>('')
+  const flagSubmitting = state<boolean>(false)
+  const flagError = state<string>('')
+  const flagSubmitted = state<boolean>(false)
+  const flagReasonOptions = [
+    { value: 'off_topic', label: 'Off-topic — not actually about this judge' },
+    { value: 'harassment', label: 'Harassment or personal attack' },
+    { value: 'spam', label: 'Spam or promotional content' },
+    { value: 'privacy', label: 'Reveals private information' },
+    { value: 'inaccurate', label: 'Factually inaccurate' },
+    { value: 'other', label: 'Other — see details' },
+  ]
+
+  function openFlag(reviewId: number): void {
+    flagTargetId.set(reviewId)
+    flagReason.set('off_topic')
+    flagDetails.set('')
+    flagError.set('')
+    flagSubmitted.set(false)
+    flagOpen.set(true)
+  }
+  function closeFlag(): void {
+    flagOpen.set(false)
+  }
+  async function submitFlagFeed(): Promise<void> {
+    if (flagSubmitting()) return
+    const id = flagTargetId()
+    if (!id) {
+      flagError.set('Cannot identify the review.')
+      return
+    }
+    flagSubmitting.set(true)
+    flagError.set('')
+    try {
+      const result = await reviewsStore.flagReview(id, flagReason(), flagDetails())
+      if (!result.ok) {
+        flagError.set(result.error || 'Could not send the report — try again.')
+        return
+      }
+      flagSubmitted.set(true)
+      flagDetails.set('')
+      setTimeout(() => { flagOpen.set(false); flagSubmitted.set(false) }, 2000)
+    }
+    finally {
+      flagSubmitting.set(false)
+    }
+  }
+
   // Fire fetches in BOTH top-level AND onMount. Top-level runs on
   // hard-reload hydration (onMount doesn't — see
   // feedback_onmount_not_on_hydration). onMount runs on SPA nav (the
@@ -370,6 +426,14 @@
             <span class="absolute inset-0" aria-hidden="true"></span>
             Read more
           </StxLink>
+          {{-- Report. relative z-10 to sit above the card-cover link overlay.
+               Hidden on the reader's own reviews (reporting your own is moot). --}}
+          <button
+            :if="!review.isOwn"
+            type="button"
+            @click="openFlag(review.id)"
+            class="relative z-10 text-gray-400 text-sm hover:text-red-600 hover:underline underline-offset-2 transition-colors"
+          >Report</button>
         </div>
       </div>
     </div>
@@ -404,5 +468,48 @@
       >Next</button>
     </nav>
     <p class="text-gray-500 text-xs">{{ 'Page ' + reviewsStore.feedPage() + ' of ' + reviewsStore.feedLastPage() + ' · ' + reviewsStore.feedTotal() + ' reviews' }}</p>
+  </div>
+
+  {{-- Shared report dialog for the feed. x-class toggle (not :if) so the
+       inner reactive bindings stay subscribed across open/close. Targets
+       whichever card opened it (flagTargetId). --}}
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40"
+    x-class="flagOpen() ? '' : 'hidden'"
+    @click.self="closeFlag()"
+  >
+    <div class="w-full max-w-md p-6 bg-white rounded-lg shadow-xl">
+      <h3 class="font-semibold text-base text-gray-900">Report this review</h3>
+      <p class="mt-1 text-gray-500 text-xs">A moderator will look at flagged reviews and decide what to do. Reporters stay anonymous to the author either way.</p>
+
+      <div class="mt-4">
+        <label class="block font-medium text-gray-900 text-xs">What's wrong with it?</label>
+        <div class="mt-2 space-y-1.5">
+          <label :for="opt in flagReasonOptions" class="flex items-center gap-2 px-3 py-2 text-gray-700 text-sm bg-white border border-gray-200 hover:bg-gray-50 rounded-md cursor-pointer transition-colors">
+            <input type="radio" name="feed_flag_reason" x-model="flagReason" :value="opt.value">
+            <span>{{ opt.label }}</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <label for="feed-flag-details" class="block font-medium text-gray-900 text-xs">Optional details</label>
+        <textarea
+          id="feed-flag-details"
+          x-model="flagDetails"
+          rows="3"
+          placeholder="Give us more context — only the moderator sees this."
+          class="block mt-1 px-3 py-2 w-full text-gray-900 sm:leading-6 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+        ></textarea>
+      </div>
+
+      <div role="alert" class="mt-3 px-3 py-2 text-red-800 text-xs bg-red-50 border border-red-200 rounded-md" x-class="flagError() ? '' : 'hidden'">{{ flagError() }}</div>
+      <div role="status" class="mt-3 px-3 py-2 text-emerald-800 text-xs bg-emerald-50 border border-emerald-200 rounded-md" x-class="flagSubmitted() ? '' : 'hidden'">Thanks — a moderator will take a look.</div>
+
+      <div class="flex justify-end gap-x-2 mt-5">
+        <button type="button" @click="closeFlag()" class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancel</button>
+        <button type="button" @click="submitFlagFeed()" x-disabled="flagSubmitting" class="px-3 py-1.5 font-medium text-white text-sm bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50">{{ flagSubmitting() ? 'Sending…' : 'Send report' }}</button>
+      </div>
+    </div>
   </div>
 </div>

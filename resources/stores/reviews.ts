@@ -497,6 +497,26 @@ defineStore('reviews', () => {
   // peeking into both slices themselves.
   const hasAnyLatest = derived<boolean>(() => latest().length > 0)
 
+  // Flag/report a review for moderation (bench-review#27). Anonymous-friendly
+  // (authFetch attaches a token when present; the endpoint allows anonymous
+  // reports and de-dupes per reporter). Returns a plain result the caller toasts.
+  async function flagReview(reviewId: number, reason: string, details: string | null): Promise<{ ok: boolean, error?: string, duplicate?: boolean }> {
+    try {
+      const res = await useStore('auth').authFetch(`/api/reviews/${reviewId}/flag`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason, details: details && details.trim() ? details.trim() : null }),
+      })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean, error?: string, duplicate?: boolean }
+      if (!res.ok || !data.ok)
+        return { ok: false, error: data.error || 'Could not send the report — try again.', duplicate: data.duplicate }
+      return { ok: true, duplicate: data.duplicate }
+    }
+    catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'Network error' }
+    }
+  }
+
   return {
     latest,
     byJudge,
@@ -523,6 +543,7 @@ defineStore('reviews', () => {
     updateOwn,
     deleteOwn,
     toggleLike,
+    flagReview,
     uploadPhotos,
     fetchDraft,
     saveDraft,
