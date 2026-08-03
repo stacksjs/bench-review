@@ -79,6 +79,15 @@ Everything else in `core/` is stock 0.70.190 and comes from the published packag
 
 ## Track A — Framework model conversion
 
+> **✅ DONE 2026-08-03 — commit `6cd9bf7c`, branch `chore/stacks-node-modules`.** `storage/framework/core`
+> deleted; `stacks` is a published dep (pinned `0.70.190`, transitives at `0.70.251`, locked in
+> `bun.lock`); `workspaces` removed. Forks kept via `scripts/link-forks.ts` postinstall overlay —
+> **bqb + ts-medium-editor only; the stx monorepo fork was dropped** (stale dist vs published 0.2.152,
+> missing `bracketPathToRegex`) so bench uses published stx. Model bumps are now
+> `rm -rf node_modules && bun install`. Verified: framework resolution, model globals via
+> `injectGlobalAutoImports`, runtime module load, `./buddy --help`. **Pending user smoke:** restart
+> `./buddy dev`, confirm pages render + DB works (watch the bqb fork at framework 0.70.251).
+
 ### Stage A0 — Preflight capture (SAFE; no install, no delete)
 **Goal:** make the conversion reversible and prove the patch surface before mutating anything.
 1. `git switch -c chore/framework-node-modules` — dedicated branch; the 168MB delete + lockfile
