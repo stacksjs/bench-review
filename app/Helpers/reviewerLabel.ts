@@ -54,7 +54,7 @@ const ROLE_DISPLAY: Record<string, string> = {
  * my review" (to hide the helpful button on your own); `is_mine` carries
  * exactly that without exposing the id of anyone else.
  */
-export function toPublicReviewRow<T extends { user_id?: number | null }>(
+export function toPublicReviewRow<T extends Record<string, any>>(
   row: T,
   viewerId: number | null,
 ): Omit<T, 'user_id'> & { is_mine: boolean } {

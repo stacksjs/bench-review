@@ -33,6 +33,7 @@ export default new Action({
   // `handle` receives the `user:registered` payload, not a request. The
   // Action type only models request handlers, so tsc flags the signature
   // (a known framework listener-typing gap, identical on SendWelcomeEmail).
+  // @ts-expect-error — listener handle receives the event payload, not a request
   async handle({ id, email, name }: RegisteredPayload) {
     if (!id || !email)
       return { success: false, message: 'Registration payload missing id/email.' }

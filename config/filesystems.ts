@@ -13,7 +13,7 @@ import { env } from '@stacksjs/env'
  * (`local` | `s3`). S3 settings live in the `s3` export below.
  */
 export default {
-  default: env.FILESYSTEM_DISK || 'local',
+  default: String(env.FILESYSTEM_DISK || 'local'),
 
   disks: {
     local: {

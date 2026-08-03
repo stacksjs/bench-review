@@ -107,9 +107,9 @@ function createS3Disk(): Disk {
   const urlFor = (key: string) => {
     const k = prefixed(key)
     if (s3Config.publicUrl)
-      return `${s3Config.publicUrl.replace(/\/+$/, '')}/${k}`
+      return `${String(s3Config.publicUrl).replace(/\/+$/, '')}/${k}`
     if (s3Config.endpoint)
-      return `${s3Config.endpoint.replace(/\/+$/, '')}/${s3Config.bucket}/${k}`
+      return `${String(s3Config.endpoint).replace(/\/+$/, '')}/${s3Config.bucket}/${k}`
     return `https://${s3Config.bucket}.s3.${s3Config.region}.amazonaws.com/${k}`
   }
 
@@ -137,7 +137,7 @@ const cache: Record<string, Disk> = {}
  * Adapters are memoised so the S3 client is built once per process.
  */
 export function disk(name?: DiskName): Disk {
-  const diskName = name || filesystems.default || 'local'
+  const diskName = (name || filesystems.default || 'local') as DiskName
   if (cache[diskName])
     return cache[diskName]
 
@@ -155,5 +155,5 @@ export function disk(name?: DiskName): Disk {
 
 /** The default disk's name — handy for logging which target is active. */
 export function defaultDiskName(): string {
-  return filesystems.default || 'local'
+  return String(filesystems.default || 'local')
 }

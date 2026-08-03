@@ -22,7 +22,7 @@ import { db } from '@stacksjs/database'
  * instances. `Response.json()` would otherwise serialise the model
  * via its `toJSON` and drop properties added after the spread.
  */
-export async function hydrateLikeData<T extends { id: number }>(
+export async function hydrateLikeData<T extends Record<string, any>>(
   rows: T[],
 ): Promise<Array<T & { likes: number, liked_by_me: boolean }>> {
   if (rows.length === 0)

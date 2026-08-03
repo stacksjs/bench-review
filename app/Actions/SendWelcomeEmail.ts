@@ -11,6 +11,8 @@ export default new Action({
   name: 'SendWelcomeEmail',
   description: 'Sends a welcome email to newly registered users',
 
+  // @ts-expect-error — event-listener handle receives the payload, not a request
+  // (Action only models request handlers; see SendEmailVerification for the note).
   async handle({ to, name }: WelcomeEmailParams) {
     const appName = config.app.name || 'our app'
     const url = config.app.url || 'https://localhost:5173'

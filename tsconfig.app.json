@@ -46,8 +46,14 @@
     "build.ts",
     "preview.ts",
     "types/**/*.d.ts",
-    "storage/framework/types/*.d.ts",
-    "storage/framework/auto-imports/globals.d.ts"
+    // Only the row-typed model globals + server auto-imports. NOT the broad
+    // storage/framework/types/*.d.ts glob — its auto-imports.d.ts types the
+    // framework's own models (User/Websocket/Subscriber) as @stacksjs/orm
+    // `boolean` stubs, which then win over user-models.d.ts's real row types.
+    // And NOT auto-imports/globals.d.ts, which drags the framework-default
+    // function barrel (craft/coupons/taggables) into the app program.
+    "storage/framework/types/user-models.d.ts",
+    "storage/framework/types/server-auto-imports.d.ts"
   ],
   "exclude": [
     "pantry",
@@ -55,6 +61,16 @@
     "**/node_modules",
     "database/migrations",
     "**/*.test.ts",
-    "**/*.spec.ts"
+    "**/*.spec.ts",
+    // Dead framework-default CMS/Logs scaffolds for models bench doesn't use
+    // (Post/Page/Comment/Categorizable/Taggable/Log). They import per-model
+    // `*RequestType`s that the vendored ORM once generated into core/orm/src;
+    // the node_modules migration dropped that source, and published @stacksjs/orm
+    // doesn't ship app-generated request types. The actions still load at runtime
+    // (types erase) — they're just not part of the meaningful app typecheck.
+    "app/Actions/Cms",
+    "app/Actions/Logs",
+    "app/Actions/LogAction.ts",
+    "app/Actions/StoreEmailSubscriptionsAction.ts"
   ]
 }

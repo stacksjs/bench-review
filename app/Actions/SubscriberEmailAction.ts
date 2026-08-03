@@ -1,6 +1,5 @@
 import { Action } from '@stacksjs/actions'
 import { HttpError } from '@stacksjs/error-handling'
-import { Subscriber } from '@stacksjs/orm'
 import { sendSubscriptionConfirmation } from '../Mail/SubscriptionConfirmation'
 
 /**
