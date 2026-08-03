@@ -166,6 +166,30 @@ defineStore('judges', () => {
     }, delay)
   }
 
+  /**
+   * One-shot server search that RETURNS results instead of writing the shared
+   * `searchResults` slice — used by the judge-claim signup flow, which needs its
+   * own result list independent of the header typeahead. Keeps fetch out of the
+   * component (see: no fetches in components).
+   */
+  async function fetchJudgeSearch(query: string): Promise<Judge[]> {
+    const trimmed = query.trim()
+    if (!trimmed)
+      return []
+    try {
+      const res = await useStore('auth').authFetch(`/api/judges/search?q=${encodeURIComponent(trimmed)}`)
+      if (!res.ok)
+        return []
+      const data = await res.json() as Judge[]
+      return Array.isArray(data) ? data : []
+    }
+    catch (err: any) {
+      if (err?.name !== 'AbortError')
+        console.error('[judges] fetchJudgeSearch failed:', err)
+      return []
+    }
+  }
+
   return {
     judges,
     courtHouses,
@@ -183,5 +207,6 @@ defineStore('judges', () => {
     fetchJudges,
     fetchCourtHouses,
     searchJudges,
+    fetchJudgeSearch,
   }
 })

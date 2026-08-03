@@ -17,6 +17,7 @@
   const authStore = useStore('auth')
   const isAuthed = authStore.isAuthenticated
   const toast = useStore('toast')
+  const judgesStore = useStore('judges')
 
   const query = state('')
   const results = state<JudgeResult[]>([])
@@ -47,12 +48,7 @@
       return
     searching.set(true)
     try {
-      const res = await fetch(`/api/judges/search?q=${encodeURIComponent(q)}`)
-      const data = await res.json().catch(() => [])
-      results.set(Array.isArray(data) ? data : [])
-    }
-    catch {
-      results.set([])
+      results.set(await judgesStore.fetchJudgeSearch(q))
     }
     finally {
       searching.set(false)

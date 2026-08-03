@@ -378,6 +378,27 @@ defineStore('auth', () => {
     }
   }
 
+  /**
+   * Verify an emailed link token. Public (pre-auth) endpoint, so it uses a
+   * plain fetch rather than authFetch. Keeps fetch out of the component.
+   */
+  async function verifyEmail(userId: number, token: string): Promise<{ ok: boolean, message?: string }> {
+    try {
+      const res = await fetch('/api/auth/verify-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, token }),
+      })
+      const data = await res.json().catch(() => ({})) as { success?: boolean, message?: string }
+      if (!res.ok || !data.success)
+        return { ok: false, message: data.message || 'This verification link is invalid or has expired.' }
+      return { ok: true }
+    }
+    catch {
+      return { ok: false, message: 'Could not reach the server — please try again.' }
+    }
+  }
+
   return {
     user,
     token,
@@ -388,6 +409,7 @@ defineStore('auth', () => {
     signIn,
     signUp,
     logout,
+    verifyEmail,
     getUser,
     setUser,
     uploadAvatar,

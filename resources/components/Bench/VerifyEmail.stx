@@ -33,25 +33,14 @@
     if (!link)
       return
     phase.set('verifying')
-    try {
-      const res = await fetch('/api/auth/verify-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: link.id, token: link.token }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok || !data.success) {
-        message.set(data.message || 'This verification link is invalid or has expired.')
-        phase.set('error')
-        return
-      }
-      phase.set('verified')
-      setTimeout(() => { navigate('/profile', true) }, 1800)
-    }
-    catch {
-      message.set('Could not reach the server — please try again.')
+    const result = await authStore.verifyEmail(link.id, link.token)
+    if (!result.ok) {
+      message.set(result.message || 'This verification link is invalid or has expired.')
       phase.set('error')
+      return
     }
+    phase.set('verified')
+    setTimeout(() => { navigate('/profile', true) }, 1800)
   }
 
   async function resend() {

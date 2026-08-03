@@ -13,6 +13,7 @@
   // contains an entity-encoded string literal and dies with
   // "Unexpected token &" on every page load.
   const toast = useStore('toast')
+  const subscribeStore = useStore('subscribe')
 
   function parseApiErrorMessage(text: string): string {
     if (!text) return 'Please try again.'
@@ -30,24 +31,14 @@
 
   async function submitEmail(): Promise<void> {
     loading.set(true)
-    try {
-      const response = await fetch('/api/subscribe', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({ email: email() }),
-      })
-      if (!response.ok) {
-        const body = await response.text().catch(() => '')
-        toast.error(`Subscription failed (${response.status})`, parseApiErrorMessage(body))
-      } else {
-        toast.success('Thanks!', "You're on the list. Stay tuned for more updates.")
-        email.set('')
-      }
-    } catch {
+    const result = await subscribeStore.subscribe(email())
+    if (result.ok) {
+      toast.success('Thanks!', "You're on the list. Stay tuned for more updates.")
+      email.set('')
+    } else if (result.status === 0) {
       toast.error('Network error', 'Please try again.')
+    } else {
+      toast.error(`Subscription failed (${result.status})`, parseApiErrorMessage(result.body))
     }
     loading.set(false)
   }
