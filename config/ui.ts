@@ -47,10 +47,48 @@ export default {
   theme: {
     // ...
     colors: {
-      veryCool: '#0000ff', // class="text-very-cool"
+      veryCool: '#0000ff', // utility class text-very-cool
       brand: {
-        primary: 'hsl(var(--hue, 217) 78% 51%)', // class="bg-brand-primary"
+        primary: 'hsl(var(--hue, 217) 78% 51%)', // utility class bg-brand-primary
       },
     },
+  },
+
+  // stx's client-script DOM guard (validateClientScript, run on every non-server
+  // <script> body at render). WARN-ONLY: failOnViolation stays false so it never
+  // throws in dev or prod — it only surfaces raw-DOM usage on the dev-server
+  // terminal. Flip to true once the app is e2e-verified clean of anything not
+  // allowlisted below.
+  //
+  // allowPatterns is a rule-global substring match against each rule's message,
+  // so each entry grandfathers one prohibited pattern project-wide. The entries
+  // below are bench's DELIBERATE, documented deviations; the guard still catches
+  // every other prohibited pattern (document.cookie, innerHTML=, bare
+  // localStorage / location.assign, window.open, document.write, setInterval, …)
+  // — the categories bench does not use.
+  strict: {
+    enabled: true,
+    failOnViolation: false,
+    allowPatterns: [
+      // window-prefixed globals are deliberate: bare `location` / `history` get
+      // shadowed by store signals in stx scopes (documented footgun), so bench
+      // always qualifies them with `window.`.
+      'window.location',
+      'window.history',
+      'window.scrollTo',
+      'window.addEventListener',
+      'window.prompt',
+      // Hydration / ref node reads — bench reads its mount nodes by id.
+      'getElementById',
+      // Fire-once UI timers, all tracked and cancellable (audited: no leaks).
+      // setInterval is intentionally NOT allowlisted — poll loops must warn.
+      'setTimeout',
+      'clearTimeout',
+      // RichTextEditor wraps ts-medium-editor; DOM building is inherent to the
+      // third-party editor and cannot be expressed as directives.
+      'createElement',
+      'querySelector',
+      'document.addEventListener',
+    ],
   },
 } satisfies UiConfig
