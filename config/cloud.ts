@@ -19,21 +19,6 @@ export default {
       path: '../storage/framework/docs/dist',
     },
 
-    modals: {
-      domain: 'modals.stacksjs.org',
-      path: '../storage/framework/core/components/modals',
-    },
-
-    stepper: {
-      domain: 'stepper.stacksjs.org',
-      path: '../storage/framework/core/components/stepper',
-    },
-
-    notification: {
-      domain: 'notification.stacksjs.org',
-      path: '../storage/framework/core/components/notification',
-    },
-
     tlsx: {
       domain: 'tlsx.stacksjs.org',
       path: '../../tlsx/docs/dist',

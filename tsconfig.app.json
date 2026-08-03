@@ -10,12 +10,23 @@
   //   - exclude the vendored framework source, generated migrations, and
   //     the dead CMS/Logs scaffolds that import ORM request types the
   //     generator never emits.
-  "extends": "./storage/framework/core/tsconfig.json",
+  // Self-contained since the node_modules migration: no vendored core/tsconfig
+  // to extend; @stacksjs/* resolve from node_modules .d.ts (skipLibCheck ignores
+  // them). See docs/STX-MIGRATION-PLAN.md.
   "compilerOptions": {
-    // v0.70.190's base tsconfig dropped the explicit `strict` + `skipLibCheck`
-    // this app config was written to inherit (see note above re: "which
-    // skipLibCheck then ignores"). Pin them here so the app typecheck stays
-    // meaningful (node_modules .d.ts noise stays suppressed) across syncs.
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["bun"],
+    "jsx": "preserve",
+    "noEmit": true,
+    "allowJs": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    // Pin strict + skipLibCheck (the old base set these; a self-contained config
+    // must declare them) so the app typecheck stays meaningful.
     "strict": true,
     "skipLibCheck": true,
     "paths": {

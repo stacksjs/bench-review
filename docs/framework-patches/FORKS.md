@@ -11,3 +11,12 @@ Their `dist/` is prebuilt and gitignored in-repo — the fork dirs must exist an
 | ts-medium-editor | ~/Documents/Stacks/ts-medium-editor | 90a6de8 | toolbar collapsed-selection fix (unpublished past 0.1.0) |
 
 Published baseline at conversion: stacks 0.70.190, @stacksjs/stx 0.2.152, @stacksjs/components 0.2.152.
+
+## Deferred bun patch — ORM schema generator
+
+`orm-generate-database-schema.patched.ts` is bench's patched copy of
+`@stacksjs/orm`'s `generate-database-schema.ts` (reads the validator NAME, not the
+non-existent `attr.type`, to type model-row columns; cut app `as any` 490→119).
+It only runs on `buddy generate:db-types`. The generated `database/types.d.ts` is
+already committed, so nothing regresses at runtime. Re-home as `bun patch @stacksjs/orm`
+before the next schema regeneration, or the casts come back.

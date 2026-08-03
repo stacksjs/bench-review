@@ -1,3 +1,47 @@
 {
-  "extends": "./storage/framework/core/tsconfig.json"
+  // Self-contained: a node_modules app has no vendored storage/framework/core to
+  // extend, and resolves @stacksjs/* from node_modules (they ship .d.ts, which
+  // skipLibCheck then ignores) — not from a core/*/src path map or a pantry/*
+  // fallback. See docs/STX-MIGRATION-PLAN.md (framework-model conversion).
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["bun"],
+    "jsx": "preserve",
+    "strict": true,
+    "noEmit": true,
+    "allowJs": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "Actions/*": ["./app/Actions/*"],
+      "Commands/*": ["./app/Commands/*"],
+      "Jobs/*": ["./app/Jobs/*"],
+      "Middleware/*": ["./app/Middleware/*"],
+      "Models/*": ["./app/Models/*"],
+      "Notifications/*": ["./app/Notifications/*"],
+      "~/*": ["./*"],
+      "@/*": ["./resources/*"]
+    }
+  },
+  "include": [
+    "*.ts",
+    "*.d.ts",
+    "types/**/*.d.ts",
+    "app/Models/**/*.ts",
+    "app/Services/**/*.ts",
+    "app/Support/**/*.ts"
+  ],
+  "exclude": [
+    "cloud/**",
+    "dist/**",
+    "node_modules/**",
+    "pantry/**",
+    "storage/framework/**",
+    "resources/assets/**"
+  ]
 }
