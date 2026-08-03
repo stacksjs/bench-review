@@ -13,12 +13,11 @@
     "lint": "bunx --bun pickier .",
     "lint:fix": "bunx --bun pickier . --fix",
     "typecheck": "bun tsc --noEmit",
-    "typecheck:app": "bun tsc --noEmit -p tsconfig.app.json",
-    "postinstall": "bun scripts/link-forks.ts",
-    "link:forks": "bun scripts/link-forks.ts"
+    "typecheck:app": "bun tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
     "@stacksjs/components": "^0.2.82",
+    "bun-query-builder": "file:../../Projects/bun-query-builder/packages/bun-query-builder",
     "chart.js": "^4.5.1",
     "leaflet": "^1.9.4",
     "ofetch": "^1.5.1",
@@ -27,7 +26,7 @@
     "sharp": "^0.34.5",
     "stacks": "0.70.190",
     "ts-broadcasting": "^0.0.4",
-    "ts-medium-editor": "^0.1.0"
+    "ts-medium-editor": "file:../ts-medium-editor"
   },
   "devDependencies": {
     "@stacksjs/stx": "^0.2.82",

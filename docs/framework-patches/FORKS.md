@@ -1,16 +1,24 @@
 # Linked framework forks (bench-review)
 
-These three repos are linked into node_modules (unpublished patches bench depends on).
-After any `rm -rf node_modules && bun install`, bun re-links them from package.json `file:` deps.
-Their `dist/` is prebuilt and gitignored in-repo — the fork dirs must exist and be built.
+Two forks carry unpublished patches bench depends on. They are declared as native
+`file:` dependencies in `package.json` — **no install script** — so `rm -rf node_modules
+&& bun install` re-materializes them from the fork dirs. With `linker = "hoisted"` bun
+**copies** a `file:` dep into node_modules (not a symlink), so it captures the fork's
+prebuilt `dist/` at install time; live edits to a fork need a reinstall to take effect.
+The fork dirs must exist and be built (`dist/` is gitignored in each fork repo).
 
-| Package | Fork path | HEAD (2026-08-03) | Why linked |
-|---|---|---|---|
-| @stacksjs/stx + bun-plugin-stx | ~/Documents/Projects/stx | 316f9e2a | serve.js no-store, nested dynamic routes, signals.js body-scope-walk (SPA rebind) |
-| bun-query-builder | ~/Documents/Projects/bun-query-builder | 791f632 | 0.1.59 saveMigrationSnapshot, paginate WHERE shim, savepoint guard |
-| ts-medium-editor | ~/Documents/Stacks/ts-medium-editor | 90a6de8 | toolbar collapsed-selection fix (unpublished past 0.1.0) |
+| Package | package.json `file:` path | Fork dir | HEAD | Why forked |
+|---|---|---|---|---|
+| bun-query-builder | `../../Projects/bun-query-builder/packages/bun-query-builder` | ~/Documents/Projects/bun-query-builder | 791f632 | 0.1.59 saveMigrationSnapshot, paginate WHERE shim, savepoint guard |
+| ts-medium-editor | `../ts-medium-editor` | ~/Documents/Stacks/ts-medium-editor | 90a6de8 | toolbar collapsed-selection fix (unpublished past 0.1.0) |
 
-Published baseline at conversion: stacks 0.70.190, @stacksjs/stx 0.2.152, @stacksjs/components 0.2.152.
+**The stx monorepo fork (@stacksjs/stx + bun-plugin-stx) is NOT linked** — its dist was
+stale vs published 0.2.152 (missing `bracketPathToRegex`); bench uses published stx.
+Both forks above have zero `workspace:*` deps, which is why `file:` linking works for them
+(the stx sub-packages' workspace siblings are what made `file:` fail there).
+
+Published baseline at conversion: stacks 0.70.190 (transitives float to latest 0.70.x),
+@stacksjs/stx 0.2.152, @stacksjs/components 0.2.152.
 
 ## Deferred bun patch — ORM schema generator
 
