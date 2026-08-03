@@ -217,10 +217,10 @@
       <p class="mt-4 text-gray-600 text-lg">Find and review judges across the United States</p>
     </div>
 
-    <!-- Practice-area filter pills (bench-review#38). Sit above the
+    {{-- Practice-area filter pills (bench-review#38). Sit above the
          search/select panel so the user's first filter act is by
          specialty, then they narrow further with the text search.
-         URL-driven via ?practice_area=<value>. -->
+         URL-driven via ?practice_area=<value>. --}}
     <div class="flex flex-wrap gap-2 mb-6" role="tablist" aria-label="Filter by practice area">
       <button
         type="button"
@@ -265,9 +265,9 @@
       </div>
     </div>
 
-    <!-- State filter (bench-review#30). Auto-populated from the
+    {{-- State filter (bench-review#30). Auto-populated from the
          loaded judges' courthouse rows. Only shows states that
-         actually have judges to filter to. -->
+         actually have judges to filter to. --}}
     <div :if="availableStates.length > 0" class="flex flex-wrap gap-2 mb-3" role="tablist" aria-label="Filter by state">
       <button
         type="button"
@@ -284,9 +284,9 @@
         x-class="stateFilter === s ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'">{{ s }}</button>
     </div>
 
-    <!-- Rating-threshold + activity filter rows. URL-driven via
+    {{-- Rating-threshold + activity filter rows. URL-driven via
          ?rating=N&has_reviews=with|without. Compose with the
-         state + practice-area filters above. -->
+         state + practice-area filters above. --}}
     <div class="flex flex-wrap gap-2 mb-3" role="tablist" aria-label="Filter by rating">
       <button
         type="button"
@@ -348,10 +348,10 @@
         x-to="`/judges/${judge.id}/profile`"
         class="overflow-hidden relative flex flex-col bg-white border border-gray-200 rounded-2xl hover:border-gray-300 shadow-sm hover:shadow-lg hover:-translate-y-0.5 duration-300 transition-all group"
       >
-          <!-- Banner strip: courthouse photo behind a strong scrim so the
+          {{-- Banner strip: courthouse photo behind a strong scrim so the
                card stays readable and the photo just hints at scale. The
                avatar centers OVER this band so the court chip sits cleanly
-               in the white area below — no overlap with the avatar disc. -->
+               in the white area below — no overlap with the avatar disc. --}}
           <div class="relative h-28 bg-gradient-to-br from-gray-100 to-gray-50">
             <img
               x-src="judge.court.image"
@@ -361,9 +361,9 @@
             <div class="absolute inset-0 bg-gradient-to-b from-transparent to-white"></div>
           </div>
 
-          <!-- Avatar pulled up so it straddles the banner / body line.
+          {{-- Avatar pulled up so it straddles the banner / body line.
                -mt-16 keeps the bottom half of the disc in the white body
-               where the chip + text live, avoiding the readability problem. -->
+               where the chip + text live, avoiding the readability problem. --}}
           <div class="relative flex flex-col items-center px-6 pb-6 -mt-16">
             <div class="overflow-hidden h-28 w-28 ring-4 ring-white rounded-full bg-white shadow-md">
               <img
@@ -380,20 +380,20 @@
               class="mt-3 font-semibold text-gray-900 text-lg group-hover:text-gray-700 duration-200 transition-colors">{{ judge.name }}</h3>
             <p class="mt-1 text-gray-500 text-sm">{{ judge.location }}</p>
 
-            <!-- Review aggregates are lazy-loaded by /api/judges/:id/reviews
+            {{-- Review aggregates are lazy-loaded by /api/judges/:id/reviews
                  when a profile opens — they're NOT included on the
                  directory payload (avoids the N+1 join). Show a clean
                  "no reviews yet" hint here; the profile page renders
-                 the full stars + distribution. -->
+                 the full stars + distribution. --}}
             <span class="mt-3 text-gray-400 text-xs">No reviews yet</span>
           </div>
       </StxLink>
     </div>
 
-    <!-- Numbered pagination (client-side over the filtered roster).
+    {{-- Numbered pagination (client-side over the filtered roster).
          Wrapper x-class toggle (not :if) so it stays in the DOM and
          appears once last_page > 1. Numbered button uses item.cls
-         (precomputed) — no signal call-syntax in the :for. -->
+         (precomputed) — no signal call-syntax in the :for. --}}
     <div x-class="lastPage() > 1 ? 'flex flex-col items-center gap-3 mt-12' : 'hidden'">
       <nav class="flex flex-wrap items-center justify-center gap-1.5" aria-label="Pagination">
         <button
@@ -421,10 +421,10 @@
       <p class="text-gray-500 text-xs">{{ 'Page ' + Math.min(currentPage(), lastPage()) + ' of ' + lastPage() + ' · ' + filteredJudges().length + ' judges' }}</p>
     </div>
 
-    <!-- Empty state. Gated on !loading so it doesn't flash during the
+    {{-- Empty state. Gated on !loading so it doesn't flash during the
          initial fetch; copy + Clear-filters CTA branch on whether any
          filter is active. Rendered as a sibling of the grid (not wrapping
-         it) so it only appears when filteredJudges is empty. -->
+         it) so it only appears when filteredJudges is empty. --}}
     <div x-class="showEmpty() ? '' : 'hidden'" class="mt-2 p-12 text-center bg-gray-50 border border-gray-200 border-dashed rounded-2xl">
       <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />

@@ -183,10 +183,10 @@
 </script>
 
 <div class="min-h-screen bg-white">
-  <!-- Loading shell — shown while reviewsStore.fetchById is in
+  {{-- Loading shell — shown while reviewsStore.fetchById is in
        flight. Header is rendered immediately so the user has an
        anchor to read; the form section flips in once `ready` is
-       set by enforceOwnership(). -->
+       set by enforceOwnership(). --}}
   <div class="mx-auto pb-32 pt-12 sm:pt-16 px-4 sm:px-6 max-w-3xl">
     <div class="mb-8">
       <StxLink x-to="`/article/${reviewId}`" class="inline-flex items-center gap-1.5 text-gray-500 text-sm hover:text-gray-900 hover:underline underline-offset-2">
@@ -198,9 +198,9 @@
       </p>
     </div>
 
-    <!-- Form. Hidden until ownership has been confirmed and the row
+    {{-- Form. Hidden until ownership has been confirmed and the row
          has been seeded, so unauthorized viewers never see the
-         fields flash before the redirect fires. -->
+         fields flash before the redirect fires. --}}
     <div
       class="p-6 bg-white border border-gray-200 rounded-lg shadow-sm"
       x-class="ready ? '' : 'hidden'"
@@ -221,14 +221,14 @@
 
         <div>
           <label class="block font-medium text-gray-900 text-sm">Content</label>
-          <!-- Rich-text editor. The wrapper carries data-no-draft so
+          {{-- Rich-text editor. The wrapper carries data-no-draft so
                the editor's mount logic skips the localStorage compose
                draft restore (otherwise an article edit would clobber
                an in-progress new-review draft). data-edit-richtext-host
                is the selector enforceOwnership() uses to seed the
                existing HTML once the row has loaded. (No backticks in
                this comment — stx's script-merge would leak it to the
-               DOM; see feedback_stx_backtick_in_html_comment.) -->
+               DOM; see feedback_stx_backtick_in_html_comment.) --}}
           <div
             data-no-draft
             data-edit-richtext-host
@@ -283,9 +283,9 @@
       </div>
     </div>
 
-    <!-- Verifying shell. Visible only while ownership is being
+    {{-- Verifying shell. Visible only while ownership is being
          resolved — keeps the page from looking blank during the
-         single round-trip on hard reload. -->
+         single round-trip on hard reload. --}}
     <div
       class="p-6 text-gray-500 text-sm bg-gray-50 border border-gray-200 rounded-lg"
       x-class="ready ? 'hidden' : ''"

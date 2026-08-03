@@ -113,8 +113,8 @@
     <div :if="store.loading() && store.flags().length === 0" class="px-4 py-12 text-center text-gray-500 text-sm">
       Loading flags…
     </div>
-    <!-- x-class hidden (not :if) so inner bindings stay subscribed across
-         filter changes — the bindIf remove/re-add cycle drops them. -->
+    {{-- x-class hidden (not :if) so inner bindings stay subscribed across
+         filter changes — the bindIf remove/re-add cycle drops them. --}}
     <div
       class="px-6 py-16 text-center"
       x-class="!store.loading() && store.flags().length === 0 ? '' : 'hidden'"

@@ -5,7 +5,7 @@
 @section('content')
 <div class="min-h-screen">
   <div class="mx-auto px-6 py-24 sm:py-32 lg:px-8 max-w-7xl">
-    <!-- Mission -->
+    {{-- Mission --}}
     <div class="mx-auto max-w-3xl text-center">
       <h1 class="font-bold text-4xl text-gray-900 tracking-tight sm:text-5xl">
         Sunlight is the best disinfectant
@@ -15,7 +15,7 @@
       </p>
     </div>
 
-    <!-- Story -->
+    {{-- Story --}}
     <div class="mt-24 mx-auto max-w-3xl">
       <h2 class="font-bold text-3xl text-gray-900 tracking-tight">Our story</h2>
       <div class="mt-6 space-y-6 leading-7 text-base text-gray-700">
@@ -31,7 +31,7 @@
       </div>
     </div>
 
-    <!-- Values -->
+    {{-- Values --}}
     <div class="mt-24 mx-auto max-w-5xl">
       <h2 class="font-bold text-3xl text-center text-gray-900 tracking-tight">What we stand for</h2>
       <dl class="grid grid-cols-1 sm:grid-cols-3 mt-12 divide-y sm:divide-y-0 sm:divide-x divide-gray-200">
@@ -50,7 +50,7 @@
       </dl>
     </div>
 
-    <!-- Team -->
+    {{-- Team --}}
     <div class="mt-24 mx-auto max-w-5xl">
       <h2 class="font-bold text-3xl text-center text-gray-900 tracking-tight">Built by people who care</h2>
       <p class="mt-4 mx-auto max-w-2xl text-center text-gray-600">
@@ -58,7 +58,7 @@
       </p>
     </div>
 
-    <!-- CTA -->
+    {{-- CTA --}}
     <div class="mt-24 mx-auto max-w-3xl text-center">
       <h3 class="font-bold text-2xl text-gray-900">Ready to contribute?</h3>
       <p class="mt-4 text-gray-600">Join the legal professionals helping to keep the bench accountable.</p>

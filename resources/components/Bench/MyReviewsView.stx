@@ -168,7 +168,7 @@
 
 <div class="min-h-screen bg-gray-50">
   <div class="mx-auto px-4 py-10 sm:px-6 lg:px-8 max-w-5xl">
-    <!-- Page header -->
+    {{-- Page header --}}
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <p class="font-medium text-blue-600 text-xs tracking-widest uppercase">Your contributions</p>
@@ -185,10 +185,10 @@
       </div>
     </div>
 
-    <!-- Status filter pills. Click pushes a `?status=` query param;
+    {{-- Status filter pills. Click pushes a `?status=` query param;
          counts come from the derived `counts` over the full list so
          the user always sees how many sit in each bucket without
-         having to switch tabs. -->
+         having to switch tabs. --}}
     <div class="flex flex-wrap gap-2 mt-8" role="tablist" aria-label="Filter by status">
       <button
         type="button"
@@ -232,11 +232,11 @@
       </button>
     </div>
 
-    <!-- Loading skeleton (bench-review#35). Renders 3 placeholder card
+    {{-- Loading skeleton (bench-review#35). Renders 3 placeholder card
          shells matching the eventual row layout (title + badge + meta
          + snippet + action row) so there's no layout shift when data
          lands. Shown only on the first fetch — subsequent SPA nav
-         reuses the cached rows. -->
+         reuses the cached rows. --}}
     <ul :if="profileStore.loading && !profileStore.loaded" class="space-y-4 mt-8">
       <li :for="i in [1, 2, 3]" class="p-5 bg-white border border-gray-200 rounded-lg animate-pulse">
         <div class="flex items-baseline gap-3">
@@ -258,9 +258,9 @@
       </li>
     </ul>
 
-    <!-- Empty state — filter-aware copy + CTA. Hidden during the
+    {{-- Empty state — filter-aware copy + CTA. Hidden during the
          initial load to avoid the "no reviews" flash before the
-         first fetch returns. -->
+         first fetch returns. --}}
     <div :if="profileStore.loaded && filtered.length === 0" class="mt-10 p-10 text-center bg-white border border-gray-200 rounded-lg">
       <p class="font-semibold text-gray-900 text-base">{{ emptyTitle }}</p>
       <p class="mt-2 mx-auto max-w-md text-gray-500 text-sm">{{ emptyHint }}</p>
@@ -269,10 +269,10 @@
       </StxLink>
     </div>
 
-    <!-- List. Each row is a card; click anywhere on the title or
+    {{-- List. Each row is a card; click anywhere on the title or
          body navigates to /article/:id where edit/delete live. We
          deliberately don't inline destructive actions here — a
-         single-click delete on a list view is a footgun. -->
+         single-click delete on a list view is a footgun. --}}
     <ul :if="filtered.length > 0" class="space-y-4 mt-8">
       <li :for="r in visible" class="p-5 bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all">
         <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -312,10 +312,10 @@
       </li>
     </ul>
 
-    <!-- Numbered pagination (client-side over the filtered list).
+    {{-- Numbered pagination (client-side over the filtered list).
          Wrapper x-class toggle (not :if) so it stays in the DOM and
          appears once last_page > 1. Numbered button uses item.cls
-         (precomputed) — no signal call-syntax in the :for. -->
+         (precomputed) — no signal call-syntax in the :for. --}}
     <div x-class="lastPage() > 1 ? 'flex flex-col items-center gap-3 mt-8' : 'hidden'">
       <nav class="flex flex-wrap items-center justify-center gap-1.5" aria-label="Pagination">
         <button

@@ -198,7 +198,7 @@
   }
 </script>
 
-<!-- Stable wrapper is the component's scope root. Without it the FIRST
+{{-- Stable wrapper is the component's scope root. Without it the FIRST
      :if child also carries data-stx-scope, and when bindIf removes that
      element on initial render (because the condition is false), the
      scope vanishes and the sibling :if branches never get their
@@ -211,24 +211,24 @@
      (No backticks in this comment — stx's script-merge concatenates
      comment text into the merged setup function and a stray backtick
      flips the JS parser into template-literal mode, breaking every
-     following script.) -->
+     following script.) --}}
 <div>
-  <!-- Plain style tag (not @push) so the rule survives SPA nav — the
+  {{-- Plain style tag (not @push) so the rule survives SPA nav — the
        router swaps only main, and @push hoists to head where it is
        not re-injected. Underlines the title while hovering anywhere
-       on the stretched-link card. -->
+       on the stretched-link card. --}}
   <style>
     .review-card:hover .review-card-title {
       text-decoration: underline;
       text-underline-offset: 2px;
     }
   </style>
-  <!-- Soft sign-in nudge when anonymous user clicks "helpful." Same
+  {{-- Soft sign-in nudge when anonymous user clicks "helpful." Same
        pattern as ArticleView's footer prompt; we don't redirect to
        keep their scroll position. CSS-toggled (x-class hidden) rather
        than :if so the element stays in DOM and the message text
        binding stays subscribed — the bindIf remove-then-readd cycle
-       drops bindings on re-add. -->
+       drops bindings on re-add. --}}
   <div
     role="status"
     class="mb-4 px-3 py-2 text-blue-800 text-sm bg-blue-50 border border-blue-200 rounded-md"
@@ -241,11 +241,11 @@
     role="alert"
     class="mb-4 px-3 py-2 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
     x-class="likeError() ? '' : 'hidden'">{{ likeError() }}</div>
-  <!-- Loading skeleton (bench-review#35). Renders three placeholder
+  {{-- Loading skeleton (bench-review#35). Renders three placeholder
        review cards matching the eventual layout (avatar circle + name
        line + meta line + 3-line body + footer chip row) so the feed
        doesn't shift when the real data lands. animate-pulse is the
-       Tailwind/crosswind shimmer; no custom CSS needed. -->
+       Tailwind/crosswind shimmer; no custom CSS needed. --}}
   <div :if="reviewsStore.loadingFeed && reviews.length === 0" class="space-y-6">
     <div :for="i in [1, 2, 3]" class="py-6 animate-pulse border-b border-gray-200">
       <div class="flex items-center justify-between">
@@ -269,9 +269,9 @@
       </div>
     </div>
   </div>
-  <!-- Two empty states: filter-narrowed vs genuinely empty. The
+  {{-- Two empty states: filter-narrowed vs genuinely empty. The
        judgesStore.activeCategory signal drives the distinction so the
-       message matches what the user just clicked. -->
+       message matches what the user just clicked. --}}
   <div x-class="showFilteredEmpty() ? '' : 'hidden'" class="mt-2 p-10 text-center bg-gray-50 border border-gray-200 border-dashed rounded-xl">
     <svg class="mx-auto h-10 w-10 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
       <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/>
@@ -289,18 +289,18 @@
     <StxLink to="/review" class="inline-flex items-center mt-5 px-4 py-2 font-medium text-white text-sm bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">Write a review</StxLink>
   </div>
   <div :if="reviews.length > 0" class="space-y-6">
-    <!-- Whole card is clickable via a stretched link: the Read more
+    {{-- Whole card is clickable via a stretched link: the Read more
          anchor at the bottom carries an absolute inset-0 overlay span
          that fills this relative card. Inner links/buttons (author,
          judge, helpful) sit above it with relative z-10 so they keep
          their own click targets. No script navigation handler needed,
-         so SPA nav comes free from the existing StxLink. -->
+         so SPA nav comes free from the existing StxLink. --}}
     <div :for="review in reviews" class="relative review-card py-6 border-b border-gray-200">
-      <!-- Reviewer row. Seeded/anonymous reviews land here with author.id
+      {{-- Reviewer row. Seeded/anonymous reviews land here with author.id
            === 0 (the PLACEHOLDER_AUTHOR sentinel) — those rows must NOT
            render as profile links, otherwise the avatar + name route to
            `/profile/0` which 404s. Real authors (author.id > 0) keep the
-           profile link. -->
+           profile link. --}}
       <div class="flex items-center justify-between">
         <div class="flex items-center">
           <div :if="review.author.id === 0" class="flex-shrink-0">
@@ -320,13 +320,13 @@
         <span class="text-gray-600 text-sm">{{ review.date }}</span>
       </div>
 
-      <!-- Title + content -->
+      {{-- Title + content --}}
       <div class="mt-3">
         <h3 class="review-card-title mb-2 font-bold text-gray-900 text-xl">{{ review.title }}</h3>
         <p class="leading-relaxed line-clamp-3 text-base text-gray-700" x-html="review.content"></p>
       </div>
 
-      <!-- Judge name + rating + actions -->
+      {{-- Judge name + rating + actions --}}
       <div class="flex items-center justify-between mt-4">
         <div class="flex items-center space-x-3">
           <StxLink x-to="`/judges/${review.judge.id}/profile`" class="relative z-10 font-semibold text-base text-gray-900 hover:underline">{{ review.judge.name }}</StxLink>
@@ -335,7 +335,7 @@
           </div>
         </div>
         <div class="flex items-center space-x-4">
-          <!-- Reader: clickable heart + count. -->
+          {{-- Reader: clickable heart + count. --}}
           <button
             :if="!review.isOwn"
             type="button"
@@ -344,18 +344,18 @@
             x-class="review.liked ? 'text-blue-600' : 'text-gray-500 hover:text-gray-600'"
             aria-label="Mark helpful"
           >
-            <!-- Heart matches the article-page button so the helpful
+            {{-- Heart matches the article-page button so the helpful
                  metaphor is consistent across the feed → detail flow.
-                 Bookmark was the old shared-state placeholder. -->
+                 Bookmark was the old shared-state placeholder. --}}
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5 transition-colors">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
             </svg>
             <span class="tabular-nums">{{ review.likes }}</span>
           </button>
-          <!-- Author: read-only count. Still shows the reaction
+          {{-- Author: read-only count. Still shows the reaction
                total — it's useful feedback for the writer — but no
                click target. Same span shape so the layout doesn't
-               jump between own/other cards. -->
+               jump between own/other cards. --}}
           <span
             :if="review.isOwn"
             class="inline-flex items-center text-gray-400 text-sm"
@@ -374,11 +374,11 @@
       </div>
     </div>
   </div>
-  <!-- Numbered pagination. The wrapper x-class toggle (not :if) keeps it
+  {{-- Numbered pagination. The wrapper x-class toggle (not :if) keeps it
        in the DOM so it reactively appears once last_page > 1 is known.
        The numbered button uses item.cls (precomputed in pages()) so the
        :for carries no signal call-syntax. Prev/Next sit outside the :for
-       so their call-syntax x-class is fine. -->
+       so their call-syntax x-class is fine. --}}
   <div x-class="reviewsStore.feedLastPage() > 1 ? 'flex flex-col items-center gap-3 mt-12' : 'hidden'">
     <nav class="flex flex-wrap items-center justify-center gap-1.5" aria-label="Pagination">
       <button

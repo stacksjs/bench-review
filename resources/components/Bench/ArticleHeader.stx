@@ -4,7 +4,7 @@
       <h1 class="font-bold text-4xl text-gray-900 tracking-tight sm:text-5xl">{{ review.title }}</h1>
     </div>
 
-    <!-- Author and Judge info -->
+    {{-- Author and Judge info --}}
     <div class="flex items-center justify-between mt-8 pt-8 border-gray-200 border-t">
       <div class="flex items-center">
         <img class="h-12 w-12 rounded-full" x-src="review.author.imageUrl" x-alt="review.author.name">

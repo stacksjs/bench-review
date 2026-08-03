@@ -171,8 +171,8 @@
 </script>
 
 <div class="min-h-screen bg-gray-50">
-  <!-- Not-found state. Renders inline so the layout chrome stays
-       intact (no full-page 404). -->
+  {{-- Not-found state. Renders inline so the layout chrome stays
+       intact (no full-page 404). --}}
   <div :if="userNotFound" class="mx-auto px-4 py-24 sm:px-6 lg:px-8 max-w-3xl text-center">
     <p class="font-medium text-blue-600 text-xs tracking-widest uppercase">404 — not found</p>
     <h1 class="mt-4 font-serif font-bold text-4xl text-gray-900 tracking-tight">Reviewer not found</h1>
@@ -182,9 +182,9 @@
     </StxLink>
   </div>
 
-  <!-- Loaded state -->
+  {{-- Loaded state --}}
   <div :if="!userNotFound" class="mx-auto px-4 py-10 sm:px-6 lg:px-8 max-w-5xl">
-    <!-- Identity header -->
+    {{-- Identity header --}}
     <div class="overflow-hidden bg-[#0b1e3b] rounded-2xl">
       <div class="p-10">
         <div class="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
@@ -193,9 +193,9 @@
             <div>
               <div class="flex flex-wrap items-center gap-2">
                 <h1 class="font-bold text-2xl text-white">{{ displayName }}</h1>
-                <!-- Verified-credential badge (bench-review#37). Emerald
+                {{-- Verified-credential badge (bench-review#37). Emerald
                      check pill, only rendered when the API surfaced a
-                     non-null credential block (admin-approved). -->
+                     non-null credential block (admin-approved). --}}
                 <span
                   :if="verifiedCredential"
                   class="inline-flex items-center gap-1 px-2 py-0.5 font-medium text-emerald-200 text-xs bg-emerald-500/20 ring-1 ring-emerald-400/40 rounded-full"
@@ -228,7 +228,7 @@
       </div>
     </div>
 
-    <!-- Aggregate stats -->
+    {{-- Aggregate stats --}}
     <div class="grid gap-4 grid-cols-2 mt-8 lg:grid-cols-4">
       <div class="p-6 bg-white border border-gray-200 rounded-xl">
         <p class="text-gray-500 text-sm">Reviews</p>
@@ -248,11 +248,11 @@
       </div>
     </div>
 
-    <!-- Reviews list -->
+    {{-- Reviews list --}}
     <div class="mt-10">
       <h2 class="font-semibold text-base text-gray-900">{{ `${displayName}'s published reviews` }}</h2>
 
-      <!-- Loading skeleton -->
+      {{-- Loading skeleton --}}
       <ul :if="!reviewsLoaded" class="mt-6 space-y-4">
         <li :for="i in [1, 2, 3]" class="p-5 bg-white border border-gray-200 rounded-lg animate-pulse">
           <div class="flex items-baseline gap-3">
@@ -266,13 +266,13 @@
         </li>
       </ul>
 
-      <!-- Empty state -->
+      {{-- Empty state --}}
       <div :if="reviewsLoaded && reviews.length === 0" class="mt-6 p-10 text-center bg-white border border-gray-200 rounded-lg">
         <p class="font-semibold text-gray-900 text-base">No published reviews yet.</p>
         <p class="mt-2 text-gray-500 text-sm">{{ isOwnProfile() ? 'When a moderator approves your first review, it lands here.' : 'This reviewer hasn\'t had a review published yet.' }}</p>
       </div>
 
-      <!-- Reviews -->
+      {{-- Reviews --}}
       <ul :if="reviews.length > 0" class="space-y-4 mt-6">
         <li :for="r in reviews" class="p-5 bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all">
           <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">

@@ -441,7 +441,7 @@
 </script>
 
 <div class="min-h-screen bg-white">
-  <!-- Prose styles for the x-html'd review content. A plain <style>
+  {{-- Prose styles for the x-html'd review content. A plain <style>
        INSIDE the component body (NOT @push) on purpose: the SPA router
        swaps only <main> (config/stx.ts), and this component renders into
        <main> — so the style travels with the article fragment and is
@@ -450,7 +450,7 @@
        heading rendered unstyled when navigating in from another page);
        main.css custom rules aren't delivered to dev pages either. The
        inner blockquote/h2/li can't carry crosswind utility classes since
-       the HTML comes from the editor, so they need real CSS here. -->
+       the HTML comes from the editor, so they need real CSS here. --}}
   <style>
     .article-body {
       font-family: 'Charter', 'Iowan Old Style', 'Source Serif Pro', Georgia, Cambria, 'Times New Roman', serif;
@@ -513,19 +513,19 @@
     .article-body a:hover { color: #92400e; }
   </style>
 
-  <!-- Reading progress bar. Sits above all article chrome so it stays
+  {{-- Reading progress bar. Sits above all article chrome so it stays
        visible during sticky-header interactions. Width is the live
-       percentage from the scroll handler. -->
+       percentage from the scroll handler. --}}
   <div class="fixed inset-x-0 top-0 z-50 h-1 bg-transparent" style="pointer-events: none">
     <div class="h-full bg-blue-600 transition-all duration-100 ease-out" x-style="`width: ${readingProgress}%`"></div>
   </div>
 
-  <!-- Loading state -->
+  {{-- Loading state --}}
   <div :if="reviewsStore.loadingCurrent && !reviewsStore.current" class="mx-auto pb-32 pt-32 px-4 sm:px-6 lg:px-8 max-w-2xl text-center text-gray-400 text-sm tracking-wide">
     Loading review…
   </div>
 
-  <!-- 404 state -->
+  {{-- 404 state --}}
   <div :if="reviewsStore.currentNotFound" class="mx-auto pb-32 pt-32 px-4 sm:px-6 lg:px-8 max-w-2xl text-center">
     <p class="font-medium text-blue-600 text-xs tracking-widest uppercase">404 — not found</p>
     <h1 class="mt-4 font-serif font-bold text-4xl text-gray-900 tracking-tight">Review not found</h1>
@@ -535,16 +535,16 @@
     </StxLink>
   </div>
 
-  <!-- Loaded state -->
+  {{-- Loaded state --}}
   <article :if="reviewsStore.current" class="mx-auto pb-32 pt-12 sm:pt-16 px-4 sm:px-6 max-w-3xl">
-    <!-- Author-only status banner. Shown for every status when the
+    {{-- Author-only status banner. Shown for every status when the
          viewer is the author (pending / rejected / published) so the
          author always knows where their review stands. Pinned at the
          top so it's the first thing they see (notification deep-links
          land them here). Edit and Delete are available on every
          status; the server flips status back to pending on every
          edit, so a published review re-enters the moderation queue
-         after the author saves changes. -->
+         after the author saves changes. --}}
     <div
       class="mb-8 px-4 py-3 ring-1 rounded-md"
       x-class="isMine ? statusBadgeClasses : 'hidden'"
@@ -573,21 +573,21 @@
       </div>
     </div>
 
-    <!-- Delete-error banner. Surfaces a failed DELETE round-trip
+    {{-- Delete-error banner. Surfaces a failed DELETE round-trip
          (rare — the only failure modes are network / 500). Hidden
-         when there's nothing to show. -->
+         when there's nothing to show. --}}
     <div
       role="alert"
       class="mb-6 px-3 py-2 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
       x-class="editError() ? '' : 'hidden'">{{ editError() }}</div>
 
-    <!-- Topic chip -->
+    {{-- Topic chip --}}
     <p class="font-medium text-blue-600 text-center text-xs tracking-widest uppercase">{{ reviewTypeLabel }}</p>
 
-    <!-- Hero title — large serif, tight tracking, generous bottom margin -->
+    {{-- Hero title — large serif, tight tracking, generous bottom margin --}}
     <h1 class="mt-4 font-serif font-bold leading-[1.1] text-4xl sm:text-5xl lg:text-6xl text-center text-gray-900 tracking-tight">{{ title }}</h1>
 
-    <!-- Star rating + date + read time row. Centered, subtle. -->
+    {{-- Star rating + date + read time row. Centered, subtle. --}}
     <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-8 text-gray-500 text-sm">
       <div class="flex items-center gap-1 article-stars">
         <span
@@ -605,10 +605,10 @@
       <span>{{ date }}</span>
       <span class="hidden sm:inline text-gray-300">·</span>
       <span>{{ readMinutes }} min read</span>
-      <!-- Reviewer line. Three rendering modes (bench-review#29, #36):
+      {{-- Reviewer line. Three rendering modes (bench-review#29, #36):
            - Linked: real user → "by <Name>" with click-through to /user/:id
            - Plain:  anonymized → "by Anonymous attorney" with no link
-           - Hidden: factory/seeded with no author → row stays clean -->
+           - Hidden: factory/seeded with no author → row stays clean --}}
       <span :if="hasReviewerName" class="hidden sm:inline text-gray-300">·</span>
       <span :if="hasReviewerLink" class="text-gray-500">
         by
@@ -617,10 +617,10 @@
       <span :if="hasReviewerName && !hasReviewerLink()" class="text-gray-500">{{ `by ${reviewerName()}` }}</span>
     </div>
 
-    <!-- Judge byline. Medium-style author row: round avatar + name + court.
+    {{-- Judge byline. Medium-style author row: round avatar + name + court.
          Avatar falls back to an initials monogram when image_url is
          missing — a broken-image icon is a tell that an MVP shipped
-         too eagerly. -->
+         too eagerly. --}}
     <div class="flex items-center gap-4 mt-12 pb-6 border-b border-gray-200">
       <img
         :if="judgeImage"
@@ -648,16 +648,16 @@
       </StxLink>
     </div>
 
-    <!-- Body. Serif typography, generous leading, drop cap on the
+    {{-- Body. Serif typography, generous leading, drop cap on the
          first paragraph. Typography styles live in the styles block
          at the bottom of this file. (No directive names inside HTML
          comments — stx's template scanner processes them anyway and
          splices the matched block right at the comment location,
-         which busts the page.) -->
-    <!-- Photo gallery (bench-review#31). Renders the 800w card
+         which busts the page.) --}}
+    {{-- Photo gallery (bench-review#31). Renders the 800w card
          variant; clicking a photo opens the 1600w full variant in a
          new tab (lightbox is a follow-up). Hidden entirely when no
-         photos are attached. -->
+         photos are attached. --}}
     <div :if="hasPhotos" class="mt-10">
       <div class="grid gap-3" x-class="photoGridClass">
         <a :for="p in photos"
@@ -678,10 +678,10 @@
 
     <div class="article-body mt-10 text-gray-800" x-html="content"></div>
 
-    <!-- Judge right-of-reply. Prominent callout under the review body when
+    {{-- Judge right-of-reply. Prominent callout under the review body when
          the judge has an official response on record. Hidden (not removed)
          via x-class so the inner x-html binding stays subscribed across
-         load/SPA-nav — same pattern as the other conditional sections. -->
+         load/SPA-nav — same pattern as the other conditional sections. --}}
     <div
       class="mt-12 p-6 border-l-4 border-blue-500 rounded-r-lg bg-blue-50/60"
       x-class="hasJudgeResponse() ? '' : 'hidden'"
@@ -691,9 +691,9 @@
       <div class="article-body mt-3 text-base text-gray-800" x-html="judgeResponseBody"></div>
     </div>
 
-    <!-- Self-serve composer — only the verified judge for this review sees
+    {{-- Self-serve composer — only the verified judge for this review sees
          this (server-set can_respond_as_judge). Lets them post/edit their
-         official response inline. Hidden via x-class to keep bindings live. -->
+         official response inline. Hidden via x-class to keep bindings live. --}}
     <div
       class="mt-6 p-4 border border-gray-300 rounded-lg bg-white"
       x-class="canRespondAsJudge() ? '' : 'hidden'"
@@ -716,20 +716,20 @@
       </div>
     </div>
 
-    <!-- Footer row: "people find this helpful" + status pill + back link.
+    {{-- Footer row: "people find this helpful" + status pill + back link.
          Helpful-button area hidden entirely for unpublished reviews —
          no readers can see them yet, so the count and the CTA don't
          apply. The status pill on the right still renders so the
          author has a footer-level reminder of where their submission
-         sits. -->
+         sits. --}}
     <div class="flex flex-col gap-3 mt-14 pt-8 sm:flex-row sm:items-center sm:justify-between border-t border-gray-200">
       <div
         class="flex flex-col gap-2 items-start"
         x-class="isUnpublished ? 'hidden' : ''"
       >
         <div class="flex gap-3 items-center">
-          <!-- Reader view: clickable button. Hidden for the author of
-               the row (own reviews can't be self-liked). -->
+          {{-- Reader view: clickable button. Hidden for the author of
+               the row (own reviews can't be self-liked). --}}
           <button
             :if="!isOwnReview"
             type="button"
@@ -742,16 +742,16 @@
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
             </svg>
-            <!-- Caption shifts based on count + own-like state so the
+            {{-- Caption shifts based on count + own-like state so the
                  button reads naturally at 0, 1, and N — and credits the
-                 reader directly when they're the one who reacted. -->
+                 reader directly when they're the one who reacted. --}}
             <span class="text-xs text-current/80">{{ liked ? (likes === 1 ? 'You find this helpful' : 'You and ' + (likes - 1) + ' ' + (likes === 2 ? 'other' : 'others') + ' find this helpful') : (likes === 0 ? 'Be the first to find this helpful' : likes === 1 ? 'One person finds this helpful' : likes + ' people find this helpful') }}</span>
           </button>
-          <!-- Author view: read-only badge showing how readers reacted.
+          {{-- Author view: read-only badge showing how readers reacted.
                Same icon + count + caption shape, no click handler, no
                hover affordance — visually distinct from the reader
                button so the author can tell at a glance that this is
-               their own row. -->
+               their own row. --}}
           <div
             :if="isOwnReview"
             class="inline-flex items-center gap-2 px-4 py-2 font-medium text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-full"
@@ -764,11 +764,11 @@
             <span class="text-xs text-gray-500">{{ likes === 0 ? 'No reactions yet' : likes === 1 ? '1 reader found this helpful' : likes + ' readers found this helpful' }}</span>
           </div>
         </div>
-        <!-- Inline sign-in nudge (anonymous click). Soft prompt, no
+        {{-- Inline sign-in nudge (anonymous click). Soft prompt, no
              redirect — the user keeps their scroll position and can
              come back after auth. The "next" query param survives the
              auth flow because the auth store's signIn navigates
-             manually after success. -->
+             manually after success. --}}
         <div
           :if="likeAuthPrompt"
           role="status"
@@ -784,19 +784,19 @@
       </div>
 
       <div class="flex items-center gap-4 text-gray-500 text-sm">
-        <!-- Status pill — color-coded per status. Author-only since
+        {{-- Status pill — color-coded per status. Author-only since
              readers don't need the moderation chip on someone else's
              review; the isMine derived combines status presence with
-             the author check. -->
+             the author check. --}}
         <span
           class="hidden sm:inline-flex items-center px-2.5 py-1 font-medium text-xs ring-1 rounded-full capitalize"
           x-class="isMine() ? statusBadgeClasses() : 'hidden'">{{ statusLabel }}</span>
         <StxLink x-to="`/reviews`" class="text-gray-600 hover:text-gray-900 hover:underline underline-offset-2">
           ← All reviews
         </StxLink>
-        <!-- Report link — only shown when the viewer isn't the author
+        {{-- Report link — only shown when the viewer isn't the author
              (authors don't need to flag themselves; they have edit/
-             delete on the banner). Resolves bench-review#27. -->
+             delete on the banner). Resolves bench-review#27. --}}
         <button
           type="button"
           @click="openFlagDialog()"
@@ -806,10 +806,10 @@
       </div>
     </div>
 
-    <!-- Flag dialog. Inline so it can read the same court/review
+    {{-- Flag dialog. Inline so it can read the same court/review
          context derived above. Same x-class hidden pattern as the
          status banner — keeps the inner reactive bindings subscribed
-         across open/close cycles. -->
+         across open/close cycles. --}}
     <div
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40"
       x-class="flagOpen() ? '' : 'hidden'"
@@ -867,7 +867,7 @@
     </div>
   </article>
 
-  <!-- Comments thread (bench-review#44). Lives OUTSIDE the article :if
+  {{-- Comments thread (bench-review#44). Lives OUTSIDE the article :if
        wrapper deliberately. Nesting a scoped component (Comments has its
        own data-stx-scope) inside a reactive :if trips stacksjs/stx#1737:
        when the conditional element is initially detached (reviewsStore.current
@@ -879,7 +879,7 @@
        processElement is never called on them). x-class hide/show on this
        wrapper keeps the element mounted, so the scope-walk dispatch reaches
        Comments uninterrupted. NOTE: no backticks in this comment — they leak
-       into the merged setup function and break the script (Unexpected token). -->
+       into the merged setup function and break the script (Unexpected token). --}}
   <div
     class="mx-auto pt-12 px-4 sm:px-6 max-w-3xl"
     x-class="commentsVisible ? '' : 'hidden'"

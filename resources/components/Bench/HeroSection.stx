@@ -1,8 +1,8 @@
 <section>
   <div class="relative isolate">
-    <!-- Ambient brand light behind the hero. Sits under a real hero
+    {{-- Ambient brand light behind the hero. Sits under a real hero
          image (below), so this is depth, not a gradient-blob stand-in.
-         pointer-events-none + aria-hidden keeps it purely decorative. -->
+         pointer-events-none + aria-hidden keeps it purely decorative. --}}
     <div class="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
       <div class="absolute -top-20 right-0 h-80 w-80 rounded-full bg-blue-400/20 blur-3xl"></div>
       <div class="absolute top-40 -left-24 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl"></div>

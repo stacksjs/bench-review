@@ -140,9 +140,9 @@
           <StxLink to="/my-reviews" class="font-medium text-gray-600 text-sm hover:text-gray-900">See all →</StxLink>
         </div>
 
-        <!-- Loading skeleton (bench-review#35). Mirrors the dot+title+body
+        {{-- Loading skeleton (bench-review#35). Mirrors the dot+title+body
              shape of the recent-reviews list below so the layout stays
-             stable when real data lands. -->
+             stable when real data lands. --}}
         <ul :if="profileStore.loading && profileStore.totalReviews === 0" class="mt-6 space-y-6">
           <li :for="i in [1, 2, 3]" class="flex gap-4 animate-pulse">
             <div class="flex-none h-2 w-2 mt-2 bg-gray-200 rounded-full"></div>

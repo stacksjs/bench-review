@@ -80,7 +80,7 @@
     </div>
 
     <form :show="!submitted" @submit.prevent="submitForm" class="mt-10 space-y-10">
-      <!-- Judge details -->
+      {{-- Judge details --}}
       <div class="p-6 sm:p-8 bg-white ring-1 ring-gray-900/5 rounded-2xl shadow-sm">
         <h2 class="font-semibold text-base text-gray-900">Judge details</h2>
         <div class="grid gap-6 grid-cols-1 sm:grid-cols-6 mt-6">
@@ -141,7 +141,7 @@
         </div>
       </div>
 
-      <!-- Submitter -->
+      {{-- Submitter --}}
       <div class="p-6 sm:p-8 bg-white ring-1 ring-gray-900/5 rounded-2xl shadow-sm">
         <h2 class="font-semibold text-base text-gray-900">About you</h2>
         <p class="mt-1 text-gray-500 text-sm">We use this to follow up only — your info is never shared.</p>

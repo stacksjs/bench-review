@@ -113,9 +113,9 @@
       <div :if="store.loading() && store.items().length === 0" class="px-6 py-12 text-center text-gray-500 text-sm">
         Loading notifications…
       </div>
-      <!-- Empty state. x-class hidden so the inner :text bindings
+      {{-- Empty state. x-class hidden so the inner :text bindings
            stay subscribed across filter changes — bindIf would drop
-           them on re-add. -->
+           them on re-add. --}}
       <div
         class="px-6 py-16 text-center"
         x-class="!store.loading() && store.items().length === 0 ? '' : 'hidden'"

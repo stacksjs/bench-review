@@ -59,7 +59,7 @@
       Comments <span class="ml-2 text-base text-gray-500">{{ `(${comments().length})` }}</span>
     </h2>
 
-    <!-- Comment form -->
+    {{-- Comment form --}}
     <form @submit.prevent="post()" class="mt-6">
       <label for="new-comment" class="sr-only">Add a comment</label>
       <textarea
@@ -82,7 +82,7 @@
       </div>
     </form>
 
-    <!-- Comments list -->
+    {{-- Comments list --}}
     <ul role="list" class="mt-10 space-y-8">
       <li
         :for="comment in comments"
@@ -105,10 +105,10 @@
               <Icon name="bookmark" size="16" class="mr-1" />
               <span>{{ comment.likes }}</span>
             </button>
-            <!-- Reply + Report buttons removed: no backend yet (comment
+            {{-- Reply + Report buttons removed: no backend yet (comment
                  replies + comment-flagging are a follow-up to #27/#44).
                  They were dead controls — interactive-looking but no-op.
-                 Re-add with @click once FlagCommentAction / replies land. -->
+                 Re-add with @click once FlagCommentAction / replies land. --}}
           </div>
         </div>
       </li>

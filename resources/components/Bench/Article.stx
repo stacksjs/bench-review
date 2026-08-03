@@ -17,7 +17,7 @@
 
     @include('Bench/Article/PaywallCta')
 
-    <!-- Article footer -->
+    {{-- Article footer --}}
     <div class="mt-[300px] pt-8 border-gray-200 border-t">
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-4">

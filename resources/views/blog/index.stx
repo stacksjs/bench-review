@@ -12,13 +12,13 @@
 @section('content')
   <div class="min-h-screen">
     <div class="mx-auto pb-32 px-4 py-8 sm:px-6 lg:px-8 max-w-7xl">
-      <!-- Header Section -->
+      {{-- Header Section --}}
       <div class="mb-16 text-center">
         <h1 class="font-bold text-4xl text-gray-900 tracking-tight sm:text-5xl">Blog</h1>
         <p class="mt-4 text-gray-600 text-lg">Latest articles and insights about the judicial system</p>
       </div>
 
-      <!-- Blog Posts List -->
+      {{-- Blog Posts List --}}
       <div class="space-y-12">
         <StxLink
           :for="post in posts"
@@ -48,7 +48,7 @@
         </StxLink>
       </div>
 
-      <!-- Pagination -->
+      {{-- Pagination --}}
       <div class="mt-16">
         <nav class="flex items-center justify-between px-4 sm:px-0 border-gray-200 border-t">
           <div class="flex flex-1 -mt-px w-0">

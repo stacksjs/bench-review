@@ -171,10 +171,10 @@
         <tr :if="store.loading() && store.users().length === 0">
           <td colspan="5" class="px-4 py-12 text-center text-gray-500 text-sm">Loading users…</td>
         </tr>
-        <!-- Empty state. x-class hidden (not :if) so the inner :text
+        {{-- Empty state. x-class hidden (not :if) so the inner :text
              bindings keep subscribing to the search query signal as
              it changes — bindIf's remove/re-add cycle drops bindings
-             on re-add. -->
+             on re-add. --}}
         <tr x-class="!store.loading() && store.users().length === 0 ? '' : 'hidden'">
           <td colspan="5" class="px-6 py-16 text-center">
             <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-50">
@@ -242,10 +242,10 @@
     </div>
   </div>
 
-  <!-- Edit modal — controlled by editingId !== 0. CSS-toggled via
+  {{-- Edit modal — controlled by editingId !== 0. CSS-toggled via
        x-class hidden because :if remove/re-add inside bindIf hits the
        re-subscription footgun for the inner form (memory: login form
-       error reflow). -->
+       error reflow). --}}
   <div
     x-class="editingId() ? 'fixed inset-0 z-30 flex justify-center items-center p-4 bg-black/40' : 'hidden'"
   >

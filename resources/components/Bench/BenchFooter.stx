@@ -1,11 +1,11 @@
 <footer class="bg-[#0b1e3b] text-slate-300">
   <div class="mx-auto px-6 py-14 lg:px-8 max-w-7xl">
-    <!-- Main footer grid -->
+    {{-- Main footer grid --}}
     <div class="grid gap-10 grid-cols-2 md:grid-cols-5">
       <div class="col-span-2">
         <StxLink to="/" class="inline-flex gap-2 items-center">
-          <!-- The bench mark is a near-black lockup; brightness-0 + invert
-               renders it as a clean white silhouette on the navy anchor. -->
+          {{-- The bench mark is a near-black lockup; brightness-0 + invert
+               renders it as a clean white silhouette on the navy anchor. --}}
           <StxImage src="/images/bench/logo.png" alt="Bench Review" class="h-12 w-auto brightness-0 invert" />
         </StxLink>
         <p class="mt-4 max-w-xs leading-6 text-slate-400 text-sm">
@@ -45,7 +45,7 @@
       </div>
     </div>
 
-    <!-- Bottom bar -->
+    {{-- Bottom bar --}}
     <div class="flex flex-col gap-6 items-center justify-between md:flex-row mt-12 pt-8 border-white/10 border-t">
       <div class="flex gap-4 items-center">
         <StxImage src="/images/bench/uscourts.webp" alt="US Courts Logo" class="h-10 brightness-0 invert opacity-50" />

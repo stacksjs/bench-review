@@ -80,7 +80,7 @@
     <p class="mt-1 text-gray-500 text-sm">Opinions and rulings curated by moderators. Not a comprehensive docket — see the linked source for the full record.</p>
   </header>
 
-  <!-- Loading skeleton -->
+  {{-- Loading skeleton --}}
   <ul :if="!opinionsLoaded" class="space-y-3">
     <li :for="i in [1, 2, 3]" class="p-5 bg-white border border-gray-200 rounded-lg animate-pulse">
       <div class="flex items-baseline gap-3">
@@ -94,13 +94,13 @@
     </li>
   </ul>
 
-  <!-- Empty state — honest about why it's empty -->
+  {{-- Empty state — honest about why it's empty --}}
   <div :if="opinionsLoaded && opinions.length === 0" class="p-10 text-center bg-white border border-gray-200 border-dashed rounded-lg">
     <p class="font-semibold text-gray-900 text-base">No rulings on file yet.</p>
     <p class="mt-2 mx-auto max-w-md text-gray-500 text-sm">Bench Review curates rulings from public docket sources as moderators identify them. Automated docket integration is on the roadmap — for now this surface is moderator-curated.</p>
   </div>
 
-  <!-- Opinions list -->
+  {{-- Opinions list --}}
   <ul :if="opinions.length > 0" class="space-y-3">
     <li :for="o in opinions" class="p-5 bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all">
       <div class="flex flex-wrap items-start justify-between gap-3">

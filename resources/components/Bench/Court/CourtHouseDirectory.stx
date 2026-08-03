@@ -118,15 +118,15 @@
 
 <div class="min-h-screen">
   <div class="mx-auto px-4 py-16 sm:px-6 sm:py-24 lg:px-8 max-w-7xl">
-    <!-- Header Section -->
+    {{-- Header Section --}}
     <div class="mb-16 text-center">
       <h1 class="font-bold text-4xl text-gray-900 tracking-tight sm:text-5xl">Court Directory</h1>
       <p class="mt-4 text-gray-600 text-lg">Find courthouses across the United States</p>
     </div>
 
-    <!-- State filter pills (bench-review#30). Auto-populated from
+    {{-- State filter pills (bench-review#30). Auto-populated from
          the loaded courthouses so we only show states that actually
-         have a court. URL-driven via ?state=CA. -->
+         have a court. URL-driven via ?state=CA. --}}
     <div class="flex flex-wrap gap-2 mb-4" role="tablist" aria-label="Filter by state">
       <button
         type="button"
@@ -150,8 +150,8 @@
       </button>
     </div>
 
-    <!-- Has-reviews filter pills. Separate row so it composes with
-         the state filter above. -->
+    {{-- Has-reviews filter pills. Separate row so it composes with
+         the state filter above. --}}
     <div class="flex flex-wrap gap-2 mb-6" role="tablist" aria-label="Filter by review activity">
       <button
         type="button"
@@ -182,7 +182,7 @@
       </button>
     </div>
 
-    <!-- Search field. Composes on top of the pill filters above. -->
+    {{-- Search field. Composes on top of the pill filters above. --}}
     <div class="mb-12 p-6 bg-white border border-gray-100 rounded-2xl shadow-sm">
       <div class="relative">
         <input
@@ -197,14 +197,14 @@
       </div>
     </div>
 
-    <!-- Court Houses Grid -->
+    {{-- Court Houses Grid --}}
     <div class="grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
       <StxLink
         :for="court in filteredCourtHouses"
         x-to="`/court-houses/${court.id}/profile`"
         class="overflow-hidden relative bg-white border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-lg duration-300 transition-all group"
       >
-          <!-- Main Image Container -->
+          {{-- Main Image Container --}}
           <div class="relative h-48 w-full">
             <img
               x-src="court.image"
@@ -217,7 +217,7 @@
             </div>
           </div>
 
-          <!-- Content Container -->
+          {{-- Content Container --}}
           <div class="p-6">
             <div class="text-center">
               <h3 class="font-semibold text-gray-900 text-xl group-hover:text-deep-brown duration-200 transition-colors">{{ court.name }}</h3>
@@ -228,10 +228,10 @@
       </StxLink>
     </div>
 
-    <!-- Empty state. Gated on !loading so it doesn't flash during the
+    {{-- Empty state. Gated on !loading so it doesn't flash during the
          initial fetch; copy + Clear-filters CTA branch on whether any
          filter is active. (Replaced a hardcoded fake pagination bar that
-         rendered dead 1/2/3 links unconditionally, implying more results.) -->
+         rendered dead 1/2/3 links unconditionally, implying more results.) --}}
     <div x-class="showEmpty() ? '' : 'hidden'" class="mt-2 p-12 text-center bg-gray-50 border border-gray-200 border-dashed rounded-2xl">
       <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />

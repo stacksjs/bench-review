@@ -375,10 +375,10 @@
 <div class="min-h-screen">
   <div>
 
-  <!-- Post-submit success panel. Replaces the entire form when the
+  {{-- Post-submit success panel. Replaces the entire form when the
        submission lands so the user gets clear confirmation. We never
        navigate to /judges/:id/reviews on submit because the new row is
-       `status=pending` and won't render there until moderation. -->
+       `status=pending` and won't render there until moderation. --}}
   <div :if="submitted" class="p-8 sm:p-12 bg-white border border-gray-200 rounded-2xl shadow-sm text-center">
     <div class="mx-auto flex items-center justify-center h-14 w-14 rounded-full bg-emerald-50 text-emerald-600">
       <Icon name="check" size="28" />
@@ -395,11 +395,11 @@
       <StxLink to="/review" class="px-4 py-2 font-semibold text-gray-700 text-sm bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 rounded-md transition-colors">Write another</StxLink>
     </div>
 
-    <!-- Optional photo attachment (bench-review#31). Only shown when
+    {{-- Optional photo attachment (bench-review#31). Only shown when
          we have a review id to attach to. Up to 4 photos, server-
          side enforced + EXIF stripped. Hidden when the photo cap is
          reached so the user can't keep clicking into an already-full
-         slot list. -->
+         slot list. --}}
     <div :if="submitted().reviewId" class="mt-8 pt-6 border-t border-gray-100 text-left max-w-md mx-auto">
       <div class="flex items-baseline justify-between mb-3">
         <h3 class="font-semibold text-gray-900 text-sm">Attach photos (optional)</h3>
@@ -435,21 +435,21 @@
     </div>
   </div>
 
-  <!-- Step 1: pick a judge (no card around it — the search component
+  {{-- Step 1: pick a judge (no card around it — the search component
        brings its own surface). x-class toggle (NOT :if): the preload
        effect sets judge synchronously at setup, so on the /review/:id
        path this block is false at bindIf's first pass — :if would DROP
        it and it would never reappear when the user clicks "Change judge"
        (judge.set(null)), which is exactly that bug. x-class keeps it
        mounted and reactively shows it. Safe to always-mount: nothing
-       inside reads judge()/submitted(), so no null-access while hidden. -->
+       inside reads judge()/submitted(), so no null-access while hidden. --}}
   <div x-class="(!judge() && !submitted()) ? '' : 'hidden'">
     @include('Bench/Judge/ReviewJudgeSearch')
   </div>
 
-  <!-- Step 2: selected-judge banner. Once a judge is chosen, this card
+  {{-- Step 2: selected-judge banner. Once a judge is chosen, this card
        sits at the top and confirms the target of the review. Clicking
-       "Change" clears the selection and re-opens the search. -->
+       "Change" clears the selection and re-opens the search. --}}
   <div :if="judge && !submitted" class="overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-sm">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-6 sm:p-8">
       <div class="flex gap-4 items-center">
@@ -470,15 +470,15 @@
     </div>
   </div>
 
-  <!-- The review: title, a single overall rating (Yelp-style — the old
+  {{-- The review: title, a single overall rating (Yelp-style — the old
        per-aspect "Judge's Performance" scorecard was dropped), and the
-       freeform text. One card, only enabled once a judge is set. -->
+       freeform text. One card, only enabled once a judge is set. --}}
   <div :if="judge && !submitted" class="p-6 sm:p-8 bg-white border border-gray-200 rounded-2xl shadow-sm mt-2">
     <h2 class="font-semibold text-base text-gray-900">Your review</h2>
     <p class="mt-1 text-gray-500 text-sm">A title, your overall rating, and your written feedback.</p>
 
     <div class="mt-6 space-y-8">
-      <!-- Title -->
+      {{-- Title --}}
       <div>
         <label for="title" class="block font-medium text-gray-900 text-sm">Review Title</label>
         <div class="mt-2">
@@ -531,30 +531,30 @@
     </div>
   </div>
 
-  <!-- Action bar — sits as its own light surface so the Submit button
+  {{-- Action bar — sits as its own light surface so the Submit button
        has visual weight against the page background. Only renders once
-       a judge is picked (matches the rest of the form). -->
+       a judge is picked (matches the rest of the form). --}}
   <div :if="judge && !submitted" class="p-6 sm:p-8 bg-white border border-gray-200 rounded-2xl shadow-sm mt-2">
-    <!-- Alert-banner pattern (x-class hidden) rather than :if because
+    {{-- Alert-banner pattern (x-class hidden) rather than :if because
          the bindIf re-subscription footgun bit the login form earlier:
          when an alert flips from set → null → set again, :if's
          remove/re-add cycle drops the :text subscription on the
          re-add. CSS-toggle keeps the element in DOM, :text stays
          subscribed, the message flips reliably on every validation
-         failure. -->
+         failure. --}}
     <div
       role="alert"
       aria-live="polite"
       class="mb-4 p-3 text-red-700 text-sm bg-red-50 border border-red-200 rounded-md"
       x-class="submitError() ? '' : 'hidden'">{{ submitError() }}</div>
 
-    <!-- Anonymity toggle (bench-review#36). Default OFF — anonymity
+    {{-- Anonymity toggle (bench-review#36). Default OFF — anonymity
          is an explicit opt-in. Surfaces above the action bar so the
          user makes the call BEFORE the submit click rather than as
          an afterthought. Bench-review's audience (clerks, court
          staff, junior attorneys) often genuinely needs this; for
          everyone else, leaving it off boosts the future verified-
-         credentials badge (#37) on their review. -->
+         credentials badge (#37) on their review. --}}
     <label class="flex gap-3 items-start mb-5 p-4 bg-blue-50/50 border border-blue-200/60 rounded-md cursor-pointer hover:bg-blue-50">
       <input
         type="checkbox"
@@ -573,13 +573,13 @@
 
     <div class="flex gap-x-4 items-center justify-end">
       <button type="button" @click="handleCancel()" class="px-4 py-2 font-semibold text-gray-700 text-sm border border-gray-200 rounded-md hover:bg-gray-50 hover:border-gray-300 transition-colors">Cancel</button>
-      <!-- Call-syntax `judge()` / `reviewsStore.submitting()` on
+      {{-- Call-syntax `judge()` / `reviewsStore.submitting()` on
            purpose. Bare `reviewsStore.submitting` returned the
            function reference in this scope (not the unwrapped value)
            which made `!judge || submittingFn` always truthy — button
            was disabled regardless of state, click silently no-op'd.
            Local-state bare access is fine elsewhere; the store-
-           property pattern needs the parens. -->
+           property pattern needs the parens. --}}
       <button
         type="button"
         data-submit-review

@@ -83,7 +83,7 @@
         </div>
 
         <div class="grid gap-x-8 gap-y-8 grid-cols-1 grid-rows-1 items-start lg:grid-cols-3 mt-8 mx-auto lg:mx-0 max-w-2xl lg:max-w-none">
-          <!-- Court House Summary Sidebar -->
+          {{-- Court House Summary Sidebar --}}
           <div class="lg:col-start-3 lg:row-end-1">
             <h2 class="sr-only">Summary</h2>
             <div class="overflow-hidden bg-white ring-1 ring-gray-900/5 rounded-lg shadow-sm">
@@ -120,7 +120,7 @@
             </div>
           </div>
 
-          <!-- Dynamic Content -->
+          {{-- Dynamic Content --}}
           @slot('content')
         </div>
       </div>

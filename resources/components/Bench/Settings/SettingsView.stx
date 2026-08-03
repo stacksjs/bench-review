@@ -448,11 +448,11 @@
       </div>
     </section>
 
-    <!-- Verified credentials (bench-review#37). User declares their
+    {{-- Verified credentials (bench-review#37). User declares their
          role; an admin verifies out-of-band. The claim itself is
          self-service; the badge comes from admin approval. Editing
          either field clears any prior verification — admin sees the
-         new claim independently. -->
+         new claim independently. --}}
     <section class="mt-6 overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-sm">
       <div class="px-6 py-5 sm:px-8 border-b border-gray-100">
         <h2 class="font-semibold text-base text-gray-900">Verified credentials</h2>
@@ -536,7 +536,7 @@
         >Sign out</button>
       </div>
 
-      <!-- Export my data -->
+      {{-- Export my data --}}
       <div class="px-6 py-5 sm:px-8 flex flex-wrap gap-3 items-center justify-between border-t border-gray-100">
         <div>
           <p class="font-medium text-gray-900 text-sm">Export my data</p>
@@ -549,7 +549,7 @@
           class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-md transition-colors disabled:opacity-50">{{ exporting() ? 'Preparing…' : 'Export data' }}</button>
       </div>
 
-      <!-- Delete account -->
+      {{-- Delete account --}}
       <div class="px-6 py-5 sm:px-8 border-t border-gray-100">
         <div class="flex flex-wrap gap-3 items-center justify-between">
           <div>
@@ -564,7 +564,7 @@
           >Delete account</button>
         </div>
 
-        <!-- Password-confirmed final step -->
+        {{-- Password-confirmed final step --}}
         <div x-class="confirmingDelete() ? 'mt-4 p-4 bg-red-50/60 border border-red-200 rounded-md' : 'hidden'">
           <label for="delete-pw" class="block font-medium text-gray-900 text-sm">Confirm your password to delete</label>
           <input

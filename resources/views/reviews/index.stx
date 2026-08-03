@@ -6,12 +6,12 @@
 <div class="min-h-screen">
   <div class="mx-auto pb-32 px-4 py-8 sm:px-6 lg:px-8 max-w-7xl">
     <div class="grid gap-x-16 gap-y-10 grid-cols-1 lg:grid-cols-6">
-      <!-- Left Sidebar - Case Categories -->
+      {{-- Left Sidebar - Case Categories --}}
       <div class="hidden lg:block lg:col-span-2 space-y-6">
         @include('Bench/CategoriesList')
       </div>
 
-      <!-- Main Feed: Bench/ReviewsFeed owns the fetch, the derived
+      {{-- Main Feed: Bench/ReviewsFeed owns the fetch, the derived
            view-model, and the three render states (loading / empty /
            list). This view is intentionally a thin shell — see the
            ReviewsFeed component header for why the script lives there
@@ -19,7 +19,7 @@
            comment: stx's script-merge step concatenates HTML-comment
            text into the merged setup function and a stray backtick
            kicks the JS parser into template-literal mode, breaking
-           every following script with "Unexpected identifier".) -->
+           every following script with "Unexpected identifier".) --}}
       <div class="col-span-1 lg:col-span-4">
         @include('Bench/ReviewsFeed')
       </div>

@@ -12,9 +12,9 @@
       <h1 class="font-bold text-4xl text-gray-900 tracking-tight sm:text-5xl" :text="post.title"></h1>
     </div>
 
-    <!-- Author and meta info -->
+    {{-- Author and meta info --}}
     <div class="flex items-center justify-between mt-8 pt-8 border-gray-200 border-t">
-      <!-- Author info -->
+      {{-- Author info --}}
       <div class="flex items-center">
         <img class="h-12 w-12 rounded-full" x-src="post.author.imageUrl" x-alt="post.author.name">
         <div class="ml-3">
@@ -24,7 +24,7 @@
         </div>
       </div>
 
-      <!-- Reading time and date -->
+      {{-- Reading time and date --}}
       <div class="flex items-center space-x-4 text-gray-500 text-sm">
         <span :text="readingTime"></span>
         <span aria-hidden="true">&middot;</span>

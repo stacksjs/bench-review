@@ -15,7 +15,7 @@
   const lastIndex = derived<number>(() => allActivity.length - 1)
 </script>
 <div class="top-4">
-  <!-- Trending Judges -->
+  {{-- Trending Judges --}}
   <div class="bg-off-gray border rounded-lg">
     <div class="p-4">
       <h2 class="font-semibold text-base text-gray-900">Trending Judges</h2>
@@ -32,7 +32,7 @@
     </div>
   </div>
 
-  <!-- Recent Activity -->
+  {{-- Recent Activity --}}
   <div class="mt-6 bg-off-gray border rounded-lg">
     <div class="p-4">
       <h2 class="font-semibold text-base text-gray-900">Recent Activity</h2>

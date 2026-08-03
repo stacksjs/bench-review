@@ -89,8 +89,8 @@
         placeholder="Search for a judge..."
         autocomplete="off"
       >
-      <!-- Spinner appears in the input gutter while the debounced fetch
-           is in flight — keeps the loading state subtle, no layout jump. -->
+      {{-- Spinner appears in the input gutter while the debounced fetch
+           is in flight — keeps the loading state subtle, no layout jump. --}}
       <span :if="showSpinner" class="flex absolute inset-y-0 right-0 items-center pr-3">
         <svg class="animate-spin h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle>
@@ -99,12 +99,12 @@
       </span>
     </div>
 
-    <!-- Results list. Inline (not absolute) so it can't be clipped by
+    {{-- Results list. Inline (not absolute) so it can't be clipped by
          a parent overflow and the page doesn't jump as suggestions
-         appear/disappear. -->
+         appear/disappear. --}}
     <div :if="showDropdown" class="mt-2 bg-white border border-gray-200 rounded-md shadow-sm">
       <ul class="overflow-auto py-1 max-h-72 divide-y divide-gray-100">
-        <!-- Loop var is "result", NOT "judge" — "judge" already exists
+        {{-- Loop var is "result", NOT "judge" — "judge" already exists
              in the merged setup scope as the parent ReviewForm's state
              signal. A :for="judge in …" would shadow it inconsistently
              across the auto-unwrap proxy, breaking both the iteration
@@ -115,8 +115,8 @@
              (Avoid backticks in HTML comments — stx's script-merge
              concatenates comment text into the merged setup function
              and a stray backtick flips the JS parser into template-
-             literal mode, breaking every following script.) -->
-        <!-- Inlined state mutation in @click is intentional, NOT a
+             literal mode, breaking every following script.) --}}
+        {{-- Inlined state mutation in @click is intentional, NOT a
              stylistic regression. The event-handler binder at
              signals.ts:1669 inspects the expression *text* to decide
              whether a signal stays raw or gets auto-unwrapped: any
@@ -128,7 +128,7 @@
              that the dispatcher silently swallows — clicks register
              but nothing visible happens. Writing the .set() calls
              directly in the expression keeps `judge` / `searchInput`
-             as raw signals so the mutations actually fire. -->
+             as raw signals so the mutations actually fire. --}}
         <li
           :for="result in judgesStore.searchResults"
           class="flex gap-3 items-center px-3 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors"

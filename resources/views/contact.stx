@@ -57,7 +57,7 @@
 <div class="min-h-screen">
   <div class="mx-auto px-6 py-24 sm:py-32 lg:px-8 max-w-7xl">
     <div class="grid gap-16 lg:grid-cols-2">
-      <!-- Left: copy and info -->
+      {{-- Left: copy and info --}}
       <div>
         <h1 class="font-bold text-4xl text-gray-900 tracking-tight sm:text-5xl">Get in touch</h1>
         <p class="mt-6 leading-8 text-gray-600 text-lg">
@@ -89,7 +89,7 @@
         </dl>
       </div>
 
-      <!-- Right: form -->
+      {{-- Right: form --}}
       <div>
         <div :show="!sent" class="p-8 bg-white border border-gray-100 rounded-2xl shadow-sm">
           <form @submit.prevent="submit()" class="space-y-6">
