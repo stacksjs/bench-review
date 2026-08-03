@@ -320,8 +320,90 @@
       deleting.set(false)
     }
   }
+
+  // ── Admin moderation (bench-review: inline take-down / delete) ────
+  //
+  // Admins can moderate ANY review from its page, not just from the
+  // /admin dashboard. Shown only to admins viewing someone else's
+  // review (an admin's own review uses the author controls above).
+  // Take down = set status 'rejected' (hides it from readers, reversible
+  // from the dashboard); Delete = permanent. Both route through the
+  // adminReviews store's authenticated endpoints; its list-state updates
+  // are harmless no-ops here.
+  const adminReviews = useStore('adminReviews')
+  const moderating = state<boolean>(false)
+  const moderationError = state<string>('')
+  const canModerate = derived<boolean>(() => authStore.isAdmin() && !isOwnReview())
+
+  async function adminTakeDown(): Promise<void> {
+    if (typeof window === 'undefined') return
+    if (moderating()) return
+    const id = reviewId
+    if (!id) return
+    const ok = await confirmStore.ask({ title: 'Take down review', message: 'Hide this review from readers? It stays saved — you can re-publish it from the admin dashboard.', confirmLabel: 'Take down', danger: false })
+    if (!ok) return
+    moderating.set(true)
+    moderationError.set('')
+    try {
+      const done = await adminReviews.setReviewStatus(id, 'rejected')
+      if (!done) {
+        moderationError.set('Could not take the review down — try again.')
+        return
+      }
+      toast.success('Review taken down', "It's hidden from readers. Re-publish it from the admin dashboard if needed.")
+      navigate('/reviews', true)
+    }
+    finally {
+      moderating.set(false)
+    }
+  }
+
+  async function adminDelete(): Promise<void> {
+    if (typeof window === 'undefined') return
+    if (moderating()) return
+    const id = reviewId
+    if (!id) return
+    const ok = await confirmStore.ask({ title: 'Delete review', message: 'Permanently delete this review? This cannot be undone.', confirmLabel: 'Delete', danger: true })
+    if (!ok) return
+    moderating.set(true)
+    moderationError.set('')
+    try {
+      const done = await adminReviews.deleteReview(id)
+      if (!done) {
+        moderationError.set('Could not delete the review — try again.')
+        return
+      }
+      toast.success('Review deleted', 'The review was permanently removed.')
+      navigate('/reviews', true)
+    }
+    finally {
+      moderating.set(false)
+    }
+  }
+
   const reviewType = derived<string>(() => reviewsStore.current()?.type ?? '')
   const likes = derived<number>(() => Number(reviewsStore.current()?.likes ?? 0))
+
+  // Helpful-count captions live in deriveds, not a nested inline ternary in
+  // {{ }} — `likes()` is called explicitly so there is no unwrap ambiguity
+  // (the inline form could render "undefined people find this helpful").
+  const helpfulCaption = derived<string>(() => {
+    const n = likes()
+    if (liked()) {
+      if (n === 1) return 'You find this helpful'
+      return 'You and ' + (n - 1) + ' ' + (n === 2 ? 'other' : 'others') + ' find this helpful'
+    }
+    if (n === 0) return 'Be the first to find this helpful'
+    if (n === 1) return 'One person finds this helpful'
+    return n + ' people find this helpful'
+  })
+  const authorHelpfulCaption = derived<string>(() => {
+    const n = likes()
+    if (n === 0) return 'No reactions yet'
+    if (n === 1) return '1 reader found this helpful'
+    return n + ' readers found this helpful'
+  })
+
   const date = derived<string>(() => formatDate(reviewsStore.current()?.created_at))
   const readMinutes = derived<number>(() => estimateReadTime(reviewsStore.current()?.content))
   const judgeName = derived<string>(() => (reviewsStore.current() as any)?.judge?.name ?? 'Judge')
@@ -573,6 +655,37 @@
       </div>
     </div>
 
+    {{-- Admin moderation bar. x-class toggle (not :if — the branch is
+         false at first render for non-admins and :if would drop it
+         permanently). Shown only to an admin viewing another user's
+         review; an admin's own review uses the author controls above. --}}
+    <div
+      class="mb-8 px-4 py-3 ring-1 ring-blue-300/60 bg-blue-50/60 rounded-md"
+      x-class="canModerate() ? '' : 'hidden'"
+    >
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold text-blue-900 text-sm">Moderator controls</p>
+          <p class="mt-1 text-blue-800 text-xs leading-relaxed">You're viewing this as an admin. Take the review down to hide it from readers (reversible from the admin dashboard), or delete it permanently.</p>
+          <p class="mt-1 text-red-700 text-xs" x-class="moderationError() ? '' : 'hidden'">{{ moderationError() }}</p>
+        </div>
+        <div class="flex flex-shrink-0 gap-x-2">
+          <button
+            type="button"
+            @click="adminTakeDown()"
+            x-disabled="moderating"
+            class="px-3 py-1.5 font-semibold text-amber-800 text-xs bg-white border border-amber-300 rounded-md hover:bg-amber-50 disabled:opacity-50"
+          >{{ moderating() ? 'Working…' : 'Take down' }}</button>
+          <button
+            type="button"
+            @click="adminDelete()"
+            x-disabled="moderating"
+            class="px-3 py-1.5 font-semibold text-red-700 text-xs bg-white border border-red-200 rounded-md hover:bg-red-50 disabled:opacity-50"
+          >{{ moderating() ? 'Working…' : 'Delete' }}</button>
+        </div>
+      </div>
+    </div>
+
     {{-- Delete-error banner. Surfaces a failed DELETE round-trip
          (rare — the only failure modes are network / 500). Hidden
          when there's nothing to show. --}}
@@ -745,7 +858,7 @@
             {{-- Caption shifts based on count + own-like state so the
                  button reads naturally at 0, 1, and N — and credits the
                  reader directly when they're the one who reacted. --}}
-            <span class="text-xs text-current/80">{{ liked ? (likes === 1 ? 'You find this helpful' : 'You and ' + (likes - 1) + ' ' + (likes === 2 ? 'other' : 'others') + ' find this helpful') : (likes === 0 ? 'Be the first to find this helpful' : likes === 1 ? 'One person finds this helpful' : likes + ' people find this helpful') }}</span>
+            <span class="text-xs text-current/80">{{ helpfulCaption() }}</span>
           </button>
           {{-- Author view: read-only badge showing how readers reacted.
                Same icon + count + caption shape, no click handler, no
@@ -761,7 +874,7 @@
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
             </svg>
             <span class="tabular-nums">{{ likes }}</span>
-            <span class="text-xs text-gray-500">{{ likes === 0 ? 'No reactions yet' : likes === 1 ? '1 reader found this helpful' : likes + ' readers found this helpful' }}</span>
+            <span class="text-xs text-gray-500">{{ authorHelpfulCaption() }}</span>
           </div>
         </div>
         {{-- Inline sign-in nudge (anonymous click). Soft prompt, no
