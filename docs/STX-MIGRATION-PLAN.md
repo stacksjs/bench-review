@@ -161,6 +161,16 @@ loads; `typeof globalThis.Judge === 'object'` after `injectGlobalAutoImports()`.
 
 ## Track B — full conformance (independent of A; gate scripts assume A is done)
 
+> **✅ ACTIONABLE ITEMS COMPLETE 2026-08-04 (commits a0d2ed67, d21f6761, 8adb57e0, bf9f4b89, 2e48bb45).**
+> B1 comments (ch 12.5: 207 `<!-- -->` → `{{-- --}}`, 13 backtick landmines killed). B2 Rule 10 types (8
+> params). B3 fetches→stores (component `fetch()` 3→0; new `subscribe` store). B4 Rule 8 strict mode
+> (warn-only, allowlist covers all 66 hits → safe to flip later). B5 app-tsc **62→0**.
+> **Rule 6 (component adoption) = SANCTIONED EXCEPTION, not done via swap:** shipped `@stacksjs/components`
+> `Dialog`/`Switch` interpolate `{{ }}` inside `<script client>` — the stx#1757 escaped-entity pattern that
+> broke bench's `Notification` (→ toast store). bench's hand-rolled dialogs/switches are the correct
+> workaround. `Tabs` (no client-script interp) is the only safely-adoptable family; deferred as low-value.
+> Revisit if stx#1757 is confirmed fixed in a running 0.2.152 app.
+
 ### Stage B0 — Turn on `strict` + declare stx-engine config
 bench has **no** stx-engine config (`config/stx.ts` absent; `config/ui.ts` is Crosswind-only). Add
 a real stx config (resolved as `{name:'stx',alias:'ui'}` — verify which file the running server
