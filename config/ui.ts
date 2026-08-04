@@ -15,7 +15,20 @@ export default {
     ],
   ],
 
-  safelist: 'prose prose-sm m-auto text-left',
+  // Responsive layout utilities are safelisted so page STRUCTURE survives SPA
+  // navigation. crosswind emits per-page CSS; on a fragment swap the router
+  // merges the incoming page's crosswind, but page-specific responsive variants
+  // (lg:/md:/sm: grid-cols / col-span / block) weren't reliably emitted into the
+  // fragment — so grids collapsed to a single column after nav and e.g. the
+  // reviews "Explore Categories" sidebar (hidden lg:block) vanished. Safelisting
+  // forces them into every page's output, so the merge always has them.
+  safelist: 'prose prose-sm m-auto text-left '
+    + 'grid-cols-1 col-span-1 hidden block '
+    + 'lg:block lg:hidden lg:flex lg:grid lg:col-span-2 lg:col-span-4 '
+    + 'lg:grid-cols-2 lg:grid-cols-3 lg:grid-cols-4 lg:grid-cols-5 lg:grid-cols-6 '
+    + 'md:flex md:grid-cols-2 md:grid-cols-5 '
+    + 'sm:block sm:hidden sm:flex sm:col-span-2 sm:col-span-3 sm:col-span-4 sm:col-span-6 '
+    + 'sm:grid-cols-2 sm:grid-cols-3 sm:grid-cols-6 sm:grid-cols-12',
   trigger: ':stx:',
   classPrefix: 'stx-',
   reset: 'tailwind',
