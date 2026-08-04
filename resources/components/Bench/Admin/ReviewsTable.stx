@@ -229,7 +229,7 @@
             <p class="mt-1 text-gray-600 text-sm">
               <span>{{ review.judge.name }}</span>
               <span class="text-gray-400"> · </span>
-              <span :if="review.user">{{ review.user ? review.user.email : '' }}</span>
+              <span :if="review.user">{{ review.user.email }}</span>
               <span :if="!review.user" class="text-gray-400">(anonymous)</span>
               <span class="text-gray-400"> · </span>
               <span>{{ '★ ' + review.rating }}</span>

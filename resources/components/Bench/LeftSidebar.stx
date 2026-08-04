@@ -1,6 +1,6 @@
 <script client>
   import type { Activity, TrendingJudge } from '~/resources/types'
-  import { recentActivity as allActivity, trendingJudges as allTrending } from '~/resources/functions/sample'
+  import { recentActivity as allActivity, trendingJudges as allTrending } from '~/resources/data/sample'
 
   // These local consts MUST NOT be named `recentActivity` / `trendingJudges`:
   // sample.ts exports symbols with those exact names, and stx bundles this

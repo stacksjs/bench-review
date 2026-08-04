@@ -1,6 +1,6 @@
 <script client>
   import type { CourtHouse } from '~/resources/types'
-  import { courtHouses } from '~/resources/functions/sample'
+  import { courtHouses } from '~/resources/data/sample'
 
   useHead({ title: 'Court House - Bench Review' })
 

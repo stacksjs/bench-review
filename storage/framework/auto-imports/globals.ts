@@ -10,16 +10,6 @@ Object.assign(globalThis, autoImports)
 
 // TypeScript declarations
 declare global {
-  const courtHouses: typeof autoImports.courtHouses
-  const judges: typeof autoImports.judges
-  const categories: typeof autoImports.categories
-  const reviews: typeof autoImports.reviews
-  const trendingJudges: typeof autoImports.trendingJudges
-  const recentActivity: typeof autoImports.recentActivity
-  const blogPosts: typeof autoImports.blogPosts
-  const isDark: typeof autoImports.isDark
-  const toggleDark: typeof autoImports.toggleDark
-  const preferredDark: typeof autoImports.preferredDark
 }
 
 export {}

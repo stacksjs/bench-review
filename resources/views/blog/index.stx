@@ -1,6 +1,6 @@
 <script client>
   import type { BlogPost } from '~/resources/types'
-  import { blogPosts } from '~/resources/functions/sample'
+  import { blogPosts } from '~/resources/data/sample'
 
   useHead({ title: 'Blog - Bench Review' })
 

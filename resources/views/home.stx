@@ -3,7 +3,7 @@
   import type { JudgeReviewRow } from '~/resources/stores/reviews'
   // Categories don't have a backing API yet — stay on sample data
   // until that endpoint exists. Judges + reviews come from the DB.
-  import { categories as allCategories } from '~/resources/functions/sample'
+  import { categories as allCategories } from '~/resources/data/sample'
 
   useHead({ title: 'Find and Review Judges - Bench Review' })
 

@@ -4,7 +4,7 @@
  * Importable from any `<script client>` via:
  *   import type { Judge, Review } from '~/resources/types'
  *
- * Shapes mirror the sample data in `resources/functions/sample.ts` and
+ * Shapes mirror the sample data in `resources/data/sample.ts` and
  * what each component currently passes around as untyped objects.
  * Tighten as the backend takes over and real schemas land.
  */
