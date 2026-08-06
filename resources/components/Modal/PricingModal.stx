@@ -37,7 +37,7 @@
               <StxLink
                 to="/register"
                 aria-describedby="tier-hobby"
-                class="block mt-8 px-4 py-3 w-full font-semibold text-base text-center text-white bg-gray-600 hover:bg-gray-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm duration-200 transition-colors"
+                class="block mt-8 px-4 py-3 w-full font-semibold text-base text-center text-white bg-blue-600 hover:bg-blue-700 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 shadow-sm duration-200 transition-colors"
               >
                 Get started today
               </StxLink>

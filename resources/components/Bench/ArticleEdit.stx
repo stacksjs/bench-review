@@ -253,7 +253,7 @@
               x-disabled="editSaving"
               @click="editRating.set(star); ratingError.set(false)"
               class="text-2xl leading-none transition-colors disabled:opacity-50"
-              x-class="editRating >= star ? 'text-yellow-400' : 'text-gray-300 hover:text-gray-400'"
+              x-class="editRating >= star ? 'text-amber-400' : 'text-gray-300 hover:text-gray-400'"
             >★</button>
           </div>
         </div>

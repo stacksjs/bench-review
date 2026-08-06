@@ -271,7 +271,7 @@
     <div class="flex gap-x-16 items-center">
       <StxLink to="/">
         <span class="sr-only">Judge Review</span>
-        <img class="h-16" src="/images/bench/logo.png" alt="">
+        <img class="h-16" src="/images/bench/logo.png" alt="Bench Review">
       </StxLink>
       <div class="hidden lg:flex lg:gap-x-8">
         <StxLink to="/judges" class="font-semibold text-gray-900 text-sm/6 border-b-2 border-transparent hover:border-blue-600 duration-200 transition-colors">Find Judges</StxLink>

@@ -74,7 +74,7 @@
         <button
           type="submit"
           x-disabled="posting() || !newComment().trim()"
-          class="px-3 py-1.5 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+          class="px-3 py-1.5 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <span :show="!posting">Post comment</span>
           <span :show="posting">Posting...</span>

@@ -77,7 +77,7 @@
     twitterImage: '/images/og-image.png',
   })
 
-  const judgeName = derived<string>(() => currentJudge()?.name || 'Loading…')
+  const judgeName = derived<string>(() => currentJudge()?.name || '')
   const judgeImage = derived<string>(() => {
     const j: any = currentJudge()
     return (j && (j.image_url || j.photo)) || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'

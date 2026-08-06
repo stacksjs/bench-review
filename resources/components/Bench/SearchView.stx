@@ -81,7 +81,7 @@
         <div class="flex absolute inset-y-0 right-0 items-center pr-2">
           <button
             type="submit"
-            class="px-4 py-2 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-lg shadow-sm"
+            class="px-4 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm"
           >
             Search
           </button>
@@ -160,7 +160,7 @@
               </div>
             </StxLink>
             <div class="flex gap-x-2 items-center">
-              <Icon :for="star in stars" name="heroicons:star-solid" size="16" x-class="star <= judge.rating ? 'text-yellow-400' : 'text-gray-200'" />
+              <Icon :for="star in stars" name="heroicons:star-solid" size="16" x-class="star <= judge.rating ? 'text-amber-400' : 'text-gray-300'" />
               <span class="ml-1 text-gray-500 text-xs">{{ `(${judge.reviewCount})` }}</span>
             </div>
           </li>

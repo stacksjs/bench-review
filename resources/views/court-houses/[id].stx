@@ -37,7 +37,7 @@
             </div>
             <div class="flex gap-x-4 items-center sm:gap-x-6">
               <a href="#" class="hidden sm:block font-semibold text-gray-900 text-sm/6">Get Directions</a>
-              <a href="#" class="px-3 py-2 font-semibold text-sm text-white bg-gray-600 hover:bg-gray-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2 shadow-sm">Follow</a>
+              <a href="#" class="px-3 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 shadow-sm">Follow</a>
             </div>
           </div>
         </div>

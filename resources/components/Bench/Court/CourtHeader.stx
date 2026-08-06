@@ -53,7 +53,7 @@
     twitterImage: '/images/og-image.png',
   })
 
-  const courtName = derived<string>(() => (currentCourt() as any)?.name || 'Loading…')
+  const courtName = derived<string>(() => (currentCourt() as any)?.name || '')
   const courtCity = derived<string>(() => (currentCourt() as any)?.city || '')
   const courtState = derived<string>(() => (currentCourt() as any)?.state || '')
   const courtImage = derived<string>(() => {

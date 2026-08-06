@@ -5,7 +5,7 @@
   <div class="mt-6 mx-auto text-gray-500">
     <div class="flex items-center mb-8">
       <div class="flex items-center">
-        <Icon :for="star in reviewStars" name="star" size="20" x-class="star <= review.rating ? 'text-yellow-400' : 'text-gray-300'" />
+        <Icon :for="star in reviewStars" name="star" size="20" x-class="star <= review.rating ? 'text-amber-400' : 'text-gray-300'" />
       </div>
       <span class="ml-2 text-gray-500 text-sm">{{ `(${review.rating})` }}</span>
     </div>
