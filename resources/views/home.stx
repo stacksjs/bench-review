@@ -13,8 +13,14 @@
   // same useSeoMeta path. og:image points at the public Bench
   // Review logo / hero artwork once we have one; for now reuses
   // the existing scales-of-justice asset.
+  // `description` must match SEO_PAGES['home.html'] in app/Helpers/seoPages.ts.
+  // That one is spliced into the built HTML and is what crawlers read; this one
+  // applies at runtime, and on SPA navigation INTO this page, where the head
+  // still carries the previous route's description. The two had diverged, so
+  // the description silently changed a moment after the page settled -- and the
+  // version anyone measuring SEO saw was never the one written here.
   useSeoMeta({
-    description: 'Reviews of judges across the United States, from clerks, attorneys, and court staff. Bring real transparency to the bench.',
+    description: 'Bench Review is a public directory of judges with first-hand reviews from attorneys, clerks, and court staff. Search judges by name and court.',
     ogTitle: 'Bench Review: find and review judges',
     ogDescription: 'A directory of judges and courthouses, with reviews from the people who appear before them. Anonymous reviews welcome for clerks, court staff, and attorneys under retaliation risk.',
     ogType: 'website',

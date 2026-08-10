@@ -7,7 +7,14 @@
   definePageMeta({ middleware: ['guest'] })
 </script>
 <script client>
-  useHead({ title: 'Create your account - Bench Review' })
+  // Must match the @section('title') above. That one reaches the pre-rendered
+  // HTML, so it is the title crawlers and first paint get; this one updates the
+  // tab on SPA navigation, because the router swaps only <main> and never
+  // re-renders the layout's head. Two phases, not a duplicate -- deleting
+  // either loses one of them. These had drifted ("Register" vs "Create your
+  // account"), so the tab title changed under the visitor a moment after the
+  // page settled.
+  useHead({ title: 'Register - Bench Review' })
 
   const auth = useStore('auth')
   const toast = useStore('toast')

@@ -11,13 +11,17 @@ Allow: /
 # Surfaces that should never be indexed:
 # - /api/* — JSON endpoints, no human-readable content
 # - /admin/* — moderator-only screens
-# - /settings, /notifications, /my-reviews — authenticated user views
+# - /settings, /notifications, /my-reviews, /profile, /review — authenticated
+#   user views (each declares definePageMeta({ middleware: ['auth'] }), so a
+#   crawler only ever gets the redirect shell)
 # - /reset-password, /forgot-password — token-bearing flows
 Disallow: /api/
 Disallow: /admin/
 Disallow: /settings
 Disallow: /notifications
 Disallow: /my-reviews
+Disallow: /profile
+Disallow: /review
 Disallow: /reset-password
 Disallow: /forgot-password
 # Test / internal-only pages:

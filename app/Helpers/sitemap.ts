@@ -120,6 +120,8 @@ Disallow: /admin/
 Disallow: /settings
 Disallow: /notifications
 Disallow: /my-reviews
+Disallow: /profile
+Disallow: /review
 Disallow: /reset-password
 Disallow: /forgot-password
 # Test / internal-only pages:
