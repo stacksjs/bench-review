@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { buildApp } from '@stacksjs/stx'
-import { tsAnalyticsTag } from '@stacksjs/ts-analytics/stx'
+import { tsAnalyticsTag } from './app/Helpers/analyticsTag'
 import { TS_ANALYTICS_APP_ID } from './config/ts-analytics'
 import { cspMetaTag } from './app/Helpers/cspMeta'
 import { FONT_HEAD_TAGS } from './app/Helpers/fontHead'

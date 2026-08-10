@@ -104,4 +104,36 @@ export default {
       'document.addEventListener',
     ],
   },
+
+  // Registers @stacksjs/components as a component source, so <Tabs>, <Dialog>
+  // and friends resolve by name from the installed package.
+  //
+  // This lives HERE, not in the root stx.config.ts, because this is the file
+  // stx actually reads. Its loader resolves `{ name: 'stx', alias: 'ui' }` and
+  // picks exactly one file — `config/ui.ts` wins, and `stx.config.ts` is never
+  // opened. Verified by calling `loadStxConfig()` from the project root: the
+  // returned object carries this file's `shortcuts`/`safelist` and none of
+  // stx.config.ts's keys.
+  //
+  // A `config/stx.ts` would take precedence over this file — but it REPLACES
+  // rather than merges, so adding one without copying everything below it
+  // silently drops the entire Crosswind config. Confirmed by probe.
+  plugins: [
+    './plugins/stx-components',
+  ],
+
+  // Where the route guards live. stx defaults to `<cwd>/middleware`
+  // (ssg.ts: `routeMiddleware?.dir || 'middleware'`), and bench keeps them under
+  // `resources/`, so `resources/middleware/guest.ts` was never loaded.
+  //
+  // That used to be invisible: an unregistered guard failed OPEN, so
+  // `definePageMeta({ middleware: ['guest'] })` on /login and /register did
+  // nothing at all and nobody noticed. stacksjs/stx#1891 made it fail closed,
+  // and the build now says so out loud:
+  //
+  //   Route middleware 'guest' is not registered — failing the guard closed.
+  //     ↳ /login — middleware aborted
+  routeMiddleware: {
+    dir: 'resources/middleware',
+  },
 } satisfies UiConfig

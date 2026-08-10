@@ -26,9 +26,14 @@ export default function authMiddleware(req: Request, ctx: MiddlewareContext): Re
   // `AUTH_COOKIE` (resources/stores/auth.ts) and
   // `config.auth.defaultTokenName`. All three keying off the same
   // value is how the SPA, server-side gate, and config stay coherent.
-  const token = ctx.cookies['auth-token']
+  // `ctx?.cookies?.` — the static generator runs guards with no request behind
+  // them, so this is undefined at build time and reading it threw, aborting the
+  // page instead of generating it. Treating that as "no token" is correct: the
+  // pre-rendered artifact for a gated route should be the redirect shell, which
+  // is what it already was.
+  const token = ctx?.cookies?.['auth-token']
   if (!token)
-    return ctx.redirect('/login')
+    return ctx?.redirect ? ctx.redirect('/login') : new Response(null, { status: 302, headers: { Location: '/login' } })
 
   // Future hook: server-side token validation. When the SPA logout
   // doesn't reach the API (network blip, tab closed mid-request), the
