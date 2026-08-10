@@ -204,7 +204,22 @@ Replace the 12 hand-rolled primitives with `@stacksjs/components`, **one family 
 behind an SPA-nav probe** (bench has a history of component swaps regressing hydration):
 - `role="dialog"` → `<Dialog>`: `ConfirmHost`, `MobileMenu`, `Modal/BaseModal`, `Modal/PricingModal`
   (verify focus-trap/Escape parity; ConfirmHost is load-bearing).
-- `role="tablist"` → `<Tabs>`: `MyReviewsView`, `Court/CourtHouseDirectory`, `Judge/JudgeDirectory`.
+- ~~`role="tablist"` → `<Tabs>`: `MyReviewsView`, `Court/CourtHouseDirectory`, `Judge/JudgeDirectory`.~~
+  **✅ RESOLVED 2026-08-10 — but NOT by adopting `<Tabs>`. Do not re-attempt the swap.**
+  On inspection all 7 `role="tablist"` blocks (20 `role="tab"` buttons) are **URL-driven filter
+  pills**, not tabs: they filter the list below via `?status=` / `?state=` / `?practice_area=`,
+  carry live counts, and several are generated with `:for` over data. The app has **zero
+  `role="tabpanel"`, zero `aria-controls`, and zero `aria-selected`** — so the markup was
+  announcing "tab" to a screen reader while controlling no panel and exposing no selected state
+  (`role="tab"` *requires* `aria-selected`). Shipped `<Tabs>` is the wrong abstraction: it owns
+  its own `activeTab`, discovers `<TabPanel>` children and toggles their `hidden` — none of which
+  maps to "filter an external list from a URL param", and adopting it would have **lost** the
+  URL-driven state, the counts and the dynamic generation.
+  Fixed as what they actually are: `role="group"` + `aria-pressed` toggle buttons, with a static
+  `aria-pressed="false"` for the pre-hydration/pre-rendered pass and `x-aria-pressed` for the
+  reactive state (the same idiom as `BenchHeader.stx`'s `x-aria-expanded`). Verified `x-aria-*`
+  routes through stx's generic attribute binder (`signals.ts:2664-2688`) and that the static and
+  reactive forms coexist through a render.
 - alert/toggle switches → `<Switch>` where applicable.
 Respect the known stx component pitfalls (no `<template>` hosts; no custom-element tags; empty-scope
 `<script client>` needs a real derived; component const must not collide with an imported export).

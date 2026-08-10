@@ -189,10 +189,18 @@
          counts come from the derived `counts` over the full list so
          the user always sees how many sit in each bucket without
          having to switch tabs. --}}
-    <div class="flex flex-wrap gap-2 mt-8" role="tablist" aria-label="Filter by status">
+    {{-- Toggle-button group, not a tablist: these filter the list below,
+         they do not switch between panels. The tab role promises a
+         controlled tabpanel and arrow-key roving focus, and this app has
+         no tabpanel anywhere -- a screen reader announced "tab, 1 of 4"
+         and then had nowhere to go, with no selected state either since
+         the tab role also requires aria-selected. Toggle buttons with
+         aria-pressed are what these actually are. --}}
+    <div class="flex flex-wrap gap-2 mt-8" role="group" aria-label="Filter by status">
       <button
         type="button"
-        role="tab"
+        aria-pressed="false"
+        x-aria-pressed="statusFilter === 'all' ? 'true' : 'false'"
         @click="setFilter('all')"
         class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
         x-class="statusFilter === 'all' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
@@ -202,7 +210,8 @@
       </button>
       <button
         type="button"
-        role="tab"
+        aria-pressed="false"
+        x-aria-pressed="statusFilter === 'pending' ? 'true' : 'false'"
         @click="setFilter('pending')"
         class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
         x-class="statusFilter === 'pending' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
@@ -212,7 +221,8 @@
       </button>
       <button
         type="button"
-        role="tab"
+        aria-pressed="false"
+        x-aria-pressed="statusFilter === 'published' ? 'true' : 'false'"
         @click="setFilter('published')"
         class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
         x-class="statusFilter === 'published' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
@@ -222,7 +232,8 @@
       </button>
       <button
         type="button"
-        role="tab"
+        aria-pressed="false"
+        x-aria-pressed="statusFilter === 'rejected' ? 'true' : 'false'"
         @click="setFilter('rejected')"
         class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
         x-class="statusFilter === 'rejected' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"

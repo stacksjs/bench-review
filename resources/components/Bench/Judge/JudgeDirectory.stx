@@ -221,10 +221,14 @@
          search/select panel so the user's first filter act is by
          specialty, then they narrow further with the text search.
          URL-driven via ?practice_area=<value>. --}}
-    <div class="flex flex-wrap gap-2 mb-6" role="tablist" aria-label="Filter by practice area">
+    {{-- Toggle-button group (role=group + aria-pressed), not a tablist:
+         these filter the list, they do not switch panels. See the fuller
+         note in MyReviewsView.stx. --}}
+    <div class="flex flex-wrap gap-2 mb-6" role="group" aria-label="Filter by practice area">
       <button
         type="button"
-        role="tab"
+        aria-pressed="false"
+        x-aria-pressed="practiceFilter === 'all' ? 'true' : 'false'"
         @click="setPracticeFilter('all')"
         class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
         x-class="practiceFilter === 'all' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
@@ -234,7 +238,8 @@
       </button>
       <button :for="area in PRACTICE_AREAS"
         type="button"
-        role="tab"
+        aria-pressed="false"
+        x-aria-pressed="practiceFilter === area ? 'true' : 'false'"
         @click="setPracticeFilter(area)"
         class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors capitalize"
         x-class="practiceFilter === area ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
@@ -268,17 +273,19 @@
     {{-- State filter (bench-review#30). Auto-populated from the
          loaded judges' courthouse rows. Only shows states that
          actually have judges to filter to. --}}
-    <div :if="availableStates.length > 0" class="flex flex-wrap gap-2 mb-3" role="tablist" aria-label="Filter by state">
+    <div :if="availableStates.length > 0" class="flex flex-wrap gap-2 mb-3" role="group" aria-label="Filter by state">
       <button
         type="button"
-        role="tab"
+        aria-pressed="false"
+        x-aria-pressed="stateFilter === 'all' ? 'true' : 'false'"
         @click="setStateFilter('all')"
         class="inline-flex items-center px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
         x-class="stateFilter === 'all' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >All states</button>
       <button :for="s in availableStates"
         type="button"
-        role="tab"
+        aria-pressed="false"
+        x-aria-pressed="stateFilter === s ? 'true' : 'false'"
         @click="setStateFilter(s)"
         class="inline-flex items-center px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
         x-class="stateFilter === s ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'">{{ s }}</button>
@@ -287,55 +294,62 @@
     {{-- Rating-threshold + activity filter rows. URL-driven via
          ?rating=N&has_reviews=with|without. Compose with the
          state + practice-area filters above. --}}
-    <div class="flex flex-wrap gap-2 mb-3" role="tablist" aria-label="Filter by rating">
+    <div class="flex flex-wrap gap-2 mb-3" role="group" aria-label="Filter by rating">
       <button
         type="button"
-        role="tab"
+        aria-pressed="false"
+        x-aria-pressed="ratingFilter === 'all' ? 'true' : 'false'"
         @click="setRatingFilter('all')"
         class="inline-flex items-center px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
         x-class="ratingFilter === 'all' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >Any rating</button>
       <button
         type="button"
-        role="tab"
+        aria-pressed="false"
+        x-aria-pressed="ratingFilter === '4' ? 'true' : 'false'"
         @click="setRatingFilter('4')"
         class="inline-flex items-center px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
         x-class="ratingFilter === '4' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >4★ and up</button>
       <button
         type="button"
-        role="tab"
+        aria-pressed="false"
+        x-aria-pressed="ratingFilter === '3' ? 'true' : 'false'"
         @click="setRatingFilter('3')"
         class="inline-flex items-center px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
         x-class="ratingFilter === '3' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >3★ and up</button>
       <button
         type="button"
-        role="tab"
+        aria-pressed="false"
+        x-aria-pressed="ratingFilter === '2' ? 'true' : 'false'"
         @click="setRatingFilter('2')"
         class="inline-flex items-center px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
         x-class="ratingFilter === '2' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >2★ and up</button>
     </div>
 
-    <div class="flex flex-wrap gap-2 mb-6" role="tablist" aria-label="Filter by review activity">
+    <div class="flex flex-wrap gap-2 mb-6" role="group" aria-label="Filter by review activity">
       <button
         type="button"
-        role="tab"
+        aria-pressed="false"
+        x-aria-pressed="hasReviewsFilter === 'all' ? 'true' : 'false'"
         @click="setHasReviewsFilter('all')"
         class="inline-flex items-center px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
         x-class="hasReviewsFilter === 'all' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >Any activity</button>
       <button
         type="button"
-        role="tab"
+        aria-pressed="false"
+        x-aria-pressed="hasReviewsFilter === 'with' ? 'true' : 'false'"
         @click="setHasReviewsFilter('with')"
         class="inline-flex items-center px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
         x-class="hasReviewsFilter === 'with' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >With reviews</button>
       <button
         type="button"
-        role="tab"
+        aria-pressed="false"
+        x-aria-pressed="hasReviewsFilter === 'without' ? 'true' : 'false'"
         @click="setHasReviewsFilter('without')"
         class="inline-flex items-center px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
         x-class="hasReviewsFilter === 'without' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
