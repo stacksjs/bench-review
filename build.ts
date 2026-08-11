@@ -51,6 +51,29 @@ try {
     }
   }
   console.log(`[build] marked ${noindexed} static pages noindex`)
+
+  // Self-canonical for everything else. The 65 pre-rendered dynamic pages
+  // (judge profiles, courthouses, review articles) aren't in SEO_PAGES — their
+  // descriptions need per-entity data — but each is a distinct URL and needs to
+  // say so, or /judges/1/profile, /judges/1/reviews and /judges/1/rulings look
+  // like three copies of one page with no declared preference between them.
+  let canonicalised = 0
+  const skip = new Set([...Object.keys(SEO_PAGES), ...NOINDEX_PAGES])
+  for (const file of new Bun.Glob('**/*.html').scanSync('dist')) {
+    if (skip.has(file))
+      continue
+    const path = `dist/${file}`
+    // eslint-disable-next-line ts/no-top-level-await
+    const html = await Bun.file(path).text()
+    if (!html.includes('</head>') || html.includes('rel="canonical"'))
+      continue
+    const route = `/${file.replace(/index\.html$/, '').replace(/\.html$/, '')}`.replace(/\/$/, '') || '/'
+    const tag = `<link rel="canonical" href="${seoBase}${route}">`
+    // eslint-disable-next-line ts/no-top-level-await
+    await Bun.write(path, html.replace('</head>', `  ${tag}\n</head>`))
+    canonicalised++
+  }
+  console.log(`[build] added self-canonical to ${canonicalised} pages`)
 }
 catch (err) {
   console.warn('[build] SEO head injection skipped:', err instanceof Error ? err.message : err)

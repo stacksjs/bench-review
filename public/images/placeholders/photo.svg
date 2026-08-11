@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" width="160" height="120" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Photo placeholder">
+  <rect width="160" height="120" fill="#f3f4f6"/>
+  <g fill="#d1d5db">
+    <circle cx="58" cy="46" r="10"/>
+    <path d="M34 86l28-30 20 22 14-14 30 22v8H34z"/>
+  </g>
+</svg>

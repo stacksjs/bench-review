@@ -737,6 +737,8 @@
     <div class="flex gap-4 items-center mt-12 pb-6 border-b border-gray-200">
       <img
         :if="judgeImage"
+        src="/images/avatars/default-user.svg"
+        alt="Judge"
         class="object-cover h-12 w-12 ring-1 ring-gray-200 rounded-full grayscale filter"
         x-src="judgeImage"
         x-alt="judgeName"
@@ -780,6 +782,8 @@
           class="overflow-hidden bg-gray-100 rounded-lg hover:opacity-95 transition-opacity"
         >
           <img
+            src="/images/placeholders/photo.svg"
+            alt="Photo attached to this review"
             x-src="p.card_url"
             x-alt="`Photo attached to this review`"
             loading="lazy"

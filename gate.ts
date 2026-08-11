@@ -97,6 +97,22 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   add('every indexable page is in the sitemap', missing.length === 0, missing.join(', '))
 }
 
+// 6b. Every advertised URL actually resolves to a file. The sitemap listed 29
+//     dynamic URLs — every judge, courthouse and published review — for which
+//     the build emitted nothing, so preview.ts (and any host doing the same
+//     pretty-URL mapping) served 404.html with a 404 status for the entire
+//     content corpus while telling crawlers those URLs were canonical.
+{
+  const sitemap = await Bun.file('dist/sitemap.xml').text()
+  const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => new URL(m[1]).pathname)
+  const missing: string[] = []
+  for (const p of locs) {
+    const f = p === '/' ? 'dist/index.html' : `dist${p.replace(/\/$/, '')}.html`
+    if (!(await Bun.file(f).exists())) missing.push(p)
+  }
+  add('every sitemap URL has a built file', missing.length === 0, missing.length ? `${missing.length} missing: ${missing.slice(0, 4).join(', ')}` : '')
+}
+
 // 7. The sitemap never advertises a path robots.txt forbids.
 {
   const sitemap = await Bun.file('dist/sitemap.xml').text()
