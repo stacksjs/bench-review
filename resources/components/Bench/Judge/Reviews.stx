@@ -5,9 +5,27 @@
   const authStore = useStore('auth')
   const stars: number[] = [1, 2, 3, 4, 5]
 
-  // `:id` route param. Cast through Number because params come in as
-  // strings — the byJudge cache is keyed by numeric id.
-  const judgeId = derived<number>(() => Number(params.id))
+  // `:id` route param, resolved the same way every sibling judge component
+  // does it (JudgeTabs, ProfileHeader, RecentRulings).
+  //
+  // This used to read a bare `params.id`. There is no `params` in the client
+  // runtime — the setup IIFE destructures only stx's own exports — so the
+  // derived threw ReferenceError on every read. onMount swallowed it (its
+  // callbacks run in a try/catch), so fetchByJudge was never called, and every
+  // `:if` binding that touched a dependent derived also threw and evaluated
+  // falsy. The whole tab rendered as just the "Write a Review" button: no list,
+  // no loading state, no empty state, and no error anywhere.
+  //
+  // window.stx._rp is unset on hard reload, hence the pathname fallback.
+  function resolveJudgeId(): number {
+    if (typeof window === 'undefined') return 0
+    const fromRouter = Number((window as any).stx?._rp?.id)
+    if (Number.isFinite(fromRouter) && fromRouter > 0) return fromRouter
+    const m = window.location.pathname.match(/^\/judges\/(\d+)/)
+    return m ? Number(m[1]) : 0
+  }
+
+  const judgeId = derived<number>(() => resolveJudgeId())
 
   onMount(() => {
     const id = judgeId()

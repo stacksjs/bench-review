@@ -4,7 +4,7 @@ import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { hydrateLikeData } from '../../Helpers/reviewLikes'
 import { buildPaginatorMeta, resolvePaginatorArgs } from '../../Helpers/paginate'
-import { toPublicReviewRow } from '../../Helpers/reviewerLabel'
+import { attachReviewers, toPublicReviewRow } from '../../Helpers/reviewerLabel'
 
 /**
  * GET /api/reviews — latest published reviews across all judges.
@@ -46,6 +46,14 @@ export default new Action({
     // Resolve the viewer once. Every public response strips the raw
     // user_id (de-anonymization guard, see toPublicReviewRow) and carries
     // is_mine instead.
+
+    // One users query per page, not one per row.
+    const loadUsers = async (ids: number[]): Promise<Array<{ id?: number, name?: string | null, role_label?: string | null }>> =>
+      await ((db.selectFrom('users') as any)
+        .select(['id', 'name', 'role_label'])
+        .where('id', 'in', ids)
+        .execute() as Promise<Array<{ id?: number, name?: string | null, role_label?: string | null }>>)
+
     const me = await Auth.user().catch(() => null)
     const viewerId = (me as any)?.id ?? null
 
@@ -98,7 +106,8 @@ export default new Action({
         .execute() as Array<Record<string, any>>
 
       const hydrated = await hydrateLikeData(rows ?? [])
-      const publicRows = hydrated.map(r => toPublicReviewRow(r, viewerId))
+      const withReviewer = await attachReviewers(hydrated, loadUsers)
+      const publicRows = withReviewer.map(r => toPublicReviewRow(r, viewerId))
       return response.json(buildPaginatorMeta(publicRows, total, page, perPage))
     }
 
@@ -115,7 +124,8 @@ export default new Action({
       .get()
 
     const hydrated = await hydrateLikeData(rows ?? [])
-    const publicRows = hydrated.map(r => toPublicReviewRow(r, viewerId))
+    const withReviewer = await attachReviewers(hydrated, loadUsers)
+    const publicRows = withReviewer.map(r => toPublicReviewRow(r, viewerId))
     return response.json(publicRows)
   },
 })

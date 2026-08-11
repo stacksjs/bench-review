@@ -54,6 +54,31 @@ const ROLE_DISPLAY: Record<string, string> = {
  * my review" (to hide the helpful button on your own); `is_mine` carries
  * exactly that without exposing the id of anyone else.
  */
+/**
+ * Attach a public `reviewer` to each row, batched.
+ *
+ * List endpoints select from judge_reviews alone, so they had no author
+ * information at all and the client filled the gap with a hardcoded
+ * "Anonymous" placeholder — which meant the public feed labelled every
+ * reviewer anonymous, including the ones who never opted in, and contradicted
+ * the article page for the same review.
+ *
+ * One query for the whole page, not one per row. Must run BEFORE
+ * toPublicReviewRow, which strips user_id.
+ */
+export async function attachReviewers<T extends Record<string, any>>(
+  rows: T[],
+  loadUsers: (ids: number[]) => Promise<Array<{ id?: number, name?: string | null, role_label?: string | null }>>,
+): Promise<Array<T & { reviewer: PublicReviewer }>> {
+  const ids = [...new Set(rows.map(r => Number(r.user_id)).filter(id => Number.isFinite(id) && id > 0))]
+  const users = ids.length ? await loadUsers(ids) : []
+  const byId = new Map(users.map(u => [Number(u.id), u]))
+  return rows.map(r => ({
+    ...r,
+    reviewer: publicReviewerFor(r as any, byId.get(Number(r.user_id)) ?? null),
+  }))
+}
+
 export function toPublicReviewRow<T extends Record<string, any>>(
   row: T,
   viewerId: number | null,

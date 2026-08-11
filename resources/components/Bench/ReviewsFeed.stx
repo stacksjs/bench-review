@@ -156,12 +156,32 @@
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
   }
 
-  // Seeded reviews have `user_id: null`. Surface a placeholder author
-  // rather than crashing on undefined access inside `Bench/Feed`.
+  // Fallback only. Rows whose author can't be resolved server-side (seeded
+  // rows with user_id: null, or a deleted user) still need something to render
+  // rather than crashing on undefined access.
+  //
+  // This used to be assigned to EVERY row unconditionally, so the public feed
+  // labelled every reviewer "Anonymous" — including those who never opted in —
+  // and suppressed every /user/:id link, while the article page for the same
+  // review correctly showed the real name. The API now returns a `reviewer`
+  // (LatestReviewsAction + attachReviewers), which already applies the
+  // anonymity rules, so the row's own value wins whenever it exists.
   const PLACEHOLDER_AUTHOR = {
     id: 0,
-    name: 'Anonymous',
+    name: 'Reviewer',
     imageUrl: 'https://www.gravatar.com/avatar/?d=mp&s=80',
+  }
+
+  function authorFor(r: any): { id: number, name: string, imageUrl: string } {
+    const rv = r?.reviewer
+    if (!rv || !rv.name) return PLACEHOLDER_AUTHOR
+    return {
+      // id 0 means "not linkable" to the template — anonymous reviewers have a
+      // null id by design, and must not get a profile link.
+      id: Number(rv.id ?? 0) || 0,
+      name: String(rv.name),
+      imageUrl: PLACEHOLDER_AUTHOR.imageUrl,
+    }
   }
 
   // Single derived owns the view-model: filter out judge-less rows
@@ -199,7 +219,7 @@
           type: r.type,
           status: r.status,
           date: formatDate(r.created_at),
-          author: PLACEHOLDER_AUTHOR,
+          author: authorFor(r),
           judge: j
             ? { id: j.id, name: j.name, imageUrl: (j as any).image_url }
             : { id: r.judge_id, name: 'Judge', imageUrl: '' },
