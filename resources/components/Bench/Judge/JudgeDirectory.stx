@@ -44,10 +44,16 @@
     if (typeof window === 'undefined') return fallback
     return new URLSearchParams(window.location.search).get(key) || fallback
   }
-  const stateFilter = state<string>(() => {
+  // IIFE, matching ratingFilter and hasReviewsFilter below. state() assigns its
+  // argument verbatim (`let value = initialValue`) and never invokes a function
+  // initializer, so passing the arrow directly stored the FUNCTION as the filter
+  // value: `stateFilter() !== 'all'` was permanently true, and the resulting
+  // `judgeState(j) === sf` compared a string to a function for every row. The
+  // directory rendered zero judges, on every visit, with no filter applied.
+  const stateFilter = state<string>((() => {
     const raw = readQueryString('state', 'all')
     return /^[A-Z]{2}$/.test(raw) ? raw : 'all'
-  })
+  })())
   const ratingFilter = state<RatingFilter>((() => {
     const raw = readQueryString('rating', 'all')
     return raw === '4' || raw === '3' || raw === '2' ? raw : 'all'

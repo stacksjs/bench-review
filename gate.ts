@@ -146,7 +146,31 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
 //     and every bare /judges/:id URL came to be dead.
 {
   const unhandled: string[] = []
+
+  // Parse the ACTUAL rewrite patterns out of preview.ts and test routes against
+  // them. An earlier version of this check just asked whether preview.ts
+  // mentioned the route's path segment anywhere — which the file's own
+  // explanatory comments satisfied, so deleting SHELL_REWRITES entirely would
+  // have left this check green. A check that passes when the thing it tests is
+  // absent is worse than no check.
+  // Evaluate the array literal rather than regex-parsing it: the patterns
+  // themselves contain slashes inside character classes ([^/]+), which defeats
+  // any reasonable "find a regex literal" regex.
   const preview = await Bun.file('preview.ts').text()
+  // Anchor on the assignment, not the first '[' — that one belongs to the type
+  // annotation Array<[RegExp, string]>.
+  const decl = preview.indexOf('SHELL_REWRITES')
+  const open = preview.indexOf('[', preview.indexOf('=', decl))
+  const close = preview.indexOf('\n]', open)
+  let rewrites: RegExp[] = []
+  try {
+    const pairs = new Function(`return ${preview.slice(open, close + 2)}`)() as Array<[RegExp, string]>
+    rewrites = pairs.map(pair => pair[0])
+  }
+  catch {
+    rewrites = []
+  }
+
   for await (const p of new Bun.Glob('resources/views/**/[[]*[]]*.stx').scan('.')) {
     // `[...all]` is the catch-all, which exists precisely to handle URLs that
     // have no page. Enumerating it is meaningless.
@@ -155,12 +179,11 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
     const src = await Bun.file(p).text()
     if (src.includes('getStaticPaths'))
       continue
-    // Otherwise it must be covered by a shell rewrite, matched loosely by the
-    // route's first path segment appearing in preview.ts's rewrite table.
-    const seg = p.replace('resources/views/', '').split('/')[0].replace(/\.stx$/, '')
-    if (!/\[/.test(seg) && preview.includes(`/${seg}/`))
+    // Build a concrete URL for this route and see whether a rewrite claims it.
+    const sample = `/${p.replace('resources/views/', '').replace(/(\/index)?\.stx$/, '').replace(/\[[^\]]+\]/g, 'x')}`
+    if (rewrites.some(re => re.test(sample)))
       continue
-    unhandled.push(p.replace('resources/views/', ''))
+    unhandled.push(`${p.replace('resources/views/', '')} (no page, no rewrite for ${sample})`)
   }
   add('every dynamic route is pre-rendered or rewritten', unhandled.length === 0, unhandled.join(', '))
 }
