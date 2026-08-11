@@ -54,11 +54,27 @@ export default new Action({
     }
 
     if (q.length > 0) {
-      // bqb has no Kysely-style callback `where(eb => eb.or([…]))` —
-      // the form is silently no-op'd. Use `where().orWhere()` instead.
+      // `whereAny`, NOT `.where().orWhere()`.
+      //
+      // bqb appends OR flat, with no parenthesised group (` OR ${column}`), and
+      // SQL binds AND tighter than OR. Combined with the status filter above,
+      // `.where('title',…).orWhere('content',…)` emitted
+      //
+      //     WHERE status = ? AND title LIKE ? OR content LIKE ?
+      //
+      // which parses as `(status AND title) OR (content)` — so the status
+      // filter was silently dropped for every row matching on content. A
+      // moderator on the default Pending tab searching any common word got the
+      // whole table back, already-published rows included, with `total`
+      // inflated to match. Both queries were affected identically, so the count
+      // agreed with the wrong rows and nothing looked out of place.
+      //
+      // whereAny emits ` AND (title LIKE ? OR content LIKE ?)` — parenthesised,
+      // and parameterised via placeholders, unlike whereRaw which concatenates
+      // a bare string and would make this an injection site.
       const like = `%${q}%`
-      listQuery = listQuery.where('title', 'like', like).orWhere('content', 'like', like)
-      countQuery = countQuery.where('title', 'like', like).orWhere('content', 'like', like)
+      listQuery = listQuery.whereAny(['title', 'content'], 'like', like)
+      countQuery = countQuery.whereAny(['title', 'content'], 'like', like)
     }
 
     listQuery = listQuery.orderBy('created_at', 'desc')

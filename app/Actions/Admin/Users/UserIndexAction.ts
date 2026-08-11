@@ -47,11 +47,18 @@ export default new Action({
       .select(['COUNT(*) as total'])
 
     if (q.length > 0) {
-      // bqb doesn't expose a Kysely-style callback `where(eb => eb.or([…]))` —
-      // the form is silently no-op'd. Use `where().orWhere()` instead.
+      // `whereAny` emits a PARENTHESISED, parameterised OR group.
+      //
+      // The old `.where().orWhere()` form happens to be correct here only
+      // because the search is currently the sole WHERE clause on both queries.
+      // Add any filter above it — a role or banned-state tab, say — and bqb's
+      // flat ` OR ${column}` would let AND/OR precedence drop that filter for
+      // every row matching on `name`. That is exactly what happened in
+      // Admin/Reviews/ReviewIndexAction. Using the grouped form now means the
+      // next filter added here can't reintroduce it.
       const like = `%${q}%`
-      listQuery = listQuery.where('email', 'like', like).orWhere('name', 'like', like)
-      countQuery = countQuery.where('email', 'like', like).orWhere('name', 'like', like)
+      listQuery = listQuery.whereAny(['email', 'name'], 'like', like)
+      countQuery = countQuery.whereAny(['email', 'name'], 'like', like)
     }
 
     listQuery = listQuery.orderBy('id', 'desc')
