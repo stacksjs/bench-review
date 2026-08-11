@@ -4,6 +4,7 @@ import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
 import { logModeration } from '../../../Helpers/auditLog'
+import { deleteUserOwnedRows } from '../../../Helpers/userCascade'
 
 /**
  * DELETE /api/admin/users/{id} — hard-delete a user and their owned
@@ -59,26 +60,13 @@ export default new Action({
     // than orphaning to `user_id = NULL` because seeded/anonymous
     // reviews already use NULL — keeping the convention clean keeps
     // the public-feed filter (`r.judge_id != null`) simple.
-    await db.deleteFrom('judge_reviews').where('user_id', '=', targetUserId).execute().catch(() => {})
-    await db.deleteFrom('judge_follows').where('user_id', '=', targetUserId).execute().catch(() => {})
-
-    // Token rows. The `personal_access_tokens` table is polymorphic
-    // (`tokenable_type`/`tokenable_id`); the OAuth table is keyed by
-    // `user_id`. Best-effort: if either table is missing on a fresh
-    // checkout the `.catch(() => {})` makes the delete a no-op rather
-    // than 500-ing the request.
-    await db.deleteFrom('personal_access_tokens')
-      .where('tokenable_id', '=', targetUserId)
-      .execute()
-      .catch(() => {})
-    await db.deleteFrom('oauth_access_tokens')
-      .where('user_id', '=', targetUserId)
-      .execute()
-      .catch(() => {})
-
-    // RBAC pivots.
-    await db.deleteFrom('user_roles').where('user_id', '=', targetUserId).execute().catch(() => {})
-    await db.deleteFrom('user_permissions').where('user_id', '=', targetUserId).execute().catch(() => {})
+    // Same cascade as the self-serve delete. This path used to clean only
+    // judge_reviews, judge_follows, the two token tables and the RBAC pivots —
+    // leaving the user's comments, likes, flags, review photos, drafts,
+    // notification preferences, subscriptions and payment rows pointing at an
+    // id that no longer existed. Whether a user's data is really erased should
+    // not depend on who pressed the button.
+    await deleteUserOwnedRows(targetUserId)
 
     await db.deleteFrom('users').where('id', '=', targetUserId).execute()
 
