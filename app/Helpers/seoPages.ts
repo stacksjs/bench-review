@@ -208,7 +208,7 @@ export function injectSeoHead(html: string, seo: PageSeo, base: string): string 
   // See the `literal` note in entitySeo.ts: extractTitle() pulls the page's
   // own <title> into og:title/twitter:title, and on any page whose title is
   // user-derived a `$'` there would splice the document into itself.
-  const literal = (s: string) => () => s
+  const literal = (s: string): (() => string) => () => s
 
   let out = html
   const descTag = `<meta name="description" content="${escapeAttr(seo.description)}">`

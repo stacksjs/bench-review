@@ -80,7 +80,7 @@ function excerpt(html: string | null, max = 155): string {
  * document into the <title>. Passing a function makes the return value literal,
  * which is the only safe way to put user-controlled text through replace().
  */
-const literal = (s: string) => () => s
+const literal = (s: string): (() => string) => () => s
 
 const clean = (s: string | null, fallback: string): string => (s ?? '').trim() || fallback
 
