@@ -226,7 +226,20 @@ export async function loadEntitySeo(base: string): Promise<Map<string, EntitySeo
         : { '@type': 'Person', 'name': judgeName },
       'publisher': { '@id': `${base}/#organization` },
     }
-    if (r.created_at) review.datePublished = new Date(r.created_at).toISOString().slice(0, 10)
+    // Guarded, matching the sitemap's toLastMod. Unguarded,
+    // `new Date(bad).toISOString()` throws RangeError, and because the whole
+    // entity-SEO pass runs inside build.ts's try/catch a single malformed
+    // created_at would have skipped per-entity SEO for EVERY page while the
+    // build still reported success.
+    //
+    // Formatting matches the sitemap (UTC via toISOString) rather than local
+    // time, deliberately: the two describe the same rows and disagreeing about
+    // a date would be worse than both being UTC.
+    if (r.created_at) {
+      const d = new Date(r.created_at)
+      if (!Number.isNaN(d.getTime()))
+        review.datePublished = d.toISOString().slice(0, 10)
+    }
     if (typeof r.rating === 'number' && r.rating > 0) {
       review.reviewRating = { '@type': 'Rating', 'ratingValue': r.rating, 'bestRating': 5, 'worstRating': 1 }
     }
