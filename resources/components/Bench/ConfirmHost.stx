@@ -22,6 +22,86 @@
     confirmStore.open() ? 'fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/40' : 'hidden')
   const acceptClass = derived<string>(() =>
     confirmStore.danger() ? 'bg-red-600 hover:bg-red-500' : 'bg-blue-600 hover:bg-blue-700')
+
+  // ── Modal keyboard semantics ──────────────────────────────────────
+  //
+  // This is a real modal — it blocks the page and settles a promise the
+  // caller is awaiting — so it owes the three things a modal owes a keyboard
+  // user, none of which it had:
+  //
+  //   Escape closes it. Without this the only way out is a mouse.
+  //   Focus moves INTO it on open. Otherwise focus stays wherever it was, on
+  //     a control now behind a scrim, and a screen reader announces nothing.
+  //   Focus stays inside while open, and is restored on close. Without the
+  //     trap, Tab walks straight out into the page underneath — the dialog is
+  //     still visually on top, so the user is typing into something they
+  //     can't see.
+  //
+  // Listener is on `document` and gates on `confirmStore.open()` rather than
+  // being added/removed per open: the overlay is only hidden via a class, so
+  // there is no mount/unmount edge to hang add/remove off, and a single
+  // always-registered handler can't leak.
+  const dialogId = 'bench-confirm-dialog'
+  let restoreFocusTo: HTMLElement | null = null
+
+  function focusableIn(root: Element): HTMLElement[] {
+    return Array.from(
+      root.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'),
+    ).filter(el => !(el as HTMLButtonElement).disabled) as HTMLElement[]
+  }
+
+  effect(() => {
+    if (typeof document === 'undefined') return
+    const isOpen = confirmStore.open()
+    const panel = document.getElementById(dialogId)
+    if (!panel) return
+    if (isOpen) {
+      // Remember where focus came from so it can go back on close, then move
+      // to Cancel — the non-destructive choice, so a stray Enter can't confirm
+      // a delete the user never read.
+      restoreFocusTo = document.activeElement as HTMLElement | null
+      const targets = focusableIn(panel)
+      if (targets.length) setTimeout(() => targets[0].focus(), 0)
+    }
+    else if (restoreFocusTo) {
+      const back = restoreFocusTo
+      restoreFocusTo = null
+      setTimeout(() => back.focus(), 0)
+    }
+  })
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('keydown', (event: KeyboardEvent) => {
+      if (!confirmStore.open()) return
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        confirmStore.dismiss()
+        return
+      }
+      if (event.key !== 'Tab') return
+      const panel = document.getElementById(dialogId)
+      if (!panel) return
+      const targets = focusableIn(panel)
+      if (!targets.length) return
+      const first = targets[0]
+      const last = targets[targets.length - 1]
+      const active = document.activeElement
+      // Wrap at both ends, and pull focus back in if it has escaped the panel
+      // entirely (browser chrome, a click on the backdrop, an SPA swap).
+      if (!panel.contains(active)) {
+        event.preventDefault()
+        first.focus()
+      }
+      else if (event.shiftKey && active === first) {
+        event.preventDefault()
+        last.focus()
+      }
+      else if (!event.shiftKey && active === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    })
+  }
 </script>
 
 <div
@@ -29,13 +109,16 @@
   @click="confirmStore.dismiss()"
 >
   <div
+    id="bench-confirm-dialog"
     role="dialog"
     aria-modal="true"
+    aria-labelledby="bench-confirm-title"
+    aria-describedby="bench-confirm-message"
     @click="$event.stopPropagation()"
     class="p-6 max-w-md w-full bg-white border border-gray-200 rounded-2xl shadow-xl"
   >
-    <h2 class="font-semibold text-gray-900 text-lg" :text="confirmStore.title()"></h2>
-    <p class="mt-2 text-gray-600 text-sm" :text="confirmStore.message()"></p>
+    <h2 id="bench-confirm-title" class="font-semibold text-gray-900 text-lg" :text="confirmStore.title()"></h2>
+    <p id="bench-confirm-message" class="mt-2 text-gray-600 text-sm" :text="confirmStore.message()"></p>
     <div class="flex gap-3 justify-end mt-6">
       <button
         type="button"
