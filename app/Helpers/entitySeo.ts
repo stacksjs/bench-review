@@ -27,9 +27,43 @@ interface JudgeRow { id: number, name: string | null, image_url: string | null, 
 interface CourtRow { id: number, name: string | null, image: string | null, address: string | null, city: string | null, state: string | null, zip_code: string | null }
 export interface ReviewRow { id: number, title: string | null, content: string | null, rating: number | null, status: string | null, anonymized: number | null, judge_id: number | null, created_at: string | null }
 
+const ENTITIES: Record<string, string> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: '\'',
+  nbsp: ' ',
+  rsquo: '’',
+  lsquo: '‘',
+  rdquo: '”',
+  ldquo: '“',
+  mdash: '—',
+  ndash: '–',
+  hellip: '…',
+}
+
+/**
+ * Decode the entities a rich-text editor actually emits.
+ *
+ * Blanking them instead (the obvious `&[a-z]+;` -> ' ') silently eats
+ * punctuation: "Fair &amp; firm" becomes "Fair firm" and "he&rsquo;s" becomes
+ * "he s". Apostrophes are near-universal in prose, so every description would
+ * have carried a visible hole. Latent against current seed data, which happens
+ * to contain no entities at all — which is exactly why it needed testing rather
+ * than eyeballing.
+ */
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&#(\d+);/g, (_m, d: string) => String.fromCodePoint(Number(d)))
+    .replace(/&#x([0-9a-f]+);/gi, (_m, h: string) => String.fromCodePoint(Number.parseInt(h, 16)))
+    .replace(/&([a-z]+);/gi, (m, name: string) => ENTITIES[name.toLowerCase()] ?? m)
+}
+
 /** Collapse HTML + whitespace to a meta-description-sized plain sentence. */
 function excerpt(html: string | null, max = 155): string {
-  const text = (html ?? '').replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/gi, ' ').replace(/\s+/g, ' ').trim()
+  // Decode AFTER stripping tags, so a decoded '<' can't reconstitute markup.
+  const text = decodeEntities((html ?? '').replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim()
   if (text.length <= max)
     return text
   // Cut at a word boundary so the snippet doesn't end mid-word.
