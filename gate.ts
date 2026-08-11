@@ -140,6 +140,31 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   add(`all ${entities.size} entity pages have their own head`, bad.length === 0, bad.slice(0, 4).join(', '))
 }
 
+// 6d. Every dynamic route is either pre-rendered or explicitly rewritten.
+//     Miss one and it 404s in production for everybody, silently — which is
+//     how the verification link in every signup email, the "Write Review" CTA
+//     and every bare /judges/:id URL came to be dead.
+{
+  const unhandled: string[] = []
+  const preview = await Bun.file('preview.ts').text()
+  for await (const p of new Bun.Glob('resources/views/**/[[]*[]]*.stx').scan('.')) {
+    // `[...all]` is the catch-all, which exists precisely to handle URLs that
+    // have no page. Enumerating it is meaningless.
+    if (/\[\.\.\./.test(p))
+      continue
+    const src = await Bun.file(p).text()
+    if (src.includes('getStaticPaths'))
+      continue
+    // Otherwise it must be covered by a shell rewrite, matched loosely by the
+    // route's first path segment appearing in preview.ts's rewrite table.
+    const seg = p.replace('resources/views/', '').split('/')[0].replace(/\.stx$/, '')
+    if (!/\[/.test(seg) && preview.includes(`/${seg}/`))
+      continue
+    unhandled.push(p.replace('resources/views/', ''))
+  }
+  add('every dynamic route is pre-rendered or rewritten', unhandled.length === 0, unhandled.join(', '))
+}
+
 // 7. The sitemap never advertises a path robots.txt forbids.
 {
   const sitemap = await Bun.file('dist/sitemap.xml').text()

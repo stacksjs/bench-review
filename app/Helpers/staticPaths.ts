@@ -55,3 +55,32 @@ export async function articlePaths(): Promise<StaticPathsResult> {
     .execute() as Promise<Array<{ id: number }>>)
   return toPaths(rows)
 }
+
+/** Blog posts — content lives in a static module, not the database. */
+export async function blogPaths(): Promise<StaticPathsResult> {
+  const { blogPosts } = await import('../../resources/data/sample')
+  return toPaths((blogPosts as Array<{ id: number }>).map(p => ({ id: p.id })))
+}
+
+/**
+ * Public reviewer profiles.
+ *
+ * Deliberately NOT "every user". A file per registered account turns the
+ * deploy into a user-enumeration oracle — anyone listing dist/ learns how many
+ * accounts exist and their ids. Only authors who have already published a
+ * NON-anonymous review get a page, because that identity is public by their
+ * own choice; it's the same set the app is willing to link to (the feed guards
+ * every /user/ link on a non-zero author id).
+ *
+ * Returns empty against current seed data, where published reviews carry no
+ * user_id. That's the correct output, not a failure — it grows on its own once
+ * reviews are attributed.
+ */
+export async function reviewerPaths(): Promise<StaticPathsResult> {
+  const rows = await ((db.selectFrom('judge_reviews') as any)
+    .select(['user_id', 'anonymized'])
+    .where('status', '=', 'published')
+    .execute() as Promise<Array<{ user_id: number | null, anonymized: number | null }>>)
+  const ids = [...new Set(rows.filter(r => r.user_id != null && !r.anonymized).map(r => Number(r.user_id)))]
+  return toPaths(ids.map(id => ({ id })))
+}

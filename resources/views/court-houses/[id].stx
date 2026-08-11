@@ -1,3 +1,15 @@
+<script server>
+// Enumerate this route's ids at build time. Two lines on purpose: stx's SSG
+// extracts this body by regex and stops at the first line starting with `}`,
+// and evaluates it via `new Function`, so there is no module scope to import
+// into. Absolute path because a relative specifier has no meaningful base
+// inside that evaluation context. See app/Helpers/staticPaths.ts.
+export async function getStaticPaths() {
+  const mod = await import(`${process.cwd()}/app/Helpers/staticPaths.ts`)
+  return await mod.courtPaths()
+}
+</script>
+
 <script client>
   import type { CourtHouse } from '~/resources/types'
   import { courtHouses } from '~/resources/data/sample'

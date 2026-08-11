@@ -1,14 +1,23 @@
 # NOTE: deploy target is not finalized — this is the existing Netlify
-# config, corrected so it at least produces a servable site. Whichever
-# host is chosen needs the same three things: publish the real build
-# output, proxy /api/* to the deployed API origin, and accept that
-# dynamic judge/article pages have no static output yet (see #46).
+# config. Whichever host is chosen needs the same four things: run the
+# real build command, publish its output, proxy /api/* to the deployed
+# API origin, and rewrite the one unbounded dynamic route (below).
+#
+# Dynamic judge / courthouse / article pages ARE pre-rendered now (the
+# `getStaticPaths` hooks in resources/views/**), so the old caveat about
+# them having no static output no longer applies.
 
 [build]
 base = "/"
-command = "bun install && touch .env && cd storage/framework/core && bun run build && cd ../../.. && ./buddy build views"
-# build.ts / `./buddy build views` writes to ./dist (NOT
-# storage/framework/views/web/dist, which is empty).
+# Ends in `bun run build` (= bun build.ts), NOT `./buddy build views`.
+# buildApp() alone emits the pages and stops; build.ts is what then splices
+# in EIGHT post-build passes the pages are incomplete without — per-page SEO
+# head, per-entity SEO + JSON-LD, noindex, self-canonical, ts-analytics, the
+# self-hosted webfont, the CSP meta, and sitemap.xml + robots.txt. Deploying
+# the framework command alone ships pages missing all of it.
+command = "bun install && touch .env && cd storage/framework/core && bun run build && cd ../../.. && bun run build"
+# build.ts writes to ./dist (NOT storage/framework/views/web/dist, which is
+# empty).
 publish = "dist"
 
 [build.environment]
@@ -23,6 +32,18 @@ NODE_VERSION = "20"
   to = "https://YOUR-API-HOST/api/:splat"
   status = 200
   force = true
+
+# Email-verification links carry a freshly-minted token, so unlike every other
+# dynamic route there is no finite set of pages to pre-render. Without this
+# rewrite the link in every signup email resolves to no file and 404s.
+#
+# Status 200 (a rewrite, not a redirect) so the browser keeps the original URL:
+# Bench/VerifyEmail reads the id and token straight off location.pathname.
+# Mirrored in preview.ts's SHELL_REWRITES — keep the two in step.
+[[redirects]]
+  from = "/verify-email/:id/:token"
+  to = "/verify-email.html"
+  status = 200
 
 [[plugins]]
 package = "@netlify/plugin-lighthouse"
