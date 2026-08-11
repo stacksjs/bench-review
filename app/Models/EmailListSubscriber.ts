@@ -22,7 +22,14 @@ export default defineModel({
     useTimestamps: true,
     useApi: {
       uri: 'email-list-subscribers',
-      routes: ['index', 'show'],
+      // SECURITY: routes [] for the same reason as Subscriber.ts — the ORM route
+      // generator SILENTLY DROPS the `middleware` key below (it reads only
+      // `uri` and `routes`), so these reads were fully unauthenticated despite
+      // the declared intent. `GET /api/email-list-subscribers` exposed
+      // which subscriber is on which list, with signup source and status.
+      // The middleware line is retained only to document intent for when the
+      // generator is fixed.
+      routes: [],
       // The pivot leaks list-membership PII (which addresses are on
       // which list, signup source, status). Auth-gate it. Public
       // unsubscribe goes through the dedicated token route, not this

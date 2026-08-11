@@ -13,7 +13,14 @@ export default defineModel({
     useTimestamps: true,
     useApi: {
       uri: 'campaign-sends',
-      routes: ['index', 'show'],
+      // SECURITY: routes [] for the same reason as Subscriber.ts — the ORM route
+      // generator SILENTLY DROPS the `middleware` key below (it reads only
+      // `uri` and `routes`), so these reads were fully unauthenticated despite
+      // the declared intent. `GET /api/campaign-sends` exposed per-subscriber
+      // delivery, open and click tracking — behavioural PII.
+      // The middleware line is retained only to document intent for when the
+      // generator is fixed.
+      routes: [],
       // Per-recipient send records carry email + delivery status. Treat
       // as PII and require auth on all read paths. The transactional
       // owner-only views in the dashboard are gated separately.
