@@ -32,7 +32,7 @@
           </StxLink>
 
           <button
-            @click="history.back()"
+            @click="window.history.back()"
             class="flex items-center justify-center px-6 py-3 w-full sm:w-auto text-slate-700 hover:bg-slate-50 border border-slate-300 rounded-lg duration-200 transition-colors"
           >
             <i class="mr-2 h-5 w-5 i-hugeicons-arrow-left-02"></i>

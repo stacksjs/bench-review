@@ -13,11 +13,11 @@ const pendingImports = new Map<string, Promise<{ handle: (event: any) => Promise
 // Pre-compute which event types have listeners for O(1) lookup
 const eventTypes = new Set(Object.keys(events))
 
-export async function handleEvents() {
+export async function handleEvents(): Promise<void> {
   emitter.on('*', listenEvents as WildcardHandler<StacksEvents>)
 }
 
-function listenEvents(type: keyof typeof events, event: any) {
+function listenEvents(type: keyof typeof events, event: any): void {
   // Fast path: skip events with no registered listeners
   if (!eventTypes.has(type as string))
     return
@@ -64,7 +64,7 @@ async function resolveAction(listener: string): Promise<{ handle: (event: any) =
   return pending
 }
 
-async function processListeners(type: string, listeners: string[], event: any) {
+async function processListeners(type: string, listeners: string[], event: any): Promise<void> {
   for (const listener of listeners) {
     try {
       if (typeof listener === 'function') {

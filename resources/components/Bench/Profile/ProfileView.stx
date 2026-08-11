@@ -103,7 +103,7 @@
       <div class="p-10">
         <div class="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div class="flex gap-4 items-center">
-            <img class="object-cover h-24 w-24 ring-2 ring-white/20 rounded-full" x-src="avatarUrl" x-alt="displayName" />
+            <img src="/images/avatars/default-user.svg" alt="Your profile photo" class="object-cover h-24 w-24 ring-2 ring-white/20 rounded-full" x-src="avatarUrl" x-alt="displayName" />
             <div>
               <h1 class="font-bold text-2xl text-white">{{ displayName }}</h1>
               <p class="text-gray-400 text-sm">{{ userEmail }}</p>
@@ -189,7 +189,7 @@
         <p class="mt-1 text-gray-500 text-sm">Judges you haven't reviewed yet.</p>
         <ul :if="suggestedJudges.length > 0" class="mt-5 space-y-4">
           <li :for="j in suggestedJudges" class="flex gap-3 items-center">
-            <img class="object-cover flex-none h-10 w-10 rounded-full grayscale filter" x-src="j.image_url || j.photo || '/images/avatars/default-user.svg'" x-alt="j.name || 'Judge'" />
+            <img alt="Judge" src="/images/avatars/default-user.svg" class="object-cover flex-none h-10 w-10 rounded-full grayscale filter" x-src="j.image_url || j.photo || '/images/avatars/default-user.svg'" x-alt="j.name || 'Judge'" />
             <div class="flex-1 min-w-0">
               <p class="font-medium text-gray-900 text-sm truncate">{{ j.name }}</p>
               <p class="text-gray-500 text-xs truncate">{{ (j.court && j.court.name) || j.court || '' }}</p>

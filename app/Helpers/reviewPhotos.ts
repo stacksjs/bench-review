@@ -62,10 +62,10 @@ export async function processAndPersistReviewPhoto(
   // Strip metadata BEFORE the resize chain. Each .toBuffer() forks
   // its own pipeline so a previous variant's transforms don't leak
   // into the next size.
-  const base = () => sharp(buf).rotate() // auto-orient via EXIF orientation tag, then strip everything else below
+  const base = (): any => sharp(buf).rotate() // auto-orient via EXIF orientation tag, then strip everything else below
 
   const photoId = randomUUID()
-  const keyFor = (label: 'thumb' | 'card' | 'full') => `uploads/review-photos/${reviewUuid}/${photoId}.${label}.webp`
+  const keyFor = (label: 'thumb' | 'card' | 'full'): string => `uploads/review-photos/${reviewUuid}/${photoId}.${label}.webp`
   const store = disk()
 
   // FULL — 1600w fit-inside (preserve aspect), strip metadata, webp q=80.

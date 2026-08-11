@@ -27,7 +27,7 @@
         >
             <article class="flex relative flex-col gap-8 lg:flex-row p-6 hover:bg-gray-50 rounded-2xl duration-200 transition-all isolate">
               <div class="aspect-[16/9] relative sm:aspect-[2/1] lg:aspect-square lg:shrink-0 lg:w-64">
-                <img x-src="post.author.imageUrl || '/images/avatars/default-user.svg'" x-alt="post.author.name || 'Author'" class="absolute inset-0 object-cover h-full w-full bg-gray-50 rounded-2xl">
+                <img alt="Author" src="/images/avatars/default-user.svg" x-src="post.author.imageUrl || '/images/avatars/default-user.svg'" x-alt="post.author.name || 'Author'" class="absolute inset-0 object-cover h-full w-full bg-gray-50 rounded-2xl">
                 <div class="absolute inset-0 ring-1 ring-gray-900/10 ring-inset rounded-2xl"></div>
               </div>
               <div class="flex-1">

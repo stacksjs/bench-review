@@ -255,7 +255,7 @@
             class="overflow-hidden p-5 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 shadow-sm hover:shadow-md duration-200 transition-all group hover:-translate-y-0.5"
           >
             <div class="flex gap-4 items-center">
-              <img class="object-cover h-14 w-14 ring-2 ring-gray-100 rounded-full duration-200 transition-all" x-src="judge.image_url || '/images/avatars/default-user.svg'" x-alt="judge.name || 'Judge'">
+              <img alt="Judge" src="/images/avatars/default-user.svg" class="object-cover h-14 w-14 ring-2 ring-gray-100 rounded-full duration-200 transition-all" x-src="judge.image_url || '/images/avatars/default-user.svg'" x-alt="judge.name || 'Judge'">
               <div class="flex-1 min-w-0">
                 <h3 class="font-semibold text-gray-900 truncate">{{ judge.name }}</h3>
                 <p :if="judge.court_name" class="text-gray-500 text-sm truncate">{{ judge.court_name }}</p>
@@ -297,7 +297,7 @@
             class="overflow-hidden p-6 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 shadow-sm hover:shadow-md duration-200 transition-all group hover:-translate-y-0.5"
           >
             <div class="flex gap-4 items-center">
-              <img class="object-cover h-16 w-16 ring-2 ring-gray-100 rounded-full duration-200 transition-all" x-src="judge.image_url || '/images/avatars/default-user.svg'" x-alt="judge.name || 'Judge'">
+              <img alt="Judge" src="/images/avatars/default-user.svg" class="object-cover h-16 w-16 ring-2 ring-gray-100 rounded-full duration-200 transition-all" x-src="judge.image_url || '/images/avatars/default-user.svg'" x-alt="judge.name || 'Judge'">
               <div class="min-w-0">
                 <h3 class="font-semibold text-gray-900 truncate duration-200 transition-colors">{{ judge.name }}</h3>
                 <p :if="judge.court_name" class="text-gray-500 text-sm truncate">{{ judge.court_name }}</p>
@@ -323,7 +323,7 @@
             class="overflow-hidden p-6 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 shadow-sm hover:shadow-md duration-200 transition-all group hover:-translate-y-0.5"
           >
             <div class="flex gap-4 items-center">
-              <img class="object-cover h-16 w-16 ring-2 ring-gray-100 rounded-full duration-200 transition-all" x-src="judge.photo || '/images/avatars/default-user.svg'" x-alt="judge.name || 'Judge'">
+              <img alt="Judge" src="/images/avatars/default-user.svg" class="object-cover h-16 w-16 ring-2 ring-gray-100 rounded-full duration-200 transition-all" x-src="judge.photo || '/images/avatars/default-user.svg'" x-alt="judge.name || 'Judge'">
               <div class="min-w-0">
                 <h3 class="font-semibold text-gray-900 truncate duration-200 transition-colors">{{ judge.name }}</h3>
                 <p class="text-gray-500 text-sm truncate">{{ judge.court.name }}</p>

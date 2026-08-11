@@ -4,7 +4,7 @@ import { tsAnalyticsTag } from './app/Helpers/analyticsTag'
 import { TS_ANALYTICS_APP_ID } from './config/ts-analytics'
 import { cspMetaTag } from './app/Helpers/cspMeta'
 import { FONT_HEAD_TAGS } from './app/Helpers/fontHead'
-import { injectSeoHead, SEO_PAGES } from './app/Helpers/seoPages'
+import { injectNoindex, injectSeoHead, NOINDEX_PAGES, SEO_PAGES } from './app/Helpers/seoPages'
 import { buildRobotsTxt, buildSitemapXml, normalizeBase } from './app/Helpers/sitemap'
 
 // eslint-disable-next-line ts/no-top-level-await
@@ -31,6 +31,26 @@ try {
     injected++
   }
   console.log(`[build] injected SEO head into ${injected} static pages`)
+
+  // Error pages and token-flow landings: crawlable, but nothing you'd want
+  // kept. Same splice-into-static-<head> reason as above.
+  let noindexed = 0
+  for (const file of NOINDEX_PAGES) {
+    const path = `dist/${file}`
+    const f = Bun.file(path)
+    // eslint-disable-next-line ts/no-top-level-await
+    if (!(await f.exists()))
+      continue
+    // eslint-disable-next-line ts/no-top-level-await
+    const html = await f.text()
+    const out = injectNoindex(html)
+    if (out !== html) {
+      // eslint-disable-next-line ts/no-top-level-await
+      await Bun.write(path, out)
+      noindexed++
+    }
+  }
+  console.log(`[build] marked ${noindexed} static pages noindex`)
 }
 catch (err) {
   console.warn('[build] SEO head injection skipped:', err instanceof Error ? err.message : err)

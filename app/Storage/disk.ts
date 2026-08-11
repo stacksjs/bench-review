@@ -58,7 +58,7 @@ export interface Disk {
 // ---------------------------------------------------------------------------
 function createLocalDisk(): Disk {
   const root = join(process.cwd(), 'storage')
-  const urlFor = (key: string) => `/storage/${key.replace(/^\/+/, '')}`
+  const urlFor = (key: string): string => `/storage/${key.replace(/^\/+/, '')}`
   return {
     name: 'local',
     async put(key, data) {
@@ -98,13 +98,13 @@ function createS3Disk(): Disk {
     return client
   }
 
-  const prefixed = (key: string) => {
+  const prefixed = (key: string): string => {
     const k = key.replace(/^\/+/, '')
     const p = s3Config.prefix.replace(/^\/+|\/+$/g, '')
     return p ? `${p}/${k}` : k
   }
 
-  const urlFor = (key: string) => {
+  const urlFor = (key: string): string => {
     const k = prefixed(key)
     if (s3Config.publicUrl)
       return `${String(s3Config.publicUrl).replace(/\/+$/, '')}/${k}`

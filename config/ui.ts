@@ -122,6 +122,28 @@ export default {
     './plugins/stx-components',
   ],
 
+  // Where views/layouts/components live, relative to resources/. Declared here
+  // rather than in the root stx.config.ts for the same reason as `plugins`
+  // above — config/ui.ts is the only file stx's loader opens, so the identical
+  // block in stx.config.ts has never had any effect.
+  //
+  // NOTE there is deliberately no `partialsDir` here. It would do nothing:
+  // stx's SSG (ssg.ts) never reads that key — it forwards layoutsDir and
+  // routeMiddleware to the renderer but not partialsDir, so `@include`
+  // resolution in a static build always uses the default `resources/partials`
+  // no matter what this file says (verified by setting it both ways).
+  //
+  // That is why `resources/partials` is a symlink to `components`. Without it
+  // EVERY `@include('Bench/…')` threw ENOENT, and because the SSG catches
+  // include failures per-include and splices an error banner into the page
+  // instead of failing the build, `bun build.ts` reported "37 pages, 0 failed"
+  // while emitting 6KB shells with no header, no footer, no hero — and
+  // ANSI-escaped error text where the markup belonged. Deleting that symlink
+  // silently breaks the entire static build again.
+  componentsDir: 'components',
+  layoutsDir: 'layouts',
+  pagesDir: 'views',
+
   // Where the route guards live. stx defaults to `<cwd>/middleware`
   // (ssg.ts: `routeMiddleware?.dir || 'middleware'`), and bench keeps them under
   // `resources/`, so `resources/middleware/guest.ts` was never loaded.

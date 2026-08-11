@@ -69,6 +69,34 @@ export const SEO_PAGES: Record<string, PageSeo> = {
     path: '/search',
     description: 'Search Bench Review for a judge by name or court.',
   },
+  'blog.html': {
+    path: '/blog',
+    description: 'Writing from Bench Review on judicial transparency, courtroom practice, and what the review data shows about the bench.',
+  },
+}
+
+/**
+ * Pages that should never appear in an index, keyed the same way as SEO_PAGES.
+ *
+ * Deliberately NOT a mirror of robots.txt's Disallow list: a disallowed path
+ * is never fetched, so a `noindex` on it is never read — the two mechanisms
+ * are alternatives, not layers. These are the pages a crawler CAN reach and
+ * shouldn't keep: error pages carry no content, and the verify-email landing
+ * is one half of a token flow.
+ *
+ * 500.html declares its own `noindex` inline (it's a standalone document with
+ * its own <head>, not a layout-extending view) and so isn't listed here.
+ */
+export const NOINDEX_PAGES: string[] = [
+  '404.html',
+  'verify-email.html',
+]
+
+/** Add `<meta name="robots" content="noindex">` unless the page has one. */
+export function injectNoindex(html: string): string {
+  if (!html.includes('</head>') || /<meta\s+name="robots"/i.test(html))
+    return html
+  return html.replace('</head>', '  <meta name="robots" content="noindex">\n</head>')
 }
 
 const escapeAttr = (s: string): string =>
@@ -81,8 +109,75 @@ function extractTitle(html: string): string {
 }
 
 /**
- * Inject canonical + OG + Twitter + description into one page's <head>.
- * Returns the rewritten HTML (or the original if it has no </head>).
+ * Escape a JSON-LD payload for safe embedding in a <script> element.
+ *
+ * JSON.stringify does not escape `<`, so a `</script>` sequence appearing in
+ * any string value would close the block early and drop the rest of the page
+ * into the document as markup. Descriptions here are ours, but this runs over
+ * page titles too, and the whole point of the file is that untrusted-ish text
+ * reaches the <head>. Escaping the `<` of a closing tag is the standard fix
+ * and leaves the JSON semantically identical.
+ */
+const escapeJsonLd = (value: unknown): string =>
+  JSON.stringify(value).replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '\\u003C!--')
+
+/**
+ * The site-wide JSON-LD graph, plus a WebPage node for this specific page.
+ *
+ * Structured data is what search engines read to build rich results; without
+ * it a review directory is just prose to them. The shape is the conventional
+ * three-node graph — Organization (who publishes), WebSite (the property, with
+ * a SearchAction so a sitelinks search box can point at /search), and WebPage
+ * (this page, tied back to the site by @id).
+ *
+ * Per-judge Review / Person nodes belong on the judge pages, which aren't
+ * pre-rendered yet (#46) — they'd need build-time static generation to be
+ * visible to a crawler that doesn't run JS, exactly like the OG tags above.
+ */
+function buildJsonLd(seo: PageSeo, base: string, title: string): string {
+  const url = `${base}${seo.path}`
+  const graph = [
+    {
+      '@type': 'Organization',
+      '@id': `${base}/#organization`,
+      'name': 'Bench Review',
+      'url': `${base}/`,
+      'logo': {
+        '@type': 'ImageObject',
+        'url': `${base}/images/bench/logo.png`,
+      },
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${base}/#website`,
+      'url': `${base}/`,
+      'name': 'Bench Review',
+      'publisher': { '@id': `${base}/#organization` },
+      'potentialAction': {
+        '@type': 'SearchAction',
+        'target': {
+          '@type': 'EntryPoint',
+          'urlTemplate': `${base}/search?q={search_term_string}`,
+        },
+        'query-input': 'required name=search_term_string',
+      },
+    },
+    {
+      '@type': 'WebPage',
+      '@id': `${url}#webpage`,
+      url,
+      'name': title,
+      'description': seo.description,
+      'isPartOf': { '@id': `${base}/#website` },
+    },
+  ]
+
+  return `<script type="application/ld+json">${escapeJsonLd({ '@context': 'https://schema.org', '@graph': graph })}</script>`
+}
+
+/**
+ * Inject canonical + OG + Twitter + description + JSON-LD into one page's
+ * <head>. Returns the rewritten HTML (or the original if it has no </head>).
  */
 export function injectSeoHead(html: string, seo: PageSeo, base: string): string {
   if (!html.includes('</head>'))
@@ -105,6 +200,7 @@ export function injectSeoHead(html: string, seo: PageSeo, base: string): string 
     `<meta name="twitter:title" content="${escapeAttr(title)}">`,
     `<meta name="twitter:description" content="${escapeAttr(ogDesc)}">`,
     `<meta name="twitter:image" content="${escapeAttr(ogImage)}">`,
+    buildJsonLd(seo, base, title),
   ].join('\n  ')
 
   // Replace the (default) description with the per-page one if present,

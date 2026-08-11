@@ -150,7 +150,7 @@ export function resolvePaginatorArgs(opts: { perPage?: number, page?: number, de
   const queryPerPage = readNumericQuery(req, 'per_page')
   const queryPage = readNumericQuery(req, 'page')
 
-  const clampPerPage = (n: number) => Math.max(1, Math.min(MAX_PER_PAGE, Math.floor(n)))
+  const clampPerPage = (n: number): number => Math.max(1, Math.min(MAX_PER_PAGE, Math.floor(n)))
   // Precedence: explicit override (opts.perPage) > client `?per_page` >
   // caller's default (opts.defaultPerPage) > global default. Use
   // `defaultPerPage` (not `perPage`) when you want the client to still

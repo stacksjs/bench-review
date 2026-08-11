@@ -314,7 +314,7 @@
       <div class="px-6 py-6 space-y-6 sm:px-8">
         <div>
           <div class="flex gap-4 items-center">
-            <img class="object-cover h-14 w-14 ring-1 ring-gray-100 rounded-full" x-src="avatarUrl" alt="Your profile photo">
+            <img src="/images/avatars/default-user.svg" class="object-cover h-14 w-14 ring-1 ring-gray-100 rounded-full" x-src="avatarUrl" alt="Your profile photo">
             <label
               class="inline-flex items-center justify-center px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 rounded-md hover:border-gray-300 transition-colors cursor-pointer"
               x-class="photoUploading() ? 'opacity-60 pointer-events-none' : ''"

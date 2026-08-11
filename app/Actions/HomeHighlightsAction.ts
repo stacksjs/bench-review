@@ -3,6 +3,21 @@ import { db } from '@stacksjs/database'
 import { response } from '@stacksjs/router'
 
 /**
+ * The public-safe judge shape both judge slices serialize to. Named so
+ * `shapeJudgeRow` can declare a return type: the raw rows come back from a
+ * hand-written aggregate as `Record<string, any>`, and without this the
+ * response contract would only exist implicitly, in the mapper's body.
+ */
+interface HighlightJudge {
+  id: number
+  name: string
+  image_url: string | null
+  court_name: string | null
+  review_count: number
+  avg_rating: number | null
+}
+
+/**
  * GET /api/home/highlights — aggregated activity slices for the home page.
  *
  * One round-trip returns three datasets the home page surfaces:
@@ -101,7 +116,7 @@ export default new Action({
       .limit(5)
       .execute() as Array<Record<string, any>>
 
-    const shapeJudgeRow = (r: any) => ({
+    const shapeJudgeRow = (r: any): HighlightJudge => ({
       id: Number(r.judge_id),
       name: String(r.judge_name ?? ''),
       image_url: r.judge_image ?? null,

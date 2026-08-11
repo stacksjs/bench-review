@@ -75,21 +75,71 @@ defineStore('notifications', () => {
     }
   }
 
-  // Polling. 30s interval is a balance between freshness and request
-  // overhead — the user might keep a tab open all day; we don't want
-  // a request every second. SPA-nav-triggered refresh covers the
-  // immediate "I just liked something, show me the toast" case.
-  let pollTimer: ReturnType<typeof setInterval> | null = null
-  function startPolling(): void {
-    if (pollTimer || typeof window === 'undefined') return
-    void fetchNotifications()
-    pollTimer = setInterval(() => { void fetchNotifications() }, 30000)
+  // Polling. 30s is a balance between freshness and request overhead — the
+  // user might keep a tab open all day; we don't want a request every second.
+  // SPA-nav-triggered refresh covers the immediate "I just liked something,
+  // show me the toast" case.
+  //
+  // A self-rescheduling setTimeout rather than setInterval, for two reasons:
+  //
+  //  1. setInterval fires on a fixed wall-clock cadence regardless of whether
+  //     the previous fetch finished. On a slow connection that stacks requests
+  //     and they can land out of order, so a stale response overwrites a fresh
+  //     one. Rescheduling only after the fetch settles makes 30s the gap
+  //     BETWEEN requests, and guarantees at most one in flight.
+  //  2. bench's client-script guard (config/ui.ts) allowlists setTimeout and
+  //     deliberately does not allowlist setInterval, precisely so poll loops
+  //     have to be looked at.
+  //
+  // Backgrounded tabs don't poll at all: browsers already throttle timers
+  // there, but the throttled request is still pointless — nobody is looking at
+  // the bell. Skip the fetch while hidden and catch up on the way back.
+  const POLL_MS = 30000
+  let pollTimer: ReturnType<typeof setTimeout> | null = null
+  let polling = false
+
+  function scheduleNextPoll(): void {
+    if (!polling) return
+    pollTimer = setTimeout(() => { void pollTick() }, POLL_MS)
   }
+
+  async function pollTick(): Promise<void> {
+    if (!polling) return
+    // try/finally so the loop cannot die: fetchNotifications swallows its own
+    // errors today, but if that ever changes, an escaping rejection here would
+    // silently stop polling for the rest of the session.
+    try {
+      if (typeof document === 'undefined' || !document.hidden)
+        await fetchNotifications()
+    }
+    finally {
+      scheduleNextPoll()
+    }
+  }
+
+  function startPolling(): void {
+    if (polling || typeof window === 'undefined') return
+    polling = true
+    void pollTick()
+  }
+
   function stopPolling(): void {
+    polling = false
     if (pollTimer) {
-      clearInterval(pollTimer)
+      clearTimeout(pollTimer)
       pollTimer = null
     }
+  }
+
+  // Coming back to a tab that sat hidden should show current state, not
+  // whatever was true when it was backgrounded. Refresh immediately and
+  // restart the clock so the next poll is a full interval away.
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (!polling || document.hidden) return
+      if (pollTimer) clearTimeout(pollTimer)
+      void pollTick()
+    })
   }
 
   // Cross-store refresh trigger. Whenever the auth store fires the

@@ -41,7 +41,7 @@ export default defineModel({
         },
       },
       factory: (faker) => {
-        const generateBlock = () => faker.string.alphanumeric({ length: 4, casing: 'upper' })
+        const generateBlock = (): string => faker.string.alphanumeric({ length: 4, casing: 'upper' })
         return `${generateBlock()}-${generateBlock()}-${generateBlock()}-${generateBlock()}-${generateBlock()}`
       },
     },

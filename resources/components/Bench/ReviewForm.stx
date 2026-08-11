@@ -446,7 +446,7 @@
   <div :if="judge && !submitted" class="overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-sm">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-6 sm:p-8">
       <div class="flex gap-4 items-center">
-        <img class="object-cover h-16 w-16 ring-2 ring-gray-100 rounded-full grayscale filter" x-src="judge().photo || '/images/avatars/default-user.svg'" x-alt="judge().name || 'Judge'" />
+        <img alt="Judge" src="/images/avatars/default-user.svg" class="object-cover h-16 w-16 ring-2 ring-gray-100 rounded-full grayscale filter" x-src="judge().photo || '/images/avatars/default-user.svg'" x-alt="judge().name || 'Judge'" />
         <div class="min-w-0">
           <h3 class="font-semibold text-gray-900 text-lg">{{ judge().name }}</h3>
           <p class="text-gray-500 text-sm">{{ judge().court }}</p>
