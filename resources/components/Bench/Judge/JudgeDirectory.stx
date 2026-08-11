@@ -368,7 +368,7 @@
               in the white area below — no overlap with the avatar disc. --}}
           <div class="relative h-28 bg-gradient-to-br from-gray-100 to-gray-50">
             <img
-              x-src="judge.court.image"
+              x-src="judge.court.image || '/images/placeholders/court.svg'"
               x-alt="`${judge.court.name} courthouse`"
               class="absolute inset-0 object-cover h-full w-full opacity-20 group-hover:opacity-30 duration-300 transition-opacity"
             >
@@ -382,8 +382,8 @@
             <div class="overflow-hidden h-28 w-28 bg-white ring-4 ring-white rounded-full shadow-md">
               <img
                 class="object-cover h-full w-full grayscale group-hover:grayscale-0 duration-300 transition-all filter"
-                x-src="judge.photo"
-                x-alt="judge.name"
+                x-src="judge.photo || '/images/avatars/default-user.svg'"
+                x-alt="judge.name || 'Judge'"
               >
             </div>
 

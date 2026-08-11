@@ -21,7 +21,7 @@
       <h2 class="font-semibold text-base text-gray-900">Trending Judges</h2>
       <div class="mt-4 space-y-4">
         <div :for="judge in trendingList" class="flex items-center space-x-3">
-            <img class="h-8 w-8 rounded-full grayscale filter" x-src="judge.photo" x-alt="judge.name" />
+            <img class="h-8 w-8 rounded-full grayscale filter" x-src="judge.photo || '/images/avatars/default-user.svg'" x-alt="judge.name || 'Judge'" />
             <div class="flex-1 min-w-0">
               <p class="font-medium text-gray-900 text-sm">{{ judge.name }}</p>
               <p class="text-gray-500 text-sm">{{ judge.court }}</p>

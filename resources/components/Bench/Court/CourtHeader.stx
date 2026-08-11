@@ -56,10 +56,13 @@
   const courtName = derived<string>(() => (currentCourt() as any)?.name || '')
   const courtCity = derived<string>(() => (currentCourt() as any)?.city || '')
   const courtState = derived<string>(() => (currentCourt() as any)?.state || '')
+  // The previous fallback was an Unsplash URL carrying `fit=facearea&facepad=2`
+  // — a portrait crop, used as the picture of a COURTHOUSE, and the very same
+  // URL that Judge/ProfileHeader.stx used for a missing judge photo. A building
+  // and a person rendered as the same stock face.
   const courtImage = derived<string>(() => {
     const c: any = currentCourt()
-    return (c && (c.image || c.image_url))
-      || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+    return (c && (c.image || c.image_url)) || '/images/placeholders/court.svg'
   })
 
   // Judges on this bench — handy for the header's secondary stat and

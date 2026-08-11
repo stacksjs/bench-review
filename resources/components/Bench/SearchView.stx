@@ -153,7 +153,7 @@
         <ul role="list" x-class="showJudgesList() ? 'mt-4 divide-gray-100 divide-y' : 'hidden'" class="mt-4 divide-gray-100 divide-y">
           <li :for="judge in filteredJudges" class="flex items-center justify-between py-5">
             <StxLink x-to="`/judges/${judge.id}/profile`" class="flex flex-1 gap-x-4 items-center min-w-0">
-              <img class="object-cover flex-none h-12 w-12 rounded-full grayscale filter" x-src="judge.photo" x-alt="judge.name">
+              <img class="object-cover flex-none h-12 w-12 rounded-full grayscale filter" x-src="judge.photo || '/images/avatars/default-user.svg'" x-alt="judge.name || 'Judge'">
               <div class="flex-auto min-w-0">
                 <p class="font-semibold text-gray-900 text-sm hover:underline">{{ judge.name }}</p>
                 <p class="mt-0.5 text-gray-500 text-xs">{{ `${judge.court.name} · ${judge.location}` }}</p>
@@ -183,7 +183,7 @@
             class="overflow-hidden bg-white border border-gray-100 rounded-2xl hover:border-softBrown shadow-sm hover:shadow-md duration-200 transition-all group"
           >
             <div class="relative h-32 w-full">
-              <img x-src="court.image" x-alt="court.name" class="object-cover h-full w-full">
+              <img x-src="court.image || '/images/placeholders/court.svg'" x-alt="court.name || 'Courthouse'" class="object-cover h-full w-full">
               <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
             </div>
             <div class="p-4">

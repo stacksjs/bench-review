@@ -51,10 +51,20 @@
   // on the next tick. If the id doesn't match any judge (deleted /
   // bad URL), `judge` stays null and the picker is shown — same UX
   // as `/review` without an id.
+  // Two ways a judge id can land on this page:
+  //   1. /review/:id       — written by the judge-search step via
+  //                          history.replaceState
+  //   2. /review?judgeId=… — legacy entry points
+  //   3. /review           — no id, show the search step
+  //
+  // Read from `window.location`, never `window.stx._rp`: _rp is unset on a
+  // hard reload, so a route-param read silently resolves nothing there.
   function resolveReviewPathJudgeId(): number {
     if (typeof window === 'undefined') return 0
     const m = window.location.pathname.match(/^\/review\/(\d+)\b/)
-    return m ? Number(m[1]) : 0
+    if (m) return Number(m[1])
+    const q = new URLSearchParams(window.location.search).get('judgeId')
+    return q && /^\d+$/.test(q) ? Number(q) : 0
   }
 
   const preloadJudgeId = resolveReviewPathJudgeId()
@@ -117,16 +127,6 @@
   // the next mount of the editor doesn't restore the just-submitted
   // content.
   const composeDraft = useLocalStorage<string>('bench-review:compose-draft', '')
-
-  function loadJudge(id: string): void {
-    judge.set({
-      id,
-      name: 'Hon. Sarah Johnson',
-      court: 'Superior Court of California',
-      department: 'San Francisco County, Department 15',
-      photo: 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&h=200&q=80',
-    })
-  }
 
   function getRatingText(value: StarRating): string {
     switch (value) {
@@ -352,24 +352,17 @@
     // copy joins in once the fetch resolves.
     hydrateFromServerDraft()
 
-    // Three ways the judge id can land on this page:
-    //   1. /review/:id        (path param, set by the search component
-    //                          via `history.replaceState`)
-    //   2. /review?judgeId=…  (query string, legacy entry points)
-    //   3. /review            (no id — show the search step)
+    // The judge itself is resolved by `applyPreloadedJudge` above, off the
+    // real directory rather than here. This used to call a `loadJudge(id)`
+    // stub that hardcoded 'Hon. Sarah Johnson' + a stock photo and set them
+    // unconditionally, so ANY /review/:id or ?judgeId= landed the user on a
+    // form naming the wrong judge. It won regardless of ordering: run first
+    // and applyPreloadedJudge's `if (judge()) return` bailed out; run second
+    // and it overwrote the judge that had just been resolved correctly.
     //
-    // `params` is only injected by the framework on dynamic routes
-    // (`/review/:id` matches; `/review` doesn't). Read it through
-    // `window.stx._rp` directly so the bare `/review` case doesn't
-    // throw `ReferenceError: params is not defined`.
-    const rp = (typeof window !== 'undefined' && (window as any).stx?._rp) || {}
-    const pathId = rp.id
-    const queryId = typeof window !== 'undefined'
-      ? new URLSearchParams(window.location.search).get('judgeId')
-      : null
-    const id = pathId || queryId
-    if (id)
-      loadJudge(String(id))
+    // Nothing replaces it here — the setup-time effect already resolves on
+    // mount and again when the directory lands, on both hard reload and SPA
+    // nav, so a second call from onMount would be redundant.
   })
 </script>
 <div class="min-h-screen">
@@ -453,7 +446,7 @@
   <div :if="judge && !submitted" class="overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-sm">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-6 sm:p-8">
       <div class="flex gap-4 items-center">
-        <img class="object-cover h-16 w-16 ring-2 ring-gray-100 rounded-full grayscale filter" x-src="judge().photo" x-alt="judge().name" />
+        <img class="object-cover h-16 w-16 ring-2 ring-gray-100 rounded-full grayscale filter" x-src="judge().photo || '/images/avatars/default-user.svg'" x-alt="judge().name || 'Judge'" />
         <div class="min-w-0">
           <h3 class="font-semibold text-gray-900 text-lg">{{ judge().name }}</h3>
           <p class="text-gray-500 text-sm">{{ judge().court }}</p>

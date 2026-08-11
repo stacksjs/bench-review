@@ -134,7 +134,7 @@
           class="flex gap-3 items-center px-3 py-2.5 hover:bg-gray-50 transition-colors cursor-pointer"
           @click="judge.set({ id: result.id, name: result.name, court: (result.court && result.court.name) || '', department: result.department || '', photo: result.photo }); searchInput.set(''); judgesStore.searchJudges(''); window.history && window.history.replaceState({}, '', '/review/' + result.id)"
         >
-          <img x-src="result.photo" class="object-cover flex-none h-10 w-10 ring-1 ring-gray-100 rounded-full grayscale filter" x-alt="result.name">
+          <img x-src="result.photo || '/images/avatars/default-user.svg'" class="object-cover flex-none h-10 w-10 ring-1 ring-gray-100 rounded-full grayscale filter" x-alt="result.name || 'Judge'">
           <div class="flex-1 min-w-0">
             <p class="font-medium text-gray-900 text-sm truncate">{{ result.name }}</p>
             <p class="text-gray-500 text-xs truncate">{{ result.court.name }}</p>

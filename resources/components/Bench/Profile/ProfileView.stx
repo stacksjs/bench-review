@@ -70,9 +70,14 @@
     return `Member since ${d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}`
   })
 
+  // Local neutral silhouette, not a stock face. The previous fallback was a
+  // face-cropped Unsplash photo of an actual stranger, shown as the avatar of
+  // every signed-in user who hasn't uploaded one — misattributing a real
+  // person's face, and a third-party request from a logged-in page on top of
+  // it. Settings/SettingsView.stx states the same policy for the same avatar
+  // ('NOT a stock face'); this brings the profile header in line with it.
   const avatarUrl = derived<string>(() => {
-    return authStore.user()?.avatar
-      || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+    return authStore.user()?.avatar || '/images/avatars/default-user.svg'
   })
 
   // Recent reviews — already sorted by created_at desc from the API.
@@ -184,7 +189,7 @@
         <p class="mt-1 text-gray-500 text-sm">Judges you haven't reviewed yet.</p>
         <ul :if="suggestedJudges.length > 0" class="mt-5 space-y-4">
           <li :for="j in suggestedJudges" class="flex gap-3 items-center">
-            <img class="object-cover flex-none h-10 w-10 rounded-full grayscale filter" x-src="j.image_url || j.photo" x-alt="j.name" />
+            <img class="object-cover flex-none h-10 w-10 rounded-full grayscale filter" x-src="j.image_url || j.photo || '/images/avatars/default-user.svg'" x-alt="j.name || 'Judge'" />
             <div class="flex-1 min-w-0">
               <p class="font-medium text-gray-900 text-sm truncate">{{ j.name }}</p>
               <p class="text-gray-500 text-xs truncate">{{ (j.court && j.court.name) || j.court || '' }}</p>

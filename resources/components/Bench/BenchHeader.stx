@@ -333,7 +333,7 @@
             @mousedown.prevent="pickJudge(judge)"
             class="flex gap-x-3 items-center px-3 py-2 w-full text-left hover:bg-gray-50"
           >
-            <img class="object-cover h-8 w-8 rounded-full" x-src="judge.photo" x-alt="judge.name">
+            <img class="object-cover h-8 w-8 rounded-full" x-src="judge.photo || '/images/avatars/default-user.svg'" x-alt="judge.name || 'Judge'">
             <div class="flex-1 min-w-0">
               <p class="font-medium text-gray-900 text-sm truncate">{{ judge.name }}</p>
               <p class="text-gray-500 text-xs truncate">{{ (judge.court && judge.court.name) ? judge.court.name : (judge.location || '') }}</p>

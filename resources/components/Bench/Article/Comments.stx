@@ -89,7 +89,7 @@
         :key="comment.id"
         class="flex gap-x-4"
       >
-        <img class="flex-none h-10 w-10 rounded-full" x-src="comment.author.imageUrl" x-alt="comment.author.name">
+        <img class="flex-none h-10 w-10 rounded-full" x-src="comment.author.imageUrl || '/images/avatars/default-user.svg'" x-alt="comment.author.name || 'Commenter'">
         <div class="flex-auto">
           <div class="flex items-center justify-between">
             <p class="font-semibold text-gray-900 text-sm">{{ comment.author.name }}</p>

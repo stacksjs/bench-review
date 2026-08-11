@@ -78,9 +78,12 @@
   })
 
   const judgeName = derived<string>(() => currentJudge()?.name || '')
+  // Local silhouette rather than the stock Unsplash face this used to fall back
+  // to. A judge profile attributing a random person's photograph to a named
+  // sitting judge is the worst place in the app to get this wrong.
   const judgeImage = derived<string>(() => {
     const j: any = currentJudge()
-    return (j && (j.image_url || j.photo)) || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+    return (j && (j.image_url || j.photo)) || '/images/avatars/default-user.svg'
   })
 
   const isFollowing = derived<boolean>(() => followsStore.isFollowing(judgeId()))

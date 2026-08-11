@@ -215,7 +215,7 @@
           {{-- Main Image Container --}}
           <div class="relative h-48 w-full">
             <img
-              x-src="court.image"
+              x-src="court.image || '/images/placeholders/court.svg'"
               x-alt="`${court.name} courthouse`"
               class="object-cover h-full w-full"
             >
