@@ -188,6 +188,52 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   add('every dynamic route is pre-rendered or rewritten', unhandled.length === 0, unhandled.join(', '))
 }
 
+// 6e. The artifact's absolute URLs match the host it was built for.
+//
+//     normalizeBase falls back to http://localhost:4000 when APP_URL is unset,
+//     silently, and every canonical, og:url, JSON-LD @id, <loc> and the
+//     robots.txt Sitemap line inherits it — as does the analytics script src
+//     via its own DEFAULT_API_ENDPOINT. A deploy runner with an empty .env
+//     therefore produces a complete, successful-looking build that tells every
+//     crawler the canonical home of every page is a loopback address.
+//
+//     When APP_URL is set (CI, deploy) this is a hard failure. When it isn't
+//     (a local build) loopback URLs are correct, so the check passes but says
+//     plainly that the artifact is not deployable — rather than going red on
+//     every local run and training everyone to ignore it.
+{
+  const appUrl = process.env.APP_URL?.trim()
+  const loopback = /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::\d+)?/g
+  const offenders: string[] = []
+  let hits = 0
+  for (const [p, h] of html) {
+    const found = h.match(loopback)
+    if (found) { hits += found.length; offenders.push(p.replace('dist/', '')) }
+  }
+  for (const extra of ['dist/sitemap.xml', 'dist/robots.txt']) {
+    const f = Bun.file(extra)
+    if (await f.exists()) {
+      const found = (await f.text()).match(loopback)
+      if (found) { hits += found.length; offenders.push(extra.replace('dist/', '')) }
+    }
+  }
+
+  if (appUrl && !/localhost|127\.0\.0\.1/.test(appUrl)) {
+    add(
+      'no loopback URLs in a deploy build',
+      hits === 0,
+      hits ? `APP_URL=${appUrl} but ${hits} loopback URLs shipped, in ${new Set(offenders).size} files (${[...new Set(offenders)].slice(0, 3).join(', ')})` : '',
+    )
+  }
+  else {
+    add(
+      'build host is declared (APP_URL)',
+      true,
+      `APP_URL unset — artifact carries ${hits} loopback URLs and is NOT deployable. Local preview only; set APP_URL to build for deploy.`,
+    )
+  }
+}
+
 // 7. The sitemap never advertises a path robots.txt forbids.
 {
   const sitemap = await Bun.file('dist/sitemap.xml').text()
