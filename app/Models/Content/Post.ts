@@ -25,7 +25,13 @@ export default defineModel({
     commentables: true,
     useApi: {
       uri: 'posts',
-      routes: ['index', 'store', 'show', 'update', 'destroy'],
+      // SECURITY: read-only. The ORM auto-CRUD generator emits POST/PUT/DELETE
+      // handlers with NO authentication — storage/framework/orm/routes.ts
+      // resolves the authed user only to feed the optional `authedFill` hook,
+      // and the 401 branch exists solely inside `if (own.enforced)`, which
+      // requires an `ownership` config this model does not declare. Writes go
+      // through explicit, gated Actions instead (see routes/api.ts).
+      routes: ['index', 'show'],
     },
   },
 

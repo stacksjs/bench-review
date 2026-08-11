@@ -70,6 +70,18 @@ function excerpt(html: string | null, max = 155): string {
   return `${text.slice(0, max - 1).replace(/\s+\S*$/, '')}…`
 }
 
+/**
+ * Replace with a literal string.
+ *
+ * String.prototype.replace treats `$&`, `$'`, `` $` `` and `$1` in the
+ * REPLACEMENT as substitution patterns, and none of the HTML escaping here
+ * touches `$` — escapeAttr covers & " < > only. A review titled
+ * "Judge cost me $' in fees" therefore spliced the entire remainder of the
+ * document into the <title>. Passing a function makes the return value literal,
+ * which is the only safe way to put user-controlled text through replace().
+ */
+const literal = (s: string) => () => s
+
 const clean = (s: string | null, fallback: string): string => (s ?? '').trim() || fallback
 
 /**
@@ -257,13 +269,13 @@ export function injectEntitySeo(html: string, seo: EntitySeo, base: string): str
   // The SSG emits a generic per-route title ("Judge Profile - Bench Review")
   // for every entity on that route; replace it with the entity's own.
   if (/<title>[\s\S]*?<\/title>/i.test(out))
-    out = out.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeAttr(seo.title)}</title>`)
+    out = out.replace(/<title>[\s\S]*?<\/title>/i, literal(`<title>${escapeAttr(seo.title)}</title>`))
 
   const descTag = `<meta name="description" content="${escapeAttr(seo.description)}">`
   if (/<meta\s+name="description"[^>]*>/i.test(out))
-    out = out.replace(/<meta\s+name="description"[^>]*>/i, descTag)
+    out = out.replace(/<meta\s+name="description"[^>]*>/i, literal(descTag))
   else
-    out = out.replace('</head>', `  ${descTag}\n</head>`)
+    out = out.replace('</head>', literal(`  ${descTag}\n</head>`))
 
   const tags = [
     ...(out.includes('rel="canonical"') ? [] : [`<link rel="canonical" href="${escapeAttr(url)}">`]),
@@ -280,5 +292,5 @@ export function injectEntitySeo(html: string, seo: EntitySeo, base: string): str
     `<script type="application/ld+json">${escapeJsonLd({ '@context': 'https://schema.org', '@graph': graph })}</script>`,
   ].join('\n  ')
 
-  return out.replace('</head>', `  ${tags}\n</head>`)
+  return out.replace('</head>', literal(`  ${tags}\n</head>`))
 }

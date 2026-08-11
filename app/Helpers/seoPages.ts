@@ -205,12 +205,17 @@ export function injectSeoHead(html: string, seo: PageSeo, base: string): string 
 
   // Replace the (default) description with the per-page one if present,
   // otherwise add it. Then splice the canonical/OG block before </head>.
+  // See the `literal` note in entitySeo.ts: extractTitle() pulls the page's
+  // own <title> into og:title/twitter:title, and on any page whose title is
+  // user-derived a `$'` there would splice the document into itself.
+  const literal = (s: string) => () => s
+
   let out = html
   const descTag = `<meta name="description" content="${escapeAttr(seo.description)}">`
   if (/<meta\s+name="description"[^>]*>/i.test(out))
-    out = out.replace(/<meta\s+name="description"[^>]*>/i, descTag)
+    out = out.replace(/<meta\s+name="description"[^>]*>/i, literal(descTag))
   else
-    out = out.replace('</head>', `  ${descTag}\n</head>`)
+    out = out.replace('</head>', literal(`  ${descTag}\n</head>`))
 
-  return out.replace('</head>', `  ${tags}\n</head>`)
+  return out.replace('</head>', literal(`  ${tags}\n</head>`))
 }
