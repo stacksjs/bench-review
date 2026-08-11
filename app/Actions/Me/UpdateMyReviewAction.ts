@@ -48,9 +48,10 @@ export default new Action({
     const reviewId = Number(request.params?.id)
 
     const existing = await db.selectFrom('judge_reviews')
-      .select(['id', 'user_id', 'status'])
+      // judge_id is needed for the resubmit collision check below.
+      .select(['id', 'user_id', 'status', 'judge_id'])
       .where('id', '=', reviewId)
-      .executeTakeFirst() as { id: number, user_id: number | null, status: string } | undefined
+      .executeTakeFirst() as { id: number, user_id: number | null, status: string, judge_id: number | null } | undefined
 
     if (!existing || existing.user_id == null || Number(existing.user_id) !== Number(userId))
       return response.json({ error: 'Review not found' }, 404)
@@ -80,8 +81,23 @@ export default new Action({
       // upper bound also stops a megabyte of pasted markup from
       // squeezing past now that we know the cleaned size.
       const cleaned = (await sanitizeReviewHtml(contentInput)).trim()
-      if (cleaned.length < 10 || cleaned.length > 10000)
+      if (cleaned.length > 10000)
         return response.json({ error: 'Content must be between 10 and 10000 characters once formatting is cleaned up.' }, 422)
+      // Measure VISIBLE TEXT for the lower bound, matching SubmitReviewAction.
+      // A raw-length check passes `<p></p><p><br></p><p>&nbsp;</p>` — ~31
+      // characters of markup whose visible text is empty, and every tag in it
+      // survives sanitisation because <p> and <br> are both allowlisted. That
+      // is the exact bypass the submit path was hardened against ("how a
+      // title-only, blank-body review got through"); the edit path still had
+      // it, so an author could blank their own published review's body and
+      // push it back into the moderation queue that way.
+      const visibleText = cleaned
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+      if (visibleText.length < 10)
+        return response.json({ error: 'Review must be at least 10 characters of actual text.' }, 422)
       patch.content = cleaned
     }
 
@@ -114,6 +130,29 @@ export default new Action({
 
     // Resubmit semantics: every successful edit bumps status back to
     // pending. The moderator queue gets the fresh content.
+    //
+    // A rejected review needs a collision check first. The partial unique index
+    //
+    //   UNIQUE (user_id, judge_id) WHERE status != 'rejected' AND user_id IS NOT NULL
+    //
+    // deliberately lets a rejected row coexist with a live one — SubmitReview
+    // only blocks duplicates in ('pending','published') precisely so a user
+    // whose review was declined can write a fresh one. Promoting the rejected
+    // row back to pending makes BOTH rows match the index, and this action had
+    // no pre-check and no error handling around the UPDATE, so SQLite's
+    // constraint error surfaced as a raw 500 on a flow this action's own
+    // docblock advertises. Mirror the submit path's friendly 409 instead.
+    if (existing.status === 'rejected' && existing.judge_id != null) {
+      const live = await db.selectFrom('judge_reviews')
+        .select(['id'])
+        .where('user_id', '=', userId)
+        .where('judge_id', '=', existing.judge_id)
+        .where('status', 'in', ['pending', 'published'] as any)
+        .executeTakeFirst()
+      if (live)
+        return response.json({ error: 'You already have another review of this judge awaiting moderation or published. Edit that one instead.' }, 409)
+    }
+
     patch.status = 'pending'
     patch.updated_at = new Date().toISOString()
 
