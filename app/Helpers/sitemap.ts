@@ -123,7 +123,13 @@ Disallow: /settings
 Disallow: /notifications
 Disallow: /my-reviews
 Disallow: /profile
-Disallow: /review
+# Anchored with $ (and a separate rule for the subtree), because Disallow is a
+# PREFIX match: a bare "Disallow: /review" also matches /reviews — the public
+# review listing, which is in the sitemap at priority 0.9 with full SEO tags.
+# That combination tells a crawler to index a page it is simultaneously
+# forbidden to fetch. $ and * are RFC 9309 and supported by the major crawlers.
+Disallow: /review$
+Disallow: /review/
 Disallow: /reset-password
 Disallow: /forgot-password
 # Test / internal-only pages:

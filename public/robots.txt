@@ -21,7 +21,11 @@ Disallow: /settings
 Disallow: /notifications
 Disallow: /my-reviews
 Disallow: /profile
-Disallow: /review
+# Anchored with $ (plus a separate subtree rule) because Disallow is a PREFIX
+# match: a bare "Disallow: /review" also matches /reviews, the public review
+# listing that ships in the sitemap at priority 0.9 with full SEO tags.
+Disallow: /review$
+Disallow: /review/
 Disallow: /reset-password
 Disallow: /forgot-password
 # Test / internal-only pages:

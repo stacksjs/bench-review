@@ -13,7 +13,9 @@
     "lint": "bunx --bun pickier .",
     "lint:fix": "bunx --bun pickier . --fix",
     "typecheck": "bun tsc --noEmit",
-    "typecheck:app": "bun tsc --noEmit -p tsconfig.app.json"
+    "typecheck:app": "bun tsc --noEmit -p tsconfig.app.json",
+    "gate": "bun run build && bun gate.ts",
+    "gate:only": "bun gate.ts"
   },
   "dependencies": {
     "@stacksjs/components": "^0.2.170",
