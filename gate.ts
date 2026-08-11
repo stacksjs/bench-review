@@ -113,6 +113,33 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   add('every sitemap URL has a built file', missing.length === 0, missing.length ? `${missing.length} missing: ${missing.slice(0, 4).join(', ')}` : '')
 }
 
+// 6c. Every pre-rendered entity page carries its own head. These are generated
+//     from the database, so a schema change or a failed query degrades them
+//     silently back to the SSG's generic per-route title.
+{
+  const { loadEntitySeo } = await import('./app/Helpers/entitySeo')
+  const entities = await loadEntitySeo('https://bench.review')
+  const bad: string[] = []
+  for (const [file, seo] of entities) {
+    const h = html.get(`dist/${file}`)
+    if (!h) continue
+    const hasDesc = /<meta\s+name="description"[^>]*content="[^"]+"/i.test(h)
+    const hasLd = h.includes('application/ld+json')
+    // The generic title is what the SSG emits for every entity on a route;
+    // seeing it back means the entity injection didn't take. Compare decoded
+    // text, not raw markup — a title containing `&` is legitimately escaped to
+    // `&amp;` in the output, and a naive substring match reads that as a miss.
+    const decode = (s: string): string => s
+      .replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, '\'')
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    const pageTitle = decode((h.match(/<title>([\s\S]*?)<\/title>/i)?.[1] ?? '').trim())
+    const ownTitle = pageTitle === seo.title
+    if (!hasDesc || !hasLd || !ownTitle)
+      bad.push(`${file}${!ownTitle ? ' (generic title)' : ''}${!hasDesc ? ' (no description)' : ''}${!hasLd ? ' (no json-ld)' : ''}`)
+  }
+  add(`all ${entities.size} entity pages have their own head`, bad.length === 0, bad.slice(0, 4).join(', '))
+}
+
 // 7. The sitemap never advertises a path robots.txt forbids.
 {
   const sitemap = await Bun.file('dist/sitemap.xml').text()

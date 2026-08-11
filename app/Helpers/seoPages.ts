@@ -99,7 +99,7 @@ export function injectNoindex(html: string): string {
   return html.replace('</head>', '  <meta name="robots" content="noindex">\n</head>')
 }
 
-const escapeAttr = (s: string): string =>
+export const escapeAttr = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 /** Extract the page's existing <title> text for og:title / twitter:title. */
@@ -118,7 +118,7 @@ function extractTitle(html: string): string {
  * reaches the <head>. Escaping the `<` of a closing tag is the standard fix
  * and leaves the JSON semantically identical.
  */
-const escapeJsonLd = (value: unknown): string =>
+export const escapeJsonLd = (value: unknown): string =>
   JSON.stringify(value).replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '\\u003C!--')
 
 /**

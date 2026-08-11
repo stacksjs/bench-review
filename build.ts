@@ -4,6 +4,7 @@ import { tsAnalyticsTag } from './app/Helpers/analyticsTag'
 import { TS_ANALYTICS_APP_ID } from './config/ts-analytics'
 import { cspMetaTag } from './app/Helpers/cspMeta'
 import { FONT_HEAD_TAGS } from './app/Helpers/fontHead'
+import { injectEntitySeo, loadEntitySeo } from './app/Helpers/entitySeo'
 import { injectNoindex, injectSeoHead, NOINDEX_PAGES, SEO_PAGES } from './app/Helpers/seoPages'
 import { buildRobotsTxt, buildSitemapXml, normalizeBase } from './app/Helpers/sitemap'
 
@@ -51,6 +52,26 @@ try {
     }
   }
   console.log(`[build] marked ${noindexed} static pages noindex`)
+
+  // Per-entity heads for the pre-rendered dynamic pages. SEO_PAGES is a
+  // hand-written table, which can't scale to one entry per judge; these come
+  // from the database at build time instead.
+  let entities = 0
+  // eslint-disable-next-line ts/no-top-level-await
+  const entitySeo = await loadEntitySeo(seoBase)
+  for (const [file, seo] of entitySeo) {
+    const path = `dist/${file}`
+    const f = Bun.file(path)
+    // eslint-disable-next-line ts/no-top-level-await
+    if (!(await f.exists()))
+      continue
+    // eslint-disable-next-line ts/no-top-level-await
+    const html = await f.text()
+    // eslint-disable-next-line ts/no-top-level-await
+    await Bun.write(path, injectEntitySeo(html, seo, seoBase))
+    entities++
+  }
+  console.log(`[build] injected per-entity SEO into ${entities} dynamic pages`)
 
   // Self-canonical for everything else. The 65 pre-rendered dynamic pages
   // (judge profiles, courthouses, review articles) aren't in SEO_PAGES — their
