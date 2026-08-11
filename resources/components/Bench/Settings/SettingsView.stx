@@ -306,20 +306,20 @@
       <p class="mt-1 text-gray-500 text-sm">Manage your account, profile, and preferences.</p>
     </header>
 
-    <section class="mt-8 overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-sm">
+    <section class="overflow-hidden mt-8 bg-white border border-gray-200 rounded-2xl shadow-sm">
       <div class="px-6 py-5 sm:px-8 border-b border-gray-100">
         <h2 class="font-semibold text-base text-gray-900">Profile</h2>
         <p class="mt-1 text-gray-500 text-sm">How your name appears on reviews and across Bench Review.</p>
       </div>
-      <div class="px-6 py-6 sm:px-8 space-y-6">
+      <div class="px-6 py-6 space-y-6 sm:px-8">
         <div>
           <div class="flex gap-4 items-center">
             <img class="object-cover h-14 w-14 ring-1 ring-gray-100 rounded-full" x-src="avatarUrl" alt="Your profile photo">
             <label
-              class="inline-flex items-center justify-center px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-md transition-colors cursor-pointer"
+              class="inline-flex items-center justify-center px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 rounded-md hover:border-gray-300 transition-colors cursor-pointer"
               x-class="photoUploading() ? 'opacity-60 pointer-events-none' : ''"
             >
-              <svg :if="photoUploading()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
+              <svg :if="photoUploading()" class="-ml-0.5 mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
               <span>{{ photoUploading() ? 'Uploading…' : 'Change photo' }}</span>
               <input
                 type="file"
@@ -358,13 +358,13 @@
               x-model="userEmail"
               autocomplete="email"
               readonly
-              class="block mt-2 px-3 py-2 w-full text-gray-500 text-sm placeholder:text-gray-400 bg-gray-50 border border-gray-300 rounded-md cursor-not-allowed focus:outline-none"
+              class="block mt-2 px-3 py-2 w-full text-gray-500 text-sm placeholder:text-gray-400 bg-gray-50 border border-gray-300 rounded-md focus:outline-none cursor-not-allowed"
             >
             <p class="mt-1 text-gray-400 text-xs">Email can't be changed yet.</p>
           </div>
         </div>
 
-        <div class="flex items-center justify-between gap-x-4 pt-2">
+        <div class="flex gap-x-4 items-center justify-between pt-2">
           <div>
             <p :if="saveStatus === 'saved'" class="text-emerald-700 text-sm">Saved.</p>
             <p :if="saveStatus === 'error'" class="text-red-600 text-sm">{{ saveError }}</p>
@@ -373,21 +373,21 @@
             type="button"
             @click="saveProfile()"
             x-disabled="saveStatus === 'saving'"
-            class="inline-flex items-center justify-center px-4 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md transition-colors shadow-sm"
+            class="inline-flex items-center justify-center px-4 py-2 font-semibold text-sm text-white bg-blue-600 disabled:bg-gray-300 hover:bg-blue-700 rounded-md shadow-sm transition-colors disabled:cursor-not-allowed"
           >
-            <svg :if="saveStatus() === 'saving'" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
+            <svg :if="saveStatus() === 'saving'" class="-ml-0.5 mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
             <span>{{ saveStatus === 'saving' ? 'Saving…' : 'Save changes' }}</span>
           </button>
         </div>
       </div>
     </section>
 
-    <section class="mt-6 overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-sm">
+    <section class="overflow-hidden mt-6 bg-white border border-gray-200 rounded-2xl shadow-sm">
       <div class="px-6 py-5 sm:px-8 border-b border-gray-100">
         <h2 class="font-semibold text-base text-gray-900">Password</h2>
         <p class="mt-1 text-gray-500 text-sm">Update the password you use to sign in.</p>
       </div>
-      <div class="px-6 py-6 sm:px-8 space-y-5">
+      <div class="px-6 py-6 space-y-5 sm:px-8">
         <div>
           <label for="current-password" class="block font-medium text-gray-900 text-sm">Current password</label>
           <input
@@ -430,7 +430,7 @@
           </div>
         </div>
 
-        <div class="flex items-center justify-between gap-x-4 pt-2">
+        <div class="flex gap-x-4 items-center justify-between pt-2">
           <div>
             <p :if="pwStatus === 'saved'" class="text-emerald-700 text-sm">Password updated.</p>
             <p :if="pwStatus === 'error'" class="text-red-600 text-sm">{{ pwError }}</p>
@@ -439,9 +439,9 @@
             type="button"
             @click="savePassword()"
             x-disabled="pwStatus === 'saving'"
-            class="inline-flex items-center justify-center px-4 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md transition-colors shadow-sm"
+            class="inline-flex items-center justify-center px-4 py-2 font-semibold text-sm text-white bg-blue-600 disabled:bg-gray-300 hover:bg-blue-700 rounded-md shadow-sm transition-colors disabled:cursor-not-allowed"
           >
-            <svg :if="pwStatus() === 'saving'" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
+            <svg :if="pwStatus() === 'saving'" class="-ml-0.5 mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
             <span>{{ pwStatus === 'saving' ? 'Updating…' : 'Update password' }}</span>
           </button>
         </div>
@@ -449,16 +449,16 @@
     </section>
 
     {{-- Verified credentials (bench-review#37). User declares their
-         role; an admin verifies out-of-band. The claim itself is
-         self-service; the badge comes from admin approval. Editing
-         either field clears any prior verification — admin sees the
-         new claim independently. --}}
-    <section class="mt-6 overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-sm">
+        role; an admin verifies out-of-band. The claim itself is
+        self-service; the badge comes from admin approval. Editing
+        either field clears any prior verification — admin sees the
+        new claim independently. --}}
+    <section class="overflow-hidden mt-6 bg-white border border-gray-200 rounded-2xl shadow-sm">
       <div class="px-6 py-5 sm:px-8 border-b border-gray-100">
         <h2 class="font-semibold text-base text-gray-900">Verified credentials</h2>
         <p class="mt-1 text-gray-500 text-sm">Declare your professional role. A moderator will verify against external evidence (email, video call, employer corroboration) before the verified badge appears on your reviews.</p>
       </div>
-      <div class="px-6 py-6 sm:px-8 space-y-5">
+      <div class="px-6 py-6 space-y-5 sm:px-8">
         <div class="grid gap-x-6 gap-y-5 grid-cols-1 sm:grid-cols-2">
           <div>
             <label for="cred-type" class="block font-medium text-gray-900 text-sm">Role</label>
@@ -510,21 +510,21 @@
             type="button"
             @click="saveCredentialClaim()"
             x-disabled="credentialStatus === 'saving'"
-            class="inline-flex items-center justify-center px-4 py-2 font-semibold text-white text-sm bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
+            class="inline-flex items-center justify-center px-4 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
           >
-            <svg :if="credentialStatus() === 'saving'" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
+            <svg :if="credentialStatus() === 'saving'" class="-ml-0.5 mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
             <span>{{ credentialStatus === 'saving' ? 'Submitting…' : 'Submit claim for verification' }}</span>
           </button>
         </div>
       </div>
     </section>
 
-    <section class="mt-6 overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-sm">
+    <section class="overflow-hidden mt-6 bg-white border border-gray-200 rounded-2xl shadow-sm">
       <div class="px-6 py-5 sm:px-8 border-b border-gray-100">
         <h2 class="font-semibold text-base text-gray-900">Danger zone</h2>
         <p class="mt-1 text-gray-500 text-sm">Sign out from this device or delete your account.</p>
       </div>
-      <div class="px-6 py-5 sm:px-8 flex flex-wrap gap-3 items-center justify-between">
+      <div class="flex flex-wrap gap-3 items-center justify-between px-6 py-5 sm:px-8">
         <div>
           <p class="font-medium text-gray-900 text-sm">Sign out</p>
           <p class="mt-0.5 text-gray-500 text-xs">You will be returned to the home page.</p>
@@ -532,12 +532,12 @@
         <button
           type="button"
           @click="authStore.logout()"
-          class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-md transition-colors"
+          class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 rounded-md hover:border-gray-300 transition-colors"
         >Sign out</button>
       </div>
 
       {{-- Export my data --}}
-      <div class="px-6 py-5 sm:px-8 flex flex-wrap gap-3 items-center justify-between border-t border-gray-100">
+      <div class="flex flex-wrap gap-3 items-center justify-between px-6 py-5 sm:px-8 border-gray-100 border-t">
         <div>
           <p class="font-medium text-gray-900 text-sm">Export my data</p>
           <p class="mt-0.5 text-gray-500 text-xs">Download everything we hold about you as a JSON file.</p>
@@ -546,11 +546,11 @@
           type="button"
           @click="exportData()"
           x-disabled="exporting"
-          class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-md transition-colors disabled:opacity-50">{{ exporting() ? 'Preparing…' : 'Export data' }}</button>
+          class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 rounded-md hover:border-gray-300 disabled:opacity-50 transition-colors">{{ exporting() ? 'Preparing…' : 'Export data' }}</button>
       </div>
 
       {{-- Delete account --}}
-      <div class="px-6 py-5 sm:px-8 border-t border-gray-100">
+      <div class="px-6 py-5 sm:px-8 border-gray-100 border-t">
         <div class="flex flex-wrap gap-3 items-center justify-between">
           <div>
             <p class="font-medium text-red-700 text-sm">Delete account</p>
@@ -560,7 +560,7 @@
             type="button"
             @click="confirmingDelete.set(true)"
             x-class="confirmingDelete() ? 'hidden' : ''"
-            class="px-3 py-1.5 font-medium text-red-700 text-sm bg-white hover:bg-red-50 border border-red-200 hover:border-red-300 rounded-md transition-colors"
+            class="px-3 py-1.5 font-medium text-red-700 text-sm bg-white hover:bg-red-50 border border-red-200 rounded-md hover:border-red-300 transition-colors"
           >Delete account</button>
         </div>
 
@@ -572,7 +572,7 @@
             type="password"
             x-model="deletePassword"
             autocomplete="current-password"
-            class="block mt-2 px-3 py-2 w-full max-w-sm text-gray-900 text-sm bg-white border border-gray-300 rounded-md focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+            class="block mt-2 px-3 py-2 max-w-sm w-full text-gray-900 text-sm bg-white border border-gray-300 rounded-md focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
           >
           <p role="alert" class="mt-2 text-red-700 text-xs" x-class="deleteError() ? '' : 'hidden'">{{ deleteError() }}</p>
           <div class="flex gap-x-3 mt-3">
@@ -580,15 +580,15 @@
               type="button"
               @click="deleteAccount()"
               x-disabled="deleting"
-              class="inline-flex items-center justify-center px-4 py-2 font-semibold text-white text-sm bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50"
+              class="inline-flex items-center justify-center px-4 py-2 font-semibold text-sm text-white bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50"
             >
-              <svg :if="deleting()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
+              <svg :if="deleting()" class="-ml-0.5 mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
               <span>{{ deleting() ? 'Deleting…' : 'Permanently delete' }}</span>
             </button>
             <button
               type="button"
               @click="confirmingDelete.set(false)"
-              class="px-4 py-2 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              class="px-4 py-2 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-300 rounded-md"
             >Cancel</button>
           </div>
         </div>

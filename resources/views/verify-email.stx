@@ -4,8 +4,8 @@
 
 @section('content')
 {{-- Thin shell — all logic lives in the Bench/VerifyEmail component
-     (view-level <script client> is silently dropped). The component
-     detects whether a /verify-email/{id}/{token} link is present and
-     either auto-verifies or shows the "check your inbox" landing. --}}
+    (view-level <script client> is silently dropped). The component
+    detects whether a /verify-email/{id}/{token} link is present and
+    either auto-verifies or shows the "check your inbox" landing. --}}
 @include('Bench/VerifyEmail')
 @endsection

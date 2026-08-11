@@ -34,16 +34,16 @@
     {{-- Values --}}
     <div class="mt-24 mx-auto max-w-5xl">
       <h2 class="font-bold text-3xl text-center text-gray-900 tracking-tight">What we stand for</h2>
-      <dl class="grid grid-cols-1 sm:grid-cols-3 mt-12 divide-y sm:divide-y-0 sm:divide-x divide-gray-200">
-        <div class="py-6 sm:py-0 sm:px-8 sm:first:pl-0 sm:last:pr-0">
+      <dl class="grid grid-cols-1 sm:grid-cols-3 mt-12 divide-gray-200 divide-y sm:divide-x sm:divide-y-0">
+        <div class="py-6 sm:px-8 sm:py-0 sm:first:pl-0 sm:last:pr-0">
           <dt class="font-semibold text-gray-900 text-lg">Transparency</dt>
           <dd class="mt-2 leading-6 text-gray-600 text-sm">Open access to information about the people deciding cases that affect millions of lives.</dd>
         </div>
-        <div class="py-6 sm:py-0 sm:px-8 sm:first:pl-0 sm:last:pr-0">
+        <div class="py-6 sm:px-8 sm:py-0 sm:first:pl-0 sm:last:pr-0">
           <dt class="font-semibold text-gray-900 text-lg">Fairness</dt>
           <dd class="mt-2 leading-6 text-gray-600 text-sm">Reviews are moderated to keep them substantive, factual, and respectful. Never personal attacks.</dd>
         </div>
-        <div class="py-6 sm:py-0 sm:px-8 sm:first:pl-0 sm:last:pr-0">
+        <div class="py-6 sm:px-8 sm:py-0 sm:first:pl-0 sm:last:pr-0">
           <dt class="font-semibold text-gray-900 text-lg">Privacy</dt>
           <dd class="mt-2 leading-6 text-gray-600 text-sm">You can review anonymously. We protect reviewers from retaliation and intimidation.</dd>
         </div>
@@ -63,7 +63,7 @@
       <h3 class="font-bold text-2xl text-gray-900">Ready to contribute?</h3>
       <p class="mt-4 text-gray-600">Join the legal professionals helping to keep the bench accountable.</p>
       <div class="flex gap-4 items-center justify-center mt-8">
-        <StxLink to="/register" class="px-4 py-2.5 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-lg shadow-sm transition">
+        <StxLink to="/register" class="px-4 py-2.5 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition active:scale-[0.98]">
           Create an account
         </StxLink>
         <StxLink to="/contact" class="font-semibold text-gray-700 text-sm hover:text-gray-900 transition-colors">

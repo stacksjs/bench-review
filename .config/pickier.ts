@@ -18,9 +18,36 @@ const config: PickierConfig = {
     // Vendored / generated bundles — not source we maintain
     'public/js/*-bundle.js',
     'storage/framework/actions/package.js',
+    // The vendored stacks framework. Tracked, but authored upstream and synced
+    // in wholesale — its style is upstream's, not ours. Linting it made
+    // `bun run lint` emit 2090 warnings of which exactly ONE was bench's own
+    // (config/deps.ts), so "lint clean" carried no information about this app.
+    // 2076 of those were markdown rules on `defaults/ai/skills/**` docs.
+    '**/storage/framework/**',
+    // Local package overrides (gitignored, rebuilt from source elsewhere).
+    '**/pantry/**',
   ],
   lint: {
-    extensions: ['ts', 'js', 'md'],
+    // `stx` is here so the 124 templates under resources/ get lint coverage at
+    // all — without it pickier skips them outright, even when one is named
+    // explicitly on the command line.
+    //
+    // Today that buys exactly one rule's worth of signal:
+    // `pickier/sort-tailwind-classes`. Nothing else fires, because every other
+    // plugin (ts/general/quality/regexp/node/eslint/unused-imports) gates
+    // itself on a JS/TS extension. The checks that actually catch stx bugs live
+    // in stx itself — the `strict` client-script guard in config/ui.ts and
+    // `stx typecheck` — not here. Keep both; this is additive, not a
+    // replacement.
+    //
+    // CAVEAT, worth knowing before running `lint:fix`: pickier disables its
+    // `indent` CHECK for stx/html/vue but not the corresponding FIXER (which
+    // receives no file path, so it cannot make the same exclusion). `--fix`
+    // therefore snaps leading whitespace to the 2-space grid in .stx files
+    // while reporting nothing — 415 comment-continuation lines here, all
+    // odd -> even. Harmless, and already applied, so the tree is at a fixed
+    // point; just don't be surprised by an unexplained diff.
+    extensions: ['ts', 'js', 'md', 'stx'],
     reporter: 'stylish',
     cache: false,
     maxWarnings: -1,

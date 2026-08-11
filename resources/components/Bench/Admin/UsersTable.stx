@@ -132,7 +132,7 @@
 </script>
 
 <div class="space-y-4">
-  <div class="flex justify-between items-end">
+  <div class="flex items-end justify-between">
     <div>
       <h1 class="font-bold text-2xl text-gray-900">Users</h1>
       <p class="mt-1 text-gray-600 text-sm">
@@ -156,7 +156,7 @@
     class="px-4 py-3 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
     x-class="store.actionError() ? '' : 'hidden'">{{ store.actionError() }}</div>
 
-  <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="overflow-hidden bg-white border border-gray-200 rounded-lg">
     <table class="w-full divide-gray-200 divide-y">
       <thead class="bg-gray-50">
         <tr>
@@ -172,18 +172,18 @@
           <td colspan="5" class="px-4 py-12 text-center text-gray-500 text-sm">Loading users…</td>
         </tr>
         {{-- Empty state. x-class hidden (not :if) so the inner :text
-             bindings keep subscribing to the search query signal as
-             it changes — bindIf's remove/re-add cycle drops bindings
-             on re-add. --}}
+            bindings keep subscribing to the search query signal as
+            it changes — bindIf's remove/re-add cycle drops bindings
+            on re-add. --}}
         <tr x-class="!store.loading() && store.users().length === 0 ? '' : 'hidden'">
           <td colspan="5" class="px-6 py-16 text-center">
-            <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-50">
+            <div class="flex items-center justify-center mb-4 mx-auto h-12 w-12 bg-gray-50 rounded-full">
               <svg class="h-6 w-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6 5.87a4 4 0 100-8 4 4 0 000 8zm0 0a4 4 0 014 4M5 8a3 3 0 116 0 3 3 0 01-6 0zm10 0a3 3 0 116 0 3 3 0 01-6 0z" />
               </svg>
             </div>
             <p class="font-semibold text-gray-900 text-sm">{{ emptyTitle() }}</p>
-            <p class="mt-1 max-w-md mx-auto text-gray-500 text-xs leading-relaxed">{{ emptyHint() }}</p>
+            <p class="mt-1 mx-auto max-w-md leading-relaxed text-gray-500 text-xs">{{ emptyHint() }}</p>
           </td>
         </tr>
         <tr :for="user in store.users" class="hover:bg-gray-50">
@@ -197,7 +197,7 @@
           <td class="px-4 py-3 text-gray-700 text-sm">{{ rolesText(user) }}</td>
           <td class="px-4 py-3 text-gray-500 text-sm">{{ formatDate(user.created_at) }}</td>
           <td class="px-4 py-3 text-right text-sm">
-            <div class="flex justify-end gap-x-2">
+            <div class="flex gap-x-2 justify-end">
               <button
                 type="button"
                 @click="startEdit(user)"
@@ -207,13 +207,13 @@
                 type="button"
                 @click="togglePromote(user)"
                 x-disabled="isSelf(user) && userHasAdmin(user)"
-                class="font-medium text-sm hover:underline disabled:cursor-not-allowed disabled:opacity-40"
+                class="font-medium text-sm hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
                 x-class="userHasAdmin(user) ? 'text-amber-700' : 'text-emerald-700'">{{ userHasAdmin(user) ? 'Demote' : 'Promote' }}</button>
               <button
                 type="button"
                 @click="confirmDelete(user)"
                 x-disabled="isSelf(user)"
-                class="font-medium text-red-700 text-sm hover:underline disabled:cursor-not-allowed disabled:opacity-40"
+                class="font-medium text-red-700 text-sm hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
               >Delete</button>
             </div>
           </td>
@@ -222,7 +222,7 @@
     </table>
   </div>
 
-  <div class="flex justify-between items-center">
+  <div class="flex items-center justify-between">
     <p class="text-gray-500 text-sm">
       Page <span>{{ store.page() }}</span> of <span>{{ store.totalPages() }}</span>
     </p>
@@ -231,21 +231,21 @@
         type="button"
         @click="prevPage()"
         x-disabled="store.page() <= 1"
-        class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
       >Previous</button>
       <button
         type="button"
         @click="nextPage()"
         x-disabled="store.page() >= store.totalPages()"
-        class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
       >Next</button>
     </div>
   </div>
 
   {{-- Edit modal — controlled by editingId !== 0. CSS-toggled via
-       x-class hidden because :if remove/re-add inside bindIf hits the
-       re-subscription footgun for the inner form (memory: login form
-       error reflow). --}}
+      x-class hidden because :if remove/re-add inside bindIf hits the
+      re-subscription footgun for the inner form (memory: login form
+      error reflow). --}}
   <div
     x-class="editingId() ? 'fixed inset-0 z-30 flex justify-center items-center p-4 bg-black/40' : 'hidden'"
   >
@@ -264,9 +264,9 @@
           role="alert"
           class="px-3 py-2 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
           x-class="editError() ? '' : 'hidden'">{{ editError() }}</div>
-        <div class="flex justify-end gap-x-2">
-          <button type="button" @click="cancelEdit()" x-disabled="saving" class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Cancel</button>
-          <button type="button" @click="saveEdit()" x-disabled="saving" class="inline-flex items-center justify-center px-3 py-1.5 font-medium text-white text-sm bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"><svg :if="saving()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg><span>{{ saving() ? 'Saving…' : 'Save' }}</span></button>
+        <div class="flex gap-x-2 justify-end">
+          <button type="button" @click="cancelEdit()" x-disabled="saving" class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed">Cancel</button>
+          <button type="button" @click="saveEdit()" x-disabled="saving" class="inline-flex items-center justify-center px-3 py-1.5 font-medium text-sm text-white bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"><svg :if="saving()" class="-ml-0.5 mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg><span>{{ saving() ? 'Saving…' : 'Save' }}</span></button>
         </div>
       </div>
     </div>

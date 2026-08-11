@@ -524,15 +524,15 @@
 
 <div class="min-h-screen bg-white">
   {{-- Prose styles for the x-html'd review content. A plain <style>
-       INSIDE the component body (NOT @push) on purpose: the SPA router
-       swaps only <main> (config/stx.ts), and this component renders into
-       <main> — so the style travels with the article fragment and is
-       present on every SPA navigation AND hard reload. @push hoists to
-       <head> and is NOT re-injected on SPA nav (a saved blockquote/
-       heading rendered unstyled when navigating in from another page);
-       main.css custom rules aren't delivered to dev pages either. The
-       inner blockquote/h2/li can't carry crosswind utility classes since
-       the HTML comes from the editor, so they need real CSS here. --}}
+      INSIDE the component body (NOT @push) on purpose: the SPA router
+      swaps only <main> (config/stx.ts), and this component renders into
+      <main> — so the style travels with the article fragment and is
+      present on every SPA navigation AND hard reload. @push hoists to
+      <head> and is NOT re-injected on SPA nav (a saved blockquote/
+      heading rendered unstyled when navigating in from another page);
+      main.css custom rules aren't delivered to dev pages either. The
+      inner blockquote/h2/li can't carry crosswind utility classes since
+      the HTML comes from the editor, so they need real CSS here. --}}
   <style>
     .article-body {
       font-family: 'Charter', 'Iowan Old Style', 'Source Serif Pro', Georgia, Cambria, 'Times New Roman', serif;
@@ -543,8 +543,8 @@
     .article-body > * + * { margin-top: 1.65em; }
     .article-body p { margin: 0; }
     /* No drop cap: review content is user-generated and can start with
-       anything (a heading, a short line, pasted preamble), so a floated
-       ::first-letter ends up huge and overlaps the following hr/heading. */
+      anything (a heading, a short line, pasted preamble), so a floated
+      ::first-letter ends up huge and overlaps the following hr/heading. */
     .article-body hr {
       border: 0;
       border-top: 1px solid #e5e7eb;
@@ -575,7 +575,7 @@
       border-left: 3px solid #111;
       padding-left: 1.25rem;
       /* Explicit top+bottom so the quote is clearly set apart from the
-         surrounding paragraphs (the following <p> was hugging it). */
+        surrounding paragraphs (the following <p> was hugging it). */
       margin: 2em 0;
       font-style: italic;
       color: #444;
@@ -596,10 +596,10 @@
   </style>
 
   {{-- Reading progress bar. Sits above all article chrome so it stays
-       visible during sticky-header interactions. Width is the live
-       percentage from the scroll handler. --}}
+      visible during sticky-header interactions. Width is the live
+      percentage from the scroll handler. --}}
   <div class="fixed inset-x-0 top-0 z-50 h-1 bg-transparent" style="pointer-events: none">
-    <div class="h-full bg-blue-600 transition-all duration-100 ease-out" x-style="`width: ${readingProgress}%`"></div>
+    <div class="h-full bg-blue-600 duration-100 ease-out transition-all" x-style="`width: ${readingProgress}%`"></div>
   </div>
 
   {{-- Loading state --}}
@@ -610,45 +610,45 @@
   {{-- 404 state --}}
   <div :if="reviewsStore.currentNotFound" class="mx-auto pb-32 pt-32 px-4 sm:px-6 lg:px-8 max-w-2xl text-center">
     <p class="font-medium text-blue-600 text-xs tracking-widest uppercase">404 — not found</p>
-    <h1 class="mt-4 font-serif font-bold text-4xl text-gray-900 tracking-tight">Review not found</h1>
+    <h1 class="mt-4 font-bold font-serif text-4xl text-gray-900 tracking-tight">Review not found</h1>
     <p class="mt-4 text-base text-gray-500">The review you're looking for either doesn't exist or hasn't been published yet.</p>
-    <StxLink x-to="`/reviews`" class="inline-block mt-8 font-semibold text-gray-900 text-sm hover:underline underline-offset-4">
+    <StxLink x-to="`/reviews`" class="inline-block mt-8 font-semibold text-gray-900 text-sm underline-offset-4 hover:underline">
       ← Back to all reviews
     </StxLink>
   </div>
 
   {{-- Loaded state --}}
-  <article :if="reviewsStore.current" class="mx-auto pb-32 pt-12 sm:pt-16 px-4 sm:px-6 max-w-3xl">
+  <article :if="reviewsStore.current" class="mx-auto pb-32 pt-12 px-4 sm:pt-16 sm:px-6 max-w-3xl">
     {{-- Author-only status banner. Shown for every status when the
-         viewer is the author (pending / rejected / published) so the
-         author always knows where their review stands. Pinned at the
-         top so it's the first thing they see (notification deep-links
-         land them here). Edit and Delete are available on every
-         status; the server flips status back to pending on every
-         edit, so a published review re-enters the moderation queue
-         after the author saves changes. --}}
+        viewer is the author (pending / rejected / published) so the
+        author always knows where their review stands. Pinned at the
+        top so it's the first thing they see (notification deep-links
+        land them here). Edit and Delete are available on every
+        status; the server flips status back to pending on every
+        edit, so a published review re-enters the moderation queue
+        after the author saves changes. --}}
     <div
       class="mb-8 px-4 py-3 ring-1 rounded-md"
       x-class="isMine ? statusBadgeClasses : 'hidden'"
     >
-      <div class="flex flex-wrap items-start justify-between gap-3">
+      <div class="flex flex-wrap gap-3 items-start justify-between">
         <div class="flex-1 min-w-0">
           <p class="font-semibold text-sm">{{ statusLabel }}</p>
-          <p class="mt-1 text-xs leading-relaxed">{{ statusBlurb }}</p>
+          <p class="mt-1 leading-relaxed text-xs">{{ statusBlurb }}</p>
         </div>
         <div class="flex flex-shrink-0 gap-x-2">
           <button
             type="button"
             @click="goToEdit()"
-            class="px-3 py-1.5 font-semibold text-gray-800 text-xs bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            class="px-3 py-1.5 font-semibold text-gray-800 text-xs bg-white hover:bg-gray-50 border border-gray-300 rounded-md"
           >Edit</button>
           <button
             type="button"
             @click="handleDelete()"
             x-disabled="deleting"
-            class="inline-flex items-center justify-center px-3 py-1.5 font-semibold text-red-700 text-xs bg-white border border-red-200 rounded-md hover:bg-red-50 disabled:opacity-50"
+            class="inline-flex items-center justify-center px-3 py-1.5 font-semibold text-red-700 text-xs bg-white hover:bg-red-50 border border-red-200 rounded-md disabled:opacity-50"
           >
-            <svg :if="deleting()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
+            <svg :if="deleting()" class="-ml-0.5 mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
             <span>{{ deleting() ? 'Deleting…' : 'Delete' }}</span>
           </button>
         </div>
@@ -656,17 +656,17 @@
     </div>
 
     {{-- Admin moderation bar. x-class toggle (not :if — the branch is
-         false at first render for non-admins and :if would drop it
-         permanently). Shown only to an admin viewing another user's
-         review; an admin's own review uses the author controls above. --}}
+        false at first render for non-admins and :if would drop it
+        permanently). Shown only to an admin viewing another user's
+        review; an admin's own review uses the author controls above. --}}
     <div
-      class="mb-8 px-4 py-3 ring-1 ring-blue-300/60 bg-blue-50/60 rounded-md"
+      class="mb-8 px-4 py-3 bg-blue-50/60 ring-1 ring-blue-300/60 rounded-md"
       x-class="canModerate() ? '' : 'hidden'"
     >
-      <div class="flex flex-wrap items-start justify-between gap-3">
+      <div class="flex flex-wrap gap-3 items-start justify-between">
         <div class="flex-1 min-w-0">
           <p class="font-semibold text-blue-900 text-sm">Moderator controls</p>
-          <p class="mt-1 text-blue-800 text-xs leading-relaxed">You're viewing this as an admin. Take the review down to hide it from readers (reversible from the admin dashboard), or delete it permanently.</p>
+          <p class="mt-1 leading-relaxed text-blue-800 text-xs">You're viewing this as an admin. Take the review down to hide it from readers (reversible from the admin dashboard), or delete it permanently.</p>
           <p class="mt-1 text-red-700 text-xs" x-class="moderationError() ? '' : 'hidden'">{{ moderationError() }}</p>
         </div>
         <div class="flex flex-shrink-0 gap-x-2">
@@ -674,21 +674,21 @@
             type="button"
             @click="adminTakeDown()"
             x-disabled="moderating"
-            class="px-3 py-1.5 font-semibold text-amber-800 text-xs bg-white border border-amber-300 rounded-md hover:bg-amber-50 disabled:opacity-50"
+            class="px-3 py-1.5 font-semibold text-amber-800 text-xs bg-white hover:bg-amber-50 border border-amber-300 rounded-md disabled:opacity-50"
           >{{ moderating() ? 'Working…' : 'Take down' }}</button>
           <button
             type="button"
             @click="adminDelete()"
             x-disabled="moderating"
-            class="px-3 py-1.5 font-semibold text-red-700 text-xs bg-white border border-red-200 rounded-md hover:bg-red-50 disabled:opacity-50"
+            class="px-3 py-1.5 font-semibold text-red-700 text-xs bg-white hover:bg-red-50 border border-red-200 rounded-md disabled:opacity-50"
           >{{ moderating() ? 'Working…' : 'Delete' }}</button>
         </div>
       </div>
     </div>
 
     {{-- Delete-error banner. Surfaces a failed DELETE round-trip
-         (rare — the only failure modes are network / 500). Hidden
-         when there's nothing to show. --}}
+        (rare — the only failure modes are network / 500). Hidden
+        when there's nothing to show. --}}
     <div
       role="alert"
       class="mb-6 px-3 py-2 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
@@ -698,11 +698,11 @@
     <p class="font-medium text-blue-600 text-center text-xs tracking-widest uppercase">{{ reviewTypeLabel }}</p>
 
     {{-- Hero title — large serif, tight tracking, generous bottom margin --}}
-    <h1 class="mt-4 font-serif font-bold leading-[1.1] text-4xl sm:text-5xl lg:text-6xl text-center text-gray-900 tracking-tight">{{ title }}</h1>
+    <h1 class="mt-4 font-bold font-serif leading-[1.1] text-4xl text-center text-gray-900 tracking-tight sm:text-5xl lg:text-6xl">{{ title }}</h1>
 
     {{-- Star rating + date + read time row. Centered, subtle. --}}
-    <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-8 text-gray-500 text-sm">
-      <div class="flex items-center gap-1 article-stars">
+    <div class="flex flex-wrap gap-x-4 gap-y-2 items-center justify-center mt-8 text-gray-500 text-sm">
+      <div class="flex gap-1 items-center article-stars">
         <span
           :for="star in stars"
           class="inline-block transition-colors"
@@ -712,29 +712,29 @@
             <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.12 2.12 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.12 2.12 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.12 2.12 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.12 2.12 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.12 2.12 0 0 0 1.597-1.16z" />
           </svg>
         </span>
-        <span class="ml-2 font-medium text-gray-700 tabular-nums">{{ rating }}/5</span>
+        <span class="ml-2 font-medium tabular-nums text-gray-700">{{ rating }}/5</span>
       </div>
       <span class="hidden sm:inline text-gray-300">·</span>
       <span>{{ date }}</span>
       <span class="hidden sm:inline text-gray-300">·</span>
       <span>{{ readMinutes }} min read</span>
       {{-- Reviewer line. Three rendering modes (bench-review#29, #36):
-           - Linked: real user → "by <Name>" with click-through to /user/:id
-           - Plain:  anonymized → "by Anonymous attorney" with no link
-           - Hidden: factory/seeded with no author → row stays clean --}}
+          - Linked: real user → "by <Name>" with click-through to /user/:id
+          - Plain:  anonymized → "by Anonymous attorney" with no link
+          - Hidden: factory/seeded with no author → row stays clean --}}
       <span :if="hasReviewerName" class="hidden sm:inline text-gray-300">·</span>
       <span :if="hasReviewerLink" class="text-gray-500">
         by
-        <StxLink x-to="`/user/${reviewerId}`" class="ml-1 text-gray-700 hover:underline underline-offset-2">{{ reviewerName }}</StxLink>
+        <StxLink x-to="`/user/${reviewerId}`" class="ml-1 text-gray-700 underline-offset-2 hover:underline">{{ reviewerName }}</StxLink>
       </span>
       <span :if="hasReviewerName && !hasReviewerLink()" class="text-gray-500">{{ `by ${reviewerName()}` }}</span>
     </div>
 
     {{-- Judge byline. Medium-style author row: round avatar + name + court.
-         Avatar falls back to an initials monogram when image_url is
-         missing — a broken-image icon is a tell that an MVP shipped
-         too eagerly. --}}
-    <div class="flex items-center gap-4 mt-12 pb-6 border-b border-gray-200">
+        Avatar falls back to an initials monogram when image_url is
+        missing — a broken-image icon is a tell that an MVP shipped
+        too eagerly. --}}
+    <div class="flex gap-4 items-center mt-12 pb-6 border-b border-gray-200">
       <img
         :if="judgeImage"
         class="object-cover h-12 w-12 ring-1 ring-gray-200 rounded-full grayscale filter"
@@ -744,33 +744,33 @@
       <div
         :if="!judgeImage"
         class="flex items-center justify-center h-12 w-12 font-semibold text-blue-700 text-sm bg-blue-50 ring-1 ring-blue-200/60 rounded-full">{{ judgeInitials }}</div>
-      <div class="min-w-0 flex-1">
+      <div class="flex-1 min-w-0">
         <p class="font-semibold text-gray-900 text-sm">
-          <span class="text-gray-400 font-normal">Review of</span>
-          <StxLink :if="judgeId" x-to="`/judges/${judgeId}/profile`" class="ml-1 text-gray-900 hover:underline underline-offset-2">{{ judgeName }}</StxLink>
+          <span class="font-normal text-gray-400">Review of</span>
+          <StxLink :if="judgeId" x-to="`/judges/${judgeId}/profile`" class="ml-1 text-gray-900 underline-offset-2 hover:underline">{{ judgeName }}</StxLink>
           <span :if="!judgeId">{{ judgeName }}</span>
         </p>
-        <p :if="judgeCourt" class="text-gray-500 text-xs mt-0.5">{{ judgeCourt }}</p>
+        <p :if="judgeCourt" class="mt-0.5 text-gray-500 text-xs">{{ judgeCourt }}</p>
       </div>
       <StxLink
         :if="judgeId"
         x-to="`/judges/${judgeId}/profile`"
-        class="hidden sm:inline-flex flex-shrink-0 items-center px-3 py-1.5 font-medium text-gray-700 text-xs border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-colors"
+        class="hidden sm:inline-flex flex-shrink-0 items-center px-3 py-1.5 font-medium text-gray-700 text-xs hover:bg-gray-50 border border-gray-200 rounded-full hover:border-gray-300 transition-colors"
       >
         View judge →
       </StxLink>
     </div>
 
     {{-- Body. Serif typography, generous leading, drop cap on the
-         first paragraph. Typography styles live in the styles block
-         at the bottom of this file. (No directive names inside HTML
-         comments — stx's template scanner processes them anyway and
-         splices the matched block right at the comment location,
-         which busts the page.) --}}
+        first paragraph. Typography styles live in the styles block
+        at the bottom of this file. (No directive names inside HTML
+        comments — stx's template scanner processes them anyway and
+        splices the matched block right at the comment location,
+        which busts the page.) --}}
     {{-- Photo gallery (bench-review#31). Renders the 800w card
-         variant; clicking a photo opens the 1600w full variant in a
-         new tab (lightbox is a follow-up). Hidden entirely when no
-         photos are attached. --}}
+        variant; clicking a photo opens the 1600w full variant in a
+        new tab (lightbox is a follow-up). Hidden entirely when no
+        photos are attached. --}}
     <div :if="hasPhotos" class="mt-10">
       <div class="grid gap-3" x-class="photoGridClass">
         <a :for="p in photos"
@@ -783,32 +783,32 @@
             x-src="p.card_url"
             x-alt="`Photo attached to this review`"
             loading="lazy"
-            class="block object-cover w-full aspect-[4/3]"
+            class="block aspect-[4/3] object-cover w-full"
           />
         </a>
       </div>
     </div>
 
-    <div class="article-body mt-10 text-gray-800" x-html="content"></div>
+    <div class="mt-10 text-gray-800 article-body" x-html="content"></div>
 
     {{-- Judge right-of-reply. Prominent callout under the review body when
-         the judge has an official response on record. Hidden (not removed)
-         via x-class so the inner x-html binding stays subscribed across
-         load/SPA-nav — same pattern as the other conditional sections. --}}
+        the judge has an official response on record. Hidden (not removed)
+        via x-class so the inner x-html binding stays subscribed across
+        load/SPA-nav — same pattern as the other conditional sections. --}}
     <div
-      class="mt-12 p-6 border-l-4 border-blue-500 rounded-r-lg bg-blue-50/60"
+      class="mt-12 p-6 bg-blue-50/60 border-blue-500 border-l-4 rounded-r-lg"
       x-class="hasJudgeResponse() ? '' : 'hidden'"
     >
       <p class="font-semibold text-blue-800 text-xs tracking-widest uppercase">Official response</p>
       <p class="mt-1 font-semibold text-gray-900 text-sm">{{ `From ${judgeResponseName()}` }}</p>
-      <div class="article-body mt-3 text-base text-gray-800" x-html="judgeResponseBody"></div>
+      <div class="mt-3 text-base text-gray-800 article-body" x-html="judgeResponseBody"></div>
     </div>
 
     {{-- Self-serve composer — only the verified judge for this review sees
-         this (server-set can_respond_as_judge). Lets them post/edit their
-         official response inline. Hidden via x-class to keep bindings live. --}}
+        this (server-set can_respond_as_judge). Lets them post/edit their
+        official response inline. Hidden via x-class to keep bindings live. --}}
     <div
-      class="mt-6 p-4 border border-gray-300 rounded-lg bg-white"
+      class="mt-6 p-4 bg-white border border-gray-300 rounded-lg"
       x-class="canRespondAsJudge() ? '' : 'hidden'"
     >
       <p class="font-semibold text-gray-900 text-sm">Respond as the judge</p>
@@ -819,36 +819,36 @@
         placeholder="Write your official response…"
         class="block mt-2 px-3 py-2 w-full text-gray-900 text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
       ></textarea>
-      <div class="flex items-center gap-x-3 mt-2">
+      <div class="flex gap-x-3 items-center mt-2">
         <button
           type="button"
           @click="postJudgeResponse()"
           x-disabled="judgeResponding"
-          class="px-4 py-2 font-semibold text-white text-sm bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50">{{ judgeResponding() ? 'Posting…' : 'Post response' }}</button>
+          class="px-4 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50">{{ judgeResponding() ? 'Posting…' : 'Post response' }}</button>
         <span class="text-red-700 text-xs" x-class="judgeRespondError() ? '' : 'hidden'">{{ judgeRespondError() }}</span>
       </div>
     </div>
 
     {{-- Footer row: "people find this helpful" + status pill + back link.
-         Helpful-button area hidden entirely for unpublished reviews —
-         no readers can see them yet, so the count and the CTA don't
-         apply. The status pill on the right still renders so the
-         author has a footer-level reminder of where their submission
-         sits. --}}
-    <div class="flex flex-col gap-3 mt-14 pt-8 sm:flex-row sm:items-center sm:justify-between border-t border-gray-200">
+        Helpful-button area hidden entirely for unpublished reviews —
+        no readers can see them yet, so the count and the CTA don't
+        apply. The status pill on the right still renders so the
+        author has a footer-level reminder of where their submission
+        sits. --}}
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-14 pt-8 border-gray-200 border-t">
       <div
         class="flex flex-col gap-2 items-start"
         x-class="isUnpublished ? 'hidden' : ''"
       >
         <div class="flex gap-3 items-center">
           {{-- Reader view: clickable button. Hidden for the author of
-               the row (own reviews can't be self-liked). --}}
+              the row (own reviews can't be self-liked). --}}
           <button
             :if="!isOwnReview"
             type="button"
             @click="toggleLike()"
             x-disabled="likePending"
-            class="inline-flex items-center gap-2 px-4 py-2 font-medium text-sm rounded-full border transition-all disabled:opacity-60 disabled:cursor-wait"
+            class="inline-flex gap-2 items-center px-4 py-2 font-medium text-sm border rounded-full disabled:opacity-60 transition-all disabled:cursor-wait"
             x-class="liked ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'"
             aria-pressed="false"
           >
@@ -856,32 +856,32 @@
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
             </svg>
             {{-- Caption shifts based on count + own-like state so the
-                 button reads naturally at 0, 1, and N — and credits the
-                 reader directly when they're the one who reacted. --}}
-            <span class="text-xs text-current/80">{{ helpfulCaption() }}</span>
+                button reads naturally at 0, 1, and N — and credits the
+                reader directly when they're the one who reacted. --}}
+            <span class="text-current/80 text-xs">{{ helpfulCaption() }}</span>
           </button>
           {{-- Author view: read-only badge showing how readers reacted.
-               Same icon + count + caption shape, no click handler, no
-               hover affordance — visually distinct from the reader
-               button so the author can tell at a glance that this is
-               their own row. --}}
+              Same icon + count + caption shape, no click handler, no
+              hover affordance — visually distinct from the reader
+              button so the author can tell at a glance that this is
+              their own row. --}}
           <div
             :if="isOwnReview"
-            class="inline-flex items-center gap-2 px-4 py-2 font-medium text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-full"
+            class="inline-flex gap-2 items-center px-4 py-2 font-medium text-gray-600 text-sm bg-gray-50 border border-gray-200 rounded-full"
             aria-label="Reader reactions to your review"
           >
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
             </svg>
             <span class="tabular-nums">{{ likes }}</span>
-            <span class="text-xs text-gray-500">{{ authorHelpfulCaption() }}</span>
+            <span class="text-gray-500 text-xs">{{ authorHelpfulCaption() }}</span>
           </div>
         </div>
         {{-- Inline sign-in nudge (anonymous click). Soft prompt, no
-             redirect — the user keeps their scroll position and can
-             come back after auth. The "next" query param survives the
-             auth flow because the auth store's signIn navigates
-             manually after success. --}}
+            redirect — the user keeps their scroll position and can
+            come back after auth. The "next" query param survives the
+            auth flow because the auth store's signIn navigates
+            manually after success. --}}
         <div
           :if="likeAuthPrompt"
           role="status"
@@ -896,46 +896,46 @@
           class="px-3 py-1.5 text-red-800 text-xs bg-red-50 border border-red-200 rounded-md">{{ likeError }}</div>
       </div>
 
-      <div class="flex items-center gap-4 text-gray-500 text-sm">
+      <div class="flex gap-4 items-center text-gray-500 text-sm">
         {{-- Status pill — color-coded per status. Author-only since
-             readers don't need the moderation chip on someone else's
-             review; the isMine derived combines status presence with
-             the author check. --}}
+            readers don't need the moderation chip on someone else's
+            review; the isMine derived combines status presence with
+            the author check. --}}
         <span
-          class="hidden sm:inline-flex items-center px-2.5 py-1 font-medium text-xs ring-1 rounded-full capitalize"
+          class="hidden sm:inline-flex items-center px-2.5 py-1 capitalize font-medium text-xs ring-1 rounded-full"
           x-class="isMine() ? statusBadgeClasses() : 'hidden'">{{ statusLabel }}</span>
-        <StxLink x-to="`/reviews`" class="text-gray-600 hover:text-gray-900 hover:underline underline-offset-2">
+        <StxLink x-to="`/reviews`" class="text-gray-600 underline-offset-2 hover:text-gray-900 hover:underline">
           ← All reviews
         </StxLink>
         {{-- Report link — only shown when the viewer isn't the author
-             (authors don't need to flag themselves; they have edit/
-             delete on the banner). Resolves bench-review#27. --}}
+            (authors don't need to flag themselves; they have edit/
+            delete on the banner). Resolves bench-review#27. --}}
         <button
           type="button"
           @click="openFlagDialog()"
-          class="text-gray-400 text-xs hover:text-red-600 hover:underline underline-offset-2 transition-colors"
+          class="text-gray-400 text-xs underline-offset-2 hover:text-red-600 hover:underline transition-colors"
           x-class="isMine() ? 'hidden' : ''"
         >Report</button>
       </div>
     </div>
 
     {{-- Flag dialog. Inline so it can read the same court/review
-         context derived above. Same x-class hidden pattern as the
-         status banner — keeps the inner reactive bindings subscribed
-         across open/close cycles. --}}
+        context derived above. Same x-class hidden pattern as the
+        status banner — keeps the inner reactive bindings subscribed
+        across open/close cycles. --}}
     <div
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40"
+      class="flex fixed inset-0 z-50 items-center justify-center p-4 bg-gray-900/40"
       x-class="flagOpen() ? '' : 'hidden'"
       @click.self="closeFlagDialog()"
     >
-      <div class="w-full max-w-md p-6 bg-white rounded-lg shadow-xl">
+      <div class="p-6 max-w-md w-full bg-white rounded-lg shadow-xl">
         <h3 class="font-semibold text-base text-gray-900">Report this review</h3>
         <p class="mt-1 text-gray-500 text-xs">A moderator will look at flagged reviews and decide what to do. Reporters stay anonymous to the author either way.</p>
 
         <div class="mt-4">
           <label class="block font-medium text-gray-900 text-xs">What's wrong with it?</label>
           <div class="mt-2 space-y-1.5">
-            <label :for="opt in flagReasonOptions" class="flex items-center gap-2 px-3 py-2 text-gray-700 text-sm bg-white border border-gray-200 hover:bg-gray-50 rounded-md cursor-pointer transition-colors">
+            <label :for="opt in flagReasonOptions" class="flex gap-2 items-center px-3 py-2 text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 rounded-md transition-colors cursor-pointer">
               <input type="radio" name="flag_reason" x-model="flagReason" :value="opt.value">
               <span>{{ opt.label }}</span>
             </label>
@@ -964,35 +964,35 @@
           x-class="flagSubmitted() ? '' : 'hidden'"
         >Thanks — a moderator will take a look.</div>
 
-        <div class="flex justify-end gap-x-2 mt-5">
+        <div class="flex gap-x-2 justify-end mt-5">
           <button
             type="button"
             @click="closeFlagDialog()"
-            class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-300 rounded-md"
           >Cancel</button>
           <button
             type="button"
             @click="submitFlag()"
             x-disabled="flagSubmitting"
-            class="px-3 py-1.5 font-medium text-white text-sm bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50">{{ flagSubmitting() ? 'Sending…' : 'Send report' }}</button>
+            class="px-3 py-1.5 font-medium text-sm text-white bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50">{{ flagSubmitting() ? 'Sending…' : 'Send report' }}</button>
         </div>
       </div>
     </div>
   </article>
 
   {{-- Comments thread (bench-review#44). Lives OUTSIDE the article :if
-       wrapper deliberately. Nesting a scoped component (Comments has its
-       own data-stx-scope) inside a reactive :if trips stacksjs/stx#1737:
-       when the conditional element is initially detached (reviewsStore.current
-       is null until fetchById resolves), bindIf's disposeSubtreeScopes walk
-       deletes the nested scope's entry from window.stx._scopes — and the
-       component's scoped-script IIFE only runs once at parse time, so the
-       scope never re-registers. Symptom: every :if / :else-if / :else inside
-       Comments would silently fail (all branches stay visible because
-       processElement is never called on them). x-class hide/show on this
-       wrapper keeps the element mounted, so the scope-walk dispatch reaches
-       Comments uninterrupted. NOTE: no backticks in this comment — they leak
-       into the merged setup function and break the script (Unexpected token). --}}
+      wrapper deliberately. Nesting a scoped component (Comments has its
+      own data-stx-scope) inside a reactive :if trips stacksjs/stx#1737:
+      when the conditional element is initially detached (reviewsStore.current
+      is null until fetchById resolves), bindIf's disposeSubtreeScopes walk
+      deletes the nested scope's entry from window.stx._scopes — and the
+      component's scoped-script IIFE only runs once at parse time, so the
+      scope never re-registers. Symptom: every :if / :else-if / :else inside
+      Comments would silently fail (all branches stay visible because
+      processElement is never called on them). x-class hide/show on this
+      wrapper keeps the element mounted, so the scope-walk dispatch reaches
+      Comments uninterrupted. NOTE: no backticks in this comment — they leak
+      into the merged setup function and break the script (Unexpected token). --}}
   <div
     class="mx-auto pt-12 px-4 sm:px-6 max-w-3xl"
     x-class="commentsVisible ? '' : 'hidden'"
@@ -1004,15 +1004,15 @@
 @push('styles')
 <style>
   /* The .article-body prose rules (serif, drop-cap, headings, blockquote,
-     lists, links) live in the GLOBAL stylesheet (resources/assets/styles/
-     main.css) — NOT here — because per-page @push styles aren't re-injected
-     on SPA navigation and aren't shipped for this dynamic route in prod, so
-     a saved blockquote/heading rendered unstyled when viewed. Only the
-     component-specific star rule stays here. */
+    lists, links) live in the GLOBAL stylesheet (resources/assets/styles/
+    main.css) — NOT here — because per-page @push styles aren't re-injected
+    on SPA navigation and aren't shipped for this dynamic route in prod, so
+    a saved blockquote/heading rendered unstyled when viewed. Only the
+    component-specific star rule stays here. */
 
   /* The star icons inherit color via currentColor, but the inline-svg
-     stars in the header use fill=currentColor so x-class colors fill
-     directly without a stroke fight. */
+    stars in the header use fill=currentColor so x-class colors fill
+    directly without a stroke fight. */
   .article-stars svg { display: block; }
 </style>
 @endpush

@@ -222,10 +222,10 @@
     <p class="mt-1 text-gray-500 text-xs">{{ courtAddress }}</p>
 
     {{-- Map host. Leaflet measures the element at construction time,
-         so the explicit h-64 (256px) on the host is required — without
-         a height the tiles can't lay out. The fallback panel below
-         renders when the row has no lat/lng (rare for the curated US
-         courthouses; common for factory-seeded filler rows). --}}
+        so the explicit h-64 (256px) on the host is required — without
+        a height the tiles can't lay out. The fallback panel below
+        renders when the row has no lat/lng (rare for the curated US
+        courthouses; common for factory-seeded filler rows). --}}
     <div
       data-court-map
       class="overflow-hidden mt-4 h-64 w-full bg-gray-100 rounded-lg"

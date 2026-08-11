@@ -72,7 +72,7 @@
 <div class="min-h-screen">
   <div class="mt-10 sm:mx-auto sm:max-w-[480px] sm:w-full">
     <div class="px-6 py-12 sm:px-12 bg-white sm:rounded-lg shadow">
-      <h1 class="mb-6 font-bold text-2xl text-gray-900 text-center">Create your account</h1>
+      <h1 class="mb-6 font-bold text-2xl text-center text-gray-900">Create your account</h1>
 
       <form @submit.prevent="submit()" class="space-y-6">
         <div>
@@ -86,7 +86,7 @@
               autocomplete="name"
               required
               x-disabled="loading"
-              class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border border-gray-400 rounded-md focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-600 disabled:opacity-50 shadow-sm"
+              class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border border-gray-400 rounded-md focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-600 shadow-sm disabled:opacity-50"
             >
           </div>
         </div>
@@ -102,7 +102,7 @@
               autocomplete="email"
               required
               x-disabled="loading"
-              class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border border-gray-400 rounded-md focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-600 disabled:opacity-50 shadow-sm"
+              class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border border-gray-400 rounded-md focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-600 shadow-sm disabled:opacity-50"
             >
           </div>
         </div>
@@ -120,7 +120,7 @@
               x-disabled="loading"
               @focus="passwordError.set(false)"
               x-class="passwordError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-400'"
-              class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border rounded-md focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-600 disabled:opacity-50 shadow-sm"
+              class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border rounded-md focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-600 shadow-sm disabled:opacity-50"
             >
           </div>
           <p class="mt-1 text-gray-500 text-xs">At least 8 characters with upper, lower, and a number.</p>
@@ -140,7 +140,7 @@
               @focus="confirmError.set(false)"
               x-class="confirmError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-400'"
               style="-webkit-text-security: disc; text-security: disc;"
-              class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border rounded-md focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-600 disabled:opacity-50 shadow-sm"
+              class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border rounded-md focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-600 shadow-sm disabled:opacity-50"
             >
           </div>
         </div>
@@ -154,9 +154,9 @@
         <button
           type="submit"
           x-disabled="loading"
-          class="inline-flex items-center justify-center px-3 py-1.5 w-full font-semibold text-sm/6 text-white bg-blue-600 hover:bg-blue-700 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+          class="inline-flex items-center justify-center px-3 py-1.5 w-full font-semibold text-sm/6 text-white bg-blue-600 hover:bg-blue-700 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <svg :if="loading()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
+          <svg :if="loading()" class="-ml-0.5 mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
           <span>{{ loading() ? 'Creating account...' : 'Sign up' }}</span>
         </button>
       </form>

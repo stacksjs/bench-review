@@ -493,9 +493,9 @@
 </script>
 
 {{-- Plain div host (NOT a custom element) — stx's component resolver
-     intercepts hyphenated tags at parse time, so `<rich-text-editor>`
-     would 404 looking for `rich-text-editor.stx`. The `data-richtext-host`
-     attribute is the marker the script uses to find this. --}}
+    intercepts hyphenated tags at parse time, so `<rich-text-editor>`
+    would 404 looking for `rich-text-editor.stx`. The `data-richtext-host`
+    attribute is the marker the script uses to find this. --}}
 <div
   data-richtext-host
   data-placeholder="Share your experience. Type / for blocks, or just start writing…"

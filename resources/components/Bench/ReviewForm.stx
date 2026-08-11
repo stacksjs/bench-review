@@ -376,40 +376,40 @@
   <div>
 
   {{-- Post-submit success panel. Replaces the entire form when the
-       submission lands so the user gets clear confirmation. We never
-       navigate to /judges/:id/reviews on submit because the new row is
-       `status=pending` and won't render there until moderation. --}}
-  <div :if="submitted" class="p-8 sm:p-12 bg-white border border-gray-200 rounded-2xl shadow-sm text-center">
-    <div class="mx-auto flex items-center justify-center h-14 w-14 rounded-full bg-emerald-50 text-emerald-600">
+      submission lands so the user gets clear confirmation. We never
+      navigate to /judges/:id/reviews on submit because the new row is
+      `status=pending` and won't render there until moderation. --}}
+  <div :if="submitted" class="p-8 sm:p-12 text-center bg-white border border-gray-200 rounded-2xl shadow-sm">
+    <div class="flex items-center justify-center mx-auto h-14 w-14 text-emerald-600 bg-emerald-50 rounded-full">
       <Icon name="check" size="28" />
     </div>
-    <h2 class="mt-5 font-semibold text-xl text-gray-900">Thanks — your review is in.</h2>
-    <p class="mt-2 leading-7 text-gray-600 text-sm max-w-md mx-auto">
+    <h2 class="mt-5 font-semibold text-gray-900 text-xl">Thanks — your review is in.</h2>
+    <p class="mt-2 mx-auto max-w-md leading-7 text-gray-600 text-sm">
       Your review of <span class="font-medium text-gray-900">{{ submitted().judgeName }}</span>
       is pending moderation. We typically publish within a day. You can see your reviews any time
       from your profile.
     </p>
-    <div class="mt-6 flex flex-wrap gap-3 items-center justify-center">
-      <StxLink to="/my-reviews?status=pending" class="px-4 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors shadow-sm">View my reviews</StxLink>
-      <StxLink x-to="`/judges/${submitted().judgeId}/profile`" class="px-4 py-2 font-semibold text-gray-700 text-sm bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 rounded-md transition-colors">Back to the judge</StxLink>
-      <StxLink to="/review" class="px-4 py-2 font-semibold text-gray-700 text-sm bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 rounded-md transition-colors">Write another</StxLink>
+    <div class="flex flex-wrap gap-3 items-center justify-center mt-6">
+      <StxLink to="/my-reviews?status=pending" class="px-4 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors">View my reviews</StxLink>
+      <StxLink x-to="`/judges/${submitted().judgeId}/profile`" class="px-4 py-2 font-semibold text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 rounded-md hover:border-gray-300 transition-colors">Back to the judge</StxLink>
+      <StxLink to="/review" class="px-4 py-2 font-semibold text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 rounded-md hover:border-gray-300 transition-colors">Write another</StxLink>
     </div>
 
     {{-- Optional photo attachment (bench-review#31). Only shown when
-         we have a review id to attach to. Up to 4 photos, server-
-         side enforced + EXIF stripped. Hidden when the photo cap is
-         reached so the user can't keep clicking into an already-full
-         slot list. --}}
-    <div :if="submitted().reviewId" class="mt-8 pt-6 border-t border-gray-100 text-left max-w-md mx-auto">
+        we have a review id to attach to. Up to 4 photos, server-
+        side enforced + EXIF stripped. Hidden when the photo cap is
+        reached so the user can't keep clicking into an already-full
+        slot list. --}}
+    <div :if="submitted().reviewId" class="mt-8 mx-auto pt-6 max-w-md text-left border-gray-100 border-t">
       <div class="flex items-baseline justify-between mb-3">
         <h3 class="font-semibold text-gray-900 text-sm">Attach photos (optional)</h3>
         <span class="text-gray-500 text-xs">{{ `${photoCount} / 4 attached` }}</span>
       </div>
-      <p class="mb-3 text-gray-500 text-xs leading-relaxed">JPEG, PNG, or WebP up to 8MB each. Camera metadata (including GPS) is stripped at upload — your photos won't reveal where you were when you took them.</p>
+      <p class="mb-3 leading-relaxed text-gray-500 text-xs">JPEG, PNG, or WebP up to 8MB each. Camera metadata (including GPS) is stripped at upload — your photos won't reveal where you were when you took them.</p>
 
       <label
         x-class="photoCount() >= 4 ? 'hidden' : ''"
-        class="flex flex-col items-center justify-center gap-2 px-4 py-6 text-gray-500 text-sm bg-gray-50 border border-gray-200 border-dashed rounded-lg cursor-pointer hover:bg-gray-100 hover:border-gray-300 transition-colors"
+        class="flex flex-col gap-2 items-center justify-center px-4 py-6 text-gray-500 text-sm bg-gray-50 hover:bg-gray-100 border border-dashed border-gray-200 rounded-lg hover:border-gray-300 transition-colors cursor-pointer"
       >
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5-5 5 5M12 15V5"/>
@@ -436,20 +436,20 @@
   </div>
 
   {{-- Step 1: pick a judge (no card around it — the search component
-       brings its own surface). x-class toggle (NOT :if): the preload
-       effect sets judge synchronously at setup, so on the /review/:id
-       path this block is false at bindIf's first pass — :if would DROP
-       it and it would never reappear when the user clicks "Change judge"
-       (judge.set(null)), which is exactly that bug. x-class keeps it
-       mounted and reactively shows it. Safe to always-mount: nothing
-       inside reads judge()/submitted(), so no null-access while hidden. --}}
+      brings its own surface). x-class toggle (NOT :if): the preload
+      effect sets judge synchronously at setup, so on the /review/:id
+      path this block is false at bindIf's first pass — :if would DROP
+      it and it would never reappear when the user clicks "Change judge"
+      (judge.set(null)), which is exactly that bug. x-class keeps it
+      mounted and reactively shows it. Safe to always-mount: nothing
+      inside reads judge()/submitted(), so no null-access while hidden. --}}
   <div x-class="(!judge() && !submitted()) ? '' : 'hidden'">
     @include('Bench/Judge/ReviewJudgeSearch')
   </div>
 
   {{-- Step 2: selected-judge banner. Once a judge is chosen, this card
-       sits at the top and confirms the target of the review. Clicking
-       "Change" clears the selection and re-opens the search. --}}
+      sits at the top and confirms the target of the review. Clicking
+      "Change" clears the selection and re-opens the search. --}}
   <div :if="judge && !submitted" class="overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-sm">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-6 sm:p-8">
       <div class="flex gap-4 items-center">
@@ -463,7 +463,7 @@
       <button
         type="button"
         @click="judge.set(null)"
-        class="self-start sm:self-auto inline-flex items-center px-3 py-1.5 font-medium text-gray-600 text-sm border border-gray-200 rounded-md hover:bg-gray-50 hover:border-gray-300 transition-colors"
+        class="inline-flex items-center self-start sm:self-auto px-3 py-1.5 font-medium text-gray-600 text-sm hover:bg-gray-50 border border-gray-200 rounded-md hover:border-gray-300 transition-colors"
       >
         Change judge
       </button>
@@ -471,9 +471,9 @@
   </div>
 
   {{-- The review: title, a single overall rating (Yelp-style — the old
-       per-aspect "Judge's Performance" scorecard was dropped), and the
-       freeform text. One card, only enabled once a judge is set. --}}
-  <div :if="judge && !submitted" class="p-6 sm:p-8 bg-white border border-gray-200 rounded-2xl shadow-sm mt-2">
+      per-aspect "Judge's Performance" scorecard was dropped), and the
+      freeform text. One card, only enabled once a judge is set. --}}
+  <div :if="judge && !submitted" class="mt-2 p-6 sm:p-8 bg-white border border-gray-200 rounded-2xl shadow-sm">
     <h2 class="font-semibold text-base text-gray-900">Your review</h2>
     <p class="mt-1 text-gray-500 text-sm">A title, your overall rating, and your written feedback.</p>
 
@@ -489,7 +489,7 @@
             x-model="reviewTitle"
             x-disabled="!judge"
             placeholder="Brief summary of your experience"
-            class="block px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border rounded-md focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            class="block px-3 py-2 w-full text-gray-900 text-sm placeholder:text-gray-400 bg-white border rounded-md focus:outline-none shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             x-class="titleError() ? 'border-red-500 ring-2 ring-red-300' : 'border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'"
           >
         </div>
@@ -497,13 +497,13 @@
 
       <div>
         <label for="rating" class="block font-medium text-gray-900 text-sm">Overall Rating</label>
-        <div class="mt-2 flex items-center space-x-2">
+        <div class="flex items-center mt-2 space-x-2">
           <div class="flex items-center space-x-1 rounded-md" x-class="ratingError() ? 'ring-2 ring-red-300 ring-offset-2' : ''">
             <button
               :for="star in stars"
               type="button"
               x-disabled="!judge"
-              class="hover:text-amber-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              class="hover:text-amber-400 focus:outline-none disabled:opacity-50 transition-colors disabled:cursor-not-allowed"
               x-class="(hoverRating || rating) >= star ? 'text-amber-400' : 'text-gray-300'"
               @click="rating.set(star); ratingError.set(false)"
               @mouseenter="hoverRating.set(star)"
@@ -532,16 +532,16 @@
   </div>
 
   {{-- Action bar — sits as its own light surface so the Submit button
-       has visual weight against the page background. Only renders once
-       a judge is picked (matches the rest of the form). --}}
-  <div :if="judge && !submitted" class="p-6 sm:p-8 bg-white border border-gray-200 rounded-2xl shadow-sm mt-2">
+      has visual weight against the page background. Only renders once
+      a judge is picked (matches the rest of the form). --}}
+  <div :if="judge && !submitted" class="mt-2 p-6 sm:p-8 bg-white border border-gray-200 rounded-2xl shadow-sm">
     {{-- Alert-banner pattern (x-class hidden) rather than :if because
-         the bindIf re-subscription footgun bit the login form earlier:
-         when an alert flips from set → null → set again, :if's
-         remove/re-add cycle drops the :text subscription on the
-         re-add. CSS-toggle keeps the element in DOM, :text stays
-         subscribed, the message flips reliably on every validation
-         failure. --}}
+        the bindIf re-subscription footgun bit the login form earlier:
+        when an alert flips from set → null → set again, :if's
+        remove/re-add cycle drops the :text subscription on the
+        re-add. CSS-toggle keeps the element in DOM, :text stays
+        subscribed, the message flips reliably on every validation
+        failure. --}}
     <div
       role="alert"
       aria-live="polite"
@@ -549,13 +549,13 @@
       x-class="submitError() ? '' : 'hidden'">{{ submitError() }}</div>
 
     {{-- Anonymity toggle (bench-review#36). Default OFF — anonymity
-         is an explicit opt-in. Surfaces above the action bar so the
-         user makes the call BEFORE the submit click rather than as
-         an afterthought. Bench-review's audience (clerks, court
-         staff, junior attorneys) often genuinely needs this; for
-         everyone else, leaving it off boosts the future verified-
-         credentials badge (#37) on their review. --}}
-    <label class="flex gap-3 items-start mb-5 p-4 bg-blue-50/50 border border-blue-200/60 rounded-md cursor-pointer hover:bg-blue-50">
+        is an explicit opt-in. Surfaces above the action bar so the
+        user makes the call BEFORE the submit click rather than as
+        an afterthought. Bench-review's audience (clerks, court
+        staff, junior attorneys) often genuinely needs this; for
+        everyone else, leaving it off boosts the future verified-
+        credentials badge (#37) on their review. --}}
+    <label class="flex gap-3 items-start mb-5 p-4 bg-blue-50/50 hover:bg-blue-50 border border-blue-200/60 rounded-md cursor-pointer">
       <input
         type="checkbox"
         x-model="anonymized"
@@ -563,23 +563,23 @@
       >
       <div class="flex-1">
         <p class="font-semibold text-gray-900 text-sm">Post this review anonymously</p>
-        <p class="mt-1 text-gray-600 text-xs leading-relaxed">Your name won't appear publicly — readers see "Anonymous reviewer" (or your role, if set in settings). A moderator still sees your identity for review. Useful for clerks, court staff, or attorneys reviewing under retaliation risk.</p>
+        <p class="mt-1 leading-relaxed text-gray-600 text-xs">Your name won't appear publicly — readers see "Anonymous reviewer" (or your role, if set in settings). A moderator still sees your identity for review. Useful for clerks, court staff, or attorneys reviewing under retaliation risk.</p>
       </div>
     </label>
 
-    <p class="mb-4 text-gray-500 text-xs leading-relaxed">
+    <p class="mb-4 leading-relaxed text-gray-500 text-xs">
       By submitting, you confirm this reflects your honest first-hand experience. Reviews are opinions, not statements of fact. Don't post anyone's home address or personal contact information, or anything else covered by our <StxLink to="/guidelines" class="underline hover:text-gray-700">content guidelines</StxLink>.
     </p>
 
     <div class="flex gap-x-4 items-center justify-end">
-      <button type="button" @click="handleCancel()" class="px-4 py-2 font-semibold text-gray-700 text-sm border border-gray-200 rounded-md hover:bg-gray-50 hover:border-gray-300 transition-colors">Cancel</button>
+      <button type="button" @click="handleCancel()" class="px-4 py-2 font-semibold text-gray-700 text-sm hover:bg-gray-50 border border-gray-200 rounded-md hover:border-gray-300 transition-colors">Cancel</button>
       {{-- Call-syntax `judge()` / `reviewsStore.submitting()` on
-           purpose. Bare `reviewsStore.submitting` returned the
-           function reference in this scope (not the unwrapped value)
-           which made `!judge || submittingFn` always truthy — button
-           was disabled regardless of state, click silently no-op'd.
-           Local-state bare access is fine elsewhere; the store-
-           property pattern needs the parens. --}}
+          purpose. Bare `reviewsStore.submitting` returned the
+          function reference in this scope (not the unwrapped value)
+          which made `!judge || submittingFn` always truthy — button
+          was disabled regardless of state, click silently no-op'd.
+          Local-state bare access is fine elsewhere; the store-
+          property pattern needs the parens. --}}
       <button
         type="button"
         data-submit-review
@@ -591,7 +591,7 @@
             ? 'bg-blue-600 hover:bg-blue-700'
             : 'bg-gray-300 cursor-not-allowed'
         ]"
-      ><svg :if="reviewsStore.submitting()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg><span>{{ reviewsStore.submitting() ? 'Submitting…' : 'Submit Review' }}</span></button>
+      ><svg :if="reviewsStore.submitting()" class="-ml-0.5 mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg><span>{{ reviewsStore.submitting() ? 'Submitting…' : 'Submit Review' }}</span></button>
     </div>
   </div>
 

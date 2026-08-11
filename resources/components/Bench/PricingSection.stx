@@ -46,7 +46,7 @@
           <span class="font-semibold text-gray-600 text-sm/6">/<span x-text="pricingPeriod() === 'monthly' ? 'month' : 'year'"></span></span>
         </p>
         <StxLink to="/register" aria-describedby="tier-free"
-          class="block mt-6 px-3 py-2 font-semibold text-center text-gray-700 text-sm/6 ring-1 ring-gray-200 ring-inset rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 hover:ring-blue-300 hover:text-blue-700 active:scale-[0.98] transition">Create
+          class="block mt-6 px-3 py-2 font-semibold text-center text-gray-700 text-sm/6 hover:text-blue-700 ring-1 ring-gray-200 ring-inset rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 hover:ring-blue-300 transition active:scale-[0.98]">Create
           a free account</StxLink>
         <ul role="list" class="mt-8 space-y-3 text-gray-600 text-sm/6">
           <li class="flex gap-x-3">
@@ -60,7 +60,7 @@
         </ul>
       </div>
       <div class="relative p-8 bg-white ring-2 ring-blue-600 rounded-2xl">
-        <span class="absolute -top-3 right-6 inline-flex items-center px-3 py-1 font-semibold text-xs text-white bg-blue-600 rounded-full shadow-sm shadow-blue-600/25">Most popular</span>
+        <span class="inline-flex absolute right-6 items-center px-3 py-1 font-semibold text-white text-xs bg-blue-600 rounded-full shadow-blue-600/25 shadow-sm -top-3">Most popular</span>
         <h3 id="tier-hobby" class="font-semibold text-gray-900 text-lg/8">Professional</h3>
         <p class="mt-4 text-gray-600 text-sm/6">For anyone curious about judge reviews.</p>
         <p class="flex gap-x-1 items-baseline mt-6">
@@ -68,7 +68,7 @@
           <span class="font-semibold text-gray-600 text-sm/6">/<span x-text="pricingPeriod() === 'monthly' ? 'month' : 'year'"></span></span>
         </p>
         <StxLink to="/register" aria-describedby="tier-hobby"
-          class="block mt-6 px-3 py-2 font-semibold text-center text-sm/6 text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 shadow-sm shadow-blue-600/25 transition">Start
+          class="block mt-6 px-3 py-2 font-semibold text-center text-sm/6 text-white bg-blue-600 hover:bg-blue-700 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 shadow-blue-600/25 shadow-sm transition active:scale-[0.98]">Start
           Professional</StxLink>
         <ul role="list" class="mt-8 space-y-3 text-gray-600 text-sm/6">
           <li class="flex gap-x-3">

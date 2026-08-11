@@ -42,7 +42,7 @@
 
   <div :if="isLoading()" class="mt-8 text-center text-gray-500 text-sm">Loading reviews…</div>
 
-  <div :if="isEmpty()" class="mt-8 p-8 text-center bg-gray-50 border border-gray-200 border-dashed rounded-lg">
+  <div :if="isEmpty()" class="mt-8 p-8 text-center bg-gray-50 border border-dashed border-gray-200 rounded-lg">
     <p class="text-gray-600 text-sm">No published reviews for this courthouse yet.</p>
     <StxLink to="/review" class="inline-block mt-4 font-semibold text-gray-700 text-sm hover:text-gray-900">
       Be the first to write one →
@@ -65,7 +65,7 @@
                 </div>
               </div>
             </div>
-            <span :if="review.type" class="inline-flex items-center px-2 py-1 font-medium text-xs text-gray-700 bg-gray-100 ring-1 ring-gray-200 ring-inset rounded-full">{{ review.type }}</span>
+            <span :if="review.type" class="inline-flex items-center px-2 py-1 font-medium text-gray-700 text-xs bg-gray-100 ring-1 ring-gray-200 ring-inset rounded-full">{{ review.type }}</span>
           </div>
           <p class="mt-3 leading-relaxed line-clamp-3 text-gray-700 text-sm">{{ review.content }}</p>
           <div class="flex items-center justify-between mt-4">

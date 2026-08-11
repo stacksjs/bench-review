@@ -58,7 +58,7 @@
     class="px-4 py-3 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
     x-class="store.error() ? '' : 'hidden'">{{ store.error() }}</div>
 
-  <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="overflow-hidden bg-white border border-gray-200 rounded-lg">
     <div :if="store.loading() && store.logs().length === 0" class="px-4 py-12 text-center text-gray-500 text-sm">
       Loading…
     </div>

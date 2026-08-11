@@ -164,9 +164,9 @@
             <button
               type="submit"
               x-disabled="loading"
-              class="inline-flex items-center justify-center px-4 py-2 w-full font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-lg shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+              class="inline-flex items-center justify-center px-4 py-2 w-full font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm disabled:opacity-50 transition active:scale-[0.98] disabled:cursor-not-allowed"
             >
-              <svg :if="loading()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
+              <svg :if="loading()" class="-ml-0.5 mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
               <span :show="!loading">Send message</span>
               <span :show="loading">Sending...</span>
             </button>

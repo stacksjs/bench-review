@@ -34,7 +34,7 @@
   })
 </script>
 
-<div class="mx-auto px-4 pt-8 sm:px-6 lg:px-8 max-w-7xl">
+<div class="mx-auto pt-8 px-4 sm:px-6 lg:px-8 max-w-7xl">
   <div class="hidden sm:block">
     <nav class="flex -mb-px space-x-8 border-b border-gray-200" aria-label="Tabs">
       <StxLink

@@ -129,21 +129,21 @@
     </div>
 
     <div class="mt-8">
-      <div x-class="showAllEmpty() ? '' : 'hidden'" class="mt-2 p-12 text-center bg-gray-50 border border-gray-200 border-dashed rounded-2xl">
+      <div x-class="showAllEmpty() ? '' : 'hidden'" class="mt-2 p-12 text-center bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
         <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
         </svg>
         <p class="mt-4 font-medium text-gray-900">{{ `No results for &quot;${search.query}&quot;` }}</p>
         <p class="mt-1 text-gray-500 text-sm">Try a different name, court, or location.</p>
         <div class="flex gap-3 items-center justify-center mt-5">
-          <StxLink to="/judges" class="inline-flex items-center px-4 py-2 font-medium text-white text-sm bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">Browse judges</StxLink>
-          <StxLink to="/court-houses" class="inline-flex items-center px-4 py-2 font-medium text-gray-700 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">Browse court houses</StxLink>
+          <StxLink to="/judges" class="inline-flex items-center px-4 py-2 font-medium text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">Browse judges</StxLink>
+          <StxLink to="/court-houses" class="inline-flex items-center px-4 py-2 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors">Browse court houses</StxLink>
         </div>
       </div>
 
       <div x-class="showJudgesSection() ? '' : 'hidden'">
         <h2 x-class="search.tab() === 'all' ? 'font-semibold text-gray-900 text-lg' : 'hidden'" class="font-semibold text-gray-900 text-lg">Judges</h2>
-        <div x-class="showJudgesEmpty() ? '' : 'hidden'" class="mt-2 p-12 text-center bg-gray-50 border border-gray-200 border-dashed rounded-2xl">
+        <div x-class="showJudgesEmpty() ? '' : 'hidden'" class="mt-2 p-12 text-center bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
           <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
           </svg>
@@ -169,7 +169,7 @@
 
       <div x-class="!showCourtsSection() ? 'hidden' : (search.tab() === 'all' ? 'mt-12' : '')">
         <h2 x-class="search.tab() === 'all' ? 'font-semibold text-gray-900 text-lg' : 'hidden'" class="font-semibold text-gray-900 text-lg">Court Houses</h2>
-        <div x-class="showCourtsEmpty() ? '' : 'hidden'" class="mt-2 p-12 text-center bg-gray-50 border border-gray-200 border-dashed rounded-2xl">
+        <div x-class="showCourtsEmpty() ? '' : 'hidden'" class="mt-2 p-12 text-center bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
           <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
           </svg>

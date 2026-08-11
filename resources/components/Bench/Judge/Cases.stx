@@ -114,7 +114,7 @@
                   </td>
                   <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap">
                     <span
-                      class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset"
+                      class="inline-flex items-center px-2 py-1 font-medium text-xs ring-1 ring-inset rounded-md"
                       x-class="statusClass(case_.status)">{{ case_.status }}</span>
                   </td>
                   <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap">{{ case_.filedDate }}</td>

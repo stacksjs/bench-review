@@ -175,18 +175,18 @@
   const canCompose = derived<boolean>(() => isAuthenticated() && !isReviewAuthor())
 </script>
 
-<section class="mt-12 pt-8 border-t border-gray-200">
+<section class="mt-12 pt-8 border-gray-200 border-t">
   <header class="flex items-end justify-between">
-    <h2 class="font-semibold text-gray-900 text-base">{{ `Comments (${comments().length})` }}</h2>
+    <h2 class="font-semibold text-base text-gray-900">{{ `Comments (${comments().length})` }}</h2>
   </header>
 
   {{-- Composer slot — one if/else-if/else chain (mutually exclusive,
-       one effect drives it, so branches can't transiently co-render):
-         - signed-in non-author  → the composer
-         - signed-in author       → muted "can't comment on your own"
-         - anonymous              → sign-in CTA
-       The author can't comment on their own review (mirrors the
-       self-like gate in ArticleView). --}}
+      one effect drives it, so branches can't transiently co-render):
+        - signed-in non-author  → the composer
+        - signed-in author       → muted "can't comment on your own"
+        - anonymous              → sign-in CTA
+      The author can't comment on their own review (mirrors the
+      self-like gate in ArticleView). --}}
   <div :if="canCompose()" class="mt-5 p-4 bg-white border border-gray-200 rounded-lg">
     <textarea
       id="comment-body"
@@ -195,7 +195,7 @@
       placeholder="Add a comment — context, clarification, or a respectful pushback."
       @input="commentFieldError.set(false)"
       @focus="commentFieldError.set(false)"
-      class="block w-full px-3 py-2 text-gray-900 sm:text-sm bg-white border rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+      class="block px-3 py-2 w-full text-gray-900 sm:text-sm bg-white border rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
       x-class="commentFieldError() ? 'border-red-500 ring-1 ring-red-300' : 'border-gray-300'"
     ></textarea>
 
@@ -204,7 +204,7 @@
       class="mt-2 px-3 py-2 text-red-800 text-xs bg-red-50 border border-red-200 rounded-md"
       x-class="commentError() ? '' : 'hidden'">{{ commentError() }}</div>
 
-    <div class="flex flex-wrap items-center justify-between gap-2 mt-3">
+    <div class="flex flex-wrap gap-2 items-center justify-between mt-3">
       <label class="flex gap-2 items-center text-gray-600 text-xs cursor-pointer">
         <input type="checkbox" x-model="commentAnon" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-600">
         Post anonymously
@@ -213,9 +213,9 @@
         type="button"
         @click="submitComment()"
         x-disabled="commentSubmitting"
-        class="inline-flex items-center justify-center px-4 py-2 font-semibold text-white text-sm bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
+        class="inline-flex items-center justify-center px-4 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
       >
-        <svg :if="commentSubmitting()" class="animate-spin -ml-0.5 mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
+        <svg :if="commentSubmitting()" class="-ml-0.5 mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
         <span>{{ commentSubmitting() ? 'Posting…' : 'Post comment' }}</span>
       </button>
     </div>
@@ -227,17 +227,17 @@
 
   <div :else class="mt-5 p-5 text-center bg-gray-50 border border-gray-200 rounded-lg">
     <p class="text-gray-600 text-sm">
-      <StxLink to="/login" class="font-semibold text-gray-900 hover:underline underline-offset-2">Sign in</StxLink>
+      <StxLink to="/login" class="font-semibold text-gray-900 underline-offset-2 hover:underline">Sign in</StxLink>
       to leave a comment.
     </p>
   </div>
 
   {{-- Three mutually-exclusive states wired as one if/else-if/else chain
-       (stx#1734). One effect drives mutual exclusion, branches can't
-       transiently both render in a tick. --}}
+      (stx#1734). One effect drives mutual exclusion, branches can't
+      transiently both render in a tick. --}}
   <ul :if="!commentsLoaded()" class="mt-6 space-y-4">
     <li :for="i in [1, 2]" class="p-4 bg-white border border-gray-100 rounded-lg animate-pulse">
-      <div class="flex items-center gap-3">
+      <div class="flex gap-3 items-center">
         <div class="h-8 w-8 bg-gray-200 rounded-full"></div>
         <div class="flex-1 space-y-1.5">
           <div class="h-3 w-24 bg-gray-200 rounded"></div>
@@ -251,18 +251,18 @@
     </li>
   </ul>
 
-  <div :else-if="comments().length === 0" class="mt-6 p-8 text-center text-gray-500 text-sm bg-gray-50 border border-gray-200 border-dashed rounded-lg">
+  <div :else-if="comments().length === 0" class="mt-6 p-8 text-center text-gray-500 text-sm bg-gray-50 border border-dashed border-gray-200 rounded-lg">
     No comments yet. Be the first to add context.
   </div>
 
-  <ul :else class="space-y-4 mt-6">
+  <ul :else class="mt-6 space-y-4">
     <li :for="c in comments" class="p-4 bg-white border border-gray-100 rounded-lg">
-      <div class="flex items-start gap-3">
+      <div class="flex gap-3 items-start">
         <span class="inline-flex flex-none items-center justify-center h-8 w-8 font-semibold text-blue-700 text-xs bg-blue-50 ring-1 ring-blue-200/60 rounded-full">{{ initialFor(c.author && c.author.name) }}</span>
         <div class="flex-1 min-w-0">
-          <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <div class="flex flex-wrap gap-x-2 gap-y-0.5 items-baseline">
             {{-- Linked when we have a real reviewer id (non-anonymous); plain text otherwise. --}}
-            <StxLink :if="c.author && c.author.id" x-to="`/user/${c.author.id}`" class="font-medium text-gray-900 text-sm hover:underline underline-offset-2">{{ c.author.name }}</StxLink>
+            <StxLink :if="c.author && c.author.id" x-to="`/user/${c.author.id}`" class="font-medium text-gray-900 text-sm underline-offset-2 hover:underline">{{ c.author.name }}</StxLink>
             <span :if="!(c.author && c.author.id)" class="font-medium text-gray-700 text-sm">{{ c.author && c.author.name || 'Anonymous reviewer' }}</span>
             <span class="text-gray-400 text-xs">{{ formatDate(c.created_at) }}</span>
           </div>
@@ -271,7 +271,7 @@
             :if="isMyComment(c)"
             type="button"
             @click="deleteComment(c.id)"
-            class="mt-2 text-red-600 text-xs hover:text-red-700 hover:underline underline-offset-2"
+            class="mt-2 text-red-600 text-xs underline-offset-2 hover:text-red-700 hover:underline"
           >Delete</button>
         </div>
       </div>

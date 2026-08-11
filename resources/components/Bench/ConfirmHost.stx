@@ -32,21 +32,21 @@
     role="dialog"
     aria-modal="true"
     @click="$event.stopPropagation()"
-    class="w-full max-w-md p-6 bg-white border border-gray-200 rounded-2xl shadow-xl"
+    class="p-6 max-w-md w-full bg-white border border-gray-200 rounded-2xl shadow-xl"
   >
-    <h2 class="font-semibold text-lg text-gray-900" :text="confirmStore.title()"></h2>
+    <h2 class="font-semibold text-gray-900 text-lg" :text="confirmStore.title()"></h2>
     <p class="mt-2 text-gray-600 text-sm" :text="confirmStore.message()"></p>
-    <div class="flex justify-end gap-3 mt-6">
+    <div class="flex gap-3 justify-end mt-6">
       <button
         type="button"
         @click="confirmStore.dismiss()"
-        class="px-4 py-2 font-medium text-gray-700 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+        class="px-4 py-2 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-300 rounded-lg transition-colors"
         :text="confirmStore.cancelLabel()"
       ></button>
       <button
         type="button"
         @click="confirmStore.accept()"
-        class="px-4 py-2 font-medium text-white text-sm rounded-lg transition-colors"
+        class="px-4 py-2 font-medium text-sm text-white rounded-lg transition-colors"
         x-class="acceptClass()"
         :text="confirmStore.confirmLabel()"
       ></button>

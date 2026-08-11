@@ -172,37 +172,37 @@
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <p class="font-medium text-blue-600 text-xs tracking-widest uppercase">Your contributions</p>
-        <h1 class="mt-2 font-serif font-bold text-3xl text-gray-900 sm:text-4xl tracking-tight">My reviews</h1>
+        <h1 class="mt-2 font-bold font-serif text-3xl text-gray-900 tracking-tight sm:text-4xl">My reviews</h1>
         <p class="mt-2 text-gray-500 text-sm">Everything you've submitted — across every status. Click a row to read, edit, or delete.</p>
       </div>
       <div class="flex flex-shrink-0 gap-2">
-        <StxLink to="/profile" class="inline-flex items-center px-3 py-2 font-medium text-gray-700 text-sm bg-white border border-gray-200 rounded-md hover:bg-gray-50">
+        <StxLink to="/profile" class="inline-flex items-center px-3 py-2 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-200 rounded-md">
           ← Profile
         </StxLink>
-        <StxLink to="/review" class="inline-flex items-center px-3 py-2 font-medium text-white text-sm bg-blue-600 rounded-md hover:bg-blue-700">
+        <StxLink to="/review" class="inline-flex items-center px-3 py-2 font-medium text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md">
           Write a review
         </StxLink>
       </div>
     </div>
 
     {{-- Status filter pills. Click pushes a `?status=` query param;
-         counts come from the derived `counts` over the full list so
-         the user always sees how many sit in each bucket without
-         having to switch tabs. --}}
+        counts come from the derived `counts` over the full list so
+        the user always sees how many sit in each bucket without
+        having to switch tabs. --}}
     {{-- Toggle-button group, not a tablist: these filter the list below,
-         they do not switch between panels. The tab role promises a
-         controlled tabpanel and arrow-key roving focus, and this app has
-         no tabpanel anywhere -- a screen reader announced "tab, 1 of 4"
-         and then had nowhere to go, with no selected state either since
-         the tab role also requires aria-selected. Toggle buttons with
-         aria-pressed are what these actually are. --}}
+        they do not switch between panels. The tab role promises a
+        controlled tabpanel and arrow-key roving focus, and this app has
+        no tabpanel anywhere -- a screen reader announced "tab, 1 of 4"
+        and then had nowhere to go, with no selected state either since
+        the tab role also requires aria-selected. Toggle buttons with
+        aria-pressed are what these actually are. --}}
     <div class="flex flex-wrap gap-2 mt-8" role="group" aria-label="Filter by status">
       <button
         type="button"
         aria-pressed="false"
         x-aria-pressed="statusFilter === 'all' ? 'true' : 'false'"
         @click="setFilter('all')"
-        class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        class="inline-flex gap-2 items-center px-3 py-1.5 font-medium text-sm border rounded-full transition-colors"
         x-class="statusFilter === 'all' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >
         All
@@ -213,7 +213,7 @@
         aria-pressed="false"
         x-aria-pressed="statusFilter === 'pending' ? 'true' : 'false'"
         @click="setFilter('pending')"
-        class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        class="inline-flex gap-2 items-center px-3 py-1.5 font-medium text-sm border rounded-full transition-colors"
         x-class="statusFilter === 'pending' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >
         Pending
@@ -224,7 +224,7 @@
         aria-pressed="false"
         x-aria-pressed="statusFilter === 'published' ? 'true' : 'false'"
         @click="setFilter('published')"
-        class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        class="inline-flex gap-2 items-center px-3 py-1.5 font-medium text-sm border rounded-full transition-colors"
         x-class="statusFilter === 'published' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >
         Published
@@ -235,7 +235,7 @@
         aria-pressed="false"
         x-aria-pressed="statusFilter === 'rejected' ? 'true' : 'false'"
         @click="setFilter('rejected')"
-        class="inline-flex items-center gap-2 px-3 py-1.5 font-medium text-sm rounded-full border transition-colors"
+        class="inline-flex gap-2 items-center px-3 py-1.5 font-medium text-sm border rounded-full transition-colors"
         x-class="statusFilter === 'rejected' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
       >
         Declined
@@ -244,13 +244,13 @@
     </div>
 
     {{-- Loading skeleton (bench-review#35). Renders 3 placeholder card
-         shells matching the eventual row layout (title + badge + meta
-         + snippet + action row) so there's no layout shift when data
-         lands. Shown only on the first fetch — subsequent SPA nav
-         reuses the cached rows. --}}
-    <ul :if="profileStore.loading && !profileStore.loaded" class="space-y-4 mt-8">
+        shells matching the eventual row layout (title + badge + meta
+        + snippet + action row) so there's no layout shift when data
+        lands. Shown only on the first fetch — subsequent SPA nav
+        reuses the cached rows. --}}
+    <ul :if="profileStore.loading && !profileStore.loaded" class="mt-8 space-y-4">
       <li :for="i in [1, 2, 3]" class="p-5 bg-white border border-gray-200 rounded-lg animate-pulse">
-        <div class="flex items-baseline gap-3">
+        <div class="flex gap-3 items-baseline">
           <div class="h-4 w-1/3 bg-gray-200 rounded"></div>
           <div class="h-4 w-16 bg-gray-100 rounded-full"></div>
         </div>
@@ -263,60 +263,60 @@
           <div class="h-3 w-full bg-gray-200 rounded"></div>
           <div class="h-3 w-4/5 bg-gray-200 rounded"></div>
         </div>
-        <div class="mt-4 pt-3 border-t border-gray-100">
+        <div class="mt-4 pt-3 border-gray-100 border-t">
           <div class="h-3 w-20 bg-gray-100 rounded"></div>
         </div>
       </li>
     </ul>
 
     {{-- Empty state — filter-aware copy + CTA. Hidden during the
-         initial load to avoid the "no reviews" flash before the
-         first fetch returns. --}}
+        initial load to avoid the "no reviews" flash before the
+        first fetch returns. --}}
     <div :if="profileStore.loaded && filtered.length === 0" class="mt-10 p-10 text-center bg-white border border-gray-200 rounded-lg">
-      <p class="font-semibold text-gray-900 text-base">{{ emptyTitle }}</p>
+      <p class="font-semibold text-base text-gray-900">{{ emptyTitle }}</p>
       <p class="mt-2 mx-auto max-w-md text-gray-500 text-sm">{{ emptyHint }}</p>
-      <StxLink to="/review" class="inline-flex items-center mt-6 px-4 py-2 font-medium text-white text-sm bg-blue-600 rounded-md hover:bg-blue-700">
+      <StxLink to="/review" class="inline-flex items-center mt-6 px-4 py-2 font-medium text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md">
         Write a review
       </StxLink>
     </div>
 
     {{-- List. Each row is a card; click anywhere on the title or
-         body navigates to /article/:id where edit/delete live. We
-         deliberately don't inline destructive actions here — a
-         single-click delete on a list view is a footgun. --}}
-    <ul :if="filtered.length > 0" class="space-y-4 mt-8">
+        body navigates to /article/:id where edit/delete live. We
+        deliberately don't inline destructive actions here — a
+        single-click delete on a list view is a footgun. --}}
+    <ul :if="filtered.length > 0" class="mt-8 space-y-4">
       <li :for="r in visible" class="p-5 bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all">
-        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <div class="flex flex-wrap gap-x-3 gap-y-1 items-baseline">
           <StxLink
             x-to="`/article/${r.id}`"
-            class="font-semibold text-gray-900 text-base hover:underline underline-offset-2 decoration-gray-300">{{ r.title }}</StxLink>
+            class="font-semibold text-base text-gray-900 underline-offset-2 hover:underline decoration-gray-300">{{ r.title }}</StxLink>
           <span
             class="inline-flex items-center px-2 py-0.5 font-medium text-xs ring-1 rounded-full"
             x-class="statusBadgeClasses(r.status)">{{ statusLabel(r.status) }}</span>
         </div>
 
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-gray-500 text-xs">
+        <div class="flex flex-wrap gap-x-3 gap-y-1 items-center mt-1 text-gray-500 text-xs">
           <span :if="r.judge">
             Review of
             <StxLink
               x-to="`/judges/${r.judge.id}/profile`"
-              class="text-gray-700 hover:underline underline-offset-2">{{ r.judge.name }}</StxLink>
+              class="text-gray-700 underline-offset-2 hover:underline">{{ r.judge.name }}</StxLink>
           </span>
           <span class="text-gray-300">·</span>
           <span>{{ formatDate(r.created_at) }}</span>
           <span class="text-gray-300">·</span>
-          <span class="inline-flex items-center gap-1 tabular-nums">{{ `${r.rating}/5` }}</span>
+          <span class="inline-flex gap-1 items-center tabular-nums">{{ `${r.rating}/5` }}</span>
           <span :if="r.likes && r.likes > 0" class="text-gray-300">·</span>
-          <span :if="r.likes && r.likes > 0" class="inline-flex items-center gap-1">{{ r.likes + ' ' + (r.likes === 1 ? 'reaction' : 'reactions') }}</span>
+          <span :if="r.likes && r.likes > 0" class="inline-flex gap-1 items-center">{{ r.likes + ' ' + (r.likes === 1 ? 'reaction' : 'reactions') }}</span>
         </div>
 
-        <p class="mt-3 text-gray-600 text-sm line-clamp-2">{{ snippet(r.content) }}</p>
+        <p class="mt-3 line-clamp-2 text-gray-600 text-sm">{{ snippet(r.content) }}</p>
 
-        <div class="flex flex-wrap items-center gap-x-4 mt-4 pt-3 border-t border-gray-100 text-sm">
-          <StxLink x-to="`/article/${r.id}`" class="font-medium text-gray-900 hover:underline underline-offset-2">
+        <div class="flex flex-wrap gap-x-4 items-center mt-4 pt-3 text-sm border-gray-100 border-t">
+          <StxLink x-to="`/article/${r.id}`" class="font-medium text-gray-900 underline-offset-2 hover:underline">
             Open →
           </StxLink>
-          <StxLink x-to="`/article/${r.id}/edit`" class="font-medium text-gray-600 hover:text-gray-900 hover:underline underline-offset-2">
+          <StxLink x-to="`/article/${r.id}/edit`" class="font-medium text-gray-600 underline-offset-2 hover:text-gray-900 hover:underline">
             Edit
           </StxLink>
         </div>
@@ -324,15 +324,15 @@
     </ul>
 
     {{-- Numbered pagination (client-side over the filtered list).
-         Wrapper x-class toggle (not :if) so it stays in the DOM and
-         appears once last_page > 1. Numbered button uses item.cls
-         (precomputed) — no signal call-syntax in the :for. --}}
+        Wrapper x-class toggle (not :if) so it stays in the DOM and
+        appears once last_page > 1. Numbered button uses item.cls
+        (precomputed) — no signal call-syntax in the :for. --}}
     <div x-class="lastPage() > 1 ? 'flex flex-col items-center gap-3 mt-8' : 'hidden'">
-      <nav class="flex flex-wrap items-center justify-center gap-1.5" aria-label="Pagination">
+      <nav class="flex flex-wrap gap-1.5 items-center justify-center" aria-label="Pagination">
         <button
           type="button"
           @click="goToPage(currentPage() - 1)"
-          class="inline-flex items-center px-3 py-2 font-medium text-sm rounded-md border transition-colors"
+          class="inline-flex items-center px-3 py-2 font-medium text-sm border rounded-md transition-colors"
           x-class="currentPage() <= 1 ? 'text-gray-300 border-gray-200 pointer-events-none' : 'text-gray-700 border-gray-300 hover:bg-gray-50'"
           aria-label="Previous page"
         >Prev</button>
@@ -340,13 +340,13 @@
           :for="item in pages()"
           type="button"
           @click="goToPage(item.n)"
-          class="inline-flex items-center justify-center min-w-[2.5rem] px-3 py-2 font-medium text-sm rounded-md border transition-colors tabular-nums"
+          class="inline-flex items-center justify-center px-3 py-2 min-w-[2.5rem] font-medium tabular-nums text-sm border rounded-md transition-colors"
           x-class="item.cls"
         >{{ item.label }}</button>
         <button
           type="button"
           @click="goToPage(currentPage() + 1)"
-          class="inline-flex items-center px-3 py-2 font-medium text-sm rounded-md border transition-colors"
+          class="inline-flex items-center px-3 py-2 font-medium text-sm border rounded-md transition-colors"
           x-class="currentPage() >= lastPage() ? 'text-gray-300 border-gray-200 pointer-events-none' : 'text-gray-700 border-gray-300 hover:bg-gray-50'"
           aria-label="Next page"
         >Next</button>

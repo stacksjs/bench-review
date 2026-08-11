@@ -179,29 +179,29 @@
           <div class="sm:col-span-2">
             <button
               type="submit"
-              class="px-3 py-3 w-full font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 shadow-sm shadow-blue-600/25 transition"
+              class="px-3 py-3 w-full font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 shadow-blue-600/25 shadow-sm transition active:scale-[0.98]"
             >
               Search
             </button>
           </div>
         </form>
-        <div class="flex flex-wrap items-center gap-2 mt-4 text-gray-500 text-xs">
+        <div class="flex flex-wrap gap-2 items-center mt-4 text-gray-500 text-xs">
           <span class="font-medium">Popular:</span>
-          <StxLink :for="cat in popularCategories" x-to="`/search?type=${cat.name}`" class="inline-flex items-center px-2.5 py-1 font-medium text-blue-700 bg-blue-50 ring-1 ring-blue-100 rounded-full hover:bg-blue-100 transition-colors">{{ cat.name }}</StxLink>
+          <StxLink :for="cat in popularCategories" x-to="`/search?type=${cat.name}`" class="inline-flex items-center px-2.5 py-1 font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 ring-1 ring-blue-100 rounded-full transition-colors">{{ cat.name }}</StxLink>
         </div>
       </div>
     </div>
 
     {{-- How It Works — asymmetric split: header column left, steps
-         stacked with hairline dividers right. Replaces the generic
-         centered 3-equal-cards row. --}}
+        stacked with hairline dividers right. Replaces the generic
+        centered 3-equal-cards row. --}}
     <div class="mx-auto px-4 py-24 sm:px-6 lg:px-8 max-w-7xl">
-      <div class="grid gap-12 grid-cols-1 lg:grid-cols-[1fr_1.6fr] lg:gap-20">
+      <div class="grid gap-12 grid-cols-1 lg:gap-20 lg:grid-cols-[1fr_1.6fr]">
         <div>
-          <h2 class="font-bold text-3xl text-gray-900 tracking-tight sm:text-4xl text-balance">How Bench Review works</h2>
+          <h2 class="font-bold text-3xl text-balance text-gray-900 tracking-tight sm:text-4xl">How Bench Review works</h2>
           <p class="mt-4 max-w-md text-gray-600 text-lg">Three steps to bring real transparency into the courtroom.</p>
         </div>
-        <div class="divide-y divide-gray-200">
+        <div class="divide-gray-200 divide-y">
           <div class="flex gap-6 items-start py-6 first:pt-0">
             <div class="flex flex-none items-center justify-center h-12 w-12 bg-blue-50 rounded-full">
               <Icon name="search" size="24" class="text-blue-600" />
@@ -234,9 +234,9 @@
     </div>
 
     {{-- Trending this week (bench-review#34). Shows judges with the
-         most reviews in the last 7 days. Hidden entirely when there's
-         no activity to surface — empty trending bands read worse than
-         a missing section. --}}
+        most reviews in the last 7 days. Hidden entirely when there's
+        no activity to surface — empty trending bands read worse than
+        a missing section. --}}
     <div class="py-16 bg-white" x-class="showTrending() ? '' : 'hidden'">
       <div class="mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         <div class="flex items-end justify-between">
@@ -252,18 +252,18 @@
           <StxLink
             :for="judge in trendingJudges"
             x-to="`/judges/${judge.id}/profile`"
-            class="overflow-hidden p-5 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 hover:shadow-md hover:-translate-y-0.5 shadow-sm duration-200 transition-all group"
+            class="overflow-hidden p-5 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 shadow-sm hover:shadow-md duration-200 transition-all group hover:-translate-y-0.5"
           >
             <div class="flex gap-4 items-center">
               <img class="object-cover h-14 w-14 ring-2 ring-gray-100 rounded-full duration-200 transition-all" x-src="judge.image_url" x-alt="judge.name">
-              <div class="min-w-0 flex-1">
+              <div class="flex-1 min-w-0">
                 <h3 class="font-semibold text-gray-900 truncate">{{ judge.name }}</h3>
                 <p :if="judge.court_name" class="text-gray-500 text-sm truncate">{{ judge.court_name }}</p>
               </div>
             </div>
-            <div class="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
-              <span class="text-gray-500 text-xs font-medium">{{ `${judge.review_count} ${judge.review_count === 1 ? 'review' : 'reviews'} this week` }}</span>
-              <span :if="judge.avg_rating" class="inline-flex items-center gap-1 px-2 py-0.5 font-semibold text-amber-700 text-xs tabular-nums bg-amber-50 ring-1 ring-amber-200/70 rounded-full">{{ `★ ${judge.avg_rating}` }}</span>
+            <div class="flex items-center justify-between mt-4 pt-3 border-gray-100 border-t">
+              <span class="font-medium text-gray-500 text-xs">{{ `${judge.review_count} ${judge.review_count === 1 ? 'review' : 'reviews'} this week` }}</span>
+              <span :if="judge.avg_rating" class="inline-flex gap-1 items-center px-2 py-0.5 font-semibold tabular-nums text-amber-700 text-xs bg-amber-50 ring-1 ring-amber-200/70 rounded-full">{{ `★ ${judge.avg_rating}` }}</span>
             </div>
           </StxLink>
         </div>
@@ -271,11 +271,11 @@
     </div>
 
     {{-- Top-rated judges (bench-review#34). Uses the highlights
-         endpoint's `top_rated_judges` slice when at least 2 published
-         reviews exist for a judge; falls back to the directory-order
-         first 6 judges when nothing's published yet so the home page
-         doesn't render a blank "Top-rated" header. The header copy
-         flips between "Top-rated" and "Featured" to stay truthful. --}}
+        endpoint's `top_rated_judges` slice when at least 2 published
+        reviews exist for a judge; falls back to the directory-order
+        first 6 judges when nothing's published yet so the home page
+        doesn't render a blank "Top-rated" header. The header copy
+        flips between "Top-rated" and "Featured" to stay truthful. --}}
     <div class="py-16 bg-off-white-darker">
       <div class="mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         <div class="flex items-end justify-between">
@@ -289,12 +289,12 @@
         </div>
 
         {{-- Real top-rated cards. Visible when we have review-backed
-             data; hidden in the fallback case below. --}}
+            data; hidden in the fallback case below. --}}
         <div class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-10" x-class="showTopRated() ? '' : 'hidden'">
           <StxLink
             :for="judge in topRatedJudges"
             x-to="`/judges/${judge.id}/profile`"
-            class="overflow-hidden p-6 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 hover:shadow-md hover:-translate-y-0.5 shadow-sm duration-200 transition-all group"
+            class="overflow-hidden p-6 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 shadow-sm hover:shadow-md duration-200 transition-all group hover:-translate-y-0.5"
           >
             <div class="flex gap-4 items-center">
               <img class="object-cover h-16 w-16 ring-2 ring-gray-100 rounded-full duration-200 transition-all" x-src="judge.image_url" x-alt="judge.name">
@@ -304,8 +304,8 @@
               </div>
             </div>
             <div class="flex items-center justify-between mt-4 pt-4 border-gray-100 border-t">
-              <span class="inline-flex items-center gap-1.5 text-gray-500 text-xs">
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 font-semibold text-amber-700 tabular-nums bg-amber-50 ring-1 ring-amber-200/70 rounded-full">{{ `★ ${judge.avg_rating}` }}</span>
+              <span class="inline-flex gap-1.5 items-center text-gray-500 text-xs">
+                <span class="inline-flex gap-1 items-center px-2 py-0.5 font-semibold tabular-nums text-amber-700 bg-amber-50 ring-1 ring-amber-200/70 rounded-full">{{ `★ ${judge.avg_rating}` }}</span>
                 {{ `${judge.review_count} ${judge.review_count === 1 ? 'review' : 'reviews'}` }}
               </span>
               <span class="font-medium text-blue-700 text-xs group-hover:text-blue-900">View profile →</span>
@@ -314,13 +314,13 @@
         </div>
 
         {{-- Featured fallback — when there are no published reviews
-             yet to compute a top-rated set, surface directory judges
-             so the section never reads as empty. --}}
+            yet to compute a top-rated set, surface directory judges
+            so the section never reads as empty. --}}
         <div class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-10" x-class="showTopRated() ? 'hidden' : ''">
           <StxLink
             :for="judge in featuredJudges"
             x-to="`/judges/${judge.id}/profile`"
-            class="overflow-hidden p-6 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 hover:shadow-md hover:-translate-y-0.5 shadow-sm duration-200 transition-all group"
+            class="overflow-hidden p-6 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 shadow-sm hover:shadow-md duration-200 transition-all group hover:-translate-y-0.5"
           >
             <div class="flex gap-4 items-center">
               <img class="object-cover h-16 w-16 ring-2 ring-gray-100 rounded-full duration-200 transition-all" x-src="judge.photo" x-alt="judge.name">
@@ -346,21 +346,21 @@
     </div>
 
     {{-- Personalized CTA band (bench-review#43). Renders ONE of two
-         banners depending on auth state; hides entirely for signed-in
-         users who've already written at least one review (so the feed
-         below is the real signal for that audience). --}}
+        banners depending on auth state; hides entirely for signed-in
+        users who've already written at least one review (so the feed
+        below is the real signal for that audience). --}}
     <div
-      class="py-12 bg-gradient-to-br from-blue-50 via-white to-blue-50"
+      class="py-12 bg-gradient-to-br from-blue-50 to-blue-50 via-white"
       x-class="isAnonymous() ? '' : 'hidden'"
     >
       <div class="mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl text-center">
-        <h2 class="font-bold text-3xl text-gray-900 sm:text-4xl tracking-tight">Help others see the bench more clearly</h2>
+        <h2 class="font-bold text-3xl text-gray-900 tracking-tight sm:text-4xl">Help others see the bench more clearly</h2>
         <p class="mt-4 mx-auto max-w-2xl leading-7 text-gray-600">If you're an attorney, clerk, or court staff, sign up in a minute and share what working with a judge was actually like. Anonymous if you prefer.</p>
         <div class="flex flex-wrap gap-3 items-center justify-center mt-8">
-          <StxLink to="/register" class="inline-flex items-center px-5 py-3 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-lg shadow-sm shadow-blue-600/25 transition">
+          <StxLink to="/register" class="inline-flex items-center px-5 py-3 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-blue-600/25 shadow-sm transition active:scale-[0.98]">
             Create an account
           </StxLink>
-          <StxLink to="/judges" class="inline-flex items-center px-5 py-3 font-semibold text-gray-700 text-sm bg-white border border-gray-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 active:scale-[0.98] rounded-lg transition">
+          <StxLink to="/judges" class="inline-flex items-center px-5 py-3 font-semibold text-gray-700 text-sm hover:text-blue-700 bg-white hover:bg-blue-50 border border-gray-200 rounded-lg hover:border-blue-300 transition active:scale-[0.98]">
             Browse judges
           </StxLink>
         </div>
@@ -368,17 +368,17 @@
     </div>
 
     <div
-      class="py-12 bg-gradient-to-br from-blue-50 via-white to-blue-50"
+      class="py-12 bg-gradient-to-br from-blue-50 to-blue-50 via-white"
       x-class="showWriteFirstCta() ? '' : 'hidden'"
     >
       <div class="mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl text-center">
-        <h2 class="font-bold text-3xl text-gray-900 sm:text-4xl tracking-tight">Write your first review</h2>
+        <h2 class="font-bold text-3xl text-gray-900 tracking-tight sm:text-4xl">Write your first review</h2>
         <p class="mt-4 mx-auto max-w-2xl leading-7 text-gray-600">Pick a judge you've appeared before and share your experience. Even one careful review helps the next person walking into that courtroom.</p>
         <div class="flex flex-wrap gap-3 items-center justify-center mt-8">
-          <StxLink to="/review" class="inline-flex items-center px-5 py-3 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-lg shadow-sm shadow-blue-600/25 transition">
+          <StxLink to="/review" class="inline-flex items-center px-5 py-3 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-blue-600/25 shadow-sm transition active:scale-[0.98]">
             Write a review
           </StxLink>
-          <StxLink to="/judges" class="inline-flex items-center px-5 py-3 font-semibold text-gray-700 text-sm bg-white border border-gray-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 active:scale-[0.98] rounded-lg transition">
+          <StxLink to="/judges" class="inline-flex items-center px-5 py-3 font-semibold text-gray-700 text-sm hover:text-blue-700 bg-white hover:bg-blue-50 border border-gray-200 rounded-lg hover:border-blue-300 transition active:scale-[0.98]">
             Browse judges
           </StxLink>
         </div>
@@ -398,11 +398,11 @@
       </div>
 
       {{-- Empty state — no reviews in the DB yet. CTA points at /review
-           so visitors land directly in the submission flow. --}}
-      <div :if="reviewsEmpty()" class="mt-10 p-12 text-center bg-white border border-gray-200 border-dashed rounded-2xl">
+          so visitors land directly in the submission flow. --}}
+      <div :if="reviewsEmpty()" class="mt-10 p-12 text-center bg-white border border-dashed border-gray-200 rounded-2xl">
         <h3 class="font-semibold text-gray-900 text-lg">No reviews yet</h3>
         <p class="mt-2 text-gray-500">Be among the first to share your courtroom experience and help the community.</p>
-        <StxLink to="/review" class="inline-block mt-6 px-5 py-2.5 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-lg shadow-sm shadow-blue-600/25 transition">
+        <StxLink to="/review" class="inline-block mt-6 px-5 py-2.5 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-blue-600/25 shadow-sm transition active:scale-[0.98]">
           Write a review
         </StxLink>
       </div>
@@ -411,7 +411,7 @@
         <StxLink
           :for="review in latestReviews()"
           x-to="`/article/${review.id}`"
-          class="block p-6 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 hover:shadow-md hover:-translate-y-0.5 shadow-sm duration-200 transition-all"
+          class="block p-6 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 shadow-sm hover:shadow-md duration-200 transition-all hover:-translate-y-0.5"
         >
             <div class="flex items-center justify-between">
               <div class="flex items-center">
@@ -432,13 +432,13 @@
     </div>
 
     {{-- Active reviewers (bench-review#34). Surfaces users with the
-         most published reviews in the last 30 days — promotes reviewer
-         credibility as a first-class concept (Yelp's "Elite" pattern,
-         scaled down). Hidden when there's no signed-in reviewer
-         activity to surface; anonymous-only review activity doesn't
-         count here. Each card links to the reviewer's public profile
-         once that lands (bench-review#29) — for now, links to
-         /user/{id} which renders the bare shell. --}}
+        most published reviews in the last 30 days — promotes reviewer
+        credibility as a first-class concept (Yelp's "Elite" pattern,
+        scaled down). Hidden when there's no signed-in reviewer
+        activity to surface; anonymous-only review activity doesn't
+        count here. Each card links to the reviewer's public profile
+        once that lands (bench-review#29) — for now, links to
+        /user/{id} which renders the bare shell. --}}
     <div class="py-16 bg-white" x-class="showActiveReviewers() ? '' : 'hidden'">
       <div class="mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         <div class="flex items-end justify-between mb-8">
@@ -449,9 +449,9 @@
         </div>
         <ul class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
           <li :for="reviewer in activeReviewers" class="p-4 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 hover:shadow-sm transition-all">
-            <StxLink x-to="`/user/${reviewer.id}`" class="flex items-center gap-3">
-              <div class="flex items-center justify-center flex-none h-10 w-10 font-semibold text-blue-700 text-xs bg-blue-50 ring-1 ring-blue-200/60 rounded-full">{{ (reviewer.name || '?').charAt(0).toUpperCase() }}</div>
-              <div class="min-w-0 flex-1">
+            <StxLink x-to="`/user/${reviewer.id}`" class="flex gap-3 items-center">
+              <div class="flex flex-none items-center justify-center h-10 w-10 font-semibold text-blue-700 text-xs bg-blue-50 ring-1 ring-blue-200/60 rounded-full">{{ (reviewer.name || '?').charAt(0).toUpperCase() }}</div>
+              <div class="flex-1 min-w-0">
                 <p class="font-medium text-gray-900 text-sm truncate">{{ reviewer.name }}</p>
                 <p class="text-gray-500 text-xs">{{ `${reviewer.review_count} ${reviewer.review_count === 1 ? 'review' : 'reviews'}` }}</p>
               </div>

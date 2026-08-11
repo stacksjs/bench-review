@@ -82,7 +82,7 @@
     <div class="mt-16 p-8 text-center bg-off-gray rounded-2xl">
       <h2 class="font-semibold text-gray-900 text-xl">Still have questions?</h2>
       <p class="mt-2 text-gray-600">We're happy to help.</p>
-      <StxLink to="/contact" class="inline-block mt-4 px-4 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-lg shadow-sm transition">Contact us</StxLink>
+      <StxLink to="/contact" class="inline-block mt-4 px-4 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition active:scale-[0.98]">Contact us</StxLink>
     </div>
   </div>
 </div>

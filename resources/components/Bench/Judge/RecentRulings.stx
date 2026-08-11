@@ -83,7 +83,7 @@
   {{-- Loading skeleton --}}
   <ul :if="!opinionsLoaded" class="space-y-3">
     <li :for="i in [1, 2, 3]" class="p-5 bg-white border border-gray-200 rounded-lg animate-pulse">
-      <div class="flex items-baseline gap-3">
+      <div class="flex gap-3 items-baseline">
         <div class="h-4 w-2/3 bg-gray-200 rounded"></div>
         <div class="h-4 w-16 bg-gray-100 rounded-full"></div>
       </div>
@@ -95,18 +95,18 @@
   </ul>
 
   {{-- Empty state — honest about why it's empty --}}
-  <div :if="opinionsLoaded && opinions.length === 0" class="p-10 text-center bg-white border border-gray-200 border-dashed rounded-lg">
-    <p class="font-semibold text-gray-900 text-base">No rulings on file yet.</p>
+  <div :if="opinionsLoaded && opinions.length === 0" class="p-10 text-center bg-white border border-dashed border-gray-200 rounded-lg">
+    <p class="font-semibold text-base text-gray-900">No rulings on file yet.</p>
     <p class="mt-2 mx-auto max-w-md text-gray-500 text-sm">Bench Review curates rulings from public docket sources as moderators identify them. Automated docket integration is on the roadmap — for now this surface is moderator-curated.</p>
   </div>
 
   {{-- Opinions list --}}
   <ul :if="opinions.length > 0" class="space-y-3">
     <li :for="o in opinions" class="p-5 bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all">
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div class="min-w-0 flex-1">
-          <h3 class="font-semibold text-gray-900 text-base">{{ o.case_name }}</h3>
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-gray-500 text-xs">
+      <div class="flex flex-wrap gap-3 items-start justify-between">
+        <div class="flex-1 min-w-0">
+          <h3 class="font-semibold text-base text-gray-900">{{ o.case_name }}</h3>
+          <div class="flex flex-wrap gap-x-3 gap-y-1 items-center mt-1 text-gray-500 text-xs">
             <span :if="o.decision_date">{{ formatDate(o.decision_date) }}</span>
             <span :if="o.decision_date && o.citation" class="text-gray-300">·</span>
             <span :if="o.citation" class="font-mono text-gray-600">{{ o.citation }}</span>
@@ -116,7 +116,7 @@
         </div>
         <span
           :if="o.outcome_label"
-          class="inline-flex items-center px-2.5 py-0.5 font-medium text-xs ring-1 rounded-full capitalize whitespace-nowrap"
+          class="inline-flex items-center px-2.5 py-0.5 capitalize font-medium text-xs whitespace-nowrap ring-1 rounded-full"
           x-class="outcomeBadgeClasses(o.outcome_label)">{{ o.outcome_label }}</span>
       </div>
       <p :if="o.summary" class="mt-3 leading-relaxed text-gray-700 text-sm">{{ o.summary }}</p>
@@ -125,7 +125,7 @@
         x-href="o.source_url"
         target="_blank"
         rel="noopener noreferrer"
-        class="inline-flex items-center gap-1 mt-3 font-medium text-gray-700 text-xs hover:text-gray-900 hover:underline underline-offset-2"
+        class="inline-flex gap-1 items-center mt-3 font-medium text-gray-700 text-xs underline-offset-2 hover:text-gray-900 hover:underline"
       >
         Read the opinion
         <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.5">

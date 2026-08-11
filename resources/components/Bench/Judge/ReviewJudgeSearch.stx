@@ -90,9 +90,9 @@
         autocomplete="off"
       >
       {{-- Spinner appears in the input gutter while the debounced fetch
-           is in flight — keeps the loading state subtle, no layout jump. --}}
+          is in flight — keeps the loading state subtle, no layout jump. --}}
       <span :if="showSpinner" class="flex absolute inset-y-0 right-0 items-center pr-3">
-        <svg class="animate-spin h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none">
+        <svg class="h-4 w-4 text-gray-400 animate-spin" viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle>
           <path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>
         </svg>
@@ -100,54 +100,54 @@
     </div>
 
     {{-- Results list. Inline (not absolute) so it can't be clipped by
-         a parent overflow and the page doesn't jump as suggestions
-         appear/disappear. --}}
+        a parent overflow and the page doesn't jump as suggestions
+        appear/disappear. --}}
     <div :if="showDropdown" class="mt-2 bg-white border border-gray-200 rounded-md shadow-sm">
-      <ul class="overflow-auto py-1 max-h-72 divide-y divide-gray-100">
+      <ul class="overflow-auto py-1 max-h-72 divide-gray-100 divide-y">
         {{-- Loop var is "result", NOT "judge" — "judge" already exists
-             in the merged setup scope as the parent ReviewForm's state
-             signal. A :for="judge in …" would shadow it inconsistently
-             across the auto-unwrap proxy, breaking both the iteration
-             reads AND the selectJudge(judge) click handler (which
-             would receive the signal instead of the iteration item).
-             Bind :for to the store signal directly (not wrapped in a
-             local derived) so the list re-renders when results land.
-             (Avoid backticks in HTML comments — stx's script-merge
-             concatenates comment text into the merged setup function
-             and a stray backtick flips the JS parser into template-
-             literal mode, breaking every following script.) --}}
+            in the merged setup scope as the parent ReviewForm's state
+            signal. A :for="judge in …" would shadow it inconsistently
+            across the auto-unwrap proxy, breaking both the iteration
+            reads AND the selectJudge(judge) click handler (which
+            would receive the signal instead of the iteration item).
+            Bind :for to the store signal directly (not wrapped in a
+            local derived) so the list re-renders when results land.
+            (Avoid backticks in HTML comments — stx's script-merge
+            concatenates comment text into the merged setup function
+            and a stray backtick flips the JS parser into template-
+            literal mode, breaking every following script.) --}}
         {{-- Inlined state mutation in @click is intentional, NOT a
-             stylistic regression. The event-handler binder at
-             signals.ts:1669 inspects the expression *text* to decide
-             whether a signal stays raw or gets auto-unwrapped: any
-             signal whose `name.set(` doesn't literally appear in the
-             expression is unwrapped to its current VALUE inside the
-             handler scope. Calling `selectJudge(result)` instead would
-             unwrap `judge` to `null`, and the `judge.set(...)` call
-             inside selectJudge's closure ends up throwing a TypeError
-             that the dispatcher silently swallows — clicks register
-             but nothing visible happens. Writing the .set() calls
-             directly in the expression keeps `judge` / `searchInput`
-             as raw signals so the mutations actually fire. --}}
+            stylistic regression. The event-handler binder at
+            signals.ts:1669 inspects the expression *text* to decide
+            whether a signal stays raw or gets auto-unwrapped: any
+            signal whose `name.set(` doesn't literally appear in the
+            expression is unwrapped to its current VALUE inside the
+            handler scope. Calling `selectJudge(result)` instead would
+            unwrap `judge` to `null`, and the `judge.set(...)` call
+            inside selectJudge's closure ends up throwing a TypeError
+            that the dispatcher silently swallows — clicks register
+            but nothing visible happens. Writing the .set() calls
+            directly in the expression keeps `judge` / `searchInput`
+            as raw signals so the mutations actually fire. --}}
         <li
           :for="result in judgesStore.searchResults"
-          class="flex gap-3 items-center px-3 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors"
+          class="flex gap-3 items-center px-3 py-2.5 hover:bg-gray-50 transition-colors cursor-pointer"
           @click="judge.set({ id: result.id, name: result.name, court: (result.court && result.court.name) || '', department: result.department || '', photo: result.photo }); searchInput.set(''); judgesStore.searchJudges(''); window.history && window.history.replaceState({}, '', '/review/' + result.id)"
         >
           <img x-src="result.photo" class="object-cover flex-none h-10 w-10 ring-1 ring-gray-100 rounded-full grayscale filter" x-alt="result.name">
-          <div class="min-w-0 flex-1">
+          <div class="flex-1 min-w-0">
             <p class="font-medium text-gray-900 text-sm truncate">{{ result.name }}</p>
             <p class="text-gray-500 text-xs truncate">{{ result.court.name }}</p>
             <p :if="result.location" class="text-gray-400 text-xs truncate">{{ result.location }}</p>
           </div>
-          <svg class="h-4 w-4 text-gray-300 flex-none" viewBox="0 0 20 20" fill="currentColor">
+          <svg class="flex-none h-4 w-4 text-gray-300" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
           </svg>
         </li>
       </ul>
     </div>
 
-    <div :if="showEmpty" class="mt-2 p-4 text-center bg-gray-50 border border-gray-200 border-dashed rounded-md">
+    <div :if="showEmpty" class="mt-2 p-4 text-center bg-gray-50 border border-dashed border-gray-200 rounded-md">
       <p class="text-gray-600 text-sm">No judges match "<span>{{ searchInput() }}</span>".</p>
       <p class="mt-1 text-gray-400 text-xs">Try a different name or court.</p>
     </div>

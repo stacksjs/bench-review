@@ -106,9 +106,9 @@
               <span>{{ comment.likes }}</span>
             </button>
             {{-- Reply + Report buttons removed: no backend yet (comment
-                 replies + comment-flagging are a follow-up to #27/#44).
-                 They were dead controls — interactive-looking but no-op.
-                 Re-add with @click once FlagCommentAction / replies land. --}}
+                replies + comment-flagging are a follow-up to #27/#44).
+                They were dead controls — interactive-looking but no-op.
+                Re-add with @click once FlagCommentAction / replies land. --}}
           </div>
         </div>
       </li>
