@@ -490,6 +490,13 @@
     }
   })
   observer.observe(document.body, { childList: true, subtree: true })
+
+  // Disconnect on unmount. This scope script is stamped data-stx-run="always",
+  // so stx-router re-executes it on every SPA navigation — without this, each
+  // navigation left another document-wide childList+subtree observer attached,
+  // and every one of them re-ran this callback for every DOM mutation on the
+  // page for the rest of the session.
+  onUnmounted(() => observer.disconnect())
 </script>
 
 {{-- Plain div host (NOT a custom element) — stx's component resolver

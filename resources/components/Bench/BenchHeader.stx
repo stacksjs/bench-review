@@ -8,7 +8,7 @@
 
   // Bell dropdown open/closed. Local toggle — doesn't need to live in
   // the store since multiple BenchHeader instances don't share one
-  // page. Click-outside is handled by the @blur on the wrapper.
+  // page. Click-outside is handled by the @focusout on the wrapper.
   const bellOpen = state<boolean>(false)
 
   function toggleBell(): void {
@@ -27,7 +27,7 @@
     setTimeout(() => bellOpen.set(false), 150)
   }
 
-  // User-menu dropdown. Same toggle/blur pattern as the bell so the
+  // User-menu dropdown. Same toggle/focusout pattern as the bell so the
   // two surfaces feel identical. Closed-on-link-click is handled
   // explicitly in the panel because StxLink navigations preempt the
   // blur timeout.
@@ -37,6 +37,35 @@
   }
   function closeUserMenu(): void {
     setTimeout(() => userMenuOpen.set(false), 150)
+  }
+
+
+  // Close-on-focus-loss.
+  //
+  // These wrappers used to carry `@blur`, which never fired: blur does NOT
+  // bubble, and a plain <div class="relative"> is not focusable, so nothing
+  // ever delivered the event. Both dropdowns stayed open until their own
+  // toggle was clicked again — click anywhere else on the page and the panel
+  // just sat there.
+  //
+  // `focusout` is the bubbling counterpart, so it reaches the wrapper from the
+  // button or any control inside the panel. relatedTarget is where focus is
+  // GOING: when that is still inside the wrapper the user is just moving
+  // between the trigger and the menu items, which must not close it.
+  function closeOnFocusOut(event: FocusEvent, close: () => void): void {
+    const wrap = event.currentTarget as HTMLElement | null
+    const next = event.relatedTarget as Node | null
+    if (wrap && next && wrap.contains(next))
+      return
+    close()
+  }
+
+  function onBellFocusOut(event: FocusEvent): void {
+    closeOnFocusOut(event, closeBell)
+  }
+
+  function onUserMenuFocusOut(event: FocusEvent): void {
+    closeOnFocusOut(event, closeUserMenu)
   }
 
   async function handleBellRowClick(notifId: number, link: string | null): Promise<void> {
@@ -390,7 +419,7 @@
             recent items + a "Mark all read" affordance. Server-side
             unread count drives the badge; the store polls every 30s
             so the badge stays fresh without a refresh. --}}
-        <div class="relative" @blur="closeBell()">
+        <div class="relative" @focusout="onBellFocusOut($event)">
           <button
             type="button"
             @click="toggleBell()"
@@ -463,9 +492,9 @@
         {{-- User menu dropdown. Avatar circle + name + chevron is the
             trigger; the panel surfaces account-scoped destinations
             (profile, my reviews, settings) plus the sign-out action.
-            Same @blur / setTimeout pattern as the bell so an inner
+            Same @focusout / setTimeout pattern as the bell so an inner
             @mousedown link click runs before the dropdown vanishes. --}}
-        <div class="relative" @blur="closeUserMenu()">
+        <div class="relative" @focusout="onUserMenuFocusOut($event)">
           <button
             type="button"
             @click="toggleUserMenu()"
