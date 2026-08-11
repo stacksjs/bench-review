@@ -197,6 +197,15 @@ route.delete('/me/photos/{id}', 'Actions/Me/DeleteMyReviewPhotoAction')
 // auth-gated; reads are public (only published comments leak).
 route.get('/reviews/{id}/comments', 'Actions/Reviews/CommentsForReviewAction')
   .name('bench.reviews.comments.index')
+  // Same gate as the review itself. Without it the thread outlived the
+  // takedown: CommentsForReviewAction filters on the COMMENTS' own status and
+  // never looks at the parent, so after a moderator unpublished a review its
+  // comments — which quote and respond to the removed content — stayed
+  // publicly readable at this URL, while GET /reviews/{id} correctly 404'd.
+  // The POST side already refuses non-published parents; only the read was
+  // open. The middleware reads request.params.id, which is the same param
+  // here, and lets the author keep seeing their own unpublished thread.
+  .middleware('viewable-review')
 
 route.post('/reviews/{id}/comments', 'Actions/Reviews/CommentSubmitAction')
   .name('bench.reviews.comments.submit')

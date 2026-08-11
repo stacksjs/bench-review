@@ -24,6 +24,9 @@
     body: string
     created_at: string | null
     author: { id: number | null, name: string, role_label: string | null }
+    /** Server-stated ownership. author.id is null on anonymous rows, so this is
+     *  the only reliable signal that the viewer wrote this comment. */
+    is_mine?: boolean
   }
 
   function resolveReviewId(): number {
@@ -145,9 +148,14 @@
   }
 
   // Is the comment author the viewer? Drives the per-row Delete affordance.
+  //
+  // Reads the server's explicit is_mine rather than comparing author.id. The
+  // author payload is public-safe: publicReviewerFor nulls the id on anonymous
+  // comments so the avatar can't link to /user/:id. Comparing ids therefore
+  // failed for exactly the rows the viewer owned anonymously — an anonymous
+  // commenter could never delete their own comment.
   function isMyComment(c: CommentRow): boolean {
-    const me = authStore.user()
-    return !!me && !!c.author && Number(c.author.id) === Number((me as any).id)
+    return !!c.is_mine
   }
 
   // Initial for the avatar circle when the comment author has no
@@ -166,10 +174,15 @@
   // fetched it via reviewsStore.fetchById(), so reviewsStore.current()
   // is the review this thread hangs off of. No @include scope
   // forwarding needed (which stx doesn't reliably support anyway).
+  //
+  // Uses the row's is_mine flag, NOT user_id: ShowReviewAction strips user_id
+  // from its response as a de-anonymisation guard and exposes is_mine instead,
+  // so `Number(undefined) === Number(me.id)` was NaN === n — permanently false.
+  // The review's own author was therefore shown the composer, and only found
+  // out their comment wasn't welcome when the submit came back 403.
   const isReviewAuthor = derived<boolean>(() => {
-    const me = authStore.user()
     const row = reviewsStore.current()
-    return !!me && !!row && Number((row as any).user_id) === Number((me as any).id)
+    return !!row && !!(row as any).is_mine
   })
   // Composer is for signed-in NON-authors only.
   const canCompose = derived<boolean>(() => isAuthenticated() && !isReviewAuthor())

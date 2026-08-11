@@ -1,4 +1,5 @@
 import { Action } from '@stacksjs/actions'
+import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
@@ -35,6 +36,13 @@ export default new Action({
 
   async handle() {
     const reviewId = Number(request.params?.id)
+    // Resolve the viewer so each row can carry is_mine. The author payload is
+    // deliberately public-safe — publicReviewerFor nulls the id on anonymous
+    // comments so the client cannot link back to /user/:id — which also means
+    // the client cannot recognise the viewer's OWN anonymous comments by id.
+    // It needs an explicit flag, the same way review rows carry one.
+    const viewer = await Auth.user().catch(() => null)
+    const viewerId = (viewer as any)?.id ?? null
     const { perPage, page, offset } = resolvePaginatorArgs({ perPage: 20 })
 
     const countRow = await (db.selectFrom('review_comments') as any)
@@ -79,6 +87,11 @@ export default new Action({
         // Public-safe author — id may be null when anonymous so the
         // client can't link back to /user/:id by construction.
         author,
+        // Ownership, stated explicitly rather than inferred from author.id,
+        // which is null for anonymous comments. Without this an anonymous
+        // commenter could never delete their own comment: the client's
+        // id-comparison was false for exactly the rows they owned.
+        is_mine: viewerId != null && r.user_id != null && Number(viewerId) === Number(r.user_id),
       }
     })
 
