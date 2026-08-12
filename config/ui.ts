@@ -33,7 +33,7 @@ export default {
   classPrefix: 'stx-',
   reset: 'tailwind',
 
-  icons: ['heroicons'],
+  icons: ['hugeicons'],
 
   fonts: {
     email: {

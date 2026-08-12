@@ -299,6 +299,38 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   )
 }
 
+// 6h. Every getStaticPaths-wired route actually produced pages.
+//
+//     This closes a hole the other checks cannot see. When the database has no
+//     content, every hook returns zero paths, so no dynamic page is built — AND
+//     the sitemap, which is built from the same queries, shrinks to match. The
+//     two then agree with each other, "every sitemap URL has a built file"
+//     stays true, and the gate passes over an artifact that dropped from 151
+//     pages to 41. Agreement between two outputs of the same broken query is
+//     not evidence that either is right.
+//
+//     Caught exactly that: a wiped dev database produced a green 15/15 build
+//     containing no judges, no courthouses and no articles.
+{
+  const routes: Array<[string, string]> = [
+    ['judges/*/profile.html', 'judges'],
+    ['court-houses/*/profile.html', 'court-houses'],
+    ['article/*.html', 'article'],
+  ]
+  const empty: string[] = []
+  for (const [pattern, label] of routes) {
+    let n = 0
+    for (const _f of new Bun.Glob(pattern).scanSync('dist')) n++
+    if (n === 0)
+      empty.push(label)
+  }
+  add(
+    'dynamic routes produced pages',
+    empty.length === 0,
+    empty.length ? `no pages for: ${empty.join(', ')} — getStaticPaths returned nothing, usually an empty database (run \`./buddy seed\`)` : '',
+  )
+}
+
 // 7. The sitemap never advertises a path robots.txt forbids.
 {
   const sitemap = await Bun.file('dist/sitemap.xml').text()
