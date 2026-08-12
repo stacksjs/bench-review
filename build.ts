@@ -8,44 +8,6 @@ import { injectEntitySeo, loadEntitySeo } from './app/Helpers/entitySeo'
 import { injectNoindex, injectSeoHead, NOINDEX_PAGES, SEO_PAGES } from './app/Helpers/seoPages'
 import { buildRobotsTxt, buildSitemapXml, normalizeBase } from './app/Helpers/sitemap'
 
-/**
- * Preflight: refuse to build without the local `file:` dependencies.
- *
- * package.json points two dependencies at directories OUTSIDE this repo —
- * bun-query-builder and ts-medium-editor, both unpublished local forks. Neither
- * is tracked by git, so a fresh clone does not have them, and `bun install`
- * handles that badly: it prints "Failed to install 2 packages" and then EXITS 0.
- * Netlify's build command is `bun install && … && bun run build`, so the &&
- * chain proceeds happily into a build with no query builder.
- *
- * What that produced was not a crash but something worse: every getStaticPaths
- * hook throws (they query the DB through @stacksjs/database, which cannot
- * resolve bun-query-builder), so all 108 dynamic pages silently vanish; the
- * entity-SEO and sitemap passes throw into their own try/catch and report
- * "skipped"; and the build still announces success. Exactly the failure mode
- * the rest of this file exists to prevent.
- *
- * So: fail here, loudly, with the fix in the message.
- */
-const REQUIRED_LOCAL_DEPS = ['bun-query-builder', 'ts-medium-editor']
-const missingDeps: string[] = []
-for (const dep of REQUIRED_LOCAL_DEPS) {
-  // eslint-disable-next-line ts/no-top-level-await
-  if (!(await Bun.file(`node_modules/${dep}/package.json`).exists()))
-    missingDeps.push(dep)
-}
-if (missingDeps.length) {
-  console.error(`\n[build] ABORTING — missing local file: dependencies: ${missingDeps.join(', ')}`)
-  console.error('[build] These are unpublished forks declared as `file:` paths in package.json,')
-  console.error('[build] living outside this repo, so a fresh checkout never has them and')
-  console.error('[build] `bun install` reports the failure but still exits 0.')
-  console.error('[build] Without them every dynamic page and all per-entity SEO silently')
-  console.error('[build] disappears while the build claims success.')
-  console.error('[build] Fix: check the forks out beside this repo, or publish them and')
-  console.error('[build] replace the file: specifiers with real versions.\n')
-  process.exit(1)
-}
-
 // eslint-disable-next-line ts/no-top-level-await
 await buildApp()
 

@@ -271,6 +271,34 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   add(`all ${inline} inline scripts are CSP-hashed`, problems.length === 0, problems.join('; '))
 }
 
+// 6g. No `file:` dependencies — a deployability invariant.
+//
+//     package.json used to point bun-query-builder and ts-medium-editor at
+//     directories OUTSIDE the repo. Neither is tracked by git, so a fresh
+//     checkout has neither, and `bun install` handles it badly: it prints
+//     "Failed to install 2 packages" and then EXITS 0. Netlify runs
+//     `bun install && … && bun run build`, so the chain proceeds into a build
+//     with no query builder — every getStaticPaths hook throws, all 108 dynamic
+//     pages vanish, the SEO passes log "skipped", and the build claims success.
+//
+//     Both were local forks that upstream has since caught up with, so they are
+//     plain registry versions now. This keeps it that way.
+{
+  const pkg = await Bun.file('package.json').json() as {
+    dependencies?: Record<string, string>
+    devDependencies?: Record<string, string>
+  }
+  const local = [
+    ...Object.entries(pkg.dependencies ?? {}),
+    ...Object.entries(pkg.devDependencies ?? {}),
+  ].filter(([, spec]) => /^(?:file:|link:|\.\.?\/)/.test(spec))
+  add(
+    'no file:/link: dependencies',
+    local.length === 0,
+    local.map(([name, spec]) => `${name} -> ${spec}`).join(', '),
+  )
+}
+
 // 7. The sitemap never advertises a path robots.txt forbids.
 {
   const sitemap = await Bun.file('dist/sitemap.xml').text()
