@@ -49,8 +49,9 @@ const distDir = 'dist'
  *     /api/judges, …). In dev the views server proxies it; a static host does
  *     not. Without the proxy every API call resolves against the static origin
  *     and 404s, so the site renders its shells and then stays empty forever.
- *     Note this preview server does NOT fake it, so `bun run preview` shows
- *     chrome without data — that is expected here, not a bug.
+ *     This server DOES fake it (see API_ORIGIN below) so the built artifact can
+ *     be exercised end-to-end locally — but that is a local convenience, not a
+ *     substitute for configuring it at the host.
  *
  * On CloudFront (config/cloud.ts sets driver: 'aws') both are cache behaviours:
  * an /api/* behaviour with the API as origin, and a CloudFront Function or a
@@ -62,11 +63,54 @@ const SHELL_REWRITES: Array<[RegExp, string]> = [
   [/^\/verify-email\/[^/]+\/[^/]+\/?$/, '/verify-email.html'],
 ]
 
+/**
+ * Where /api/* is forwarded, so the BUILT artifact can be exercised locally
+ * against a real API.
+ *
+ * Without this, previewing dist/ was only half an end-to-end: the pre-rendered
+ * pages, the per-entity SEO and the hashed CSP were all real, but every store
+ * call 404'd against the static origin, so nothing ever loaded data. Meanwhile
+ * the dev server has the API but serves from source, so it shows NONE of the
+ * build-time output. Neither one alone exercises what actually ships.
+ *
+ * Defaults to the dev API port. Override with API_ORIGIN to point at a deployed
+ * one.
+ */
+const apiOrigin = (process.env.API_ORIGIN || 'http://localhost:4008').replace(/\/+$/, '')
+
 Bun.serve({
   port,
   async fetch(req) {
     const url = new URL(req.url)
     let pathname = url.pathname
+
+    // API proxy runs before everything: /api/... has no file behind it, and the
+    // extensionless-to-.html mapping below would otherwise turn it into a
+    // confusing 404 for a page nobody asked for.
+    if (pathname.startsWith('/api/')) {
+      const target = `${apiOrigin}${pathname}${url.search}`
+      try {
+        const upstream = await fetch(target, {
+          method: req.method,
+          headers: req.headers,
+          body: req.method === 'GET' || req.method === 'HEAD' ? undefined : await req.arrayBuffer(),
+          redirect: 'manual',
+        })
+        return new Response(upstream.body, {
+          status: upstream.status,
+          statusText: upstream.statusText,
+          headers: upstream.headers,
+        })
+      }
+      catch {
+        // Distinct from a 404: the API simply isn't up. Say so, rather than
+        // letting the client see an ambiguous failure and blame the artifact.
+        return new Response(
+          JSON.stringify({ error: `preview: no API reachable at ${apiOrigin}. Start it, or set API_ORIGIN.` }),
+          { status: 502, headers: { 'content-type': 'application/json' } },
+        )
+      }
+    }
 
     // Shell rewrites run FIRST — before the .html mapping below, which would
     // otherwise turn /verify-email/1/abc into a lookup for a file that by
