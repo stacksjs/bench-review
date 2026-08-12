@@ -127,20 +127,22 @@ export default {
   // above — config/ui.ts is the only file stx's loader opens, so the identical
   // block in stx.config.ts has never had any effect.
   //
-  // NOTE there is deliberately no `partialsDir` here. It would do nothing:
-  // stx's SSG (ssg.ts) never reads that key — it forwards layoutsDir and
-  // routeMiddleware to the renderer but not partialsDir, so `@include`
-  // resolution in a static build always uses the default `resources/partials`
-  // no matter what this file says (verified by setting it both ways).
+  // `partialsDir` is load-bearing: bench keeps partials in components/, and
+  // `@include('Bench/…')` resolves against this. Remove it and every include
+  // fails. Note it is resolved from the PROJECT ROOT, unlike componentsDir /
+  // layoutsDir / pagesDir just below, which are relative to resources/.
   //
-  // That is why `resources/partials` is a symlink to `components`. Without it
-  // EVERY `@include('Bench/…')` threw ENOENT, and because the SSG catches
-  // include failures per-include and splices an error banner into the page
-  // instead of failing the build, `bun build.ts` reported "37 pages, 0 failed"
-  // while emitting 6KB shells with no header, no footer, no hero — and
-  // ANSI-escaped error text where the markup belonged. Deleting that symlink
-  // silently breaks the entire static build again.
+  // It only started working in stx 0.2.176 (stacksjs/stx#1921). Before that the
+  // SSG never read the key at all, so `resources/partials` had to be a symlink
+  // to `components` — that symlink is now deleted, and this replaces it.
+  //
+  // The same release also made a failed include FAIL the build instead of
+  // splicing an ANSI-escaped error banner into the page. That is why this went
+  // unnoticed for three weeks: `bun build.ts` reported "37 pages, 0 failed"
+  // while emitting 6KB shells with no header, no footer and no hero. It now
+  // throws with the offending include named.
   componentsDir: 'components',
+  partialsDir: 'resources/components',
   layoutsDir: 'layouts',
   pagesDir: 'views',
 
