@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 import { buildApp } from '@stacksjs/stx'
-import { tsAnalyticsTag } from './app/Helpers/analyticsTag'
+import { resolveApiEndpoint, tsAnalyticsTag } from './app/Helpers/analyticsTag'
 import { TS_ANALYTICS_APP_ID } from './config/ts-analytics'
-import { cspMetaTag } from './app/Helpers/cspMeta'
+import { cspMetaTag, cspPolicyFor } from './app/Helpers/cspMeta'
 import { FONT_HEAD_TAGS } from './app/Helpers/fontHead'
 import { injectEntitySeo, loadEntitySeo } from './app/Helpers/entitySeo'
 import { injectNoindex, injectSeoHead, NOINDEX_PAGES, SEO_PAGES } from './app/Helpers/seoPages'
@@ -159,7 +159,10 @@ catch (err) {
 // directives are env-dependent and must be verified against a live app
 // before enabling — see app/Helpers/cspMeta.ts. Best-effort + idempotent.
 try {
-  const tag = cspMetaTag()
+  // Per-page policy: the baseline plus a script-src carrying a sha256 for each
+  // inline script ON THAT PAGE. Runs last, after every pass that can add a
+  // script, because it hashes what is actually there.
+  const analyticsOrigin = resolveApiEndpoint()
   const glob = new Bun.Glob('**/*.html')
   let injected = 0
   // eslint-disable-next-line ts/no-top-level-await
@@ -169,6 +172,7 @@ try {
     const html = await Bun.file(path).text()
     if (!html.includes('</head>') || html.includes('http-equiv="Content-Security-Policy"'))
       continue
+    const tag = cspMetaTag(cspPolicyFor(html, analyticsOrigin))
     // eslint-disable-next-line ts/no-top-level-await
     await Bun.write(path, html.replace('</head>', `${tag}</head>`))
     injected++

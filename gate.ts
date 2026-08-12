@@ -234,6 +234,43 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   }
 }
 
+// 6f. Every inline script is covered by a hash in its own page's CSP.
+//
+//     script-src now carries a sha256 per inline script instead of
+//     'unsafe-inline'. That is only safe if the hashes actually match: a build
+//     pass that adds or edits an inline script AFTER the CSP step, or any
+//     serve-time HTML rewriting, silently breaks the page's JS in the browser
+//     while every other check here stays green. This recomputes the digests
+//     from the shipped bytes and compares them to the shipped policy.
+{
+  const uncovered: string[] = []
+  let inline = 0
+  let unsafeInline = 0
+  let handlers = 0
+  for (const [p, h] of html) {
+    const meta = h.match(/<meta http-equiv="Content-Security-Policy" content="([^"]*)"/)
+    if (!meta)
+      continue
+    if (meta[1].includes('unsafe-inline'))
+      unsafeInline++
+    handlers += [...h.matchAll(/\son[a-z]+\s*=/g)].length
+    for (const m of h.matchAll(/<script(?![^>]*\ssrc=)[^>]*>([\s\S]*?)<\/script>/g)) {
+      inline++
+      const digest = new Bun.CryptoHasher('sha256').update(m[1], 'utf8').digest('base64')
+      if (!meta[1].includes(`'sha256-${digest}'`))
+        uncovered.push(p.replace('dist/', ''))
+    }
+  }
+  // Inline on* handlers would need 'unsafe-hashes', which the policy does not
+  // grant — so one appearing is a silently-dead handler, not just a style note.
+  const problems = [
+    uncovered.length ? `${uncovered.length} of ${inline} inline scripts unhashed (${[...new Set(uncovered)].slice(0, 3).join(', ')})` : '',
+    unsafeInline ? `${unsafeInline} policies still allow unsafe-inline` : '',
+    handlers ? `${handlers} inline on* handlers would be blocked` : '',
+  ].filter(Boolean)
+  add(`all ${inline} inline scripts are CSP-hashed`, problems.length === 0, problems.join('; '))
+}
+
 // 7. The sitemap never advertises a path robots.txt forbids.
 {
   const sitemap = await Bun.file('dist/sitemap.xml').text()
