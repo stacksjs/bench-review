@@ -26,11 +26,37 @@ const distDir = 'dist'
  * Kept as an explicit table, not a catch-all, so genuinely unknown URLs still
  * 404 honestly instead of silently rendering a shell.
  *
- * ⚠️ THIS MUST BE MIRRORED AT THE REAL HOST. This file only serves local
- * previews. On Netlify that's a `_redirects` line:
- *     /verify-email/*  /verify-email.html  200
- * on Vercel a `rewrites` entry, on CloudFront a function. Without it, prod
- * still 404s the whole email-verification flow.
+ * ─────────────────────────────────────────────────────────────────────────────
+ * ⚠️ THE HOST MUST PROVIDE TWO THINGS THAT THIS FILE FAKES LOCALLY
+ *
+ * This is a local preview server. Neither of the following is part of the built
+ * artifact, so a host that does not provide them serves a site that looks fine
+ * and is broken in two specific ways. (netlify.toml used to carry both; it has
+ * been deleted along with Netlify, and config/cloud.ts's `cdn` block is
+ * cache-tuning only — there is nowhere in-repo left to declare them.)
+ *
+ *  1. REWRITE  /verify-email/:id/:token  ->  /verify-email.html   (status 200)
+ *
+ *     Verification tokens are minted per request, so unlike every other dynamic
+ *     route there is no finite set of pages to pre-render. Without the rewrite,
+ *     the link in every signup confirmation email 404s. It must be a rewrite,
+ *     not a redirect: Bench/VerifyEmail reads the id and token off
+ *     location.pathname, so the URL has to survive.
+ *
+ *  2. PROXY  /api/*  ->  the deployed API origin   (same-origin, status 200)
+ *
+ *     Every store calls the API with a RELATIVE path (/api/auth, /api/me,
+ *     /api/judges, …). In dev the views server proxies it; a static host does
+ *     not. Without the proxy every API call resolves against the static origin
+ *     and 404s, so the site renders its shells and then stays empty forever.
+ *     Note this preview server does NOT fake it, so `bun run preview` shows
+ *     chrome without data — that is expected here, not a bug.
+ *
+ * On CloudFront (config/cloud.ts sets driver: 'aws') both are cache behaviours:
+ * an /api/* behaviour with the API as origin, and a CloudFront Function or a
+ * /verify-email/* behaviour rewriting the URI. Whatever the host, these two are
+ * the deploy contract.
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 const SHELL_REWRITES: Array<[RegExp, string]> = [
   [/^\/verify-email\/[^/]+\/[^/]+\/?$/, '/verify-email.html'],
