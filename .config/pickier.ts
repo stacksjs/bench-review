@@ -40,13 +40,12 @@ const config: PickierConfig = {
     // `stx typecheck` — not here. Keep both; this is additive, not a
     // replacement.
     //
-    // CAVEAT, worth knowing before running `lint:fix`: pickier disables its
-    // `indent` CHECK for stx/html/vue but not the corresponding FIXER (which
-    // receives no file path, so it cannot make the same exclusion). `--fix`
-    // therefore snaps leading whitespace to the 2-space grid in .stx files
-    // while reporting nothing — 415 comment-continuation lines here, all
-    // odd -> even. Harmless, and already applied, so the tree is at a fixed
-    // point; just don't be surprised by an unexplained diff.
+    // `lint:fix` used to silently reindent .stx comment lines that nothing
+    // reported — pickier disabled its `indent` CHECK for stx/html/vue but not
+    // the matching FIXER. Filed as pickier/pickier#1372, fixed in 0.1.56, which
+    // is what better-dx's peer range now resolves to. Re-verified against the
+    // issue's own repro: .stx and .html are neither reported nor rewritten, and
+    // `pickier . --fix` across this repo now touches no .stx file at all.
     extensions: ['ts', 'js', 'md', 'stx'],
     reporter: 'stylish',
     cache: false,
