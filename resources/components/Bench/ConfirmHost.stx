@@ -117,7 +117,18 @@
     @click="$event.stopPropagation()"
     class="p-6 max-w-md w-full bg-white border border-gray-200 rounded-2xl shadow-xl"
   >
-    <h2 id="bench-confirm-title" class="font-semibold text-gray-900 text-lg" :text="confirmStore.title()"></h2>
+    {{--
+      The static text inside these four elements mirrors the confirm store's
+      own defaults ('Are you sure?' / 'Confirm' / 'Cancel'), and `:text`
+      overwrites it the moment the dialog is asked to open. It is NOT dead
+      markup: without it the static build ships an empty <h2> and two buttons
+      with no accessible name, which is both an a11y defect (a screen reader
+      announces an empty heading and two unlabelled buttons) and a
+      release-gate failure — scripts/validate-release.ts rejects an empty
+      primary heading, and scripts/validate-ui.ts rejects an icon-only button
+      with no name. Keep these in sync with resources/stores/confirm.ts.
+    --}}
+    <h2 id="bench-confirm-title" class="font-semibold text-gray-900 text-lg" :text="confirmStore.title()">Are you sure?</h2>
     <p id="bench-confirm-message" class="mt-2 text-gray-600 text-sm" :text="confirmStore.message()"></p>
     <div class="flex gap-3 justify-end mt-6">
       <button
@@ -125,14 +136,14 @@
         @click="confirmStore.dismiss()"
         class="px-4 py-2 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-300 rounded-lg transition-colors"
         :text="confirmStore.cancelLabel()"
-      ></button>
+      >Cancel</button>
       <button
         type="button"
         @click="confirmStore.accept()"
         class="px-4 py-2 font-medium text-sm text-white rounded-lg transition-colors"
         x-class="acceptClass()"
         :text="confirmStore.confirmLabel()"
-      ></button>
+      >Confirm</button>
     </div>
   </div>
 </div>

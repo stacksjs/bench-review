@@ -196,6 +196,7 @@
         <input
           type="text"
           x-model="searchQuery"
+          aria-label="Search courthouses by name, city, or state"
           placeholder="Search by name, city, or state..."
           class="block pl-12 pr-4 py-3 w-full text-gray-900 sm:leading-6 sm:text-sm placeholder:text-gray-400 bg-gray-50 border-0 ring-1 ring-gray-200 ring-inset rounded-xl focus:ring-2 focus:ring-inset focus:ring-softBrown duration-200 transition-all"
         >
