@@ -313,7 +313,12 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
 //     containing no judges, no courthouses and no articles.
 {
   const routes: Array<[string, string]> = [
-    ['judges/*/profile.html', 'judges'],
+    // The canonical judge page, not judges/*/profile.html: the profile tab is
+    // deliberately no longer pre-rendered (six pages per judge OOM'd the build
+    // at 20,028 pages), so probing for it would report an empty database on
+    // every healthy build. This still does the job the check exists for —
+    // catching a wiped database that produces a plausible green artifact.
+    ['judges/*.html', 'judges'],
     ['court-houses/*/profile.html', 'court-houses'],
     ['article/*.html', 'article'],
   ]

@@ -49,9 +49,15 @@ export const CANONICAL_BASE: string = site.url.replace(/\/+$/, '')
 
 /**
  * Build the full sitemap XML from current DB content. Every judge gets a
- * /judges/:id/profile entry, every courthouse /court-houses/:id/profile,
- * every PUBLISHED review /article/:id (pending/rejected omitted so the
- * sitemap matches what anonymous visitors actually see).
+ * /judges/:id entry, every courthouse /court-houses/:id/profile, every
+ * PUBLISHED review /article/:id (pending/rejected omitted so the sitemap
+ * matches what anonymous visitors actually see).
+ *
+ * Judges point at /judges/:id, NOT /judges/:id/profile. The profile tab is no
+ * longer pre-rendered — enumerating six pages per judge took the build to
+ * 20,028 pages and an out-of-memory death — so advertising it would list 2,740
+ * URLs with no file behind them. The gate catches exactly that drift
+ * ("every sitemap URL has a built file"), which is how this was found.
  */
 export async function buildSitemapXml(base: string): Promise<string> {
   const [judges, courts, reviews] = await Promise.all([
@@ -87,7 +93,7 @@ export async function buildSitemapXml(base: string): Promise<string> {
 
   for (const j of judges) {
     entries.push(`  <url>
-    <loc>${base}/judges/${j.id}/profile</loc>
+    <loc>${base}/judges/${j.id}</loc>
     <lastmod>${toLastMod(j.updated_at)}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>

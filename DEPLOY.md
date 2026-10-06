@@ -47,6 +47,28 @@ so the site renders its shells and then stays empty forever.
 end-to-end before shipping — that is a local convenience, not a substitute for
 configuring them at the host.
 
+### 3. Rewrite the non-enumerated dynamic routes to their shells
+
+Only the canonical `/judges/:id` page is pre-rendered. Six pre-rendered pages
+per judge took the build to 20,028 pages and an out-of-memory death, so the tab
+routes and the auth-gated review forms are served from a shell instead:
+
+| Request | Serve (status 200) |
+|---|---|
+| `/judges/:id/profile`, `/reviews`, `/rulings`, `/cases` | `/judges/:id.html` — that judge's own page |
+| `/judges/review/:id` | `/judges/review.html` |
+| `/review/:id` | `/review.html` |
+
+Note the first one carries the id through, so it is a capture rewrite, not a
+fixed target: `^/judges/([^/]+)/(?:profile|reviews|rulings|cases)/?$` →
+`/judges/$1.html`. As with the verify-email rule these must be **rewrites**,
+not redirects — the components read the id and the active tab off
+`location.pathname`, so the URL has to survive.
+
+`preview.ts`'s `SHELL_REWRITES` is the source of truth for these; the
+conformance gate parses that array to check every dynamic route is either
+pre-rendered or rewritten, so adding a route there keeps the two in step.
+
 On CloudFront these are both cache behaviours: an `/api/*` behaviour with the
 API as origin, and a CloudFront Function (or a `/verify-email/*` behaviour)
 rewriting the URI. On nginx/Caddy they are a `try_files`/`rewrite` and a
@@ -154,6 +176,9 @@ on natural keys, so re-running is safe.
    for the chosen host or delete it; do not assume `./buddy deploy` works.
 3. **Set a production `APP_URL`** — without it the artifact is not deployable.
 4. **Configure real SMTP** — verification and password reset are dead without it.
-5. **Seed or restore the database** so dynamic pages are pre-rendered.
+5. **Seed or restore the database** so dynamic pages are pre-rendered. Federal
+   coverage comes from `bun scripts/ingest-courtlistener.ts` followed by
+   `bun scripts/enrich-courthouse-geodata.ts`; both are idempotent and safe to
+   re-run after each quarterly CourtListener snapshot.
 6. **`MAIL_FROM_ADDRESS`** still reads `no-reply@benchreview.com`; the
    canonical domain is `benchreview.org`.

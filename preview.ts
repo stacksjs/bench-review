@@ -61,6 +61,17 @@ const distDir = 'dist'
  */
 const SHELL_REWRITES: Array<[RegExp, string]> = [
   [/^\/verify-email\/[^/]+\/[^/]+\/?$/, '/verify-email.html'],
+
+  // Judge tabs. Only the canonical /judges/:id page is pre-rendered — see the
+  // comment in each of those views. The tab content is fetched client-side, so
+  // serving that judge's own page is the correct shell: same component tree,
+  // and the URL survives so the tab can be selected from location.pathname.
+  [/^\/judges\/([^/]+)\/(?:profile|reviews|rulings|cases)\/?$/, '/judges/$1.html'],
+
+  // Write-a-review forms. Auth-gated, so there is nothing to pre-render per
+  // judge; the shell reads the id off location.pathname.
+  [/^\/judges\/review\/([^/]+)\/?$/, '/judges/review.html'],
+  [/^\/review\/([^/]+)\/?$/, '/review.html'],
 ]
 
 /**
@@ -117,7 +128,10 @@ Bun.serve({
     // definition cannot exist.
     const rewrite = SHELL_REWRITES.find(([pattern]) => pattern.test(pathname))
     if (rewrite) {
-      pathname = rewrite[1]
+      // `replace`, not assignment: the judge-tab rule carries a capture so it
+      // can resolve /judges/123/profile to that judge's own pre-rendered
+      // /judges/123.html. Targets without a `$1` are unaffected.
+      pathname = pathname.replace(rewrite[0], rewrite[1])
     }
     // Map directory roots and extensionless routes to .html files
     // (Netlify's Pretty URLs mode does the same: /about → /about.html)
