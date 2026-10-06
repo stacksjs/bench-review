@@ -22,7 +22,11 @@ defineStore('notifications', () => {
 
   async function fetchNotifications(): Promise<void> {
     const authStore = useStore('auth')
-    if (!authStore.token()) return
+    // isAuthenticated(), not token(): the token is in-memory only since the
+    // session moved to an HttpOnly cookie, so it is empty after a reload while
+    // the session is still valid. Keying off it here meant the bell silently
+    // stopped fetching on every hard refresh.
+    if (!authStore.isAuthenticated()) return
     loading.set(true)
     try {
       const res = await authStore.authFetch(`/api/me/notifications?filter=${filter()}&limit=30`)

@@ -30,6 +30,13 @@ interface RegisterPayload {
 // USER cookie is a project-side mirror so `<script server>` blocks
 // and the pre-paint auth-guard.stx can read user data without an
 // extra API roundtrip.
+// Retained as documentation even though this file no longer reads it: the name
+// is a four-way contract between config/auth.ts (defaultTokenName), the
+// framework's authCookieName(), resources/middleware/auth.ts (which reads
+// ctx.cookies['auth-token'] server-side, and still can — HttpOnly only blocks
+// scripts, not the server), and the Set-Cookie the auth actions now emit.
+// Deleting it would delete the only place that relationship is written down.
+// eslint-disable-next-line pickier/no-unused-vars -- documents the shared cookie-name contract; see above
 const AUTH_COOKIE = 'auth-token'
 const USER_COOKIE = 'auth-user'
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30 // 30 days
@@ -42,13 +49,23 @@ function secureAttr(): string {
   return (typeof window !== 'undefined' && window.location?.protocol === 'https:') ? '; Secure' : ''
 }
 
-function setAuthCookie(token: string): void {
-  if (typeof document === 'undefined') return
-  // SameSite=Lax so navigations from external referrers still send it
-  // (so the server-side auth gate can see the session on a deep-link
-  // back into /profile).
-  document.cookie = `${AUTH_COOKIE}=${encodeURIComponent(token)}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax${secureAttr()}`
-}
+// NOTE: there is deliberately no setAuthCookie().
+//
+// The session credential is now written by the SERVER as an HttpOnly cookie
+// (app/Support/sessionCookie.ts, applied by the app-local Login/Register
+// actions). A cookie written here via document.cookie could never be HttpOnly
+// — by definition scripts can write it, and whatever a script can write a
+// script can read — which left the session token readable for 30 days by any
+// injected script. On an app that renders user-submitted rich HTML that turns
+// one XSS into session theft.
+//
+// Nothing client-side needs to read it either: the browser attaches it to
+// same-origin requests automatically, and the framework's requestToken() falls
+// back to the cookie after checking the Authorization header.
+//
+// `sessionToken` below is an in-memory mirror, kept only for the Authorization
+// header within the current tab. It is never persisted and dies on reload,
+// after which the HttpOnly cookie carries the session on its own.
 
 function setUserCookie(user: UserProfile): void {
   if (typeof document === 'undefined') return
@@ -56,10 +73,30 @@ function setUserCookie(user: UserProfile): void {
 }
 
 function clearAuthCookies(): void {
+  sessionToken = ''
   if (typeof document === 'undefined') return
-  document.cookie = `${AUTH_COOKIE}=; path=/; max-age=0; SameSite=Lax`
+  // Only the USER cookie — it is a non-credential UI mirror, so it stays
+  // script-writable. The auth cookie is HttpOnly and a document.cookie
+  // expiry for it is simply ignored by the browser; the server clears it
+  // (LogoutAction -> clearAuthCookie()).
+  //
+  // On the 401-expiry path (signOutAndRedirect) no logout request is sent, so
+  // the auth cookie does linger until it expires. That fails CLOSED: it names
+  // a token the server has already rejected, and clearing the user cookie here
+  // means isAuthenticated() is false so nothing retries in a loop. The next
+  // successful login overwrites it.
   document.cookie = `${USER_COOKIE}=; path=/; max-age=0; SameSite=Lax`
 }
+
+/**
+ * In-memory copy of the current tab's token, used only to set an
+ * `Authorization` header. Belt-and-braces: the HttpOnly cookie is the real
+ * credential and is sufficient on its own, but sending the header too means a
+ * deployment that has not yet wired the same-origin `/api/*` proxy still
+ * authenticates inside the tab that logged in, instead of appearing to log in
+ * and then silently failing every request.
+ */
+let sessionToken = ''
 
 function readCookie(name: string): string {
   if (typeof document === 'undefined') return ''
@@ -130,17 +167,25 @@ function isAuthExempt(url: string): boolean {
  * module-load.
  */
 async function _apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  const token = readCookie(AUTH_COOKIE)
-  const carriedToken = !!token
+  // The HttpOnly auth cookie is unreadable from here and does not need to be
+  // read: the browser attaches it to this same-origin request itself. The
+  // header is only added when this tab still holds the token in memory.
+  const headers = new Headers(options.headers)
+  if (sessionToken && !headers.has('Authorization'))
+    headers.set('Authorization', `Bearer ${sessionToken}`)
+  if (!headers.has('Accept'))
+    headers.set('Accept', 'application/json')
+  options.headers = headers
 
-  if (token) {
-    const headers = new Headers(options.headers)
-    if (!headers.has('Authorization'))
-      headers.set('Authorization', `Bearer ${token}`)
-    if (!headers.has('Accept'))
-      headers.set('Accept', 'application/json')
-    options.headers = headers
-  }
+  // Whether we BELIEVED we had a session, which is what makes a 401 mean
+  // "expired" rather than "not logged in". The credential itself is no longer
+  // observable from script, so the non-credential user cookie stands in for it.
+  const carriedToken = !!sessionToken || !!readCookie(USER_COOKIE)
+
+  // Explicit, though it is already the default: the session now rides on a
+  // cookie, so it must be sent. See DEPLOY.md — the host's same-origin
+  // /api/* proxy is load-bearing for auth, not just a convenience.
+  options.credentials = options.credentials ?? 'same-origin'
 
   const res = await fetch(url, options)
 
@@ -160,7 +205,12 @@ defineStore('auth', () => {
   // we've fetched user details (or return an empty user object on
   // register), and the UI should treat token presence as "logged in".
   // This matches training's pattern.
-  const isAuthenticated = derived<boolean>(() => !!token())
+  // Keyed off the USER object, not the token: the token is in-memory only now,
+  // so it is empty after a reload while the session is still perfectly valid.
+  // `user` is rehydrated synchronously from the user cookie below, so this
+  // survives a hard refresh. External callers that used `token()` as an
+  // "am I signed in" flag (notifications store, AdminShell) now read this.
+  const isAuthenticated = derived<boolean>(() => !!user())
   const notifications = state<NotificationItem[]>([])
 
   const unreadCount = derived<number>(() => {
@@ -172,10 +222,10 @@ defineStore('auth', () => {
   // same session as the SPA. Migrated from prior localStorage scheme.
   if (typeof window !== 'undefined') {
     try {
-      const storedToken = readCookie(AUTH_COOKIE)
+      // Only the user half is restorable — the credential is HttpOnly by
+      // design. The session itself survives because the browser keeps sending
+      // that cookie; this just rebuilds the UI's idea of who is signed in.
       const storedUser = readCookie(USER_COOKIE)
-      if (storedToken)
-        token.set(storedToken)
       if (storedUser)
         user.set(JSON.parse(storedUser))
     }
@@ -201,7 +251,9 @@ defineStore('auth', () => {
   function persistAuth(authToken: string, userData?: UserProfile): void {
     if (authToken) {
       token.set(authToken)
-      setAuthCookie(authToken)
+      // In-memory only. The server already set the HttpOnly cookie on the
+      // response that carried this token.
+      sessionToken = authToken
     }
     if (userData) {
       user.set(userData)
@@ -267,9 +319,11 @@ defineStore('auth', () => {
     // ends up on /login as expected.
     try {
       const headers: Record<string, string> = { Accept: 'application/json' }
-      if (token())
-        headers.Authorization = `Bearer ${token()}`
-      await fetch('/api/auth/logout', { method: 'POST', headers })
+      if (sessionToken)
+        headers.Authorization = `Bearer ${sessionToken}`
+      // credentials matter here: the server needs the cookie both to find the
+      // token it is revoking and to send back the Set-Cookie that clears it.
+      await fetch('/api/auth/logout', { method: 'POST', headers, credentials: 'same-origin' })
     }
     catch {}
 
