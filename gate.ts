@@ -299,40 +299,88 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   )
 }
 
-// 6h. Every getStaticPaths-wired route actually produced pages.
+// 6h. Dynamic routes: the build emitted a file for every id getStaticPaths
+//     handed it, and the reference-data routes are not empty.
 //
-//     This closes a hole the other checks cannot see. When the database has no
-//     content, every hook returns zero paths, so no dynamic page is built — AND
-//     the sitemap, which is built from the same queries, shrinks to match. The
-//     two then agree with each other, "every sitemap URL has a built file"
-//     stays true, and the gate passes over an artifact that dropped from 151
-//     pages to 41. Agreement between two outputs of the same broken query is
-//     not evidence that either is right.
+//     Two properties, reported as two checks on purpose, because they are two
+//     different incidents with two different responses.
 //
-//     Caught exactly that: a wiped dev database produced a green 15/15 build
-//     containing no judges, no courthouses and no articles.
+//     COMPLETENESS compares the build's INPUT (the ids each hook returns) to
+//     its OUTPUT (files in dist). That makes it precise — it names the missing
+//     ids — but it cannot see an empty database, because then both sides are
+//     zero and it passes.
+//
+//     NON-EMPTINESS is the hardcoded expectation that closes that hole. With no
+//     content every hook returns zero paths, no dynamic page is built, AND the
+//     sitemap — built from the same queries — shrinks to match. The two then
+//     agree, "every sitemap URL has a built file" stays true, and the gate waves
+//     through an artifact that fell from 151 pages to 41. Agreement between two
+//     outputs of the same broken query is not evidence that either is right.
+//     This caught exactly that: a wiped dev database produced a green 15/15
+//     build containing no judges and no courthouses.
+//
+//     It applies to judges and court-houses ONLY. Those are ingested reference
+//     data, so empty means the import is gone and the build is broken.
+//     /article/:id enumerates PUBLISHED REVIEWS — user-generated content — and a
+//     directory nobody has reviewed yet correctly has none. Failing on that
+//     asked for a fabricated published review about a real, named federal judge
+//     to make the gate green, which is the exact thing the preceding commits
+//     removed. Zero articles is now reported, not failed.
 {
-  const routes: Array<[string, string]> = [
-    // The canonical judge page, not judges/*/profile.html: the profile tab is
-    // deliberately no longer pre-rendered (six pages per judge OOM'd the build
-    // at 20,028 pages), so probing for it would report an empty database on
-    // every healthy build. This still does the job the check exists for —
-    // catching a wiped database that produces a plausible green artifact.
-    ['judges/*.html', 'judges'],
-    ['court-houses/*/profile.html', 'court-houses'],
-    ['article/*.html', 'article'],
-  ]
-  const empty: string[] = []
-  for (const [pattern, label] of routes) {
-    let n = 0
-    for (const _f of new Bun.Glob(pattern).scanSync('dist')) n++
-    if (n === 0)
-      empty.push(label)
+  const { articlePaths, courtPaths, judgePaths } = await import('./app/Helpers/staticPaths')
+
+  interface Route {
+    label: string
+    ids: () => Promise<{ paths: Array<{ params: Record<string, string> }> }>
+    file: (id: string) => string
+    /** Ingested reference data must be non-empty. User-generated content may not be. */
+    reference: boolean
   }
+
+  const routes: Route[] = [
+    // The canonical judge page, not judges/:id/profile: the profile tab is
+    // deliberately no longer pre-rendered (six pages per judge OOM'd the build
+    // at 20,028 pages).
+    //
+    // Naming the id-shaped file explicitly also repairs a hole the previous
+    // `judges/*.html` glob had: that pattern matches submit.html, signup.html
+    // and review.html, which exist on every build, so it counted a healthy 3
+    // against a database holding no judges at all — defeating, for the busiest
+    // route in the app, the one thing this check exists to catch.
+    { label: 'judges', ids: judgePaths, file: id => `judges/${id}.html`, reference: true },
+    { label: 'court-houses', ids: courtPaths, file: id => `court-houses/${id}/profile.html`, reference: true },
+    { label: 'article', ids: articlePaths, file: id => `article/${id}.html`, reference: false },
+  ]
+
+  const missing: string[] = []
+  const empty: string[] = []
+  const pending: string[] = []
+
+  for (const route of routes) {
+    const ids = (await route.ids()).paths.map(p => p.params.id)
+    if (!ids.length) {
+      ;(route.reference ? empty : pending).push(route.label)
+      continue
+    }
+    const gone = ids.filter(id => !html.has(`dist/${route.file(id)}`))
+    if (gone.length)
+      missing.push(`${route.label}: ${gone.length} of ${ids.length} missing (e.g. ${gone.slice(0, 3).map(id => route.file(id)).join(', ')})`)
+  }
+
   add(
-    'dynamic routes produced pages',
+    'every getStaticPaths id has a built page',
+    missing.length === 0,
+    missing.length
+      ? `${missing.join('; ')} — getStaticPaths returned these ids and the build emitted no file for them`
+      : pending.map(l => `${l}: no ids yet, so no pages — correct for user-generated content until the first one is published`).join('; '),
+  )
+
+  add(
+    'reference-data routes are not empty',
     empty.length === 0,
-    empty.length ? `no pages for: ${empty.join(', ')} — getStaticPaths returned nothing, usually an empty database (run \`./buddy seed\`)` : '',
+    empty.length
+      ? `no ids for: ${empty.join(', ')} — these come from the CourtListener/Wikidata import, so an empty result means the import is missing, not that content is pending (run \`bun scripts/ingest-courtlistener.ts\`)`
+      : '',
   )
 }
 
