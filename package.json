@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "@stacksjs/components": "^0.2.170",
-    "bun-query-builder": "^0.2.26",
+    "bun-query-builder": "0.2.50",
     "chart.js": "^4.5.1",
     "leaflet": "^1.9.4",
     "ofetch": "^1.5.1",
