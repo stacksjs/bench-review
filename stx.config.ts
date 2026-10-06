@@ -14,6 +14,7 @@
 import { tsAnalytics } from '@stacksjs/ts-analytics/stx'
 import { FONT_HEAD_TAGS } from './app/Helpers/fontHead'
 import { TS_ANALYTICS_APP_ID } from './config/ts-analytics'
+import site from './site.config'
 
 export default {
   componentsDir: 'components',
@@ -29,9 +30,11 @@ export default {
     head: {
       // Fallback title/description for pages that don't set their own via
       // @section('title') / @head (hoisted into the static <head>, stx#1756).
-      title: 'Bench Review: Read and Write Reviews of Judges',
+      // Both come from site.config.ts so the shell, the JSON-LD graph, and
+      // the sitemap can't disagree about what this site is called.
+      title: site.seo.title,
       meta: [
-        { name: 'description', content: 'Bench Review is a public directory of judges where attorneys, clerks, and court staff share first-hand reviews. Search judges by name and court.' },
+        { name: 'description', content: site.seo.description },
       ],
       // ts-analytics, added like a Nuxt module — just an App ID (Fathom-style),
       // set once in config/ts-analytics.ts. The endpoint is baked into the

@@ -15,7 +15,12 @@
     "typecheck": "bun tsc --noEmit",
     "typecheck:app": "bun tsc --noEmit -p tsconfig.app.json",
     "gate": "bun run build && bun gate.ts",
-    "gate:only": "bun gate.ts"
+    "gate:only": "bun gate.ts",
+    "docs:validate": "bun scripts/validate-docs.ts",
+    "ui:validate": "bun scripts/validate-ui.ts",
+    "visual:validate": "bun scripts/validate-visual.ts",
+    "release:validate": "bun scripts/validate-release.ts",
+    "deployment:smoke": "bun scripts/smoke-deployment.ts"
   },
   "dependencies": {
     "@stacksjs/components": "^0.2.170",

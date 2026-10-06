@@ -14,6 +14,8 @@
  * they need build-time static generation (#46).
  */
 
+import site from '~/site.config'
+
 interface PageSeo {
   /** Public path, e.g. '/judges'. Canonical + og:url = base + path. */
   path: string
@@ -105,7 +107,7 @@ export const escapeAttr = (s: string): string =>
 /** Extract the page's existing <title> text for og:title / twitter:title. */
 function extractTitle(html: string): string {
   const m = html.match(/<title>([^<]*)<\/title>/i)
-  return m?.[1]?.trim() || 'Bench Review'
+  return m?.[1]?.trim() || site.seo.siteName
 }
 
 /**
@@ -140,18 +142,18 @@ function buildJsonLd(seo: PageSeo, base: string, title: string): string {
     {
       '@type': 'Organization',
       '@id': `${base}/#organization`,
-      'name': 'Bench Review',
+      'name': site.seo.siteName,
       'url': `${base}/`,
       'logo': {
         '@type': 'ImageObject',
-        'url': `${base}/images/bench/logo.png`,
+        'url': `${base}${site.seo.logo}`,
       },
     },
     {
       '@type': 'WebSite',
       '@id': `${base}/#website`,
       'url': `${base}/`,
-      'name': 'Bench Review',
+      'name': site.seo.siteName,
       'publisher': { '@id': `${base}/#organization` },
       'potentialAction': {
         '@type': 'SearchAction',
@@ -186,12 +188,13 @@ export function injectSeoHead(html: string, seo: PageSeo, base: string): string 
   const url = `${base}${seo.path}`
   const title = extractTitle(html)
   const ogDesc = seo.ogDescription ?? seo.description
-  const ogImage = `${base}/images/og-image.png`
+  const ogImage = `${base}${site.seo.imagePath}`
 
   const tags = [
     `<link rel="canonical" href="${escapeAttr(url)}">`,
-    `<meta property="og:type" content="website">`,
-    `<meta property="og:site_name" content="Bench Review">`,
+    `<meta property="og:type" content="${escapeAttr(site.seo.type)}">`,
+    `<meta property="og:site_name" content="${escapeAttr(site.seo.siteName)}">`,
+    `<meta property="og:locale" content="${escapeAttr(site.seo.locale)}">`,
     `<meta property="og:url" content="${escapeAttr(url)}">`,
     `<meta property="og:title" content="${escapeAttr(title)}">`,
     `<meta property="og:description" content="${escapeAttr(ogDesc)}">`,

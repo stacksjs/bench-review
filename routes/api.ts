@@ -1,4 +1,5 @@
 import { response, route } from '@stacksjs/router'
+import { healthResponse } from '../app/Support/health'
 
 /**
  * This file is the entry point for your application's API routes.
@@ -16,6 +17,14 @@ import { response, route } from '@stacksjs/router'
  *
  * @see https://docs.stacksjs.com/routing
  */
+
+// Health — the endpoint uptime monitoring points at. Declared bare (`/health`)
+// because this file auto-prefixes with `/api`, so it serves at `/api/health`.
+// Unauthenticated and deliberately uncached; answers 503 when the database or
+// cache probe fails, so a plain HTTP check gets the right answer without
+// parsing the body. See app/Support/health.ts for why it isn't the framework's
+// route.health().
+route.get('/health', () => healthResponse())
 
 // Your custom routes go here:
 route.get('/', () => response.text('hello'))
