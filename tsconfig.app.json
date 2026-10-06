@@ -62,14 +62,12 @@
     "database/migrations",
     "**/*.test.ts",
     "**/*.spec.ts",
-    // Dead framework-default CMS/Logs scaffolds for models bench doesn't use
-    // (Post/Page/Comment/Categorizable/Taggable/Log). They import per-model
-    // `*RequestType`s that the vendored ORM once generated into core/orm/src;
-    // the node_modules migration dropped that source, and published @stacksjs/orm
-    // doesn't ship app-generated request types. The actions still load at runtime
-    // (types erase) — they're just not part of the meaningful app typecheck.
-    "app/Actions/Cms",
-    "app/Actions/Logs",
+    // Two framework-default scaffolds that import per-model `*RequestType`s the
+    // vendored ORM once generated into core/orm/src; the node_modules migration
+    // dropped that source, and published @stacksjs/orm doesn't ship
+    // app-generated request types. They still load at runtime (types erase) --
+    // they're just not part of the meaningful app typecheck. The Cms/ and Logs/
+    // directories that used to be listed here were deleted outright.
     "app/Actions/LogAction.ts",
     "app/Actions/StoreEmailSubscriptionsAction.ts"
   ]
