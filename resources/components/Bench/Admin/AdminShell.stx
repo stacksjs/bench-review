@@ -44,7 +44,7 @@
     await adminStore.signOut()
   }
 
-  // Hydration check: if we have a token (auth.token) but no admin
+  // Hydration check: if we have a session but no admin
   // profile in memory yet, refresh it. If the user is not actually an
   // admin, bounce to /admin/login. Runs on top-level mount AND
   // onMount so both hard-reload and SPA nav are covered (see memory
@@ -55,8 +55,11 @@
     if (bootstrapped) return
     bootstrapped = true
 
-    // Not authenticated at all → straight to login.
-    if (!authStore.token()) {
+    // Not authenticated at all → straight to login. Uses isAuthenticated()
+    // rather than token(): the token is in-memory only now that the session
+    // lives in an HttpOnly cookie, so on a hard reload of /admin it would be
+    // empty and bounce a perfectly valid admin session to the login page.
+    if (!authStore.isAuthenticated()) {
       if (typeof window !== 'undefined' && window.location.pathname !== '/admin/login')
         navigate('/admin/login', true)
       return
