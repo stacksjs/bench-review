@@ -1,4 +1,5 @@
 import { db } from '@stacksjs/database'
+import site from '~/site.config'
 
 /**
  * Shared sitemap + robots builders.
@@ -29,10 +30,22 @@ const STATIC_PATHS: Array<{ path: string, priority: number, changefreq: string }
   { path: '/register', priority: 0.5, changefreq: 'yearly' },
 ]
 
-/** Normalize a base URL: trim trailing slashes so `${base}${path}` is clean. */
+/**
+ * Normalize a base URL: trim trailing slashes so `${base}${path}` is clean.
+ *
+ * The fallback is deliberately the LOCAL dev host, not the production
+ * canonical: a build with APP_URL unset must produce an obviously-local
+ * artifact that the conformance gate rejects ("APP_URL unset — artifact
+ * carries N loopback URLs"), rather than a plausible-looking one that
+ * silently claims to be production. `site.url` is the canonical host and is
+ * what you get once APP_URL is set; see DEPLOY.md.
+ */
 export function normalizeBase(raw: string | undefined): string {
   return (raw || 'http://localhost:4000').replace(/\/+$/, '')
 }
+
+/** The production canonical origin, from site.config.ts. */
+export const CANONICAL_BASE: string = site.url.replace(/\/+$/, '')
 
 /**
  * Build the full sitemap XML from current DB content. Every judge gets a
