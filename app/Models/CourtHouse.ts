@@ -65,7 +65,13 @@ export default defineModel({
     },
 
     image: {
-      required: true,
+      // Optional because we have no source for courthouse photographs.
+      // scripts/ingest-courtlistener.ts writes null for every row: CourtListener
+      // publishes no courthouse images, and the 202 rows in the table are all
+      // null. Declaring it required made the model assert a field the data has
+      // never had, which surfaced as a migration that could not apply
+      // ("NOT NULL constraint failed: _qb_tmp_court_houses.image").
+      required: false,
       order: 2,
       fillable: true,
       validation: {
