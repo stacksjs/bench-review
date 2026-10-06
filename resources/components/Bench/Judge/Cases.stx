@@ -1,165 +1,80 @@
-<script client>
-  interface Case {
-    id: number
-    number: string
-    title: string
-    type: string
-    status: string
-    filedDate: string
-    nextHearing: string
-  }
+{{--
+  Judge case history — deliberately an empty state, not a table.
 
-  const cases = derived<Case[]>(() => [
-    {
-      id: 1,
-      number: 'CR-2024-001',
-      title: 'State v. Johnson',
-      type: 'Criminal',
-      status: 'Active',
-      filedDate: 'Jan 15, 2024',
-      nextHearing: 'Mar 1, 2024'
-    },
-    {
-      id: 2,
-      number: 'CV-2024-045',
-      title: 'Smith v. Corporation',
-      type: 'Civil',
-      status: 'Pending',
-      filedDate: 'Feb 1, 2024',
-      nextHearing: 'Mar 15, 2024'
-    },
-    {
-      id: 3,
-      number: 'FM-2024-023',
-      title: 'In re: Williams Family',
-      type: 'Family',
-      status: 'Active',
-      filedDate: 'Jan 30, 2024',
-      nextHearing: 'Mar 10, 2024'
-    },
-    {
-      id: 4,
-      number: 'PR-2024-012',
-      title: 'Estate of Davis',
-      type: 'Probate',
-      status: 'Closed',
-      filedDate: 'Dec 15, 2023',
-      nextHearing: 'N/A'
-    },
-    {
-      id: 5,
-      number: 'CR-2024-078',
-      title: 'State v. Anderson',
-      type: 'Criminal',
-      status: 'Active',
-      filedDate: 'Feb 10, 2024',
-      nextHearing: 'Mar 20, 2024'
-    }
-  ])
+  ## What was here
 
-  function statusClass(status: string): string {
-    if (status === 'Active') return 'bg-green-50 text-green-700 ring-green-600/20'
-    if (status === 'Pending') return 'bg-yellow-50 text-yellow-700 ring-yellow-600/20'
-    return 'bg-gray-50 text-gray-700 ring-gray-600/20'
-  }
-</script>
+  Five hardcoded cases, rendered on the page of every real, named federal
+  judge in the directory:
 
-<div class="lg:col-span-2 lg:row-end-2 lg:row-span-2 -mx-4 px-4 py-6 sm:mx-0 sm:pb-10 sm:px-6 xl:pb-16 xl:pt-12 xl:px-12 ring-1 ring-gray-900/5 sm:rounded-lg shadow-sm">
-  {{-- Header with Stats --}}
-  <div class="flex items-center justify-between">
-    <div>
-      <h2 class="font-semibold text-2xl text-gray-900">Case History</h2>
-      <p class="mt-1 text-gray-500 text-sm">Total cases: 1,248 | Active cases: 12</p>
-    </div>
-    <div class="flex items-center space-x-4">
-      <button type="button" class="px-3 py-2 font-semibold text-gray-900 text-sm bg-white hover:bg-gray-50 ring-1 ring-gray-300 ring-inset rounded-md shadow-sm">
-        <span class="flex items-center">
-          <Icon name="list-filter" size="20" class="mr-2 text-gray-400" />
-          Filter
-        </span>
-      </button>
-      <button type="button" class="px-3 py-2 font-semibold text-gray-900 text-sm bg-white hover:bg-gray-50 ring-1 ring-gray-300 ring-inset rounded-md shadow-sm">
-        <span class="flex items-center">
-          <Icon name="arrow-up-down" size="20" class="mr-2 text-gray-400" />
-          Sort
-        </span>
-      </button>
-    </div>
+      CR-2024-001  State v. Johnson        Criminal  Active
+      CV-2024-045  Smith v. Corporation    Civil     Pending
+      FM-2024-023  In re: Williams Family  Family    Active
+      PR-2024-012  Estate of Davis         Probate   Closed
+      CR-2024-078  State v. Anderson       Criminal  Active
+
+  plus "Total cases: 1,248 | Active cases: 12", "Showing 1 to 10 of 97
+  results", a nine-page paginator, and Filter / Sort buttons that did nothing.
+  None of it came from anywhere. Every judge's page showed the same five
+  invented dockets with the same invented statistics.
+
+  That is not placeholder text. It reads as a judicial record — case numbers,
+  party names, filing dates, case status — attributed to an identifiable
+  person, on a site whose purpose is public criticism of that person. Lorem
+  ipsum is obviously fake; "State v. Johnson, filed Jan 15 2024, Active" is
+  not, and a visitor has no way to tell it apart from a real docket.
+
+  ## Why there is no table yet
+
+  Nothing in this application has case data. The `judges` and `court_houses`
+  tables come from CourtListener's bulk export (see
+  scripts/ingest-courtlistener.ts) and carry no dockets.
+
+  Real data is reachable, but not cheaply: CourtListener publishes a
+  `dockets` bulk table with an `assigned_to` link to the judge — it is about
+  5 GB compressed, so it needs a selective import rather than the
+  parse-the-whole-file approach the other tables use. The REST API's
+  /api/rest/v4/dockets/ is the alternative and needs a token plus a quota
+  that will not paginate 2,740 judges' dockets.
+
+  Until one of those lands, an empty state is the honest render. It is also
+  the one that does not have to be unwound: whoever wires dockets up replaces
+  this file, rather than hunting for which numbers on the page were real.
+
+  No `<script client>` on purpose — there is nothing dynamic here, and an
+  empty scope with no bindings is harmless, whereas a scope registered with
+  no state/derived/effect call silently kills any binding added later.
+--}}
+
+<div class="lg:col-span-2 lg:row-end-2 lg:row-span-2 -mx-4 px-4 py-6 sm:mx-0 sm:pb-10 sm:px-6 xl:pb-16 xl:pt-12 xl:px-12 bg-white ring-1 ring-gray-900/5 sm:rounded-lg shadow-sm">
+  <h2 class="font-semibold text-2xl text-gray-900">Case history</h2>
+
+  <div class="mt-8 px-6 py-12 text-center bg-gray-50 border border-dashed border-gray-200 rounded-lg">
+    {{--
+      No <Icon> here. `folder-open` IS present in the installed hugeicons
+      collection, and it still rendered as nothing — verified in the built
+      artifact, where the <h3> follows the wrapper div with no <svg> between
+      them. 17 of the 23 <Icon> names used across this app are not in the
+      installed collection at all (`search`, `chevron-down`, `check`, …), so
+      the icon pipeline has a problem wider than one name and worth its own
+      pass. Shipping an element that reliably renders nothing is just dead
+      markup, so this empty state is type-only.
+    --}}
+    <h3 class="font-semibold text-base text-gray-900">No case history available</h3>
+    <p class="mt-2 mx-auto max-w-md text-gray-600 text-sm">
+      Bench Review does not currently publish docket records for this judge. We would
+      rather show nothing than show case numbers we cannot stand behind.
+    </p>
+    <p class="mt-4 mx-auto max-w-md text-gray-500 text-xs">
+      Federal dockets are public record. If you are looking for a specific case,
+      <a href="https://www.courtlistener.com/?type=r" class="font-medium text-blue-600 underline hover:text-blue-700" rel="noopener noreferrer" target="_blank">CourtListener</a>
+      and
+      <a href="https://pacer.uscourts.gov" class="font-medium text-blue-600 underline hover:text-blue-700" rel="noopener noreferrer" target="_blank">PACER</a>
+      both carry them.
+    </p>
   </div>
 
-  {{-- Cases Table --}}
-  <div class="mt-8">
-    <div class="flow-root">
-      <div class="overflow-x-auto -mx-4 -my-2 sm:-mx-6 lg:-mx-8">
-        <div class="inline-block py-2 sm:px-6 lg:px-8 min-w-full align-middle">
-          <table class="min-w-full divide-gray-300 divide-y">
-            <thead>
-              <tr>
-                <th scope="col" class="pl-4 pr-3 py-3.5 sm:pl-0 font-semibold text-gray-900 text-left text-sm">Case Number</th>
-                <th scope="col" class="px-3 py-3.5 font-semibold text-gray-900 text-left text-sm">Title</th>
-                <th scope="col" class="px-3 py-3.5 font-semibold text-gray-900 text-left text-sm">Type</th>
-                <th scope="col" class="px-3 py-3.5 font-semibold text-gray-900 text-left text-sm">Status</th>
-                <th scope="col" class="px-3 py-3.5 font-semibold text-gray-900 text-left text-sm">Filed Date</th>
-                <th scope="col" class="relative pl-3 pr-4 py-3.5 sm:pr-0">
-                  <span class="sr-only">View</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody class="divide-gray-200 divide-y">
-              <tr :for="case_ in cases">
-                  <td class="pl-4 pr-3 py-4 sm:pl-0 font-medium text-gray-900 text-sm whitespace-nowrap">{{ case_.number }}</td>
-                  <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap">{{ case_.title }}</td>
-                  <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap">
-                    <span class="inline-flex items-center px-2 py-1 font-medium text-blue-700 text-xs bg-blue-50 ring-1 ring-blue-700/10 ring-inset rounded-md">{{ case_.type }}</span>
-                  </td>
-                  <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap">
-                    <span
-                      class="inline-flex items-center px-2 py-1 font-medium text-xs ring-1 ring-inset rounded-md"
-                      x-class="statusClass(case_.status)">{{ case_.status }}</span>
-                  </td>
-                  <td class="px-3 py-4 text-gray-500 text-sm whitespace-nowrap">{{ case_.filedDate }}</td>
-                  <td class="relative pl-3 pr-4 py-4 sm:pr-0 font-medium text-right text-sm whitespace-nowrap">
-                    <a href="#" class="text-gray-600 hover:text-gray-900">View<span class="sr-only">{{ `, ${case_.number}` }}</span></a>
-                  </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  {{-- Pagination --}}
-  <div class="flex items-center justify-between mt-6 px-4 py-3 sm:px-6 bg-white border-gray-200 border-t">
-    <div class="flex sm:hidden flex-1 justify-between">
-      <a href="#" class="inline-flex relative items-center px-4 py-2 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-300 rounded-md">Previous</a>
-      <a href="#" class="inline-flex relative items-center ml-3 px-4 py-2 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-300 rounded-md">Next</a>
-    </div>
-    <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-      <div>
-        <p class="text-gray-700 text-sm">
-          Showing <span class="font-medium">1</span> to <span class="font-medium">10</span> of <span class="font-medium">97</span> results
-        </p>
-      </div>
-      <div>
-        <nav class="inline-flex -space-x-px rounded-md shadow-sm isolate" aria-label="Pagination">
-          <a href="#" class="inline-flex relative focus:z-20 items-center px-2 py-2 text-gray-400 hover:bg-gray-50 ring-1 ring-gray-300 ring-inset rounded-l-md focus:outline-offset-0">
-            <span class="sr-only">Previous</span>
-            <Icon name="chevron-left" size="20" />
-          </a>
-          <a href="#" aria-current="page" class="inline-flex relative z-10 focus:z-20 items-center px-4 py-2 font-semibold text-sm text-white bg-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2">1</a>
-          <a href="#" class="inline-flex relative focus:z-20 items-center px-4 py-2 font-semibold text-gray-900 text-sm hover:bg-gray-50 ring-1 ring-gray-300 ring-inset focus:outline-offset-0">2</a>
-          <a href="#" class="hidden md:inline-flex relative focus:z-20 items-center px-4 py-2 font-semibold text-gray-900 text-sm hover:bg-gray-50 ring-1 ring-gray-300 ring-inset focus:outline-offset-0">3</a>
-          <span class="inline-flex relative items-center px-4 py-2 font-semibold text-gray-700 text-sm ring-1 ring-gray-300 ring-inset focus:outline-offset-0">...</span>
-          <a href="#" class="hidden md:inline-flex relative focus:z-20 items-center px-4 py-2 font-semibold text-gray-900 text-sm hover:bg-gray-50 ring-1 ring-gray-300 ring-inset focus:outline-offset-0">8</a>
-          <a href="#" class="inline-flex relative focus:z-20 items-center px-4 py-2 font-semibold text-gray-900 text-sm hover:bg-gray-50 ring-1 ring-gray-300 ring-inset focus:outline-offset-0">9</a>
-          <a href="#" class="inline-flex relative focus:z-20 items-center px-4 py-2 font-semibold text-gray-900 text-sm hover:bg-gray-50 ring-1 ring-gray-300 ring-inset focus:outline-offset-0">10</a>
-          <a href="#" class="inline-flex relative focus:z-20 items-center px-2 py-2 text-gray-400 hover:bg-gray-50 ring-1 ring-gray-300 ring-inset rounded-r-md focus:outline-offset-0">
-            <span class="sr-only">Next</span>
-            <Icon name="chevron-right" size="20" />
-          </a>
-        </nav>
-      </div>
-    </div>
-  </div>
+  <p class="mt-6 text-gray-500 text-xs">
+    Reviews on this site describe first-hand courtroom experience. They are not
+    linked to docket records, and nothing here should be read as a case outcome.
+  </p>
 </div>
