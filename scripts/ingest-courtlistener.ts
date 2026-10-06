@@ -304,13 +304,15 @@ async function main(): Promise<void> {
   if (DRY_RUN)
     console.log('DRY RUN — nothing will be written\n')
 
-  const [courts, courthouses, people, positions] = await Promise.all([
+  const [courts, courthouses, people, positions, educations, schools] = await Promise.all([
     table('courts', snapshot),
     table('courthouses', snapshot),
     table('people-db-people', snapshot),
     table('people-db-positions', snapshot),
+    table('people-db-educations', snapshot),
+    table('people-db-schools', snapshot),
   ])
-  console.log(`  parsed ${courts.length} courts, ${courthouses.length} courthouses, ${people.length} people, ${positions.length} positions\n`)
+  console.log(`  parsed ${courts.length} courts, ${courthouses.length} courthouses, ${people.length} people, ${positions.length} positions, ${educations.length} educations, ${schools.length} schools\n`)
 
   // ── Courts in scope ──────────────────────────────────────────────────
   const federalCourts = new Map<string, Row>()
@@ -358,6 +360,31 @@ async function main(): Promise<void> {
     seats.push({ person, court: federalCourts.get(position.court_id)! })
   }
 
+  // ── Education ────────────────────────────────────────────────────────
+  // Replaces the hardcoded "J.D., Stanford Law School" that
+  // Bench/Judge/Profile.stx rendered for every judge in the directory.
+  // Stored as a JSON array on judges.education; ~48% of sitting judges have
+  // at least one record, and the rest keep the component's empty state.
+  const schoolName = new Map(schools.map(s => [s.id, (s.name || '').trim()]))
+  const educationByPerson = new Map<string, Array<{ degree: string, school: string, year: string }>>()
+  for (const row of educations) {
+    const school = schoolName.get(row.school_id)
+    if (!school)
+      continue // no resolvable institution — a degree with no school is not worth showing
+    // degree_detail is the human form ("J.D.", "LL.B."); degree_level is the
+    // slug ("jd", "llb"). Prefer the former, upcase the latter, skip neither-.
+    const degree = (row.degree_detail || '').trim() || (row.degree_level || '').trim().toUpperCase()
+    if (!degree)
+      continue
+    const list = educationByPerson.get(row.person_id) ?? []
+    list.push({ degree, school, year: (row.degree_year || '').trim() })
+    educationByPerson.set(row.person_id, list)
+  }
+  // Oldest first, so a profile reads undergraduate then law school. Entries
+  // with no year sort last rather than claiming to be earliest.
+  for (const list of educationByPerson.values())
+    list.sort((a, b) => (Number(a.year) || 9999) - (Number(b.year) || 9999))
+
   const courtsWithJudges = new Set(seats.map(s => s.court.id))
   console.log(`In scope:`)
   console.log(`  federal courts in use:        ${federalCourts.size}`)
@@ -365,6 +392,7 @@ async function main(): Promise<void> {
   console.log(`  sitting judges (person×court): ${seats.length}`)
   console.log(`  distinct judges:              ${new Set(seats.map(s => s.person.id)).size}`)
   console.log(`  courts with a known state:    ${[...courtsWithJudges].filter(id => stateByCourt.has(id)).length}`)
+  console.log(`  judges with education data:    ${new Set(seats.filter(s => educationByPerson.has(s.person.id)).map(s => s.person.id)).size}`)
 
   if (DRY_RUN) {
     console.log('\nSample of what would be written:')
@@ -428,19 +456,55 @@ async function main(): Promise<void> {
       continue
     judgeKeys.add(key)
 
+    const education = educationByPerson.get(seat.person.id)
     await db.insertInto('judges' as any).values({
       name,
       image_url: avatar(name),
       practice_area: PRACTICE_AREA[seat.court.jurisdiction] ?? 'other',
       court_house_id: courtHouseId,
+      education: education ? JSON.stringify(education) : null,
       uuid: crypto.randomUUID(),
     } as any).execute()
     insertedJudges++
   }
 
+  // Backfill education onto judges that already existed. The insert above is
+  // idempotent, so on any run after the first it writes nothing — without this
+  // an added source column would never reach the 2,740 rows already in place.
+  //
+  // Keyed on (name, court_house_id), the same pair the insert dedupes on,
+  // because `judges` stores no CourtListener person id. Storing that id would
+  // make re-identification exact instead of name-dependent, and is worth doing
+  // if this script grows a third pass.
+  let educationBackfilled = 0
+  const needsEducation = await db.selectFrom('judges' as any)
+    .select(['id', 'name', 'court_house_id'] as any)
+    .where('education' as any, 'is', null)
+    .execute() as Array<{ id: number, name: string, court_house_id: number }>
+  if (needsEducation.length) {
+    const wanted = new Map<string, string>()
+    for (const seat of seats) {
+      const education = educationByPerson.get(seat.person.id)
+      if (!education)
+        continue
+      const courtHouseId = courtIdByName.get(seat.court.full_name || seat.court.short_name)
+      if (!courtHouseId)
+        continue
+      wanted.set(`${judgeName(seat.person)}:${courtHouseId}`, JSON.stringify(education))
+    }
+    for (const row of needsEducation) {
+      const payload = wanted.get(`${row.name}:${row.court_house_id}`)
+      if (!payload)
+        continue
+      await db.updateTable('judges' as any).set({ education: payload } as any).where('id' as any, '=', row.id).execute()
+      educationBackfilled++
+    }
+  }
+
   console.log(`\nWrote:`)
   console.log(`  court_houses inserted: ${insertedCourts}`)
   console.log(`  judges inserted:       ${insertedJudges}`)
+  console.log(`  education backfilled:  ${educationBackfilled}`)
   if (skippedNoCourt)
     console.log(`  judges skipped (no courthouse row): ${skippedNoCourt}`)
 

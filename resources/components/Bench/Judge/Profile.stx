@@ -1,72 +1,109 @@
+<script client>
+  // Judge professional background.
+  //
+  // ## What this replaced
+  //
+  // Static markup with no bindings, rendered identically on the Profile tab of
+  // all 2,740 real named federal judges: "J.D., Stanford Law School",
+  // "Bar Admission: California, 2005", "Senior Partner, Johnson & Associates",
+  // plus a "Recent Cases" table asserting outcomes ("State v. Johnson — 2023 —
+  // Guilty"). Every judge claimed the same degree, firm and case outcomes.
+  //
+  // That was false biographical and professional history about identifiable
+  // people — and an asserted criminal conviction — on a page built to host
+  // public criticism of them. Profile is also the DEFAULT tab (JudgeTabs falls
+  // back to 'profile'), so it was the most-seen surface in the app.
+  //
+  // ## What it shows now
+  //
+  // Real education from CourtListener's people-db-educations + people-db-schools
+  // export, ingested by scripts/ingest-courtlistener.ts into judges.education
+  // and served by /api/judges/{id}/education. About 1,324 of the 2,730 sitting
+  // judges have records; the rest get the empty state rather than a guess.
+  //
+  // Bar admission, firm history and case outcomes are NOT coming back. We have
+  // no source for them, and "Outcome: Guilty" beside a judge's name is not a
+  // claim this site should make even with one.
+  //
+  // Mirrors Bench/Judge/RecentRulings: judge id off location.pathname (stx
+  // leaves window.stx._rp unset on a hard reload), lazy fetch through the auth
+  // store, and show/hide via an x-class toggle rather than `:if` — bindIf drops
+  // a branch that is false at first render and never brings it back, which is
+  // exactly the shape of a list that arrives after a fetch.
+
+  const authStore = useStore('auth')
+
+  interface EducationEntry {
+    degree: string
+    school: string
+    year: string
+  }
+
+  function resolveJudgeId(): number {
+    if (typeof window === 'undefined') return 0
+    const fromRouter = Number((window as any).stx?._rp?.id)
+    if (Number.isFinite(fromRouter) && fromRouter > 0) return fromRouter
+    const m = window.location.pathname.match(/^\/judges\/(\d+)/)
+    return m ? Number(m[1]) : 0
+  }
+
+  const profileJudgeId = resolveJudgeId()
+  const education = state<EducationEntry[]>([])
+  const educationLoaded = state<boolean>(false)
+
+  const hasEducation = derived<boolean>(() => education().length > 0)
+  const showEmptyState = derived<boolean>(() => educationLoaded() && education().length === 0)
+
+  async function loadEducation(): Promise<void> {
+    if (!profileJudgeId) {
+      educationLoaded.set(true)
+      return
+    }
+    try {
+      const res = await authStore.authFetch(`/api/judges/${profileJudgeId}/education`)
+      if (!res.ok) return
+      const json = await res.json() as { education?: EducationEntry[] }
+      education.set(Array.isArray(json?.education) ? json.education : [])
+    }
+    catch (err) {
+      console.error('[profile] education fetch failed:', err)
+    }
+    finally {
+      educationLoaded.set(true)
+    }
+  }
+
+  onMount(() => { loadEducation() })
+</script>
+
 <div class="lg:col-span-2 lg:row-end-2 lg:row-span-2 -mx-4 px-4 py-8 sm:mx-0 sm:pb-14 sm:px-8 xl:pb-20 xl:pt-16 xl:px-16 bg-white ring-1 ring-gray-900/5 sm:rounded-lg shadow-sm">
-  <h2 class="font-semibold text-base text-gray-800">Professional Background</h2>
-  <dl class="grid grid-cols-1 sm:grid-cols-2 mt-6 text-sm/6">
-    <div class="sm:pr-4">
-      <dt class="inline text-gray-600">Education</dt>
-      <dd class="inline text-gray-700">J.D., Stanford Law School</dd>
-    </div>
-    <div class="mt-2 sm:mt-0 sm:pl-4">
-      <dt class="inline text-gray-600">Bar Admission</dt>
-      <dd class="inline text-gray-700">California, 2005</dd>
-    </div>
-    <div class="mt-6 pt-6 sm:pr-4 border-gray-900/5 border-t">
-      <dt class="font-semibold text-gray-800">Previous Experience</dt>
-      <dd class="mt-2 text-gray-600">
-        <span class="font-medium text-gray-800">Senior Partner, Johnson & Associates</span><br>
-        Criminal Defense Attorney<br>
-        2005-2020
-      </dd>
-    </div>
-    <div class="mt-8 sm:mt-6 sm:pl-4 sm:pt-6 sm:border-gray-900/5 sm:border-t">
-      <dt class="font-semibold text-gray-800">Notable Achievements</dt>
-      <dd class="mt-2 text-gray-600">
-        <span class="font-medium text-gray-800">California Bar Association</span><br>
-        Excellence in Legal Practice Award<br>
-        2018
-      </dd>
+  <h2 class="font-semibold text-base text-gray-800">Education</h2>
+
+  {{-- Real records. Hidden until the fetch lands, so nothing flashes. --}}
+  <dl class="mt-6 space-y-5" x-class="hasEducation() ? '' : 'hidden'">
+    <div :for="entry in education" class="pb-5 last:pb-0 border-b border-gray-900/5 last:border-0">
+      <dt class="font-semibold text-gray-800 text-sm">{{ entry.degree }}</dt>
+      <dd class="mt-1 text-gray-600 text-sm">{{ entry.school }}</dd>
+      <dd class="mt-0.5 tabular-nums text-gray-500 text-xs">{{ entry.year }}</dd>
     </div>
   </dl>
-  <div class="mt-16">
-    <h3 class="font-semibold text-base text-gray-800">Recent Cases</h3>
-    <table class="mt-6 w-full text-left text-sm/6 whitespace-nowrap">
-      <colgroup>
-        <col class="w-full">
-        <col>
-        <col>
-      </colgroup>
-      <thead class="text-gray-800 border-b border-gray-200">
-        <tr>
-          <th scope="col" class="px-0 py-3 font-semibold">Case Name</th>
-          <th scope="col" class="hidden sm:table-cell pl-8 pr-0 py-3 font-semibold text-right">Year</th>
-          <th scope="col" class="pl-8 pr-0 py-3 font-semibold text-right">Outcome</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr class="border-b border-gray-100">
-          <td class="px-0 py-5 max-w-0 align-top">
-            <div class="font-medium text-gray-800 truncate">State v. Johnson</div>
-            <div class="text-gray-600 truncate">Criminal case involving complex evidence handling</div>
-          </td>
-          <td class="hidden sm:table-cell pl-8 pr-0 py-5 tabular-nums text-gray-700 text-right align-top">2023</td>
-          <td class="pl-8 pr-0 py-5 tabular-nums text-gray-700 text-right align-top">Guilty</td>
-        </tr>
-        <tr class="border-b border-gray-100">
-          <td class="px-0 py-5 max-w-0 align-top">
-            <div class="font-medium text-gray-800 truncate">Smith Family Trust</div>
-            <div class="text-gray-600 truncate">Complex family law dispute resolution</div>
-          </td>
-          <td class="hidden sm:table-cell pl-8 pr-0 py-5 tabular-nums text-gray-700 text-right align-top">2023</td>
-          <td class="pl-8 pr-0 py-5 tabular-nums text-gray-700 text-right align-top">Settled</td>
-        </tr>
-        <tr class="border-b border-gray-100">
-          <td class="px-0 py-5 max-w-0 align-top">
-            <div class="font-medium text-gray-800 truncate">City v. Development Corp</div>
-            <div class="text-gray-600 truncate">Land use and zoning dispute</div>
-          </td>
-          <td class="hidden sm:table-cell pl-8 pr-0 py-5 tabular-nums text-gray-700 text-right align-top">2022</td>
-          <td class="pl-8 pr-0 py-5 tabular-nums text-gray-700 text-right align-top">Appealed</td>
-        </tr>
-      </tbody>
-    </table>
+
+  {{-- Shown only once we know there is nothing, never while loading. --}}
+  <div
+    class="mt-6 px-6 py-10 text-center bg-gray-50 border border-dashed border-gray-200 rounded-lg"
+    x-class="showEmptyState() ? '' : 'hidden'"
+  >
+    <h3 class="font-semibold text-base text-gray-900">Background not yet available</h3>
+    <p class="mt-2 mx-auto max-w-md text-gray-600 text-sm">
+      We do not hold education records for this judge, and we would rather show
+      nothing than guess.
+    </p>
   </div>
+
+  <p class="mt-6 text-gray-500 text-xs">
+    Education is sourced from
+    <a href="https://www.courtlistener.com/person/" class="font-medium text-blue-600 underline hover:text-blue-700" rel="noopener noreferrer" target="_blank">CourtListener</a>.
+    Appointment history and financial disclosures for federal judges are published by the
+    <a href="https://www.fjc.gov/history/judges" class="font-medium text-blue-600 underline hover:text-blue-700" rel="noopener noreferrer" target="_blank">Federal Judicial Center</a>.
+  </p>
 </div>

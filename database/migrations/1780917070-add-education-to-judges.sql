@@ -1,0 +1,13 @@
+-- Judge education, as a JSON array of { degree, school, year } objects.
+--
+-- Sourced from CourtListener's bulk `people-db-educations` + `people-db-schools`
+-- tables by scripts/ingest-courtlistener.ts. Replaces the hardcoded
+-- "J.D., Stanford Law School" that Bench/Judge/Profile.stx rendered for every
+-- judge in the directory.
+--
+-- A JSON column rather than a `judge_educations` table: the data is read as a
+-- whole list for one judge and never queried across judges, there are only
+-- ~2,131 rows in total for the 2,730 sitting federal judges, and a table would
+-- need a model (and therefore an explicit `useApi.routes: []` opt-out, since
+-- the ORM generator defaults to unauthenticated full CRUD) for no gain.
+ALTER TABLE "judges" ADD COLUMN "education" TEXT;

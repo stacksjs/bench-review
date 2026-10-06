@@ -174,6 +174,16 @@ route.get('/judges/{id}/reviews', 'Actions/Reviews/ReviewsByJudgeAction')
 route.get('/judges/{id}/opinions', 'Actions/Judges/JudgeOpinionsAction')
   .name('bench.judges.opinions')
 
+// Judge education — public-record biographical data, ingested from
+// CourtListener's people-db-educations/schools export by
+// scripts/ingest-courtlistener.ts. Its own endpoint rather than a field on
+// /api/judges, which already ships all 2,740 rows in one response. Replaces
+// the hardcoded "J.D., Stanford Law School" that Profile.stx used to render
+// for every judge. Throttled like the other public judge reads.
+route.get('/judges/{id}/education', 'Actions/Judges/JudgeEducationAction')
+  .name('bench.judges.education')
+  .middleware('throttle:60,1m')
+
 route.post('/admin/judges/{id}/opinions', 'Actions/Admin/Opinions/CreateJudgeOpinionAction')
   .name('bench.admin.judges.opinions.create')
   .middleware('auth')
