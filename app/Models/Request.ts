@@ -13,7 +13,31 @@ export default defineModel({
     useSeeder: {
       count: 50,
     },
-    useApi: true,
+
+    // SECURITY: no auto-generated routes at all.
+    //
+    // `useApi.routes` is opt-OUT, not opt-in: `useApi: true` (what this model
+    // carried) makes the ORM generator emit index, show, store, update,
+    // destroy AND a bulk-delete at /api/requests — and the generated write
+    // handlers have no 401 path. `storage/framework/orm/routes.ts` resolves
+    // the authed user only to feed the optional `authedFill` hook, and its
+    // sole 401 branch sits inside `if (own.enforced)`, which needs an
+    // `ownership` config this model does not declare.
+    //
+    // This table is request telemetry — it holds `ip_address`, `user_agent`,
+    // `path` and `status_code`. Readable, that is an unmetered log of who
+    // visited what, which on a site whose whole premise is anonymous reviews
+    // is a de-anonymisation primitive: correlate an IP against a
+    // POST /api/reviews hit and the "anonymous" author is named. Writable, it
+    // lets anyone forge or wipe telemetry that the framework dashboard renders
+    // (defaults/routes/dashboard.ts -> Dashboard/Infrastructure/RequestIndexAction).
+    //
+    // Nothing in this app reads or writes the table today, so there was no
+    // live leak — but the endpoints were real. `routes: []` is the opt-out.
+    useApi: {
+      uri: 'requests',
+      routes: [],
+    },
   },
 
   attributes: {
