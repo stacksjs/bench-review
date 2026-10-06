@@ -103,7 +103,18 @@
       <div class="p-10">
         <div class="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div class="flex gap-4 items-center">
-            <img src="/images/avatars/default-user.svg" alt="Your profile photo" class="object-cover h-24 w-24 ring-2 ring-white/20 rounded-full" x-src="avatarUrl" x-alt="displayName" />
+            {{-- This wrapper is load-bearing, not cosmetic. stx's build-time
+                 cloak heuristic scans from every opening tag to the first
+                 "</" looking for an interpolation, and a self-closing
+                 <img /> does not terminate that scan. With no closing tag
+                 before the first {{ }}, every ancestor up to and including
+                 the layout's <main> is given x-cloak — and nothing ever
+                 removes it from <main>, since the runtime only uncloaks
+                 within [data-stx-scope] subtrees. The entire page then
+                 renders display:none. Guarded by gate.ts check 17. --}}
+            <div class="flex-none">
+              <img src="/images/avatars/default-user.svg" alt="Your profile photo" class="object-cover h-24 w-24 ring-2 ring-white/20 rounded-full" x-src="avatarUrl" x-alt="displayName" />
+            </div>
             <div>
               <h1 class="font-bold text-2xl text-white">{{ displayName }}</h1>
               <p class="text-gray-400 text-sm">{{ userEmail }}</p>

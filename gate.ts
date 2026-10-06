@@ -426,6 +426,42 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   add('app functions declare return types', missing === 0, missing ? `${missing} missing` : '')
 }
 
+// 10. No page ships a cloaked <main> or <body>.
+//
+//     stx hides un-hydrated markup with x-cloak + `[x-cloak]{display:none}`,
+//     then removes the attribute once a scope hydrates. Every removal site in
+//     the runtime is scope-relative — `el.removeAttribute('x-cloak')` plus
+//     `el.querySelectorAll('[x-cloak]')` — and querySelectorAll only reaches
+//     DESCENDANTS. So a cloak landing on a layout element ABOVE every
+//     [data-stx-scope] root is never lifted, and the whole content region
+//     stays display:none forever.
+//
+//     That is reachable by accident. The build-time heuristic decides whether
+//     a tag "contains" an interpolation by scanning from its `>` to the first
+//     `</` in the REST OF THE DOCUMENT, so a run of nested opening tags with
+//     no closing tag before the first {{ }} cloaks every ancestor in the run.
+//     A self-closing <img /> does not terminate the scan. /profile hit exactly
+//     this: six nested divs, a self-closing avatar, then {{ displayName }} —
+//     <main> was cloaked and the page rendered header and footer around a
+//     completely blank body, while the console showed a healthy 200, correct
+//     auth and every signal resolving. Nothing else in this gate sees it,
+//     because the markup IS all present in the HTML; it is only invisible.
+{
+  const cloaked: string[] = []
+  for (const [p, s] of html) {
+    for (const tag of ['body', 'main']) {
+      const m = s.match(new RegExp(`<${tag}\\b[^>]*>`, 'i'))
+      if (m && /(?:^|\s)x-cloak(?:[=\s/>]|$)/.test(m[0]))
+        cloaked.push(`${p} <${tag}>`)
+    }
+  }
+  add(
+    'no page ships a cloaked <main> or <body>',
+    cloaked.length === 0,
+    cloaked.length ? `${cloaked.slice(0, 5).join(', ')} — nothing ever removes x-cloak above a [data-stx-scope] root; the page body renders display:none` : '',
+  )
+}
+
 const failed = checks.filter(c => !c.ok)
 console.log(`\n  bench conformance gate — ${pages.length} built pages\n`)
 for (const c of checks)
