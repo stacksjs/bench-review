@@ -1,9 +1,10 @@
 <script client>
-  import type { Category, Judge } from '~/resources/types'
+  import type { Judge } from '~/resources/types'
   import type { JudgeReviewRow } from '~/resources/stores/reviews'
-  // Categories don't have a backing API yet — stay on sample data
-  // until that endpoint exists. Judges + reviews come from the DB.
-  import { categories as allCategories } from '~/resources/data/sample'
+
+  interface CategoryChip {
+    name: string
+  }
 
   useHead({ title: 'Find and Review Judges - Bench Review' })
 
@@ -120,7 +121,33 @@
     // of whether the response had rows, so it's the right gate.
     return profileStore.loaded() && profileStore.myReviews().length === 0
   })
-  const popularCategories = derived<Category[]>(() => allCategories.slice(0, 5))
+  // Category chips, derived from the judges we actually hold.
+  //
+  // These used to come from the hardcoded sample list — Criminal 428,
+  // Civil 312, Family 256, Probate 252, Appellate 198, Bankruptcy 156. The
+  // counts were never rendered (only `cat.name` is), but the NAMES were just
+  // as wrong: after the CourtListener ingest, `practice_area` only ever holds
+  // 'appellate', 'bankruptcy' or 'other', because federal district judges hear
+  // both criminal and civil matters and get classified as general jurisdiction.
+  // So every one of those chips linked to a /search that returns nothing.
+  //
+  // Deriving from `judgesStore` means a chip exists only if judges behind it
+  // do. 'other' is skipped: it is a real stored value but "Other" is not a
+  // category anyone browses by, and it would dominate the list at ~1,980 of
+  // 2,730 judges.
+  const popularCategories = derived<CategoryChip[]>(() => {
+    const counts = new Map<string, number>()
+    for (const judge of judgesStore.judges()) {
+      const area = (judge as any).practice_area
+      if (!area || area === 'other')
+        continue
+      counts.set(area, (counts.get(area) ?? 0) + 1)
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([area]) => ({ name: area.charAt(0).toUpperCase() + area.slice(1) }))
+  })
   const stars: number[] = [1, 2, 3, 4, 5]
 
   function formatDate(dateStr: string | null | undefined): string {

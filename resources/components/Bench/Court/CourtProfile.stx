@@ -175,29 +175,34 @@
   <h2 class="font-semibold text-base text-gray-800">About this court</h2>
   <p class="mt-4 leading-7 text-gray-600">{{ aboutText }}</p>
 
-  <dl class="grid grid-cols-1 sm:grid-cols-2 mt-8 text-sm/6">
-    <div class="sm:pr-4">
-      <dt class="inline text-gray-600">Established</dt>
-      <dd class="inline text-gray-700">1879</dd>
-    </div>
-    <div class="mt-2 sm:mt-0 sm:pl-4">
-      <dt class="inline text-gray-600">Jurisdiction</dt>
-      <dd class="inline text-gray-700">State</dd>
-    </div>
-    <div class="mt-6 pt-6 sm:pr-4 border-gray-900/5 border-t">
-      <dt class="font-semibold text-gray-800">Chief Judge</dt>
-      <dd class="mt-2 text-gray-600">
-        <span class="font-medium text-gray-800">Hon. Sarah Johnson</span><br>
-        Appointed 2018<br>
-      </dd>
-    </div>
-    <div class="mt-8 sm:mt-6 sm:pl-4 sm:pt-6 sm:border-gray-900/5 sm:border-t">
-      <dt class="font-semibold text-gray-800">Departments</dt>
-      <dd class="mt-2 text-gray-600">
-        Criminal · Civil · Family · Probate · Appellate
-      </dd>
-    </div>
-  </dl>
+  {{--
+    A hardcoded facts table used to sit here, on every one of the 202
+    courthouse profile pages — the canonical URL sitemap.xml advertises for
+    each courthouse:
+
+        Established   1879
+        Jurisdiction  State
+        Chief Judge   Hon. Sarah Johnson, Appointed 2018
+        Departments   Criminal · Civil · Family · Probate · Appellate
+
+    All invented, and self-contradicting now that the directory holds real
+    courts: every courthouse in it is FEDERAL, so "Jurisdiction: State" was
+    wrong on all 202 pages, and "Hon. Sarah Johnson" is not a judge — she is a
+    leftover from resources/data/sample.ts, asserted as the sitting chief judge
+    of the Supreme Court of the United States among others.
+
+    Removed rather than emptied, because the surrounding sections are real:
+    `aboutText` above and the "By the numbers" panel below both read from the
+    courthouse store. A fabricated block sandwiched between two real ones is
+    the worst case — it inherits their credibility.
+
+    Two of these fields are recoverable. CourtListener's `courts` table carries
+    `start_date` (establishment) and `jurisdiction`, both already downloaded by
+    scripts/ingest-courtlistener.ts and currently discarded; adding two columns
+    would make Established and Jurisdiction real. Chief judge is derivable from
+    the positions table (position_type 'c-jud'). Departments are not — federal
+    district courts do not have them.
+  --}}
 
   <div class="mt-12">
     <h3 class="font-semibold text-base text-gray-800">By the numbers</h3>
