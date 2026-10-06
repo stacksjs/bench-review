@@ -28,6 +28,26 @@
   const tabsJudgeId = state<number>(resolveJudgeId())
   const activeTab = state<'reviews' | 'cases' | 'rulings' | 'profile'>(resolveActiveTab())
 
+  // Hrefs as DERIVED STRINGS, not as template literals inside x-to.
+  //
+  // Interpolating the id directly into x-to (a backtick template literal
+  // referencing tabsJudgeId) rendered the literal text
+  // "/judges/undefined/reviews" into the HTML and never re-evaluated on the
+  // client, so every tab linked to an unresolvable URL and clicking one
+  // dumped the user on the /judges directory. Verified in a browser against
+  // the built artifact.
+  //
+  // Two things go wrong there: the interpolation is evaluated once at build
+  // time, where the signal is not resolvable, and a template literal inside a
+  // binding attribute is the pattern stx handles least well (see the
+  // no-URL-template-literal and no-ternary-with-template-literal notes). A
+  // derived that returns a plain concatenated string avoids both — it is a
+  // normal reactive value, so it resolves on the client like `activeTab` does.
+  const reviewsHref = derived<string>(() => '/judges/' + tabsJudgeId() + '/reviews')
+  const casesHref = derived<string>(() => '/judges/' + tabsJudgeId() + '/cases')
+  const rulingsHref = derived<string>(() => '/judges/' + tabsJudgeId() + '/rulings')
+  const profileHref = derived<string>(() => '/judges/' + tabsJudgeId() + '/profile')
+
   onMount(() => {
     tabsJudgeId.set(resolveJudgeId())
     activeTab.set(resolveActiveTab())
@@ -38,28 +58,28 @@
   <div class="hidden sm:block">
     <nav class="flex -mb-px space-x-8 border-b border-gray-200" aria-label="Tabs">
       <StxLink
-        x-to="`/judges/${tabsJudgeId}/reviews`"
+        x-to="reviewsHref"
         class="px-1 py-4 font-medium text-sm whitespace-nowrap border-b-2 transition-colors"
         x-class="activeTab === 'reviews' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
       >
         Reviews
       </StxLink>
       <StxLink
-        x-to="`/judges/${tabsJudgeId}/cases`"
+        x-to="casesHref"
         class="px-1 py-4 font-medium text-sm whitespace-nowrap border-b-2 transition-colors"
         x-class="activeTab === 'cases' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
       >
         Cases
       </StxLink>
       <StxLink
-        x-to="`/judges/${tabsJudgeId}/rulings`"
+        x-to="rulingsHref"
         class="px-1 py-4 font-medium text-sm whitespace-nowrap border-b-2 transition-colors"
         x-class="activeTab === 'rulings' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
       >
         Recent rulings
       </StxLink>
       <StxLink
-        x-to="`/judges/${tabsJudgeId}/profile`"
+        x-to="profileHref"
         class="px-1 py-4 font-medium text-sm whitespace-nowrap border-b-2 transition-colors"
         x-class="activeTab === 'profile' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
       >

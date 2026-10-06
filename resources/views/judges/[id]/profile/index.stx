@@ -1,17 +1,15 @@
-{{--
-  NOT pre-rendered, on purpose.
-
-  Enumerating this route produced one page per judge — 2,740 of them — and with
-  six such per-judge routes the SSG was emitting 20,028 pages and dying with
-  "Out of memory" partway through, which also meant no sitemap.xml, no SEO head
-  injection and no CSP for anything.
-
-  Only the canonical /judges/:id page is pre-rendered now. This route is a tab
-  of that page whose content is fetched client-side from the API, so a crawler
-  was getting a shell plus head tags, not content — the cheapest 10,960 pages
-  to give up. `preview.ts` SHELL_REWRITES serves it from the judge's own
-  pre-rendered page, and the host must do the same (see DEPLOY.md).
---}}
+<script server>
+// Enumerate this route as a SINGLE shell shared by every judge, not one page
+// per judge. See judgeShellPath() in app/Helpers/staticPaths.ts for why, and
+// preview.ts SHELL_REWRITES for how /judges/:id/<tab> reaches it. Two lines on
+// purpose: stx's SSG extracts this body by regex and stops at the first line
+// starting with `}`, and evaluates it via `new Function`, so there is no module
+// scope to import into.
+export async function getStaticPaths() {
+  const mod = await import(`${process.cwd()}/app/Helpers/staticPaths.ts`)
+  return mod.judgeShellPath()
+}
+</script>
 
 @extends('layouts/default')
 

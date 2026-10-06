@@ -25,6 +25,28 @@ interface StaticPathsResult { paths: StaticPath[] }
 const toPaths = (rows: Array<{ id: number }>): StaticPathsResult =>
   ({ paths: rows.map(r => ({ params: { id: String(r.id) } })) })
 
+/**
+ * ONE shell page shared by every judge, for the tab routes.
+ *
+ * Enumerating /judges/:id/{profile,reviews,rulings,cases} per judge meant four
+ * pages × 2,740 judges, and with the other per-judge routes the SSG reached
+ * 20,028 pages and died with "Out of memory" partway through — taking
+ * sitemap.xml, the SEO injection and the CSP down with it.
+ *
+ * These views do not actually need a page per judge: `Bench/Judge/JudgeTabs`
+ * and each panel already resolve the judge from `location.pathname`
+ * (`/^\/judges\/(\d+)/`) rather than from a build-time param, precisely
+ * because stx leaves `window.stx._rp` unset on a hard reload. So one shell per
+ * tab renders identically for every judge once hydrated, and `preview.ts`
+ * rewrites /judges/:id/reviews onto /judges/_shell/reviews.html.
+ *
+ * `_shell` is deliberately not a number: judge ids are numeric, so it can
+ * never collide with a real /judges/:id/... URL.
+ */
+export function judgeShellPath(): StaticPathsResult {
+  return { paths: [{ params: { id: '_shell' } }] }
+}
+
 /** Every judge — drives /judges/:id/{profile,reviews,rulings,cases}. */
 export async function judgePaths(): Promise<StaticPathsResult> {
   const rows = await ((db.selectFrom('judges') as any)

@@ -62,11 +62,17 @@ const distDir = 'dist'
 const SHELL_REWRITES: Array<[RegExp, string]> = [
   [/^\/verify-email\/[^/]+\/[^/]+\/?$/, '/verify-email.html'],
 
-  // Judge tabs. Only the canonical /judges/:id page is pre-rendered — see the
-  // comment in each of those views. The tab content is fetched client-side, so
-  // serving that judge's own page is the correct shell: same component tree,
-  // and the URL survives so the tab can be selected from location.pathname.
-  [/^\/judges\/([^/]+)\/(?:profile|reviews|rulings|cases)\/?$/, '/judges/$1.html'],
+  // Judge tabs -> the ONE shell page built for that tab, shared by every judge.
+  //
+  // Note the capture is the TAB, not the id. Pointing these at the judge's own
+  // /judges/$1.html was wrong and verified broken in the browser: that view is
+  // a separate, older judge page that includes only Bench/Judge/ProfileHeader,
+  // so a deep link to /judges/1/reviews rendered the header and an unstyled tab
+  // bar with no panel at all — no reviews list, no JudgeTabs scope registered.
+  // The /judges/:id/<tab> views are the ones that include JudgeTabs plus their
+  // panel, and they resolve the judge from location.pathname, so one shell per
+  // tab serves every judge correctly.
+  [/^\/judges\/[^/]+\/(profile|reviews|rulings|cases)\/?$/, '/judges/_shell/$1.html'],
 
   // Write-a-review forms. Auth-gated, so there is nothing to pre-render per
   // judge; the shell reads the id off location.pathname.

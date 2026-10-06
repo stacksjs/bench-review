@@ -55,15 +55,24 @@ routes and the auth-gated review forms are served from a shell instead:
 
 | Request | Serve (status 200) |
 |---|---|
-| `/judges/:id/profile`, `/reviews`, `/rulings`, `/cases` | `/judges/:id.html` — that judge's own page |
+| `/judges/:id/profile`, `/reviews`, `/rulings`, `/cases` | `/judges/_shell/<tab>.html` — one shell per tab, shared by every judge |
 | `/judges/review/:id` | `/judges/review.html` |
 | `/review/:id` | `/review.html` |
 
-Note the first one carries the id through, so it is a capture rewrite, not a
-fixed target: `^/judges/([^/]+)/(?:profile|reviews|rulings|cases)/?$` →
-`/judges/$1.html`. As with the verify-email rule these must be **rewrites**,
-not redirects — the components read the id and the active tab off
-`location.pathname`, so the URL has to survive.
+Note the first one captures the **tab**, not the id:
+`^/judges/[^/]+/(profile|reviews|rulings|cases)/?$` → `/judges/_shell/$1.html`.
+There is one shell per tab rather than one page per judge because `JudgeTabs`
+and each panel resolve the judge from `location.pathname`, not from a
+build-time param.
+
+Do NOT point these at the judge's own `/judges/:id.html`. That was tried and
+verified broken in a browser: `judges/[id].stx` is a separate, older judge page
+that includes only `Bench/Judge/ProfileHeader`, so a deep link rendered the
+header and an unstyled tab bar with no panel at all.
+
+As with the verify-email rule these must be **rewrites**, not redirects — the
+components read the id and the active tab off `location.pathname`, so the URL
+has to survive.
 
 `preview.ts`'s `SHELL_REWRITES` is the source of truth for these; the
 conformance gate parses that array to check every dynamic route is either
