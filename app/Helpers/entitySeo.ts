@@ -129,10 +129,10 @@ export async function loadEntitySeo(base: string): Promise<Map<string, EntitySeo
 
     const person: Record<string, unknown> = {
       '@type': 'Person',
-      '@id': `${base}/judges/${j.id}/profile#person`,
+      '@id': `${base}/judges/${j.id}#person`,
       'name': name,
       'jobTitle': 'Judge',
-      'url': `${base}/judges/${j.id}/profile`,
+      'url': `${base}/judges/${j.id}`,
     }
     if (j.image_url) person.image = j.image_url
     if (courtName) person.affiliation = { '@type': 'Organization', 'name': courtName }
@@ -156,14 +156,31 @@ export async function loadEntitySeo(base: string): Promise<Map<string, EntitySeo
       ['rulings', `Rulings by ${name}`, `Recent rulings and decisions attributed to ${name}${where}.`],
       ['cases', `Cases before ${name}`, `Cases heard by ${name}${where}, as reported by Bench Review contributors.`],
     ]
+    // The CANONICAL page. sitemap.ts advertises /judges/:id, not a tab, and
+    // that page is what Google indexes -- so the per-judge head has to land
+    // here or it lands nowhere. It previously landed nowhere: the per-tab puts
+    // below address judges/<id>/<tab>.html, which stopped existing when the
+    // tabs became shell-served (one built file per tab for all 2,740 judges),
+    // so every put was a silent no-op and all 2,740 sitemap'd pages shipped
+    // the view's generic "Judge Profile" title. Verified: 2740 of 2740.
+    const [, profileTitle, profileDescription] = tabs[0]
+    put(`judges/${j.id}.html`, {
+      path: `/judges/${j.id}`,
+      title: `${profileTitle} | Bench Review`,
+      description: profileDescription,
+      nodes: [person],
+    })
+
+    // The tab routes. No-ops while those routes are served by a shared shell,
+    // kept so the heads are correct if a tab is ever pre-rendered per id again.
+    // The Person node stays on the canonical page only, so one @id is never
+    // asserted with different content on several URLs.
     for (const [tab, title, description] of tabs) {
       put(`judges/${j.id}/${tab}.html`, {
         path: `/judges/${j.id}/${tab}`,
         title: `${title} | Bench Review`,
         description,
-        // Only the canonical profile tab claims the Person node, so the same
-        // @id isn't asserted with different content on four URLs.
-        nodes: tab === 'profile' ? [person] : [],
+        nodes: [],
       })
     }
   }
