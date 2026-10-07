@@ -18,10 +18,12 @@ import type { MobileConfig } from '@stacksjs/types/mobile'
  *   - under MOBILE_E2E: `webAssets: 'dist'` only, so the end-to-end run never
  *     depends on a network.
  *
- * bench already pre-renders every page into `dist/` (3,593 of them: every
- * judge, every courthouse, every static page), which is exactly what the
- * offline bundle needs. Run `bun run build` before a mobile build or the
- * bundled copy is whatever was in `dist/` last.
+ * The offline copy is `dist-offline/`, NOT `dist/`. `dist/` pre-renders a page
+ * per entity and weighs 430 MB — unshippable, and `simctl install` times out
+ * on it. `scripts/build-offline-bundle.ts` strips the per-entity page trees to
+ * get 10.5 MB, which costs nothing offline: the API is unreachable then too, so
+ * a bundled judge page shows the same empty state as the shared tab shell that
+ * is kept. Run `bun run build:ios`, which chains build -> bundle -> generate.
  *
  * ## Capabilities
  *
@@ -51,10 +53,10 @@ const personalTeam = envVars.IOS_PERSONAL_TEAM === '1'
 // End-to-end runs load the bundled site so they never depend on the network;
 // every other build prefers the live site and keeps `dist/` as the fallback.
 const mobileContent = envVars.MOBILE_E2E === '1'
-  ? { webAssets: 'dist' }
+  ? { webAssets: 'dist-offline' }
   : {
       url: envVars.MOBILE_URL ?? 'https://benchreview.org',
-      fallbackWebAssets: 'dist',
+      fallbackWebAssets: 'dist-offline',
     }
 
 export default {

@@ -8,6 +8,8 @@
     "dev": "./buddy dev",
     "build": "bun build.ts",
     "build:stacks": "./buddy build",
+    "build:offline-bundle": "bun scripts/build-offline-bundle.ts",
+    "build:ios": "bun run build && bun run build:offline-bundle && ./buddy build:ios",
     "preview": "bun preview.ts",
     "start": "bun preview.ts",
     "lint": "bunx --bun pickier .",
