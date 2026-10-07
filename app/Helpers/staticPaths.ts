@@ -47,6 +47,30 @@ export function judgeShellPath(): StaticPathsResult {
   return { paths: [{ params: { id: '_shell' } }] }
 }
 
+/**
+ * ONE shell page shared by every courthouse, for the tab routes.
+ *
+ * Same shape as judgeShellPath, and the same reasoning: /court-houses/:id/
+ * {profile,bench,reviews} was 3 pages x 202 courthouses = 606 built files,
+ * roughly 143 MB of dist/, none of which held anything a shared shell cannot
+ * render. Bench/Court/{CourtTabs,CourtHeader,CourtProfile} resolve the
+ * courthouse from useRoute().params with a path fallback, so one shell per tab
+ * serves all 202 once hydrated, and preview.ts rewrites
+ * /court-houses/:id/<tab> onto /court-houses/_shell/<tab>.html.
+ *
+ * The per-courthouse head moves with it: entitySeo now writes the real title,
+ * description and CivicStructure node to court-houses/<id>.html, the canonical
+ * page the sitemap advertises, because a shell serving 202 courthouses cannot
+ * carry a per-courthouse head. Skipping that step is how all 2,740 judge pages
+ * ended up sharing one generic title.
+ *
+ * `_shell` is deliberately not a number: courthouse ids are numeric, so it can
+ * never collide with a real /court-houses/:id/... URL.
+ */
+export function courtShellPath(): StaticPathsResult {
+  return { paths: [{ params: { id: '_shell' } }] }
+}
+
 /** Every judge — drives /judges/:id/{profile,reviews,rulings,cases}. */
 export async function judgePaths(): Promise<StaticPathsResult> {
   const rows = await ((db.selectFrom('judges') as any)

@@ -10,73 +10,35 @@ export async function getStaticPaths() {
 }
 </script>
 
-<script client>
-  // Redirect shell for /court-houses/{id}.
-  //
-  // ## What this used to render
-  //
-  // A full courthouse header — image, name, address, stat panel — resolved
-  // from the hardcoded sample list:
-  //
-  //     const court = derived(() => courtHouses.find(c => c.id === params.id)
-  //                                 || courtHouses[0])
-  //
-  // That list holds four invented courthouses ("Supreme Court of California",
-  // "Appellate Court of New York", ...). The real table has 202 rows, so ids
-  // 1-4 rendered the WRONG courthouse and ids 5-202 fell through to
-  // `courtHouses[0]` — meaning every one of the 202 built pages displayed
-  // "Supreme Court of California", regardless of which courthouse it was for.
-  // Verified: that string appeared in all 202 files of the built artifact.
-  //
-  // In a browser the damage was brief, because this page has always redirected
-  // to the profile tab on mount. But the static HTML is what a crawler indexes
-  // and what a no-JS visitor sees, and it named the wrong institution every
-  // time.
-  //
-  // ## Why it is now empty
-  //
-  // Redirecting is this route's entire job, and has been since the tab views
-  // landed: /court-houses/{id}/profile is the real page, backed by the
-  // courthouse store, and it is what sitemap.xml advertises for each
-  // courthouse. So there is nothing for this page to show that is not either a
-  // duplicate of the profile tab or, as before, a fabrication.
-  //
-  // The `redirecting` state is load-bearing, not decoration: a <script client>
-  // with no state/derived/effect call registers an EMPTY scope, and an empty
-  // scope would take `onMount` — and therefore the redirect — down with it.
-  // Binding it to the paragraph below keeps this component on the healthy
-  // compile path.
+{{--
+  The canonical courthouse page.
 
-  useHead({ title: 'Court House - Bench Review' })
+  It used to be a redirect shell that bounced to /court-houses/:id/profile.
+  That was fine while the profile tab was pre-rendered per courthouse: the tab
+  carried the real content and the real per-courthouse head, and the sitemap
+  pointed at it.
 
-  const redirecting = state<boolean>(true)
+  The tabs are now one shared shell for all 202 courthouses, which cannot carry
+  a per-courthouse head, so the sitemap points here instead. Advertising a
+  client-side redirect as canonical hands a crawler a page whose only content is
+  "Opening courthouse profile..." -- the complaint in #64 -- so this renders the
+  courthouse itself, the same components the profile tab shows, and entitySeo
+  writes the real title, description and CivicStructure node onto it.
 
-  onMount(() => {
-    if (typeof window === 'undefined') return
-    const m = window.location.pathname.match(/^\/court-houses\/(\d+)\/?$/)
-    if (m) {
-      navigate(`/court-houses/${m[1]}/profile`, true)
-      return
-    }
-    // Reached with a non-numeric id, so there is nothing to redirect to.
-    redirecting.set(false)
-  })
-</script>
+  Mirrors /judges/:id, which has been the canonical judge page all along for the
+  same reason. No client script here on purpose: the three includes carry their
+  own scopes, and a block that only called useHead would register an empty one.
+--}}
 
 @extends('layouts/default')
 @section('title', 'Court House - Bench Review')
 @section('content')
   <div>
     <main>
-      <div class="mx-auto px-4 py-24 sm:px-6 lg:px-8 max-w-2xl text-center">
-        <p class="text-gray-500 text-sm" x-class="redirecting() ? '' : 'hidden'">Opening courthouse profile…</p>
-        <div x-class="redirecting() ? 'hidden' : ''">
-          <h1 class="font-semibold text-gray-900 text-xl">Courthouse not found</h1>
-          <p class="mt-2 text-gray-600 text-sm">
-            That courthouse address doesn't look right.
-            <StxLink to="/court-houses" class="font-medium text-blue-600 underline hover:text-blue-700">Browse the courthouse directory</StxLink>.
-          </p>
-        </div>
+      @include('Bench/Court/CourtHeader')
+      @include('Bench/Court/CourtTabs')
+      <div class="mx-auto px-4 py-8 sm:px-6 lg:px-8 max-w-7xl">
+        @include('Bench/Court/CourtProfile')
       </div>
     </main>
   </div>

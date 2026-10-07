@@ -49,9 +49,14 @@ export const CANONICAL_BASE: string = site.url.replace(/\/+$/, '')
 
 /**
  * Build the full sitemap XML from current DB content. Every judge gets a
- * /judges/:id entry, every courthouse /court-houses/:id/profile, every
+ * /judges/:id entry, every courthouse /court-houses/:id, every
  * PUBLISHED review /article/:id (pending/rejected omitted so the sitemap
  * matches what anonymous visitors actually see).
+ *
+ * Courthouses point at /court-houses/:id for the same reason, since the three
+ * courthouse tabs became shell-served too. The canonical page renders the
+ * courthouse itself rather than redirecting, so what is advertised here is a
+ * real page with a real per-courthouse head.
  *
  * Judges point at /judges/:id, NOT /judges/:id/profile. The profile tab is no
  * longer pre-rendered — enumerating six pages per judge took the build to
@@ -102,7 +107,7 @@ export async function buildSitemapXml(base: string): Promise<string> {
 
   for (const c of courts) {
     entries.push(`  <url>
-    <loc>${base}/court-houses/${c.id}/profile</loc>
+    <loc>${base}/court-houses/${c.id}</loc>
     <lastmod>${toLastMod(c.updated_at)}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>

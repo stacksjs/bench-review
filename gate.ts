@@ -348,7 +348,13 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
     // against a database holding no judges at all — defeating, for the busiest
     // route in the app, the one thing this check exists to catch.
     { label: 'judges', ids: judgePaths, file: id => `judges/${id}.html`, reference: true },
-    { label: 'court-houses', ids: courtPaths, file: id => `court-houses/${id}/profile.html`, reference: true },
+    // The canonical courthouse page, not court-houses/:id/profile: the three
+    // courthouse tabs are now served by one shared shell each, exactly like the
+    // judge tabs above, so probing for a per-id profile file would report an
+    // empty database on every healthy build. This is the drift that check
+    // caught when the tabs were converted -- 202 of 202 "missing" -- which is
+    // the check working, not failing.
+    { label: 'court-houses', ids: courtPaths, file: id => `court-houses/${id}.html`, reference: true },
     { label: 'article', ids: articlePaths, file: id => `article/${id}.html`, reference: false },
   ]
 

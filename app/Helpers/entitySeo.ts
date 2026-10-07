@@ -194,9 +194,9 @@ export async function loadEntitySeo(base: string): Promise<Map<string, EntitySeo
 
     const place: Record<string, unknown> = {
       '@type': 'CivicStructure',
-      '@id': `${base}/court-houses/${c.id}/profile#place`,
+      '@id': `${base}/court-houses/${c.id}#place`,
       'name': name,
-      'url': `${base}/court-houses/${c.id}/profile`,
+      'url': `${base}/court-houses/${c.id}`,
     }
     if (c.image) place.image = c.image
     if (c.address || locality || c.zip_code) {
@@ -215,12 +215,28 @@ export async function loadEntitySeo(base: string): Promise<Map<string, EntitySeo
       ['bench', `Judges of ${name}`, `The ${bench.length === 1 ? 'judge' : 'judges'} sitting at ${name}${at}${bench.length ? ` (${bench.length})` : ''}.`],
       ['reviews', `Reviews at ${name}`, `Reviews of judges sitting at ${name}${at}, from attorneys, clerks, and court staff.`],
     ]
+    // The CANONICAL page, for the same reason as judges above: sitemap.ts
+    // advertises /court-houses/:id, the tab routes are served by one shared
+    // shell that cannot carry a per-courthouse head, and without this every
+    // courthouse page would ship the view's generic "Court House - Bench
+    // Review" title.
+    const [, profileTitle, profileDescription] = tabs[0]
+    put(`court-houses/${c.id}.html`, {
+      path: `/court-houses/${c.id}`,
+      title: `${profileTitle} | Bench Review`,
+      description: profileDescription,
+      nodes: [place],
+    })
+
+    // The tab routes. No-ops while shell-served; kept correct for the day a
+    // tab is pre-rendered per id again. The CivicStructure node stays on the
+    // canonical page only.
     for (const [tab, title, description] of tabs) {
       put(`court-houses/${c.id}/${tab}.html`, {
         path: `/court-houses/${c.id}/${tab}`,
         title: `${title} | Bench Review`,
         description,
-        nodes: tab === 'profile' ? [place] : [],
+        nodes: [],
       })
     }
   }

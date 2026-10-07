@@ -74,6 +74,15 @@ const SHELL_REWRITES: Array<[RegExp, string]> = [
   // tab serves every judge correctly.
   [/^\/judges\/[^/]+\/(profile|reviews|rulings|cases)\/?$/, '/judges/_shell/$1.html'],
 
+  // Courthouse tabs -> the ONE shell page built for that tab, shared by every
+  // courthouse. Same shape as the judge rule above, and the capture is again
+  // the TAB, not the id: /court-houses/42/bench resolves to the bench shell,
+  // which reads the courthouse from useRoute().params with a path fallback.
+  //
+  // /court-houses/:id itself is NOT rewritten -- it is pre-rendered per
+  // courthouse and is what sitemap.ts advertises.
+  [/^\/court-houses\/[^/]+\/(profile|bench|reviews)\/?$/, '/court-houses/_shell/$1.html'],
+
   // Write-a-review forms. Auth-gated, so there is nothing to pre-render per
   // judge; the shell reads the id off location.pathname.
   [/^\/judges\/review\/([^/]+)\/?$/, '/judges/review.html'],
