@@ -6,8 +6,19 @@
 
   function resolveCourtId(): number {
     if (typeof window === 'undefined') return 0
-    const fromRouter = Number((window as any).stx?._rp?.id)
-    if (Number.isFinite(fromRouter) && fromRouter > 0) return fromRouter
+    // stx-standards 9.10: route params come from useRoute(), never from
+    // re-parsing the URL. useRoute().params reads a signal that the runtime
+    // primes from the id the build injects into <head> -- byte 520 of
+    // court-houses/1/profile.html, well before the runtime loads -- so it is
+    // already populated by the time this runs on a hard reload. useRoute is
+    // auto-imported; do not hand-import it.
+    const fromRoute = Number(useRoute().params.id)
+    if (Number.isFinite(fromRoute) && fromRoute > 0) return fromRoute
+    // Shell fallback, and the reason this is not a bare useRoute() call. When
+    // one built page serves many ids the injected param is the literal
+    // '_shell' -- that is how the judge tabs work today, and how courthouse
+    // tabs will work once #83 lands -- and the real id exists only in the
+    // path. Keeping this here means #83 does not have to reopen these files.
     const m = window.location.pathname.match(/^\/court-houses\/(\d+)/)
     return m ? Number(m[1]) : 0
   }
