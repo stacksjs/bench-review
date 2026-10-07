@@ -122,7 +122,7 @@ export default defineModel({
           max: 'State must be 2 characters',
         },
       },
-      factory: faker => faker.location.state({ abbreviated: true }),
+      factory: faker => faker.location.stateAbbr(),
     },
 
     zipCode: {
