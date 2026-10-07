@@ -74,10 +74,21 @@ export default {
     urlSchemes: ['benchreview'],
 
     appIcon: 'public/images/app/bench-review-app-icon.png',
-    // The footer navy from the Gavel Blue design system
-    // (`Bench/BenchFooter.stx` → `bg-[#0b1e3b]`), so the launch screen matches
-    // the site's own chrome instead of flashing white.
-    backgroundColor: '#0b1e3b',
+    // White, because that is what the site actually renders as: `<body>` carries
+    // no background class on any page, so every browser paints it white and the
+    // content is styled for it (the root page's h1 is `text-gray-900`, the pill
+    // `text-gray-600`).
+    //
+    // This was the footer navy (#0b1e3b) first, on the reasoning that it would
+    // match the site's chrome. It does not — the footer is the only navy
+    // surface. Because no page paints its own background, the WebView's colour
+    // IS the page background, so navy put dark-grey text on a dark-navy field
+    // and the first screen was close to unreadable. Verified on an iPhone 17
+    // Pro simulator in light appearance, so it was not a dark-mode fault.
+    //
+    // Change this only together with a page that actually sets its own
+    // background.
+    backgroundColor: '#ffffff',
     // The site renders light-only — the conformance gate's visual check runs
     // THEMES = ['light'] — so claiming dark support would hand iOS a dark
     // container around a light page.
