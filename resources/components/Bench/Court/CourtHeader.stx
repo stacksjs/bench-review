@@ -49,20 +49,21 @@
     return courtsStore.courtHouses().find((c: any) => Number(c.id) === id) || null
   })
 
-  // OG / Twitter card defaults (bench-review#32). Generic per-
-  // page-type baseline; per-courthouse interpolation needs
-  // server-side data resolution (follow-up).
-  useSeoMeta({
-    description: 'Courthouse profile on Bench Review — judges sitting on this bench, plus reviews from the people who appear before them.',
-    ogTitle: 'Courthouse profile — Bench Review',
-    ogDescription: 'Judges, reviews, and contact info for this courthouse.',
-    ogType: 'place',
-    ogImage: '/images/og-image.png',
-    twitterCard: 'summary_large_image',
-    twitterTitle: 'Courthouse profile — Bench Review',
-    twitterDescription: 'Judges, reviews, and contact info for this courthouse.',
-    twitterImage: '/images/og-image.png',
-  })
+  // No useSeoMeta here any more.
+  //
+  // This used to set a generic baseline -- ogTitle 'Courthouse profile — Bench
+  // Review' and friends -- with a comment saying per-courthouse interpolation
+  // needed server-side data resolution as a follow-up. That follow-up exists
+  // now: entitySeo resolves each courthouse at build time and injects the real
+  // title, description, og and twitter tags into court-houses/<id>.html, which
+  // is the page the sitemap advertises.
+  //
+  // So this call had stopped being a baseline and become an override, replacing
+  // the real per-courthouse values with generic ones the moment the component
+  // hydrated. Verified: the built page carries og:title 'Court of Appeals for
+  // the Sixth Circuit in Cincinnati | Bench Review', while document.title in
+  // the browser read 'Courthouse profile — Bench Review'. Crawlers that run JS
+  // saw the generic one.
 
   const courtName = derived<string>(() => (currentCourt() as any)?.name || '')
   const courtCity = derived<string>(() => (currentCourt() as any)?.city || '')
