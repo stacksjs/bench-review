@@ -22,6 +22,22 @@
   const courtTabsId = state<number>(resolveCourtId())
   const courtActiveTab = state<'profile' | 'reviews' | 'bench'>(resolveActiveTab())
 
+  // Hrefs as DERIVED STRINGS, not template literals inside x-to.
+  //
+  // Interpolating the id straight into x-to evaluates once, at build time,
+  // while courtTabsId is still its initial 0 -- so every built courthouse page
+  // shipped href="/court-houses/undefined/profile" and all three tabs led
+  // nowhere. Verified in the artifact: dist/court-houses/1/profile.html
+  // contained only the three 'undefined' hrefs, never a real id.
+  //
+  // A derived returning a concatenated string re-evaluates after onMount sets
+  // the real id. Same fix, same reason, as Bench/Judge/JudgeTabs, which hit
+  // this first. Concatenation rather than interpolation on purpose: a backtick
+  // in a client script is its own hazard.
+  const courtProfileHref = derived<string>(() => '/court-houses/' + courtTabsId() + '/profile')
+  const courtBenchHref = derived<string>(() => '/court-houses/' + courtTabsId() + '/bench')
+  const courtReviewsHref = derived<string>(() => '/court-houses/' + courtTabsId() + '/reviews')
+
   onMount(() => {
     courtTabsId.set(resolveCourtId())
     courtActiveTab.set(resolveActiveTab())
@@ -32,21 +48,21 @@
   <div class="hidden sm:block">
     <nav class="flex -mb-px space-x-8 border-b border-gray-200" aria-label="Tabs">
       <StxLink
-        x-to="`/court-houses/${courtTabsId}/profile`"
+        x-to="courtProfileHref"
         class="px-1 py-4 font-medium text-sm whitespace-nowrap border-b-2 transition-colors"
         x-class="courtActiveTab === 'profile' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
       >
         Profile
       </StxLink>
       <StxLink
-        x-to="`/court-houses/${courtTabsId}/bench`"
+        x-to="courtBenchHref"
         class="px-1 py-4 font-medium text-sm whitespace-nowrap border-b-2 transition-colors"
         x-class="courtActiveTab === 'bench' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
       >
         Judges on the Bench
       </StxLink>
       <StxLink
-        x-to="`/court-houses/${courtTabsId}/reviews`"
+        x-to="courtReviewsHref"
         class="px-1 py-4 font-medium text-sm whitespace-nowrap border-b-2 transition-colors"
         x-class="courtActiveTab === 'reviews' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
       >
