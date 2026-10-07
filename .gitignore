@@ -37,6 +37,9 @@ custom-cli
 storage/framework/stx/*
 !storage/framework/stx/routes.ts
 !storage/framework/stx/route-types.d.ts
+# Generated native project — `./buddy build:ios` regenerates it from
+# config/mobile.ts, and it carries a copy of dist/ as the offline bundle.
+storage/framework/mobile/
 .qb
 .claude
 pantry
