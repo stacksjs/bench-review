@@ -489,23 +489,47 @@
       </div>
 
       <div>
-        <label for="rating" class="block font-medium text-gray-900 text-sm">Overall Rating</label>
+        {{-- A span with an id, not `<label for="rating">`: there is no single
+            control called "rating" to label — the widget is five buttons —
+            so the `for` pointed at nothing and the group had no accessible
+            name. `aria-labelledby` on the radiogroup is the shape that
+            actually works (bench-review#58). --}}
+        <span id="rating-label" class="block font-medium text-gray-900 text-sm">Overall Rating</span>
         <div class="flex items-center mt-2 space-x-2">
-          <div class="flex items-center space-x-1 rounded-md" x-class="ratingError() ? 'ring-2 ring-red-300 ring-offset-2' : ''">
+          <div
+            role="radiogroup"
+            aria-labelledby="rating-label"
+            class="flex items-center space-x-1 rounded-md"
+            x-class="ratingError() ? 'ring-2 ring-red-300 ring-offset-2' : ''"
+          >
+            {{-- Each star is a radio with its own name and checked state, so a
+                screen reader announces "Rate 4 of 5, radio button, selected"
+                instead of five identical unnamed buttons. --}}
             <button
               :for="star in stars"
               type="button"
+              role="radio"
               x-disabled="!judge"
-              class="hover:text-amber-400 focus:outline-none disabled:opacity-50 transition-colors disabled:cursor-not-allowed"
+              x-aria-checked="rating === star ? 'true' : 'false'"
+              x-aria-label="'Rate ' + star + ' of 5'"
+              class="hover:text-amber-400 rounded focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 focus:outline-none disabled:opacity-50 transition-colors disabled:cursor-not-allowed"
               x-class="(hoverRating || rating) >= star ? 'text-amber-400' : 'text-gray-300'"
               @click="rating.set(star); ratingError.set(false)"
               @mouseenter="hoverRating.set(star)"
               @mouseleave="hoverRating.set(0)"
             >
-              <Icon name="heroicons:star-solid" size="32" />
+              {{-- Filled vs outlined, not amber vs grey. Colour was the only
+                  visual cue for which stars were chosen, which fails WCAG
+                  1.4.1 for anyone who cannot distinguish the two. The outline
+                  is the default so the pre-JS render shows an empty rating,
+                  which is the correct starting state. --}}
+              <span :show="(hoverRating || rating) >= star" style="display:none"><Icon name="star-solid" size="32" /></span>
+              <span :show="(hoverRating || rating) < star"><Icon name="star" size="32" /></span>
             </button>
           </div>
-          <span class="ml-3 font-medium text-gray-700 text-sm">{{ ratingText() }}</span>
+          {{-- aria-live so the choice is announced after a click, which is the
+              only confirmation a non-sighted user gets that it registered. --}}
+          <span class="ml-3 font-medium text-gray-700 text-sm" aria-live="polite">{{ ratingText() }}</span>
         </div>
       </div>
 

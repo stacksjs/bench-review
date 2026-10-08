@@ -1,6 +1,18 @@
+{{-- Skip link. First focusable thing in the document, visually hidden until
+    it takes focus, so a keyboard or screen-reader user can jump past the
+    header's nav, search and account controls instead of tabbing through them
+    on every page (bench-review#58). `sr-only focus:not-sr-only` is the
+    standard pair; the positioning classes only matter once it is shown. --}}
+<a
+  href="#main"
+  class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:px-4 focus:py-2 focus:font-semibold focus:text-sm focus:text-white focus:bg-blue-600 focus:rounded-lg focus:shadow-lg"
+>Skip to content</a>
+
 @include('Bench/BenchHeader')
 
-<main class="py-16 bg-off-white">
+{{-- id="main" is the skip link's target. One <main> per page lives here, in
+    the layout, per stx-standards 2.8/3.5 — views must not open another. --}}
+<main id="main" class="py-16 bg-off-white">
   @slot('content')
 </main>
 
