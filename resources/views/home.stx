@@ -263,8 +263,13 @@
     {{-- Trending this week (bench-review#34). Shows judges with the
         most reviews in the last 7 days. Hidden entirely when there's
         no activity to surface — empty trending bands read worse than
-        a missing section. --}}
-    <div class="py-16 bg-white" x-class="showTrending() ? '' : 'hidden'">
+        a missing section.
+
+        That is why this is `:show` and not an x-class 'hidden' toggle:
+        x-class is evaluated in the browser only, so the pre-rendered
+        home page painted exactly the empty band this guard exists to
+        prevent, every load, until the runtime booted. stx-standards 7.3. --}}
+    <div class="py-16 bg-white" :show="showTrending" style="display:none">
       <div class="mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         <div class="flex items-end justify-between">
           <div>
@@ -375,7 +380,14 @@
     {{-- Personalized CTA band (bench-review#43). Renders ONE of two
         banners depending on auth state; hides entirely for signed-in
         users who've already written at least one review (so the feed
-        below is the real signal for that audience). --}}
+        below is the real signal for that audience).
+
+        The anonymous banner KEEPS its x-class toggle, unlike its
+        signed-in sibling below. `isAnonymous` is true for a visitor who
+        is not signed in, which is most of this page's traffic, so this
+        band is usually correct in the first paint; `:show` would cloak
+        it and make it flash IN after hydration instead. The sibling
+        starts false for everyone and is cloaked. --}}
     <div
       class="py-12 bg-gradient-to-br from-blue-50 to-blue-50 via-white"
       x-class="isAnonymous() ? '' : 'hidden'"
@@ -396,7 +408,8 @@
 
     <div
       class="py-12 bg-gradient-to-br from-blue-50 to-blue-50 via-white"
-      x-class="showWriteFirstCta() ? '' : 'hidden'"
+      :show="showWriteFirstCta"
+      style="display:none"
     >
       <div class="mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl text-center">
         <h2 class="font-bold text-3xl text-gray-900 tracking-tight sm:text-4xl">Write your first review</h2>
@@ -466,7 +479,7 @@
         count here. Each card links to the reviewer's public profile
         once that lands (bench-review#29) — for now, links to
         /user/{id} which renders the bare shell. --}}
-    <div class="py-16 bg-white" x-class="showActiveReviewers() ? '' : 'hidden'">
+    <div class="py-16 bg-white" :show="showActiveReviewers" style="display:none">
       <div class="mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         <div class="flex items-end justify-between mb-8">
           <div>

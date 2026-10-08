@@ -324,10 +324,18 @@
     </ul>
 
     {{-- Numbered pagination (client-side over the filtered list).
-        Wrapper x-class toggle (not :if) so it stays in the DOM and
-        appears once last_page > 1. Numbered button uses item.cls
-        (precomputed) — no signal call-syntax in the :for. --}}
-    <div x-class="lastPage() > 1 ? 'flex flex-col items-center gap-3 mt-8' : 'hidden'">
+        `:show` (not :if) so the wrapper stays in the DOM and appears
+        once last_page > 1. Numbered button uses item.cls (precomputed)
+        — no signal call-syntax in the :for.
+
+        Layout classes are static per stx-standards 7.1 because bindShow
+        reveals by clearing `display`; as an x-class toggle this painted
+        a dead 'Prev Next Page 1 of 1' bar before the runtime booted. --}}
+    <div
+      class="flex flex-col gap-3 items-center mt-8"
+      :show="lastPage() > 1"
+      style="display:none"
+    >
       <nav class="flex flex-wrap gap-1.5 items-center justify-center" aria-label="Pagination">
         <button
           type="button"
