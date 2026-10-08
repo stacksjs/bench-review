@@ -1,8 +1,0 @@
-<div class="mt-8">
-  <h2 class="font-medium text-gray-800 text-lg">Your Reviews</h2>
-  <div class="mt-6 space-y-6">
-    <div :for="review in reviews">
-      @include('Bench/Feed', { review: review })
-    </div>
-  </div>
-</div>

@@ -1,3 +1,26 @@
+{{--
+  UNWIRED. Nothing includes this component, and it will not work as written —
+  it is kept because it records the intended mobile nav, not because it runs.
+
+  It is the only candidate answer to a real gap: BenchHeader hides all three
+  of its regions below `lg` (`hidden lg:flex` on the links, the search and the
+  auth buttons) and offers no hamburger, so on a phone the site header is the
+  logo and nothing else. That is also what the iOS app will show, since the
+  app is a WebView over this same site.
+
+  What has to be fixed before it can be included (bench-review#90):
+    - `isOpen` and `isAuthenticated` are not defined in this component's own
+      scope and no parent passes them; a component const or a
+      `useStore('auth')` reference has to supply both.
+    - `:if="isOpen"` is the wrong binder for a toggle that is false on first
+      render — bindIf drops it and never re-renders. Use `:show` with a static
+      `style="display:none"`, per stx-standards 7.3 and gate check 19.
+    - `isAuthenticated` is read both with and without parens in the same file.
+    - `<StxLink to="/logout">` points at a route that does not exist. Logout is
+      a store action; BenchHeader calls `auth.logout()`.
+    - `$dispatch('close')` is unverified against this stx version.
+--}}
+
 <script client>
   const mobileSearchQuery = state<string>('')
 
