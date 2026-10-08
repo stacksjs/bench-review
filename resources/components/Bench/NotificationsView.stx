@@ -113,12 +113,17 @@
       <div :if="store.loading() && store.items().length === 0" class="px-6 py-12 text-center text-gray-500 text-sm">
         Loading notifications…
       </div>
-      {{-- Empty state. x-class hidden so the inner :text bindings
-          stay subscribed across filter changes — bindIf would drop
-          them on re-add. --}}
+      {{-- Empty state. `:show`, not `:if`, so the inner bindings stay
+          subscribed across filter changes — bindIf would drop them on
+          re-add — and not an x-class 'hidden' toggle either: x-class is
+          evaluated in the browser only, so the pre-rendered page painted
+          this block before the runtime booted, moustaches and all
+          ('{{ emptyTitle() }}' rendered as literal text). `:show` is
+          cloaked at build time. stx-standards 7.3. --}}
       <div
         class="px-6 py-16 text-center"
-        x-class="!store.loading() && store.items().length === 0 ? '' : 'hidden'"
+        :show="!store.loading() && store.items().length === 0"
+        style="display:none"
       >
         <div class="flex items-center justify-center mb-4 mx-auto h-12 w-12 bg-gray-50 rounded-full">
           <svg class="h-6 w-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -128,7 +133,7 @@
         <p class="font-semibold text-gray-900 text-sm">{{ emptyTitle() }}</p>
         <p class="mt-1 mx-auto max-w-md leading-relaxed text-gray-500 text-xs">{{ emptyHint() }}</p>
       </div>
-      <ul x-class="store.items().length > 0 ? 'divide-gray-100 divide-y' : 'hidden'">
+      <ul class="divide-gray-100 divide-y" :show="store.items().length > 0" style="display:none">
         <li :for="n in store.items" class="hover:bg-gray-50">
           <button
             type="button"

@@ -71,20 +71,30 @@
 
 <div class="flex items-center justify-center px-4 min-h-[60vh]">
   <div class="p-8 max-w-md w-full text-center bg-white border border-gray-200 rounded-2xl shadow-sm">
-    {{-- Verifying --}}
-    <div x-class="phase() === 'verifying' ? '' : 'hidden'">
+    {{-- Verifying.
+
+        All four blocks below toggle with `:show`, not an x-class 'hidden'
+        branch. x-class is evaluated in the browser only, so the
+        pre-rendered page shipped every one of them without 'hidden' and
+        painted all four states at once — 'Verifying your email…',
+        'Email verified', 'Verification failed' and 'Check your inbox'
+        stacked in one card — until the runtime booted and picked one.
+        They are mutually exclusive by construction, so that was never a
+        state a user should see. `:show` is cloaked at build time, which
+        is the half x-class cannot do. stx-standards 7.3. --}}
+    <div :show="phase() === 'verifying'" style="display:none">
       <h1 class="font-bold font-serif text-2xl text-gray-900">Verifying your email…</h1>
       <p class="mt-2 text-gray-500 text-sm">One moment while we confirm your link.</p>
     </div>
 
     {{-- Verified --}}
-    <div x-class="phase() === 'verified' ? '' : 'hidden'">
+    <div :show="phase() === 'verified'" style="display:none">
       <h1 class="font-bold font-serif text-2xl text-emerald-700">Email verified ✓</h1>
       <p class="mt-2 text-gray-600 text-sm">You're all set — taking you to your profile…</p>
     </div>
 
     {{-- Error (bad/expired link) --}}
-    <div x-class="phase() === 'error' ? '' : 'hidden'">
+    <div :show="phase() === 'error'" style="display:none">
       <h1 class="font-bold font-serif text-2xl text-gray-900">Verification failed</h1>
       <p class="mt-2 text-gray-600 text-sm" :text="message()"></p>
       <button
@@ -98,7 +108,7 @@
     </div>
 
     {{-- Landing (arrived at /verify-email with no token) --}}
-    <div x-class="!hasLink() ? '' : 'hidden'">
+    <div :show="!hasLink()" style="display:none">
       <h1 class="font-bold font-serif text-2xl text-gray-900">Check your inbox</h1>
       <p class="mt-2 text-gray-600 text-sm">We've sent a verification link to your email address. Click it to verify your account — you'll need a verified email to post reviews.</p>
       <button

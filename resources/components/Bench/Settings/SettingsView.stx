@@ -494,15 +494,22 @@
           </div>
         </div>
 
+        {{-- `:show` on this pair, not an x-class 'hidden' toggle: x-class
+            is evaluated in the browser only, so the pre-rendered page
+            painted the success notice — 'Claim submitted — a moderator
+            will review it' — at everyone who opened Settings, before they
+            had claimed anything. stx-standards 7.3. --}}
         <div
           role="alert"
           class="px-3 py-2 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
-          x-class="credentialStatus === 'error' ? '' : 'hidden'">{{ credentialError() }}</div>
+          :show="credentialStatus === 'error'"
+          style="display:none">{{ credentialError() }}</div>
 
         <div
           role="status"
           class="px-3 py-2 text-emerald-800 text-sm bg-emerald-50 border border-emerald-200 rounded-md"
-          x-class="credentialStatus === 'saved' ? '' : 'hidden'"
+          :show="credentialStatus === 'saved'"
+          style="display:none"
         >Claim submitted — a moderator will review it. The badge appears on your reviews after verification.</div>
 
         <div class="flex justify-end">
@@ -564,8 +571,14 @@
           >Delete account</button>
         </div>
 
-        {{-- Password-confirmed final step --}}
-        <div x-class="confirmingDelete() ? 'mt-4 p-4 bg-red-50/60 border border-red-200 rounded-md' : 'hidden'">
+        {{-- Password-confirmed final step. Static classes + `:show` per
+            stx-standards 7.1/7.3 — bindShow reveals by clearing `display`,
+            so the panel's own styling has to be on the element. As an
+            x-class toggle this painted 'Confirm your password to delete',
+            with the password field, on first load. The 'Delete account'
+            button above keeps its x-class: it starts VISIBLE, so cloaking
+            it would be a regression, not a fix. --}}
+        <div class="mt-4 p-4 bg-red-50/60 border border-red-200 rounded-md" :show="confirmingDelete" style="display:none">
           <label for="delete-pw" class="block font-medium text-gray-900 text-sm">Confirm your password to delete</label>
           <input
             id="delete-pw"
