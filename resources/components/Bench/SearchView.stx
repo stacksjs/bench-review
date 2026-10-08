@@ -53,8 +53,9 @@
   // host the x-class empty/list panels above, a wrapper dropped by bindIf
   // (e.g. landing on the 'courts' tab leaves the judges wrapper false at
   // first render) would take its x-class children down with it — the
-  // exact bindIf-drop bug, one level up. Keep the wrappers in the DOM via
-  // x-class so the inner reactive panels survive tab switches.
+  // exact bindIf-drop bug, one level up. The wrappers now toggle with
+  // `:show`, which keeps that property — bindShow only writes
+  // el.style.display — and additionally hides them in the first paint.
   const showJudgesSection = derived<boolean>(() =>
     (search.tab() === 'all' && totalResults() > 0) || search.tab() === 'judges')
   const showCourtsSection = derived<boolean>(() =>
@@ -130,7 +131,15 @@
     </div>
 
     <div class="mt-8">
-      <div x-class="showAllEmpty() ? '' : 'hidden'" class="mt-2 p-12 text-center bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
+      {{-- `:show`, not an x-class 'hidden' toggle, on this panel and on the
+          two section wrappers below. x-class is evaluated in the browser
+          only, so the pre-rendered /search painted all three empty states
+          at once — 'No results for ""', 'No judges match your search',
+          'No courts match your search' — before the runtime booted.
+          Cloaking the three outer elements is enough: their children do
+          not paint, which is why the inner panels keep their x-class.
+          stx-standards 7.3. --}}
+      <div :show="showAllEmpty" style="display:none" class="mt-2 p-12 text-center bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
         <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
         </svg>
@@ -142,7 +151,7 @@
         </div>
       </div>
 
-      <div x-class="showJudgesSection() ? '' : 'hidden'">
+      <div :show="showJudgesSection" style="display:none">
         <h2 x-class="search.tab() === 'all' ? 'font-semibold text-gray-900 text-lg' : 'hidden'" class="font-semibold text-gray-900 text-lg">Judges</h2>
         <div x-class="showJudgesEmpty() ? '' : 'hidden'" class="mt-2 p-12 text-center bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
           <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -168,7 +177,7 @@
         </ul>
       </div>
 
-      <div x-class="!showCourtsSection() ? 'hidden' : (search.tab() === 'all' ? 'mt-12' : '')">
+      <div :show="showCourtsSection" style="display:none" x-class="search.tab() === 'all' ? 'mt-12' : ''">
         <h2 x-class="search.tab() === 'all' ? 'font-semibold text-gray-900 text-lg' : 'hidden'" class="font-semibold text-gray-900 text-lg">Court Houses</h2>
         <div x-class="showCourtsEmpty() ? '' : 'hidden'" class="mt-2 p-12 text-center bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
           <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
