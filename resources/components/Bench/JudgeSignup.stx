@@ -106,7 +106,14 @@
     Reviews on Bench Review are about real, named judges. If a profile is yours, claim it — once we verify your identity you can post an official response to any review of you.
   </p>
 
-  {{-- Not signed in --}}
+  {{-- Not signed in. This one KEEPS its x-class: `!isAuthed()` is true
+      for a visitor who is not signed in, which is who lands here, so it
+      is correct in the first paint and `:show` would make it flash in
+      after hydration. Its two siblings below start false for everyone
+      and are cloaked — all three painted at once before that, so the
+      page offered "create an account", "Claim submitted ✓" and the
+      search box in one column. gate check 19 lists this expression under
+      STARTS_VISIBLE. --}}
   <div x-class="!isAuthed() ? '' : 'hidden'" class="mt-8 p-6 text-center bg-white border border-gray-200 rounded-2xl shadow-sm">
     <p class="text-gray-700 text-sm">First, create an account or sign in — then you can claim your profile.</p>
     <div class="flex gap-x-3 justify-center mt-5">
@@ -116,7 +123,7 @@
   </div>
 
   {{-- Signed in: claimed confirmation --}}
-  <div x-class="isAuthed() && phase() === 'claimed' ? '' : 'hidden'" class="mt-8 p-6 text-center bg-white border border-blue-200 rounded-2xl shadow-sm">
+  <div :show="isAuthed() && phase() === 'claimed'" style="display:none" class="mt-8 p-6 text-center bg-white border border-blue-200 rounded-2xl shadow-sm">
     <h2 class="font-bold font-serif text-2xl text-emerald-700">Claim submitted ✓</h2>
     <p class="mt-2 text-gray-700 text-sm">
       Thanks — we've recorded your claim for <span class="font-semibold">{{ claimedName() }}</span>. An admin will verify your identity before you can respond to reviews. We'll be in touch.
@@ -125,7 +132,7 @@
   </div>
 
   {{-- Signed in: search + claim --}}
-  <div x-class="isAuthed() && phase() !== 'claimed' ? '' : 'hidden'" class="mt-8 p-6 bg-white border border-gray-200 rounded-2xl shadow-sm">
+  <div :show="isAuthed() && phase() !== 'claimed'" style="display:none" class="mt-8 p-6 bg-white border border-gray-200 rounded-2xl shadow-sm">
     <label for="judge-claim-search" class="block font-semibold text-gray-900 text-sm">Find your profile</label>
     <input
       id="judge-claim-search"
@@ -137,10 +144,10 @@
       class="block mt-2 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
     >
 
-    <p x-class="searching() ? '' : 'hidden'" class="mt-2 text-gray-400 text-xs">Searching…</p>
+    <p :show="searching" style="display:none" class="mt-2 text-gray-400 text-xs">Searching…</p>
 
     {{-- Results --}}
-    <ul x-class="hasResults() ? 'mt-2 divide-y divide-gray-100 border border-gray-100 rounded-md' : 'hidden'">
+    <ul class="mt-2 border border-gray-100 divide-gray-100 divide-y rounded-md" :show="hasResults" style="display:none">
       <li :for="j in results">
         <button
           type="button"
