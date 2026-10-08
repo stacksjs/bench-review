@@ -355,15 +355,7 @@
       class="lg:hidden -m-2.5 p-2.5 text-gray-700 hover:bg-gray-50 rounded-md"
     >
       <span class="sr-only">Open main menu</span>
-      {{-- Inline SVG, not <Icon>: there is no Icon component in this project
-          or in @stacksjs/components (44 components, none of them an icon), so
-          every <Icon> tag renders empty. bench has 59 of them; see #91. The
-          rest of this header draws its glyphs inline for the same reason. --}}
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <line x1="3" y1="6" x2="21" y2="6" />
-        <line x1="3" y1="12" x2="21" y2="12" />
-        <line x1="3" y1="18" x2="21" y2="18" />
-      </svg>
+      <Icon name="menu" size="24" />
     </button>
 
     <div class="hidden lg:flex relative flex-1 justify-center mx-8 max-w-md">
@@ -738,10 +730,7 @@
         </StxLink>
         <button type="button" @click="closeMobileMenu()" class="-m-2.5 p-2.5 text-gray-700 hover:bg-gray-50 rounded-md">
           <span class="sr-only">Close menu</span>
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
+          <Icon name="x" size="24" />
         </button>
       </div>
 
