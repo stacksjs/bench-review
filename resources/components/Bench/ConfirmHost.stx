@@ -70,8 +70,16 @@
     }
   })
 
+  // Escape-to-dismiss and Tab focus-trapping for the confirm dialog, on
+  // `document` because the keystroke can arrive while focus sits anywhere.
+  // Named and cancelled rather than inline: a document-level listener
+  // outlives the component's DOM, so without onDestroy a re-run of this
+  // setup body stacks another copy. The built artifact never re-runs it —
+  // it ships no page router, so each document binds once — but the dev
+  // server does navigate client-side, and that is where a pile-up would
+  // show as one dismiss() per past navigation. stx-standards 6.7.
   if (typeof document !== 'undefined') {
-    document.addEventListener('keydown', (event: KeyboardEvent) => {
+    const onKeydown = (event: KeyboardEvent): void => {
       if (!confirmStore.open()) return
       if (event.key === 'Escape') {
         event.preventDefault()
@@ -100,7 +108,9 @@
         event.preventDefault()
         first.focus()
       }
-    })
+    }
+    document.addEventListener('keydown', onKeydown)
+    onDestroy(() => document.removeEventListener('keydown', onKeydown))
   }
 </script>
 

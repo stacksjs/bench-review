@@ -13,6 +13,9 @@
 
   const authStore = useStore('auth')
 
+  let redirectTimer: ReturnType<typeof setTimeout> | null = null
+  onDestroy(() => { if (redirectTimer !== null) clearTimeout(redirectTimer) })
+
   const phase = state('idle') // 'idle' | 'verifying' | 'verified' | 'error'
   const message = state('')
   const hasLink = state(false)
@@ -40,7 +43,12 @@
       return
     }
     phase.set('verified')
-    setTimeout(() => { navigate('/profile', true) }, 1800)
+    // Hold the success state long enough to read, then move on. Tracked and
+    // cancelled: an uncancelled redirect timer survives the component in any
+    // environment that swaps the page without discarding the document — the
+    // dev server navigates client-side — and would yank someone out of
+    // whatever they opened in the meantime. stx-standards 6.7.
+    redirectTimer = setTimeout(() => { navigate('/profile', true) }, 1800)
   }
 
   async function resend() {

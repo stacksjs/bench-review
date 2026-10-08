@@ -28,10 +28,26 @@
   // `stx:navigate` is dispatched by the router when `navigate(...)` is
   // called (StxLink clicks, post-login redirects). `popstate` covers
   // browser back/forward. Both fire AFTER the URL has updated.
+  //
+  // That is the DEV picture. The built artifact in dist/ carries no page
+  // router at all: its runtime registers no document-level click handler
+  // and never dispatches `stx:load`, and a measured StxLink click there
+  // is a full document load (performance navigation type 'navigate',
+  // window state discarded). So in production these listeners fire for
+  // `popstate` only, and each page load registers them once.
+  //
+  // onDestroy either way: it is correct in both environments, and in dev
+  // — where the body DOES re-run per navigation, which is why
+  // BenchHeader guards its own global listener with a window flag —
+  // it is what stops a syncPath pile-up. stx-standards 6.7.
   if (typeof window !== 'undefined') {
     const syncPath = (): void => currentPath.set(window.location.pathname)
     window.addEventListener('stx:navigate', syncPath)
     window.addEventListener('popstate', syncPath)
+    onDestroy(() => {
+      window.removeEventListener('stx:navigate', syncPath)
+      window.removeEventListener('popstate', syncPath)
+    })
   }
 
   function isActive(path: string): boolean {
