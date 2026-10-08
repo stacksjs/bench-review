@@ -47,11 +47,18 @@
     <div class="px-6 py-12 sm:px-12 bg-white sm:rounded-lg shadow">
       <h1 class="mb-6 font-bold text-2xl text-center text-gray-900">Welcome back</h1>
 
+      {{-- `:show`, not an x-class 'hidden' toggle. x-class is evaluated
+          in the browser only, so the pre-rendered page shipped this
+          banner with no 'hidden' in its class list and told every
+          visitor their session had expired until the runtime booted —
+          on a page whose whole job is to be trusted with a password.
+          stx-standards 7.3. --}}
       <div
         role="status"
         aria-live="polite"
         class="mb-6 px-4 py-3 text-amber-800 text-sm bg-amber-50 border border-amber-200 rounded-md"
-        x-class="sessionExpired() ? '' : 'hidden'"
+        :show="sessionExpired"
+        style="display:none"
       >
         Your session expired. Please sign in again.
       </div>

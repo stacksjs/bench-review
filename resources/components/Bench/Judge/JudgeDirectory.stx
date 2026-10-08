@@ -412,10 +412,20 @@
     </div>
 
     {{-- Numbered pagination (client-side over the filtered roster).
-        Wrapper x-class toggle (not :if) so it stays in the DOM and
-        appears once last_page > 1. Numbered button uses item.cls
-        (precomputed) — no signal call-syntax in the :for. --}}
-    <div x-class="lastPage() > 1 ? 'flex flex-col items-center gap-3 mt-12' : 'hidden'">
+        `:show` (not `:if`) so the wrapper stays in the DOM and its
+        nested `:for` bindings survive the first false → true flip.
+        Numbered button uses item.cls (precomputed) — no signal
+        call-syntax in the :for.
+
+        The layout classes are static and the toggle is `:show` per
+        stx-standards 7.1/7.3: an x-class toggle is evaluated in the
+        browser only, so the pre-rendered page painted a full pagination
+        bar — Prev, Next, 'Page 1 of 1' — before the runtime booted. --}}
+    <div
+      class="flex flex-col gap-3 items-center mt-12"
+      :show="lastPage() > 1"
+      style="display:none"
+    >
       <nav class="flex flex-wrap gap-1.5 items-center justify-center" aria-label="Pagination">
         <button
           type="button"
@@ -446,7 +456,7 @@
         initial fetch; copy + Clear-filters CTA branch on whether any
         filter is active. Rendered as a sibling of the grid (not wrapping
         it) so it only appears when filteredJudges is empty. --}}
-    <div x-class="showEmpty() ? '' : 'hidden'" class="mt-2 p-12 text-center bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
+    <div :show="showEmpty" style="display:none" class="mt-2 p-12 text-center bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
       <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
       </svg>

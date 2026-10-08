@@ -240,8 +240,16 @@
     {{-- Empty state. Gated on !loading so it doesn't flash during the
         initial fetch; copy + Clear-filters CTA branch on whether any
         filter is active. (Replaced a hardcoded fake pagination bar that
-        rendered dead 1/2/3 links unconditionally, implying more results.) --}}
-    <div x-class="showEmpty() ? '' : 'hidden'" class="mt-2 p-12 text-center bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
+        rendered dead 1/2/3 links unconditionally, implying more results.)
+
+        `:show`, not an x-class 'hidden' toggle: x-class is evaluated in
+        the browser only, so the pre-rendered page painted this whole
+        panel — 'No courthouses yet', 'Try a different state', 'Clear
+        filters' — before the runtime booted, which is the flash the
+        !loading gate above was meant to prevent. stx-standards 7.3; the
+        two inner x-class toggles need no change because a cloaked
+        parent does not paint its children. --}}
+    <div :show="showEmpty" style="display:none" class="mt-2 p-12 text-center bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
       <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
       </svg>
