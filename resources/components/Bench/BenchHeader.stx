@@ -6,6 +6,41 @@
   const judgesStore = useStore('judges')
   const notifications = useStore('notifications')
 
+  // Mobile navigation (bench-review#90). The header's three regions are all
+  // `hidden lg:flex`, so below that breakpoint this panel is the only way to
+  // reach anything — and the iOS app is a WebView over this same site, so it
+  // is the app's navigation too.
+  //
+  // Kept in BenchHeader's own scope rather than in the old Bench/MobileMenu
+  // component, which was never wired up: handing `isOpen` to a component
+  // across an `@include` boundary is the documented scope footgun, whereas
+  // the bell and user-menu toggles right here already work this way.
+  const mobileMenuOpen = state<boolean>(false)
+
+  function toggleMobileMenu(): void {
+    mobileMenuOpen.set(!mobileMenuOpen())
+  }
+
+  function closeMobileMenu(): void {
+    mobileMenuOpen.set(false)
+  }
+
+  // Routes through the search store, like the desktop field, so both inputs
+  // and the /search page agree on one query.
+  function handleMobileSearchInput(event: Event): void {
+    search.setQuery((event.target as HTMLInputElement).value)
+  }
+
+  function submitMobileSearch(): void {
+    closeMobileMenu()
+    search.navigateToSearch()
+  }
+
+  async function handleMobileLogout(): Promise<void> {
+    closeMobileMenu()
+    await auth.logout()
+  }
+
   // Bell dropdown open/closed. Local toggle — doesn't need to live in
   // the store since multiple BenchHeader instances don't share one
   // page. Click-outside is handled by the @focusout on the wrapper.
@@ -309,6 +344,28 @@
         <StxLink to="/reviews" class="font-semibold text-gray-900 text-sm/6 border-b-2 border-transparent hover:border-blue-600 duration-200 transition-colors">Reviews</StxLink>
       </div>
     </div>
+    {{-- Mobile menu trigger. `lg:hidden` is the mirror of the three
+        `hidden lg:flex` regions around it, so exactly one of the two
+        navigations is reachable at any width. --}}
+    <button
+      type="button"
+      @click="toggleMobileMenu()"
+      x-aria-expanded="mobileMenuOpen() ? 'true' : 'false'"
+      aria-controls="bench-mobile-menu"
+      class="lg:hidden -m-2.5 p-2.5 text-gray-700 hover:bg-gray-50 rounded-md"
+    >
+      <span class="sr-only">Open main menu</span>
+      {{-- Inline SVG, not <Icon>: there is no Icon component in this project
+          or in @stacksjs/components (44 components, none of them an icon), so
+          every <Icon> tag renders empty. bench has 59 of them; see #91. The
+          rest of this header draws its glyphs inline for the same reason. --}}
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="3" y1="6" x2="21" y2="6" />
+        <line x1="3" y1="12" x2="21" y2="12" />
+        <line x1="3" y1="18" x2="21" y2="18" />
+      </svg>
+    </button>
+
     <div class="hidden lg:flex relative flex-1 justify-center mx-8 max-w-md">
       <form class="w-full" @submit.prevent="submitHeaderSearch()">
         <label for="header-search" class="sr-only">Search</label>
@@ -657,4 +714,84 @@
       </div>
     </div>
   </nav>
+
+  {{-- Mobile menu panel. `:show` with a static `style="display:none"`, per
+      stx-standards 7.3 and gate check 19: an x-class 'hidden' toggle is
+      evaluated in the browser only, so the pre-rendered page would paint this
+      slide-over open on every load until the runtime booted. --}}
+  <div
+    id="bench-mobile-menu"
+    :show="mobileMenuOpen"
+    style="display:none"
+    class="lg:hidden"
+    role="dialog"
+    aria-modal="true"
+  >
+    {{-- Backdrop. Click anywhere outside the panel closes it. --}}
+    <div class="fixed inset-0 z-40 bg-gray-900/20" @click="closeMobileMenu()"></div>
+
+    <div class="fixed inset-y-0 overflow-y-auto right-0 z-50 px-6 py-6 w-full sm:max-w-sm bg-white sm:ring-1 sm:ring-gray-900/10">
+      <div class="flex items-center justify-between">
+        <StxLink to="/" class="-m-1.5 p-1.5">
+          <span class="sr-only">Bench Review</span>
+          <img class="h-10 w-auto" src="/images/bench/logo.png" alt="Bench Review">
+        </StxLink>
+        <button type="button" @click="closeMobileMenu()" class="-m-2.5 p-2.5 text-gray-700 hover:bg-gray-50 rounded-md">
+          <span class="sr-only">Close menu</span>
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+
+      <form class="mt-6" @submit.prevent="submitMobileSearch()">
+        <label for="mobile-search" class="sr-only">Search judges or courts</label>
+        <input
+          id="mobile-search"
+          type="text"
+          :value="search.query()"
+          @input="handleMobileSearchInput($event)"
+          autocomplete="off"
+          placeholder="Search judges or courts..."
+          class="block px-3 py-2 w-full text-gray-900 sm:text-sm placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-200 ring-inset rounded-lg focus:ring-2 focus:ring-blue-600 focus:ring-inset"
+        >
+      </form>
+
+      <div class="flow-root mt-6">
+        <div class="-my-6 divide-gray-500/10 divide-y">
+          <div class="py-6 space-y-2">
+            <StxLink to="/judges" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:text-blue-700 hover:bg-blue-50 rounded-lg">Find Judges</StxLink>
+            <StxLink to="/court-houses" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:text-blue-700 hover:bg-blue-50 rounded-lg">Court Houses</StxLink>
+            <StxLink to="/review" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:text-blue-700 hover:bg-blue-50 rounded-lg">Write a Review</StxLink>
+            <StxLink to="/reviews" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:text-blue-700 hover:bg-blue-50 rounded-lg">Reviews</StxLink>
+            <StxLink to="/judges/submit" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:text-blue-700 hover:bg-blue-50 rounded-lg">Submit a Judge</StxLink>
+          </div>
+
+          {{-- Signed-in links. `:show`, not `:if`, for the same reason as the
+              panel itself, and because bindIf drops a branch that is false at
+              first render and never brings it back when auth resolves. --}}
+          <div :show="isAuthenticated()" style="display:none" class="py-6 space-y-2">
+            <StxLink to="/notifications" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:text-blue-700 hover:bg-blue-50 rounded-lg">Notifications</StxLink>
+            <StxLink to="/profile" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:text-blue-700 hover:bg-blue-50 rounded-lg">Profile</StxLink>
+            <StxLink to="/my-reviews" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:text-blue-700 hover:bg-blue-50 rounded-lg">My reviews</StxLink>
+            <StxLink to="/settings" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:text-blue-700 hover:bg-blue-50 rounded-lg">Settings</StxLink>
+            {{-- A button, not a link to /logout: that route does not exist.
+                Signing out is a store action, the same one the desktop user
+                menu calls. --}}
+            <button
+              type="button"
+              @click="handleMobileLogout()"
+              class="block -mx-3 px-3 py-2 w-full font-semibold text-base/7 text-left text-red-600 hover:bg-red-50 rounded-lg"
+            >Sign out</button>
+          </div>
+
+          <div :show="!isAuthenticated()" class="py-6">
+            <StxLink to="/register" class="block -mx-3 mb-2 px-3 py-2.5 font-semibold text-base/7 text-center text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-blue-600/25 shadow-sm transition active:scale-[0.98]">Sign up</StxLink>
+            <StxLink to="/login" class="block -mx-3 px-3 py-2 font-semibold text-base/7 text-gray-900 hover:text-blue-700 hover:bg-blue-50 rounded-lg">Log in</StxLink>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </header>
