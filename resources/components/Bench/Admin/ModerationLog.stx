@@ -63,15 +63,19 @@
       Loading…
     </div>
 
+    {{-- `:show`, not an x-class 'hidden' toggle. x-class is evaluated in
+        the browser only, so the pre-rendered admin page painted this
+        before the runtime booted. stx-standards 7.3; gate check 19. --}}
     <div
       class="px-6 py-16 text-center"
-      x-class="!store.loading() && store.logs().length === 0 ? '' : 'hidden'"
+      :show="!store.loading() && store.logs().length === 0"
+      style="display:none"
     >
       <p class="font-semibold text-gray-900 text-sm">No moderation actions yet</p>
       <p class="mt-1 text-gray-500 text-xs">Approvals, rejections, and deletions will appear here as they happen.</p>
     </div>
 
-    <ul x-class="hasLogs() ? 'divide-gray-100 divide-y' : 'hidden'">
+    <ul class="divide-gray-100 divide-y" :show="hasLogs" style="display:none">
       <li :for="entry in store.logs" class="px-4 py-3">
         <div class="flex flex-wrap gap-2 items-center">
           <span class="inline-block px-2 py-0.5 font-medium text-xs rounded-full" x-class="actionTone(entry)">{{ actionLabel(entry) }}</span>

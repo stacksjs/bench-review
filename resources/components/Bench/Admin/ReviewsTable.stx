@@ -199,9 +199,13 @@
         bindings stay subscribed across status / query changes —
         bindIf's remove/re-add cycle drops bindings on the re-add
         (same footgun the login form hit; see login.stx). --}}
+    {{-- `:show`, not an x-class 'hidden' toggle. x-class is evaluated in
+        the browser only, so the pre-rendered admin page painted this
+        before the runtime booted. stx-standards 7.3; gate check 19. --}}
     <div
       class="px-6 py-16 text-center"
-      x-class="!store.loading() && store.reviews().length === 0 ? '' : 'hidden'"
+      :show="!store.loading() && store.reviews().length === 0"
+      style="display:none"
     >
       <div class="flex items-center justify-center mb-4 mx-auto h-12 w-12 bg-gray-50 rounded-full">
         <svg class="h-6 w-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -215,7 +219,7 @@
         subscription across the loading -> loaded transition. The
         :if remove/re-add cycle drops the :for binding on re-add and
         the rows never render even after reviews() populates. --}}
-    <ul x-class="store.reviews().length > 0 ? 'divide-gray-100 divide-y' : 'hidden'">
+    <ul class="divide-gray-100 divide-y" :show="store.reviews().length > 0" style="display:none">
       <li :for="review in store.reviews" class="px-4 py-4">
         <div class="flex gap-x-4 justify-between">
           <div class="flex-1 min-w-0">

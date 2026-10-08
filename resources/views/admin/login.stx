@@ -44,7 +44,8 @@
         role="status"
         aria-live="polite"
         class="mb-6 px-4 py-3 text-amber-800 text-sm bg-amber-50 border border-amber-200 rounded-md"
-        x-class="sessionExpired() ? '' : 'hidden'"
+        :show="sessionExpired"
+        style="display:none"
       >
         Your admin session expired. Please sign in again.
       </div>

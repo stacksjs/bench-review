@@ -122,7 +122,11 @@
       <p class="font-semibold text-gray-900 text-sm">{{ emptyTitle() }}</p>
       <p class="mt-1 mx-auto max-w-md leading-relaxed text-gray-500 text-xs">{{ emptyHint() }}</p>
     </div>
-    <ul x-class="store.flags().length > 0 ? 'divide-gray-100 divide-y' : 'hidden'">
+    {{-- `:show` + static classes, not an x-class 'hidden' toggle: x-class
+        is evaluated in the browser only, so the pre-rendered admin page
+        painted this list wrapper before the runtime booted.
+        stx-standards 7.1/7.3; gate check 19. --}}
+    <ul class="divide-gray-100 divide-y" :show="store.flags().length > 0" style="display:none">
       <li :for="flag in store.flags" class="px-4 py-4">
         <div class="flex gap-x-4 justify-between">
           <div class="flex-1 min-w-0">

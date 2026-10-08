@@ -175,7 +175,7 @@
             bindings keep subscribing to the search query signal as
             it changes — bindIf's remove/re-add cycle drops bindings
             on re-add. --}}
-        <tr x-class="!store.loading() && store.users().length === 0 ? '' : 'hidden'">
+        <tr :show="!store.loading() && store.users().length === 0" style="display:none">
           <td colspan="5" class="px-6 py-16 text-center">
             <div class="flex items-center justify-center mb-4 mx-auto h-12 w-12 bg-gray-50 rounded-full">
               <svg class="h-6 w-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -247,7 +247,9 @@
       re-subscription footgun for the inner form (memory: login form
       error reflow). --}}
   <div
-    x-class="editingId() ? 'fixed inset-0 z-30 flex justify-center items-center p-4 bg-black/40' : 'hidden'"
+    class="flex fixed inset-0 z-30 items-center justify-center p-4 bg-black/40"
+    :show="editingId"
+    style="display:none"
   >
     <div class="p-6 w-full sm:max-w-md bg-white rounded-lg shadow-xl">
       <h2 class="mb-4 font-bold text-gray-900 text-lg">Edit user</h2>
