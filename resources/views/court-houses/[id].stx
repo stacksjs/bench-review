@@ -33,13 +33,14 @@ export async function getStaticPaths() {
 @extends('layouts/default')
 @section('title', 'Court House - Bench Review')
 @section('content')
-  <div>
-    <main>
-      @include('Bench/Court/CourtHeader')
-      @include('Bench/Court/CourtTabs')
-      <div class="mx-auto px-4 py-8 sm:px-6 lg:px-8 max-w-7xl">
-        @include('Bench/Court/CourtProfile')
-      </div>
-    </main>
+  {{-- No <main> here: stx-standards 2.8/3.5 put it in the layout, and
+       resources/layouts/default.stx already opens one. Two landmarks per page
+       is invalid HTML, announces twice to a screen reader, and matters for
+       routing too -- config/ui.ts sets router.container 'main', so the SPA
+       router picks one of them to swap. --}}
+  @include('Bench/Court/CourtHeader')
+  @include('Bench/Court/CourtTabs')
+  <div class="mx-auto px-4 py-8 sm:px-6 lg:px-8 max-w-7xl">
+    @include('Bench/Court/CourtProfile')
   </div>
 @endsection
