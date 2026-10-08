@@ -16,10 +16,17 @@
   // falsy. The whole tab rendered as just the "Write a Review" button: no list,
   // no loading state, no empty state, and no error anywhere.
   //
-  // window.stx._rp is unset on hard reload, hence the pathname fallback.
+  // useRoute() first; the pathname fallback is for the shell-served tabs,
+  // where the injected param is the literal '_shell' (stx-standards 9.10).
   function resolveJudgeId(): number {
     if (typeof window === 'undefined') return 0
-    const fromRouter = Number((window as any).stx?._rp?.id)
+    // stx-standards 9.10: route params come from useRoute(), never from
+    // window.stx._rp and never by re-parsing the URL. useRoute().params reads
+    // a signal the runtime primes from the id the build injects into <head>,
+    // ahead of the runtime itself, so it is populated on a hard reload too —
+    // which is what the older note about _rp being unset was working around.
+    // useRoute is auto-imported; do not hand-import it.
+    const fromRouter = Number(useRoute().params.id)
     if (Number.isFinite(fromRouter) && fromRouter > 0) return fromRouter
     const m = window.location.pathname.match(/^\/judges\/(\d+)/)
     return m ? Number(m[1]) : 0

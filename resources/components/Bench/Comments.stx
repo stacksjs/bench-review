@@ -2,9 +2,9 @@
   // Comments section under an article (bench-review#44).
   //
   // Renders below the article body. Self-contained:
-  //   - resolves the review id from the URL (same pattern as
-  //     ArticleEdit — pathname-based fallback because
-  //     window.stx._rp is unset on hard reload)
+  //   - resolves the review id with useRoute().params (same pattern as
+  //     ArticleEdit; the pathname fallback below is for shell-served
+  //     pages, where the injected param is the literal '_shell')
   //   - fetches /api/reviews/{id}/comments on mount
   //   - composer for signed-in users (auto-publishing; comments hit
   //     status='published' immediately per the action body)
@@ -31,7 +31,13 @@
 
   function resolveReviewId(): number {
     if (typeof window === 'undefined') return 0
-    const fromRouter = Number((window as any).stx?._rp?.id)
+    // stx-standards 9.10: route params come from useRoute(), never from
+    // window.stx._rp and never by re-parsing the URL. useRoute().params reads
+    // a signal the runtime primes from the id the build injects into <head>,
+    // ahead of the runtime itself, so it is populated on a hard reload too —
+    // which is what the older note about _rp being unset was working around.
+    // useRoute is auto-imported; do not hand-import it.
+    const fromRouter = Number(useRoute().params.id)
     if (Number.isFinite(fromRouter) && fromRouter > 0) return fromRouter
     const m = window.location.pathname.match(/^\/article\/(\d+)/)
     return m ? Number(m[1]) : 0

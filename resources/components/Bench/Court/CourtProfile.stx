@@ -3,9 +3,8 @@
   import L from 'leaflet'
 
   // Self-contained court profile body. Owns:
-  //   - resolving the court id from the URL (same pathname fallback
-  //     as ArticleView + CourtHeader — _rp is undefined during hard-
-  //     reload hydration)
+  //   - resolving the court id with useRoute(), with the same pathname
+  //     fallback as ArticleView + CourtHeader for shell-served pages
   //   - reading the matching row out of judgesStore's courtHouses
   //     cache (already fetched by CourtHeader's mount; we fetch again
   //     to be safe on direct nav into the tab)

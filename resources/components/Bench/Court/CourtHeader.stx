@@ -1,8 +1,7 @@
 <script client>
-  // Court-house detail header. Resolves the court id from URL pathname
-  // (same fallback pattern as ArticleView — _rp is undefined during
-  // hard-reload hydration) and looks it up against judgesStore's
-  // courtHouses cache.
+  // Court-house detail header. Resolves the court id from useRoute(), with
+  // a pathname fallback for shell-served pages, and looks it up against
+  // judgesStore's courtHouses cache.
 
   function resolveCourtId(): number {
     if (typeof window === 'undefined') return 0

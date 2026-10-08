@@ -2,9 +2,8 @@
   import type { JudgeReviewRow } from '~/resources/stores/reviews'
 
   // Self-contained article view. Owns:
-  //   - reading the URL :id param (pathname-based; see
-  //     feedback_stx_rp_unset_on_hard_reload for why we don't read
-  //     window.stx._rp)
+  //   - reading the :id param from useRoute(), with a pathname fallback
+  //     for shell-served pages (stx-standards 9.10)
   //   - calling reviewsStore.fetchById(id) on mount/hydrate
   //   - three render states (loading / not-found / loaded)
   //   - the article markup itself, inlined here so loop/binding scope
@@ -67,13 +66,20 @@
   // also stops the optimistic UI from flickering.
   const likePending = state<boolean>(false)
 
-  // Resolve id from the URL. See feedback_stx_rp_unset_on_hard_reload —
-  // window.stx._rp is unset during hydration on hard reload, so we
-  // parse location.pathname instead. Router param wins when present
-  // (faster on SPA nav), pathname is the canonical fallback.
+  // Resolve the id. useRoute() first, pathname only as the shell fallback
+  // (stx-standards 9.10). An earlier version here read window.stx._rp and
+  // treated pathname as canonical, on the belief that _rp is unset during
+  // hard-reload hydration; useRoute().params reads a signal primed from the
+  // <head> injection, which lands before the runtime, so that is not so.
   function resolveReviewId(): number {
     if (typeof window === 'undefined') return 0
-    const fromRouter = Number((window as any).stx?._rp?.id)
+    // stx-standards 9.10: route params come from useRoute(), never from
+    // window.stx._rp and never by re-parsing the URL. useRoute().params reads
+    // a signal the runtime primes from the id the build injects into <head>,
+    // ahead of the runtime itself, so it is populated on a hard reload too —
+    // which is what the older note about _rp being unset was working around.
+    // useRoute is auto-imported; do not hand-import it.
+    const fromRouter = Number(useRoute().params.id)
     if (Number.isFinite(fromRouter) && fromRouter > 0) return fromRouter
     const m = window.location.pathname.match(/^\/article\/(\d+)/)
     return m ? Number(m[1]) : 0
