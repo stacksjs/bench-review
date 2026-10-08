@@ -12,7 +12,9 @@ import site from '~/site.config'
  */
 
 /** Public static pages a guest can land on. Test/internal pages
- *  (/jtest, /secret-marketing, /paywall) are deliberately absent. */
+ *  (/paywall) are deliberately absent. /jtest and /secret-marketing no
+ *  longer exist — jtest was a four-line scratch page that shipped a 101KB
+ *  document at /jtest carrying the framework's default "stx App" title. */
 const STATIC_PATHS: Array<{ path: string, priority: number, changefreq: string }> = [
   { path: '/', priority: 1.0, changefreq: 'daily' },
   { path: '/judges', priority: 0.9, changefreq: 'daily' },
@@ -157,6 +159,8 @@ Disallow: /review/
 Disallow: /reset-password
 Disallow: /forgot-password
 # Test / internal-only pages:
+# /jtest and /secret-marketing were deleted; the rules stay so an old
+# crawl queue entry is still refused rather than 404-ing repeatedly.
 Disallow: /jtest
 Disallow: /secret-marketing
 Disallow: /paywall

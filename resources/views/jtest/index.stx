@@ -1,4 +1,0 @@
-@extends('layouts/default')
-@section('content')
-JTEST_MARKER
-@endsection
