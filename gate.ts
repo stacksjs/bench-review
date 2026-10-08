@@ -468,6 +468,79 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   )
 }
 
+// 19. No page PAINTS a hidden-class toggle.
+//
+//     `x-class="cond() ? '' : 'hidden'"` is evaluated in the browser, so the
+//     pre-rendered page ships the element with no `hidden` in its static class
+//     list and paints it until the runtime boots. The whole site did this:
+//     /verify-email showed all four of its mutually exclusive outcomes at once,
+//     /reviews laid its full-screen "Report this review" dialog over the page,
+//     /login told every visitor their session had expired, and the header
+//     dropdown hung open on all 2990 pages. stx-standards 7.3's `:show` is the
+//     fix because stx stamps x-cloak on `:show` elements at BUILD time.
+//
+//     An x-class toggle under a cloaked ancestor is fine — a cloaked parent
+//     does not paint its children — so this walks the tag stack rather than
+//     grepping, which is also how it sees `fixed` overlays that a browser probe
+//     filtering on `offsetParent` silently misses. That is how the /reviews
+//     dialog was found, after the browser pass had called the page clean.
+{
+  // Toggles whose element is CORRECT to paint: the condition is true on
+  // arrival, so cloaking them would trade a flash-out for a flash-in.
+  const STARTS_VISIBLE = new Set([
+    // home.stx — anonymous CTA band; most of this page's traffic is anonymous.
+    `isAnonymous() ? '' : 'hidden'`,
+    // SettingsView.stx — "Delete account" button, hidden only once confirming.
+    `confirmingDelete() ? 'hidden' : ''`,
+    // ReviewForm.stx — the judge search, which is the page's whole content
+    // until a judge is picked.
+    `(!judge() && !submitted()) ? '' : 'hidden'`,
+    // JudgeSignup.stx — "sign in first" prompt; whoever lands on
+    // /judges/signup is not signed in yet.
+    `!isAuthed() ? '' : 'hidden'`,
+  ])
+  const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr'])
+  const TAG = /<(\/?)([a-zA-Z][\w-]*)((?:"[^"]*"|'[^']*'|[^>"'])*)(\/?)>/g
+
+  const painted: string[] = []
+  for (const [path, doc] of html) {
+    const stack: { tag: string, cloak: boolean }[] = []
+    let cloakDepth = 0
+    let m: RegExpExecArray | null
+    TAG.lastIndex = 0
+    while ((m = TAG.exec(doc))) {
+      const [, slash, rawTag, attrs, selfClose] = m
+      const tag = rawTag.toLowerCase()
+      if (slash) {
+        for (let i = stack.length - 1; i >= 0; i--) {
+          if (stack[i].tag === tag) {
+            for (let j = stack.length - 1; j >= i; j--) if (stack[j].cloak) cloakDepth--
+            stack.length = i
+            break
+          }
+        }
+        continue
+      }
+      const cloak = /(?:^|\s)x-cloak(?:[=\s/]|$)/.test(attrs)
+      const toggle = attrs.match(/\sx-class="([^"]*)"/)
+      if (toggle && /'[a-z-]*hidden'/.test(toggle[1]) && cloakDepth === 0 && !cloak && !STARTS_VISIBLE.has(toggle[1]))
+        painted.push(`${path.replace('dist/', '')}: ${toggle[1]}`)
+      if (!VOID.has(tag) && !selfClose) {
+        stack.push({ tag, cloak })
+        if (cloak) cloakDepth++
+      }
+    }
+  }
+  const unique = [...new Set(painted.map(h => h.split(': ')[1]))]
+  add(
+    'no page paints a hidden-class toggle',
+    painted.length === 0,
+    painted.length
+      ? `${painted.length} elements over ${new Set(painted.map(h => h.split(':')[0])).size} pages paint before JS — use :show + style="display:none" (stx-standards 7.3), or add to STARTS_VISIBLE if the element is meant to be visible on arrival: ${unique.slice(0, 4).join(' | ')}`
+      : '',
+  )
+}
+
 const failed = checks.filter(c => !c.ok)
 console.log(`\n  bench conformance gate — ${pages.length} built pages\n`)
 for (const c of checks)

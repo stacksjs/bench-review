@@ -503,12 +503,20 @@
     <p class="text-gray-500 text-xs">{{ 'Page ' + reviewsStore.feedPage() + ' of ' + reviewsStore.feedLastPage() + ' · ' + reviewsStore.feedTotal() + ' reviews' }}</p>
   </div>
 
-  {{-- Shared report dialog for the feed. x-class toggle (not :if) so the
-      inner reactive bindings stay subscribed across open/close. Targets
-      whichever card opened it (flagTargetId). --}}
+  {{-- Shared report dialog for the feed. `:show` (not :if) so the inner
+      reactive bindings stay subscribed across open/close. Targets
+      whichever card opened it (flagTargetId).
+
+      This one is why the gate carries a static check for the pattern
+      rather than only a browser probe: the element is `fixed`, so
+      `offsetParent` is null even while it is painted, and a probe that
+      filtered on offsetParent reported /reviews clean. It was not — the
+      full 'Report this review' dialog, scrim and all, covered the page
+      on every load until the runtime booted. stx-standards 7.3. --}}
   <div
     class="flex fixed inset-0 z-50 items-center justify-center p-4 bg-gray-900/40"
-    x-class="flagOpen() ? '' : 'hidden'"
+    :show="flagOpen"
+    style="display:none"
     @click.self="closeFlag()"
   >
     <div class="p-6 max-w-md w-full bg-white rounded-lg shadow-xl">

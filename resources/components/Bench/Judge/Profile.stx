@@ -79,8 +79,13 @@
 <div class="lg:col-span-2 lg:row-end-2 lg:row-span-2 -mx-4 px-4 py-8 sm:mx-0 sm:pb-14 sm:px-8 xl:pb-20 xl:pt-16 xl:px-16 bg-white ring-1 ring-gray-900/5 sm:rounded-lg shadow-sm">
   <h2 class="font-semibold text-base text-gray-800">Education</h2>
 
-  {{-- Real records. Hidden until the fetch lands, so nothing flashes. --}}
-  <dl class="mt-6 space-y-5" x-class="hasEducation() ? '' : 'hidden'">
+  {{-- Real records. Hidden until the fetch lands, so nothing flashes —
+      which needs `:show`, not an x-class 'hidden' toggle. x-class is
+      evaluated in the browser only, so the pre-rendered profile shell
+      shipped this list and the empty state below with no 'hidden' in
+      either class list, and every judge profile painted both at once
+      before the runtime booted. stx-standards 7.3. --}}
+  <dl class="mt-6 space-y-5" :show="hasEducation" style="display:none">
     <div :for="entry in education" class="pb-5 last:pb-0 border-b border-gray-900/5 last:border-0">
       <dt class="font-semibold text-gray-800 text-sm">{{ entry.degree }}</dt>
       <dd class="mt-1 text-gray-600 text-sm">{{ entry.school }}</dd>
@@ -91,7 +96,8 @@
   {{-- Shown only once we know there is nothing, never while loading. --}}
   <div
     class="mt-6 px-6 py-10 text-center bg-gray-50 border border-dashed border-gray-200 rounded-lg"
-    x-class="showEmptyState() ? '' : 'hidden'"
+    :show="showEmptyState"
+    style="display:none"
   >
     <h3 class="font-semibold text-base text-gray-900">Background not yet available</h3>
     <p class="mt-2 mx-auto max-w-md text-gray-600 text-sm">
