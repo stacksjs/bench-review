@@ -35,9 +35,14 @@ export async function getStaticPaths() {
 @section('content')
   {{-- No <main> here: stx-standards 2.8/3.5 put it in the layout, and
        resources/layouts/default.stx already opens one. Two landmarks per page
-       is invalid HTML, announces twice to a screen reader, and matters for
-       routing too -- config/ui.ts sets router.container 'main', so the SPA
-       router picks one of them to swap. --}}
+       is invalid HTML and announces twice to a screen reader.
+
+       It also matters to stx itself, though not for the reason first written
+       here: config/ui.ts has no router key at all. The real consumer is the
+       runtime's scope-root fallback, which resolves a <script> block's root
+       with `document.querySelector('main')` when it cannot find one from the
+       script's siblings -- and that returns the FIRST <main>. With two, a
+       block taking that path binds its scope to the wrong element. --}}
   @include('Bench/Court/CourtHeader')
   @include('Bench/Court/CourtTabs')
   <div class="mx-auto px-4 py-8 sm:px-6 lg:px-8 max-w-7xl">
