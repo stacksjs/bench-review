@@ -2,7 +2,7 @@ import { defineStore, derived, state, useStore } from '@stacksjs/stx'
 
 export interface NotificationRow {
   id: number
-  type: 'like' | 'approved' | 'rejected' | string
+  type: 'like' | 'approved' | 'rejected' | 'judge_review' | 'followed_review' | string
   created_at: string
   read_at: string | null
   unread: boolean

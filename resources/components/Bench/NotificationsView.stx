@@ -47,6 +47,11 @@
     }
     if (n.type === 'approved') return `Your review "${title}" was approved`
     if (n.type === 'rejected') return `Your review "${title}" was declined`
+    // Publish fan-out (bench-review#57) — addressed to the judge being
+    // reviewed and to followers, not to the review's author, so none of these
+    // may say "your review".
+    if (n.type === 'judge_review') return `A new review of you was published: "${title}"`
+    if (n.type === 'followed_review') return `New review of a judge you follow: "${title}"`
     return 'New notification'
   }
 
@@ -54,6 +59,8 @@
     if (n.type === 'approved') return 'It\'s now visible on the public feed.'
     if (n.type === 'rejected') return 'A moderator declined it. You can edit and resubmit if you have new context.'
     if (n.type === 'like') return 'Click to view the review.'
+    if (n.type === 'judge_review') return 'You can respond to it from your claimed profile.'
+    if (n.type === 'followed_review') return 'Click to read it.'
     return ''
   }
 

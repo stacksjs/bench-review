@@ -1,6 +1,23 @@
 import { db } from '@stacksjs/database'
 
-export type NotificationType = 'like' | 'approved' | 'rejected'
+/**
+ * `like` / `approved` / `rejected` are addressed to a review's AUTHOR.
+ *
+ * `judge_review` and `followed_review` are the publish fan-out, added for
+ * bench-review#57. They are addressed to people who did not write the review:
+ *
+ *   judge_review     the verified claimant of the judge being reviewed. This
+ *                    one is not an engagement feature -- it is how the subject
+ *                    of a published review learns it exists, which is the
+ *                    trigger the right-of-reply path never had.
+ *   followed_review  a user following that judge.
+ *
+ * Any new value needs a case in BOTH `notificationLabel` (Bench/BenchHeader)
+ * and `labelFor`/`detailFor` (Bench/NotificationsView). Neither throws on an
+ * unknown type -- they fall back to a bare "New notification" -- so a missing
+ * case ships a delivered-but-meaningless row rather than an error.
+ */
+export type NotificationType = 'like' | 'approved' | 'rejected' | 'judge_review' | 'followed_review'
 
 interface DispatchInput {
   userId: number
@@ -36,6 +53,20 @@ export async function notify(input: DispatchInput): Promise<void> {
   if (!Number.isFinite(userId) || userId <= 0) return
 
   try {
+    // Dedup the fan-out types on (recipient, type, review) as well. A review
+    // can be unpublished and republished -- toggling it back and forth is a
+    // moderation signal its AUTHOR should see each time, but the judge and
+    // their followers should not be told about the same review twice.
+    if (type === 'judge_review' || type === 'followed_review') {
+      const existing = await db.selectFrom('user_notifications')
+        .select(['id'])
+        .where('user_id', '=', userId)
+        .where('type', '=', type)
+        .where('review_id', '=', reviewId ?? null)
+        .executeTakeFirst()
+      if (existing) return
+    }
+
     if (type === 'like') {
       // Dedup: skip if an unread or recent-read like notification
       // already exists for this exact (recipient, actor, review).

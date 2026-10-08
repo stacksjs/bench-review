@@ -162,6 +162,67 @@ export default new Action({
       }
     }
 
+    // Publish fan-out (bench-review#57). Until now a publish notified only
+    // the review's author, so two groups never heard about it:
+    //
+    //   - the judge being reviewed, if they have claimed and verified their
+    //     profile. That is the part that is not an engagement feature: the
+    //     subject of a published review had no way to learn it existed, which
+    //     left the right-of-reply path with no trigger at all.
+    //   - everyone following that judge, which is what made Follow a
+    //     dead-end button.
+    //
+    // Only on a transition INTO published. Unpublishing is not an event for
+    // these recipients, and notify() dedups both types on (recipient, review)
+    // so a republish does not tell them twice.
+    if (status === 'published' && existing.status !== status) {
+      try {
+        const reviewRow = await db.selectFrom('judge_reviews')
+          .select(['judge_id'])
+          .where('id', '=', reviewId)
+          .executeTakeFirst() as { judge_id: number | null } | undefined
+        const judgeId = Number(reviewRow?.judge_id)
+
+        if (Number.isFinite(judgeId) && judgeId > 0) {
+          // The verified claimant. Filtered in JS rather than SQL because a
+          // null-comparison on credential_verified_at hits the bqb
+          // null-operator quirk the claim action documents.
+          const claimants = await db.selectFrom('users')
+            .select(['id', 'credential_verified_at'])
+            .where('claimed_judge_id', '=', judgeId)
+            .where('credential_type', '=', 'judge')
+            .execute() as Array<{ id: number, credential_verified_at: string | null }>
+          const judgeUser = claimants.find(u => u.credential_verified_at != null)
+
+          const recipients = new Map<number, 'judge_review' | 'followed_review'>()
+          if (judgeUser) recipients.set(Number(judgeUser.id), 'judge_review')
+
+          const followers = await db.selectFrom('judge_follows')
+            .select(['user_id'])
+            .where('judge_id', '=', judgeId)
+            .execute() as Array<{ user_id: number }>
+          for (const f of followers) {
+            const id = Number(f.user_id)
+            // The claimant's own follow must not downgrade their
+            // judge_review notification to a follower one.
+            if (!recipients.has(id)) recipients.set(id, 'followed_review')
+          }
+
+          // Never tell someone about their own review: they already got the
+          // 'approved' notification above.
+          if (existing.user_id != null) recipients.delete(Number(existing.user_id))
+
+          for (const [userId, type] of recipients)
+            await notify({ userId, actorUserId: adminId, type, reviewId })
+        }
+      }
+      catch (err) {
+        // Best-effort, like the author email: a missed fan-out must not undo
+        // a moderation decision that is already persisted.
+        console.warn(`[admin-review-status] publish fan-out failed for review ${reviewId}.`, err instanceof Error ? err.message : err)
+      }
+    }
+
     return response.json({ ok: true, id: reviewId, status })
   },
 })

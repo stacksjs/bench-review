@@ -123,6 +123,10 @@
     }
     if (n.type === 'approved') return `Your review "${truncated}" was approved`
     if (n.type === 'rejected') return `Your review "${truncated}" was declined`
+    // Publish fan-out. These go to people who did NOT write the review, so
+    // the phrasing must not say "your review" (bench-review#57).
+    if (n.type === 'judge_review') return `A new review of you was published: "${truncated}"`
+    if (n.type === 'followed_review') return `New review of a judge you follow: "${truncated}"`
     return 'New notification'
   }
 
