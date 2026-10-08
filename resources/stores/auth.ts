@@ -67,6 +67,33 @@ function secureAttr(): string {
 // header within the current tab. It is never persisted and dies on reload,
 // after which the HttpOnly cookie carries the session on its own.
 
+// stx-standards 6.5 says cookies go through `useCookie()`, never
+// document.cookie. bench deviates here deliberately, for one reason that is
+// specific to what this cookie is.
+//
+// The serialisation is not the issue — `useCookie` (signals.js:5344) builds
+// the identical string: encodeURIComponent, `path=/`, `max-age`,
+// `SameSite=Lax`, and `Secure` derived from `location.protocol === 'https:'`.
+// Swapping to it would be a wash on correctness, and it escapes the cookie
+// NAME before matching, which readCookie() below does not (safe today only
+// because both names are constants with no regex metacharacters).
+//
+// The problem is WHEN it writes. `useCookie` performs its write inside an
+// `effect` (signals.js:5370), and `effect` runs immediately on creation
+// (signals.js:781, `if (options.immediate !== false) runEffect()`), with no
+// option passed to suppress that. So declaring one at store scope rewrites
+// the cookie on every page load and refreshes `max-age` each time — a sliding
+// expiry.
+//
+// For this cookie that is not a neutral change. `auth-user` is the UI mirror
+// of the HttpOnly `auth-token`, and the two are deliberately given the same
+// fixed 30-day life from the same login. Make one slide and it outlives the
+// other: isAuthenticated() stays true after the real session is dead, so
+// instead of a clean logged-out render the user gets a page that believes it
+// is signed in until the first 401 bounces them through signOutAndRedirect.
+//
+// Revisit if stx gains a non-eager write (or useCookie takes `{ immediate:
+// false }`), at which point this should move over.
 function setUserCookie(user: UserProfile): void {
   if (typeof document === 'undefined') return
   document.cookie = `${USER_COOKIE}=${encodeURIComponent(JSON.stringify(user))}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax${secureAttr()}`
@@ -453,6 +480,71 @@ defineStore('auth', () => {
     }
   }
 
+  /**
+   * Request a password-reset link. Public (pre-auth) endpoint, so a plain
+   * fetch rather than authFetch — same shape as verifyEmail above, and here
+   * for the same reason: fetch does not belong in a component
+   * (stx-standards 6.6, and bench's own store rule).
+   *
+   * The anti-enumeration behaviour lives here rather than in the view. The
+   * action returns 404 for an unknown email, and surfacing that would let
+   * anyone test which addresses are registered, so every 4xx reports success
+   * — "if an account exists, we sent you a link". Only a genuine 5xx is an
+   * error. Keeping that in the store means a second caller cannot
+   * accidentally reintroduce the oracle by handling the status itself.
+   */
+  async function requestPasswordReset(email: string): Promise<{ ok: boolean, message?: string }> {
+    try {
+      const res = await fetch('/api/auth/password/forgot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      const body = await res.json().catch(() => ({})) as { message?: string }
+      if (!res.ok && res.status >= 500)
+        return { ok: false, message: body?.message || 'Could not send reset link' }
+      return { ok: true }
+    }
+    catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : 'Network error' }
+    }
+  }
+
+  /** Complete a password reset with the emailed token. Public endpoint. */
+  async function resetPassword(input: {
+    token: string
+    email: string
+    password: string
+    passwordConfirmation: string
+  }): Promise<{ ok: boolean, message?: string }> {
+    try {
+      const res = await fetch('/api/auth/password/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          token: input.token,
+          email: input.email,
+          password: input.password,
+          password_confirmation: input.passwordConfirmation,
+        }),
+      })
+      const body = await res.json().catch(() => ({})) as {
+        message?: string
+        errors?: Array<{ message?: string }>
+      }
+      if (!res.ok) {
+        return {
+          ok: false,
+          message: body?.errors?.[0]?.message || body?.message || 'Reset link is invalid or expired.',
+        }
+      }
+      return { ok: true }
+    }
+    catch {
+      return { ok: false, message: 'Network error. Please try again.' }
+    }
+  }
+
   return {
     user,
     token,
@@ -464,6 +556,8 @@ defineStore('auth', () => {
     signUp,
     logout,
     verifyEmail,
+    requestPasswordReset,
+    resetPassword,
     getUser,
     setUser,
     uploadAvatar,
