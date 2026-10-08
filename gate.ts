@@ -541,6 +541,33 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   )
 }
 
+// 20. Every page declares a colour scheme.
+//
+//     bench renders light-only — not one `dark:` variant exists in any
+//     template — but nothing in the built page painted a background, so the
+//     canvas was whatever the user agent chose, and a browser in dark mode
+//     chooses black. Every page served dark grey text on black. Three things
+//     had to be missing at once and all three were: the SSG drops
+//     `app.bodyClass`, the class it asks for (`bg-off-white`) names a colour
+//     that does not exist in the theme so crosswind emits no rule for it, and
+//     there was no `color-scheme` meta. See app/Helpers/colorScheme.ts.
+//
+//     Checked here rather than in a template because the declaration is a
+//     post-build splice, like the webfont and CSP tags — a template-side test
+//     would pass while the artifact shipped without it.
+{
+  const bare: string[] = []
+  for (const [p, h] of html) {
+    if (!/<meta\s+name="color-scheme"/i.test(h))
+      bare.push(p.replace('dist/', ''))
+  }
+  add(
+    'every page declares a colour scheme',
+    bare.length === 0,
+    bare.length ? `${bare.length} pages ship no color-scheme meta (${bare.slice(0, 3).join(', ')}) — they render dark-on-dark for anyone whose browser is in dark mode` : '',
+  )
+}
+
 const failed = checks.filter(c => !c.ok)
 console.log(`\n  bench conformance gate — ${pages.length} built pages\n`)
 for (const c of checks)

@@ -3,6 +3,7 @@ import { buildApp } from '@stacksjs/stx'
 import { resolveApiEndpoint, tsAnalyticsTag } from './app/Helpers/analyticsTag'
 import { TS_ANALYTICS_APP_ID } from './config/ts-analytics'
 import { cspMetaTag, cspPolicyFor } from './app/Helpers/cspMeta'
+import { COLOR_SCHEME_HEAD_TAGS } from './app/Helpers/colorScheme'
 import { FONT_HEAD_TAGS } from './app/Helpers/fontHead'
 import { injectEntitySeo, loadEntitySeo } from './app/Helpers/entitySeo'
 import { injectNoindex, injectSeoHead, NOINDEX_PAGES, SEO_PAGES } from './app/Helpers/seoPages'
@@ -151,6 +152,32 @@ try {
 catch (err) {
   console.warn('[build] webfont head injection skipped:', err instanceof Error ? err.message : err)
 }
+
+// Colour scheme: declare the site light-only and pin the page background.
+// Same post-build splice, same reason. Without it every page rendered dark
+// grey text on the user agent's black canvas for anyone in dark mode, because
+// nothing in bench paints a background — see app/Helpers/colorScheme.ts.
+// Best-effort + idempotent.
+try {
+  const glob = new Bun.Glob('**/*.html')
+  let injected = 0
+  // eslint-disable-next-line ts/no-top-level-await
+  for await (const file of glob.scan('dist')) {
+    const path = `dist/${file}`
+    // eslint-disable-next-line ts/no-top-level-await
+    const html = await Bun.file(path).text()
+    if (!html.includes('</head>') || html.includes('name="color-scheme"'))
+      continue
+    // eslint-disable-next-line ts/no-top-level-await
+    await Bun.write(path, html.replace('</head>', `${COLOR_SCHEME_HEAD_TAGS}</head>`))
+    injected++
+  }
+  console.log(`[build] declared light colour scheme on ${injected} static pages`)
+}
+catch (err) {
+  console.warn('[build] colour-scheme injection skipped:', err instanceof Error ? err.message : err)
+}
+
 
 // Content-Security-Policy (bench-review#3 hardening). Splice a CSP <meta>
 // into every built page's <head>, same post-build mechanism as the SEO +
