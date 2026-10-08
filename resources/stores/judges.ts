@@ -190,6 +190,29 @@ defineStore('judges', () => {
     }
   }
 
+  /**
+   * Submit a judge for the directory. Public endpoint — the form is open to
+   * anyone — so a plain fetch rather than an authenticated one. Here rather
+   * than in resources/views/judges/submit.stx because components do not
+   * fetch (stx-standards 6.6, and bench's own store rule); the view keeps
+   * only its form state and the message it shows.
+   */
+  async function submitJudge(input: Record<string, unknown>): Promise<{ ok: boolean, message?: string }> {
+    try {
+      const res = await fetch('/api/judges/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(input),
+      })
+      if (!res.ok)
+        return { ok: false, message: 'Could not submit — please try again' }
+      return { ok: true }
+    }
+    catch {
+      return { ok: false, message: 'Could not reach the server — please try again' }
+    }
+  }
+
   return {
     judges,
     courtHouses,
@@ -208,5 +231,6 @@ defineStore('judges', () => {
     fetchCourtHouses,
     searchJudges,
     fetchJudgeSearch,
+    submitJudge,
   }
 })

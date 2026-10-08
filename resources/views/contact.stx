@@ -5,6 +5,10 @@
 @section('content')
 <script client>
   const toast = useStore('toast')
+  // Named `contactStore`, not `contact`: a component const that collides with
+  // a top-level export of a module it imports gets renamed by the bundler and
+  // the template binds to the import instead (documented bench footgun).
+  const contactStore = useStore('contact')
   const contactName = state<string>('')
   const contactEmail = state<string>('')
   const topic = state<string>('general')
@@ -35,18 +39,19 @@
     }
     loading.set(true)
     try {
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: contactName(), email: contactEmail(), topic: topic(), message: contactMessage() }),
+      const result = await contactStore.send({
+        name: contactName(),
+        email: contactEmail(),
+        topic: topic(),
+        message: contactMessage(),
       })
-      if (!res.ok) throw new Error('Could not send message. Please try again.')
+      if (!result.ok) {
+        const msg = result.message || 'Could not send message. Please try again.'
+        submitError.set(msg)
+        toast.error('Message not sent', msg)
+        return
+      }
       sent.set(true)
-    }
-    catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      submitError.set(msg)
-      toast.error('Message not sent', msg)
     }
     finally {
       loading.set(false)

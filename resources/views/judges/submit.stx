@@ -13,6 +13,8 @@
     submitterEmail: string
   }
 
+  const judgesStore = useStore('judges')
+
   const form = state<JudgeSubmission>({
     judgeName: '',
     court: '',
@@ -34,16 +36,12 @@
     loading.set(true)
     submitError.set('')
     try {
-      const res = await fetch('/api/judges/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form()),
-      })
-      if (!res.ok) throw new Error('Could not submit — please try again')
+      const result = await judgesStore.submitJudge(form())
+      if (!result.ok) {
+        submitError.set(result.message || 'Could not submit — please try again')
+        return
+      }
       submitted.set(true)
-    }
-    catch (e) {
-      submitError.set(e instanceof Error ? e.message : String(e))
     }
     finally {
       loading.set(false)
