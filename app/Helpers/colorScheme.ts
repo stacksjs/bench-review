@@ -34,10 +34,12 @@
  * the surface even if a future page or an embedding WebView disagrees about
  * the default.
  *
- * White, not a tinted off-white, because white is what the site renders as
- * TODAY in a light-mode browser — this fixes the dark-mode bug without
- * changing the light-mode design. Picking the intended `off-white` is a
- * design decision; see the note on `bg-off-white` above.
+ * The value is the app's surface colour, `off-white` / #f9f7f1, now that
+ * `config/ui.ts` defines it. It is pinned here as well as on the utility so
+ * the surface is one colour end to end: the layout's <main> covers the
+ * content area, and this covers everything outside it — above the header on
+ * an overscroll, below the footer on a short page, and the WebView's own
+ * canvas in the iOS app.
  *
  * Used in TWO places (same tags, one source of truth), like FONT_HEAD_TAGS:
  *   - stx.config.ts `app.head.headRaw` — the dev server's document shell
@@ -46,5 +48,19 @@
 
 export const COLOR_SCHEME_HEAD_TAGS: string = [
   '<meta name="color-scheme" content="light">',
-  '<style>:root{color-scheme:light}html,body{background-color:#fff}</style>',
+  '<style>'
+  + ':root{color-scheme:light}html,body{background-color:#f9f7f1}'
+  // The app's surface colours. These belong in config/ui.ts's theme.colors
+  // and are here instead because that key is inert in the static build — see
+  // the note on it. `bg-off-white` is written in nine places (the layout's
+  // <main>, six views, two components) and emitted nothing until this rule.
+  //
+  // #f9f7f1 is not invented: Bench/BlurReview.stx fades its gradient to
+  // `rgb(249, 247, 241)` in an inline style, and a fade-out gradient has to
+  // end on the colour of the surface behind it. The darker step, used by
+  // home.stx's top-rated band between two white bands, has no prior record
+  // and is a derived tone in the same warm family.
+  + '.bg-off-white{background-color:#f9f7f1}'
+  + '.bg-off-white-darker{background-color:#f2efe7}'
+  + '</style>',
 ].join('')

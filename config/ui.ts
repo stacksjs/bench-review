@@ -57,12 +57,32 @@ export default {
     },
   },
 
+  // ⚠️ INERT IN THE STATIC BUILD. Nothing under this key reaches the emitted
+  // CSS. Measured 2026-10-08 on a throwaway probe page that used each class:
+  // `theme.colors` entries emit no utility (camelCase or kebab key alike),
+  // and neither does the `safelist` below — `lg:grid-cols-5`, `sm:col-span-6`
+  // and `prose-sm` are all absent from the built stylesheet, while ordinary
+  // utilities picked up from markup (`text-gray-900`) are present.
+  //
+  // stx DOES have the merge path for this — `mergeCrosswindConfig`
+  // (@stacksjs/stx/dist/crosswind-config.js:10) deep-merges `user.theme` over
+  // the base and concatenates safelists — so the keys are shaped right; what
+  // is missing is the SSG handing config/ui.ts to it. Same family of problem
+  // as `app.bodyClass`, which the SSG also drops.
+  //
+  // The consequence that bit: `bg-off-white` is written in nine places and
+  // emitted nothing, so the app's surface colour silently fell through to the
+  // user agent's canvas — which is black in dark mode. The surface colours
+  // are therefore defined in app/Helpers/colorScheme.ts, which is spliced
+  // into every page post-build and demonstrably works. Move them back here if
+  // this key ever starts taking effect.
+  //
+  // `veryCool` was scaffolding and is gone; it never emitted anything either,
+  // despite the comment that used to claim `utility class text-very-cool`.
   theme: {
-    // ...
     colors: {
-      veryCool: '#0000ff', // utility class text-very-cool
       brand: {
-        primary: 'hsl(var(--hue, 217) 78% 51%)', // utility class bg-brand-primary
+        primary: 'hsl(var(--hue, 217) 78% 51%)',
       },
     },
   },
