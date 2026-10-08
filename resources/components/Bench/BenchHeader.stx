@@ -335,14 +335,27 @@
           sections — Judges first, Courts second — to match the
           /search page's grouping.
 
-          CSS-toggled (x-class hidden) rather than `:if`. The bindIf
-          remove-then-readd cycle drops the nested `:for`/:text
-          bindings on the re-add when `showDropdown` first flips
-          false → true (same footgun we hit on the login error
-          banner). Element stays in DOM; visibility toggles. --}}
+          `:show`, not `:if`: bindIf's remove-then-readd cycle drops the
+          nested `:for`/`:text` bindings on the re-add when `showDropdown`
+          first flips false → true (same footgun as the login error
+          banner). bindShow only writes `el.style.display`, so the node
+          and its bindings stay put — the same property that made the
+          x-class-hidden toggle this used to be work.
+
+          What x-class could not do is hide it BEFORE hydration. x-class
+          is evaluated client-side only, so the static build shipped this
+          panel with no `hidden` in its class list and every page painted
+          an open, empty dropdown under the search box until the runtime
+          booted. `:show` is cloaked at build time (stx stamps `x-cloak`
+          and ships `[x-cloak]{display:none!important}` in the head), and
+          the static `style="display:none"` is stx-standards 7.3's
+          counterpart rule — bindShow reads it as `originalDisplay === ''`
+          and reveals by clearing the property, so the class list decides
+          the shown display mode. --}}
       <div
         class="absolute left-0 overflow-hidden overflow-y-auto right-0 top-full z-20 mt-1 max-h-96 bg-white border border-gray-200 rounded-lg shadow-lg"
-        x-class="showDropdown() ? '' : 'hidden'"
+        :show="showDropdown"
+        style="display:none"
       >
         {{-- `:for="judge in judgesStore.searchResults"` — NO PARENS on
             the signal reference. Matches the working pattern in
@@ -389,10 +402,14 @@
       </div>
 
       {{-- Empty-state. Only when there's a query, no loading, and zero
-          results across both groups. Same x-class-hidden pattern. --}}
+          results across both groups. Same `:show` treatment as the
+          dropdown above, and the same reason: this is the panel that
+          was painting 'No matches. Press Enter to search all results.'
+          on first load of every page in the site. --}}
       <div
         class="absolute left-0 right-0 top-full z-20 mt-1 px-3 py-3 text-gray-500 text-sm bg-white border border-gray-200 rounded-lg shadow-lg"
-        x-class="showEmpty() ? '' : 'hidden'"
+        :show="showEmpty"
+        style="display:none"
       >
         No matches. Press Enter to search all results.
       </div>
