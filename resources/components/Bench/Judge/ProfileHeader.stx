@@ -52,13 +52,12 @@
       navigate('/judges', true)
       return
     }
-    // Bare /judges/{id} (no tab) → default to the profile tab, so the
-    // parent layout's content slot is filled instead of rendering empty
-    // (the tabs render their content into [id].stx's @slot('content')).
-    if (/^\/judges\/\d+\/?$/.test(window.location.pathname)) {
-      navigate(`/judges/${resolved}/profile`, true)
-      return
-    }
+    // No bare-/judges/{id} redirect any more. It existed because
+    // views/judges/[id].stx ended in an @slot('content') that nothing on this
+    // route filled, so the page rendered empty without one — and it made the
+    // canonical URL in the sitemap a client-side bounce to a shared shell
+    // (#64). That view now renders the judge itself, so the canonical page
+    // stands on its own and this component is just a header again.
     judgeId.set(resolved)
     fetchOnce()
   })
@@ -72,20 +71,17 @@
     return judgesStore.judges().find((j: any) => Number(j.id) === id) || null
   })
 
-  // OG / Twitter card defaults (bench-review#32). Generic per-
-  // page-type baseline; per-judge interpolation needs server-side
-  // data resolution (follow-up).
-  useSeoMeta({
-    description: 'Judge profile and reviews on Bench Review — see what attorneys, clerks, and court staff have said.',
-    ogTitle: 'Judge profile — Bench Review',
-    ogDescription: 'Reviews of this judge from clerks, attorneys, and court staff.',
-    ogType: 'profile',
-    ogImage: '/images/og-image.png',
-    twitterCard: 'summary_large_image',
-    twitterTitle: 'Judge profile — Bench Review',
-    twitterDescription: 'Reviews of this judge from clerks, attorneys, and court staff.',
-    twitterImage: '/images/og-image.png',
-  })
+  // No useSeoMeta here, deliberately. It used to set a generic
+  // "Judge profile — Bench Review" title/description/OG set as a
+  // per-page-type baseline, and because this component mounts on the
+  // canonical /judges/:id page it overwrote, at hydration, the per-judge
+  // head that app/Helpers/entitySeo.ts injects at build time — the exact
+  // regression fixed for CourtHeader in 83d0b6da. The static HTML kept the
+  // right title, so crawlers were unaffected, but the browser tab, history
+  // entry and share sheet all read the generic one.
+  //
+  // entitySeo is the source for these pages; the shared tab shells get their
+  // baseline from the shell views themselves.
 
   const judgeName = derived<string>(() => currentJudge()?.name || '')
   // Local silhouette rather than the stock Unsplash face this used to fall back
