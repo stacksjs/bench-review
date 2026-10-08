@@ -23,7 +23,6 @@ export const routes = [
   { pattern: '/forgot-password', filePath: 'resources/views/forgot-password.stx', isDynamic: false, params: [] },
   { pattern: '/guidelines', filePath: 'resources/views/guidelines.stx', isDynamic: false, params: [] },
   { pattern: '/home', filePath: 'resources/views/home.stx', isDynamic: false, params: [] },
-  { pattern: '/jtest', filePath: 'resources/views/jtest/index.stx', isDynamic: false, params: [] },
   { pattern: '/judges', filePath: 'resources/views/judges/index.stx', isDynamic: false, params: [] },
   { pattern: '/login', filePath: 'resources/views/login.stx', isDynamic: false, params: [] },
   { pattern: '/my-reviews', filePath: 'resources/views/my-reviews.stx', isDynamic: false, params: [] },

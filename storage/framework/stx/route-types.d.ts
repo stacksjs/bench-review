@@ -22,7 +22,6 @@ declare module '@stacksjs/stx' {
     '/forgot-password': {  }
     '/guidelines': {  }
     '/home': {  }
-    '/jtest': {  }
     '/judges': {  }
     '/login': {  }
     '/my-reviews': {  }
