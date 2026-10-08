@@ -112,7 +112,14 @@
   // filtering/searching down to an empty result never re-showed the panel
   // (it stayed blank). x-class keeps the panel in the DOM with a live,
   // reactive binding. Mirrors ReviewsFeed.stx's showFilteredEmpty/showGenuineEmpty.
-  const showEmpty = derived<boolean>(() => filteredCourtHouses().length === 0 && !judgesStore.loading())
+  // Gated on there being no load error -- see JudgeDirectory. An empty list
+  // during an outage is a failed request, not an empty directory.
+  const loadFailed = derived<boolean>(() => !judgesStore.loading() && !!judgesStore.loadError())
+  const showEmpty = derived<boolean>(() => filteredCourtHouses().length === 0 && !judgesStore.loading() && !judgesStore.loadError())
+
+  function retryLoad(): void {
+    void judgesStore.fetchCourtHouses()
+  }
   const hasActiveFilters = derived<boolean>(() => stateFilter() !== 'all' || hasReviewsFilter() !== 'all' || searchQuery() !== '')
 </script>
 
@@ -249,6 +256,19 @@
         !loading gate above was meant to prevent. stx-standards 7.3; the
         two inner x-class toggles need no change because a cloaked
         parent does not paint its children. --}}
+  {{-- Load failure. A different claim from "nothing here yet", so it does not
+      borrow the empty state's styling, and it offers the only action that
+      helps. --}}
+  <div :show="loadFailed" style="display:none" role="alert" class="mt-2 p-12 text-center bg-white border border-gray-200 rounded-2xl">
+    <p class="font-medium text-gray-900">{{ judgesStore.loadError() }}</p>
+    <p class="mt-1 text-gray-500 text-sm">This is a problem on our side, not with your connection to the rest of the site.</p>
+    <button
+      type="button"
+      @click="retryLoad()"
+      class="inline-flex items-center mt-5 px-4 py-2 font-medium text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+    >Try again</button>
+  </div>
+
     <div :show="showEmpty" style="display:none" class="mt-2 p-12 text-center bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
       <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />

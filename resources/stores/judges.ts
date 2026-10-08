@@ -6,6 +6,13 @@ defineStore('judges', () => {
   const courtHouses = state<CourtHouse[]>([])
   const loading = state<boolean>(false)
 
+  // Whether the last directory fetch failed. Without it a down API is
+  // indistinguishable from an empty directory: both leave the list empty and
+  // loading false, and the view renders "No judges yet" -- a claim about the
+  // content that is simply false during an outage. Components read it to show
+  // a retry instead of an empty state.
+  const loadError = state<string>('')
+
   // Typeahead results live in their own slice so the directory's
   // `judges` cache stays untouched while a user is mid-search. The
   // search-form (and any future autocomplete) reads `searchResults`;
@@ -71,15 +78,20 @@ defineStore('judges', () => {
 
   async function fetchJudges(): Promise<void> {
     loading.set(true)
+    loadError.set('')
     try {
       const res = await useStore('auth').authFetch('/api/judges')
       if (res.ok) {
         const data = await res.json() as Judge[]
         judges.set(data)
       }
+      else {
+        loadError.set('Could not load the judge directory.')
+      }
     }
     catch (error) {
       console.error('Failed to fetch judges:', error)
+      loadError.set('Could not reach the server.')
     }
     finally {
       loading.set(false)
@@ -88,15 +100,20 @@ defineStore('judges', () => {
 
   async function fetchCourtHouses(): Promise<void> {
     loading.set(true)
+    loadError.set('')
     try {
       const res = await useStore('auth').authFetch('/api/court-houses')
       if (res.ok) {
         const data = await res.json() as CourtHouse[]
         courtHouses.set(data)
       }
+      else {
+        loadError.set('Could not load the courthouse directory.')
+      }
     }
     catch (error) {
       console.error('Failed to fetch court houses:', error)
+      loadError.set('Could not reach the server.')
     }
     finally {
       loading.set(false)
@@ -215,6 +232,7 @@ defineStore('judges', () => {
 
   return {
     judges,
+    loadError,
     courtHouses,
     loading,
     searchResults,

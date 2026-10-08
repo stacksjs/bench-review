@@ -234,10 +234,21 @@
   // :if empty panel (it stayed blank). x-class keeps the panel in the DOM
   // with a live, reactive binding. feed() is server-filtered, so an empty
   // page with a category active is genuinely "no reviews in this category".
+  // Both empty states are gated on there being no load error. An empty list
+  // means one of two very different things -- the site has no reviews, or the
+  // request failed -- and until now both rendered "No reviews yet. Be the
+  // first to write one." A visitor arriving during an outage was told
+  // something untrue about the content, on a site whose whole product is the
+  // content. `loadFailed` takes priority and offers a retry instead.
+  const loadFailed = derived<boolean>(() => !reviewsStore.loadingFeed() && !!reviewsStore.loadError())
   const showFilteredEmpty = derived<boolean>(() =>
-    !reviewsStore.loadingFeed() && reviews().length === 0 && !!judgesStore.activeCategory())
+    !reviewsStore.loadingFeed() && !reviewsStore.loadError() && reviews().length === 0 && !!judgesStore.activeCategory())
   const showGenuineEmpty = derived<boolean>(() =>
-    !reviewsStore.loadingFeed() && reviews().length === 0 && !judgesStore.activeCategory())
+    !reviewsStore.loadingFeed() && !reviewsStore.loadError() && reviews().length === 0 && !judgesStore.activeCategory())
+
+  function retryFeed(): void {
+    void reviewsStore.goToFeedPage(reviewsStore.feedPage(), 20)
+  }
 
   // Numbered pagination. buildPages returns plain objects (no signal
   // calls / no template ternary in the :for — footgun) describing each
@@ -352,6 +363,19 @@
   {{-- Two empty states: filter-narrowed vs genuinely empty. The
       judgesStore.activeCategory signal drives the distinction so the
       message matches what the user just clicked. --}}
+  {{-- Load failure. Deliberately NOT styled as an empty state: it is a
+      different claim about the world, and it offers the one action that can
+      help. --}}
+  <div :show="loadFailed" style="display:none" role="alert" class="mt-2 p-10 text-center bg-white border border-gray-200 rounded-xl">
+    <p class="font-medium text-gray-900 text-sm">{{ reviewsStore.loadError() }}</p>
+    <p class="mt-1 text-gray-500 text-sm">This is a problem on our side, not with your connection to the rest of the site.</p>
+    <button
+      type="button"
+      @click="retryFeed()"
+      class="inline-flex items-center mt-5 px-4 py-2 font-medium text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+    >Try again</button>
+  </div>
+
   <div :show="showFilteredEmpty" style="display:none" class="mt-2 p-10 text-center bg-gray-50 border border-dashed border-gray-200 rounded-xl">
     <svg class="mx-auto h-10 w-10 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
       <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/>

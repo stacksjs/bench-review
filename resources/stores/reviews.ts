@@ -106,6 +106,13 @@ defineStore('reviews', () => {
   // (slice 0,5), so the feed's growing accumulator must not bleed into
   // those capped views. The feed is the only unbounded cross-judge
   // surface, hence the only one that truly needs server pagination.
+  // Whether the last public fetch failed. Without this a down API is
+  // indistinguishable from an empty site: both leave the list empty and
+  // loading false, and the view renders "No reviews yet. Be the first to
+  // write one." -- which tells a visitor something untrue about the content.
+  // Components read it to show a retry instead of an empty state.
+  const loadError = state<string>('')
+
   const feed = state<JudgeReviewRow[]>([])
   const feedPage = state<number>(1)
   const feedLastPage = state<number>(1)
@@ -125,14 +132,19 @@ defineStore('reviews', () => {
 
   async function fetchLatest(limit = 6): Promise<void> {
     loadingLatest.set(true)
+    loadError.set('')
     try {
       const res = await useStore('auth').authFetch(`/api/reviews?limit=${limit}`)
-      if (!res.ok) return
+      if (!res.ok) {
+        loadError.set('Could not load reviews.')
+        return
+      }
       const data = await res.json() as JudgeReviewRow[]
       latest.set(Array.isArray(data) ? data : [])
     }
     catch (err) {
       console.error('[reviews] fetchLatest failed:', err)
+      loadError.set('Could not reach the server.')
     }
     finally {
       loadingLatest.set(false)
@@ -153,12 +165,19 @@ defineStore('reviews', () => {
     const controller = new AbortController()
     feedAbort = controller
     loadingFeed.set(true)
+    loadError.set('')
     try {
       const cat = useStore('judges').activeCategory()
       const catParam = cat ? `&category=${encodeURIComponent(cat)}` : ''
       const res = await useStore('auth').authFetch(`/api/reviews?page=${page}&per_page=${perPage}${catParam}`, { signal: controller.signal })
-      // Bail if not ok, or if a newer request superseded this one.
-      if (!res.ok || feedAbort !== controller) return
+      // Bail if not ok, or if a newer request superseded this one. Only the
+      // still-current request may report an error -- a superseded one failing
+      // says nothing about the page the user is now looking at.
+      if (!res.ok) {
+        if (feedAbort === controller) loadError.set('Could not load reviews.')
+        return
+      }
+      if (feedAbort !== controller) return
       const json = await res.json() as { data?: JudgeReviewRow[], current_page?: number, last_page?: number, total?: number }
       if (feedAbort !== controller) return
       feed.set(Array.isArray(json?.data) ? json.data : [])
@@ -170,6 +189,7 @@ defineStore('reviews', () => {
       // Aborts are expected when a newer request supersedes this one.
       if ((err as { name?: string })?.name === 'AbortError') return
       console.error('[reviews] goToFeedPage failed:', err)
+      if (feedAbort === controller) loadError.set('Could not reach the server.')
     }
     finally {
       // Only the still-active request owns the loading flag — a
@@ -520,6 +540,7 @@ defineStore('reviews', () => {
   return {
     latest,
     byJudge,
+    loadError,
     loadingLatest,
     loadingByJudge,
     submitting,
