@@ -93,6 +93,10 @@
   })
 
   const isFollowing = derived<boolean>(() => followsStore.isFollowing(judgeId()))
+
+  // Gate the claim prompt on the name having loaded, so it never renders
+  // "Are you ?" while the fetch is in flight.
+  const hasJudgeName = derived<boolean>(() => !!judgeName())
   const followPending = derived<boolean>(() => followsStore.isPending(judgeId()))
 
   async function toggleFollow(): Promise<void> {
@@ -191,5 +195,32 @@
         </div>
       </div>
     </div>
+
+    {{-- Claim prompt. The footer and /guidelines already link to
+        /judges/signup, but the page a judge actually lands on -- their own
+        profile, which is where a search for their name sends them -- did not,
+        so the funnel's one high-intent entry point was missing
+        (bench-review#57).
+
+        It pairs with the publish fan-out in 44c589ce: that gives a verified
+        claimant a notification when a review of them is published, and this
+        is how they find out claiming is possible in the first place.
+
+        Deliberately quiet -- a line of text under the header, not a button
+        competing with Follow. It is addressed to one specific person out of
+        everyone who loads the page.
+
+        `:show`, not `:if`: the name arrives with the fetch, so this starts
+        false at first render, which is exactly the case bindIf drops and
+        never brings back (stx-standards 7.3, gate check 19). --}}
+    <p
+      :show="hasJudgeName"
+      style="display:none"
+      class="mt-6 text-gray-500 text-sm"
+    >
+      Are you {{ judgeName }}?
+      <StxLink to="/judges/signup" class="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900">Claim this profile</StxLink>
+      to respond to reviews.
+    </p>
   </div>
 </header>
