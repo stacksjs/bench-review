@@ -5,6 +5,7 @@ import { request, response } from '@stacksjs/router'
 import { hydrateLikeData } from '../../Helpers/reviewLikes'
 import { buildPaginatorMeta, resolvePaginatorArgs } from '../../Helpers/paginate'
 import { attachReviewers, toPublicReviewRow } from '../../Helpers/reviewerLabel'
+import { fetchReviewsByIds, rankByHelpful, resolveReviewSort } from '../../Helpers/reviewSort'
 
 /**
  * GET /api/reviews — latest published reviews across all judges.
@@ -22,6 +23,10 @@ import { attachReviewers, toPublicReviewRow } from '../../Helpers/reviewerLabel'
  *   - `?limit=N`            → raw array of the newest N (capped at 20).
  *     The home page strip and the court page read this form
  *     (`reviews` store `fetchLatest`). Opt-in via `?limit` only.
+ *
+ * Both shapes accept `?sort=recent` (default) or `?sort=helpful`, which
+ * ranks by "helpful" marks across the entire scope before the page is
+ * cut — see `app/Helpers/reviewSort.ts`.
  *
  * Published only — pending/rejected stay invisible to the public.
  * Hydrates `liked_by_me` per row when the request carries auth so the
@@ -57,6 +62,9 @@ export default new Action({
     const me = await Auth.user().catch(() => null)
     const viewerId = (me as any)?.id ?? null
 
+    // Shared by both response shapes below.
+    const sort = resolveReviewSort()
+
     // The canonical paginator is the DEFAULT response. Only the explicit
     // ?limit form returns the legacy raw array (home/court strips). This
     // way hitting /api/reviews with no params still yields a sensible
@@ -86,24 +94,48 @@ export default new Action({
           return response.json(buildPaginatorMeta([], 0, page, perPage))
       }
 
-      let countQ = (db.selectFrom('judge_reviews') as any)
-        .select(['COUNT(*) as c'])
-        .where('status', '=', 'published')
-      if (judgeIds)
-        countQ = countQ.where('judge_id', 'in', judgeIds)
-      const countRow = await countQ.executeTakeFirst() as { c: number | string } | undefined
-      const total = Number(countRow?.c ?? 0)
+      // `?sort=helpful` ranks the WHOLE scope by like count before the
+      // page is cut. Sorting the fetched page instead would mean the
+      // site's most-helpful review never reaches page 1 unless it also
+      // happened to be recent — see app/Helpers/reviewSort.ts for why
+      // this can't just be a different orderBy.
+      let rows: Array<Record<string, any>>
+      let total: number
 
-      let dataQ = (db.selectFrom('judge_reviews') as any)
-        .selectAll()
-        .where('status', '=', 'published')
-      if (judgeIds)
-        dataQ = dataQ.where('judge_id', 'in', judgeIds)
-      const rows = await dataQ
-        .orderBy('created_at', 'desc')
-        .limit(perPage)
-        .offset(offset)
-        .execute() as Array<Record<string, any>>
+      if (sort === 'helpful') {
+        // The candidate query doubles as the count, so this path costs
+        // the same two queries as the date path plus one grouped count
+        // over the pivot — not one query per row.
+        let candidateQ = (db.selectFrom('judge_reviews') as any)
+          .select(['id', 'created_at'])
+          .where('status', '=', 'published')
+        if (judgeIds)
+          candidateQ = candidateQ.where('judge_id', 'in', judgeIds)
+        const candidates = await candidateQ.execute() as Array<{ id: number, created_at?: string | null }>
+        total = candidates.length
+        const ranked = await rankByHelpful(candidates)
+        rows = await fetchReviewsByIds(ranked.slice(offset, offset + perPage))
+      }
+      else {
+        let countQ = (db.selectFrom('judge_reviews') as any)
+          .select(['COUNT(*) as c'])
+          .where('status', '=', 'published')
+        if (judgeIds)
+          countQ = countQ.where('judge_id', 'in', judgeIds)
+        const countRow = await countQ.executeTakeFirst() as { c: number | string } | undefined
+        total = Number(countRow?.c ?? 0)
+
+        let dataQ = (db.selectFrom('judge_reviews') as any)
+          .selectAll()
+          .where('status', '=', 'published')
+        if (judgeIds)
+          dataQ = dataQ.where('judge_id', 'in', judgeIds)
+        rows = await dataQ
+          .orderBy('created_at', 'desc')
+          .limit(perPage)
+          .offset(offset)
+          .execute() as Array<Record<string, any>>
+      }
 
       const hydrated = await hydrateLikeData(rows ?? [])
       const withReviewer = await attachReviewers(hydrated, loadUsers)
@@ -118,10 +150,23 @@ export default new Action({
       ? Math.min(parsed, MAX_LIMIT)
       : DEFAULT_LIMIT
 
-    const rows = await JudgeReview.where('status', 'published')
-      .orderBy('created_at', 'desc')
-      .limit(limit)
-      .get()
+    // The strips honour ?sort= too: a param that silently does nothing on
+    // one response shape is worse than no param at all.
+    let rows: Array<Record<string, any>>
+    if (sort === 'helpful') {
+      const candidates = await (db.selectFrom('judge_reviews') as any)
+        .select(['id', 'created_at'])
+        .where('status', '=', 'published')
+        .execute() as Array<{ id: number, created_at?: string | null }>
+      const ranked = await rankByHelpful(candidates)
+      rows = await fetchReviewsByIds(ranked.slice(0, limit))
+    }
+    else {
+      rows = await JudgeReview.where('status', 'published')
+        .orderBy('created_at', 'desc')
+        .limit(limit)
+        .get()
+    }
 
     const hydrated = await hydrateLikeData(rows ?? [])
     const withReviewer = await attachReviewers(hydrated, loadUsers)

@@ -5,6 +5,7 @@ import { request, response } from '@stacksjs/router'
 import { hydrateLikeData } from '../../Helpers/reviewLikes'
 import { buildPaginatorMeta, resolvePaginatorArgs } from '../../Helpers/paginate'
 import { toPublicReviewRow } from '../../Helpers/reviewerLabel'
+import { fetchReviewsByIds, rankByHelpful, resolveReviewSort } from '../../Helpers/reviewSort'
 
 /**
  * GET /api/judges/:id/reviews — paginated list of published reviews
@@ -26,6 +27,12 @@ import { toPublicReviewRow } from '../../Helpers/reviewerLabel'
  * Pagination:
  *   - `?page=N`         — 1-indexed page (default 1)
  *   - `?per_page=M`     — clamped to [1, 100], default 25 (per the shim)
+ *
+ * Sorting:
+ *   - `?sort=recent`    — newest first (default)
+ *   - `?sort=helpful`   — most "helpful" marks first, ranked across every
+ *                         published review for this judge before the page
+ *                         is cut (see app/Helpers/reviewSort.ts)
  *
  * Resolves bench-review#28 (public read endpoints).
  */
@@ -81,22 +88,37 @@ export default new Action({
     // Without this the profile's average/distribution would only cover
     // the loaded slice — a latent bug now that the list paginates via
     // load-more. Doubles as the paginator's `total`.
+    //
+    // `id` and `created_at` ride along on the same query because
+    // `?sort=helpful` needs exactly this scope — every published review
+    // for the judge — to rank against. The helpful path therefore adds
+    // no scan the summary wasn't already paying for.
     const ratingRows = await (db.selectFrom('judge_reviews') as any)
-      .select(['rating'])
+      .select(['id', 'rating', 'created_at'])
       .where('judge_id', '=', judgeId)
       .where('status', '=', 'published')
-      .execute() as Array<{ rating: number | string }>
+      .execute() as Array<{ id: number, rating: number | string, created_at?: string | null }>
     const total = ratingRows.length
     const summary = buildRatingSummary(ratingRows, total)
 
-    const rows = await (db.selectFrom('judge_reviews') as any)
-      .selectAll()
-      .where('judge_id', '=', judgeId)
-      .where('status', '=', 'published')
-      .orderBy('created_at', 'desc')
-      .limit(perPage)
-      .offset(offset)
-      .execute() as Array<Record<string, any>>
+    // Ranking spans the whole scope, not the page: sorting a date-selected
+    // page by likes would leave the judge's most-marked review off page 1
+    // unless it also happened to be recent.
+    let rows: Array<Record<string, any>>
+    if (resolveReviewSort() === 'helpful') {
+      const ranked = await rankByHelpful(ratingRows)
+      rows = await fetchReviewsByIds(ranked.slice(offset, offset + perPage))
+    }
+    else {
+      rows = await (db.selectFrom('judge_reviews') as any)
+        .selectAll()
+        .where('judge_id', '=', judgeId)
+        .where('status', '=', 'published')
+        .orderBy('created_at', 'desc')
+        .limit(perPage)
+        .offset(offset)
+        .execute() as Array<Record<string, any>>
+    }
 
     const hydrated = await hydrateLikeData(rows ?? [])
     // Strip raw user_id (de-anonymization guard); is_mine carries the
