@@ -5,6 +5,7 @@ import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
 import { logModeration } from '../../../Helpers/auditLog'
 import { notify } from '../../../Helpers/notifications'
+import { wantsEmail } from '../../../Helpers/emailPreferences'
 import { escapeHtml, renderReviewEmail } from '../../../Helpers/reviewEmailTemplate'
 
 /**
@@ -83,18 +84,19 @@ export default new Action({
         reviewId,
       })
 
-      // Email the author too. Best-effort — a failed send doesn't
-      // roll back the moderation decision; the in-app notification
-      // above still surfaces in the bell dropdown. Looks up the
-      // author's email + the judge name from a couple of cheap
-      // selects so the email body has real context.
+      // Email the author too, unless they have turned review mail off in
+      // settings. Best-effort — a failed send doesn't roll back the
+      // moderation decision; the in-app notification above still surfaces in
+      // the bell dropdown, which is also where the outcome lands for anyone
+      // who opted out. Looks up the author's email + the judge name from a
+      // couple of cheap selects so the email body has real context.
       try {
         const author = await db.selectFrom('users')
           .select(['id', 'email', 'name'])
           .where('id', '=', Number(existing.user_id))
           .executeTakeFirst() as { id: number, email: string, name: string | null } | undefined
 
-        if (author?.email) {
+        if (author?.email && await wantsEmail(Number(existing.user_id), 'review_activity')) {
           const reviewRow = await db.selectFrom('judge_reviews')
             .select(['title', 'judge_id'])
             .where('id', '=', reviewId)

@@ -3,6 +3,7 @@ import { isEmailVerified } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { wantsEmail } from '../../Helpers/emailPreferences'
 import { escapeHtml, renderReviewEmail } from '../../Helpers/reviewEmailTemplate'
 import { sanitizeReviewHtml } from '../../Helpers/sanitizeReviewHtml'
 
@@ -172,8 +173,12 @@ export default new Action({
     // catchers in dev sometimes aren't running; production with a
     // real driver will deliver normally. Same pattern as the password
     // reset action.
+    // Skipped entirely for anyone who has turned review mail off in settings
+    // -- this is the first of the three review-activity emails, and the one
+    // they are most likely to consider noise, since they just pressed submit.
     const recipient = (authUser as any)?.email as string | undefined
-    if (recipient && (inserted as any)?.id) {
+    const emailAllowed = recipient ? await wantsEmail(Number((authUser as any)?.id ?? 0), 'review_activity') : false
+    if (recipient && emailAllowed && (inserted as any)?.id) {
       try {
         const { mail } = await import('@stacksjs/email')
         const judgeName = (judge as any)?.name ?? 'this judge'

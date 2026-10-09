@@ -392,6 +392,19 @@ route.post('/me/notifications/read-all', 'Actions/Me/NotificationsReadAllAction'
   .middleware('auth')
   .skipCsrf()
 
+// Email opt-outs (bench-review#57). Distinct literal from the
+// /me/notifications routes above, so no ordering constraint between them.
+// Both verbs bind the same action; it dispatches on the method.
+route.get('/me/notification-preferences', 'Actions/Me/NotificationPreferencesAction')
+  .name('bench.me.notificationPreferences')
+  .middleware('auth')
+
+route.patch('/me/notification-preferences', 'Actions/Me/NotificationPreferencesAction')
+  .name('bench.me.notificationPreferences.update')
+  .middleware('auth')
+  .middleware('throttle:60,1m') // per-user write-churn guard, as on the other /me writes
+  .skipCsrf()
+
 route.get('/me/follows', 'Actions/Me/MyFollowsAction')
   .name('bench.me.follows')
   .middleware('auth')
