@@ -3,10 +3,10 @@
   // because view-level <script client> blocks are silently dropped —
   // see feedback_stx_view_vs_component_scripts.
   //
-  // Pre-fills from the auth store. Save is wired through the auth
-  // store as well, but for now (no /api/me PATCH endpoint yet) it just
-  // updates the cookie-cached user so the navbar/profile reflect the
-  // edit; persistence to the backend lands when the endpoint does.
+  // Pre-fills from the auth store, and saves through PATCH /api/me (the
+  // endpoint an older version of this comment said did not exist yet --
+  // Actions/Me/UpdateMeAction). The cookie-cached user is updated from the
+  // response so the navbar and profile reflect the edit without a reload.
 
   const authStore = useStore('auth')
   const toast = useStore('toast')
@@ -51,6 +51,82 @@
   // Sync on both hydration and SPA-nav (feedback_stx_toplevel_skipped_on_spa_nav).
   syncFromAuth()
   onMount(() => syncFromAuth())
+
+  // ── Email notifications (bench-review#57) ───────────────────────
+  //
+  // The category list comes from the server (GET returns id + label +
+  // description alongside the flag) rather than being hardcoded here, so
+  // adding a category in app/Helpers/emailPreferences.ts surfaces it in
+  // settings with no template change -- and a renamed one cannot drift
+  // between the two.
+  const emailCategories = state<any[]>([])
+  const emailPrefsError = state<string>('')
+  // Category id currently in flight, so one row's spinner does not disable
+  // the others.
+  const emailPrefSaving = state<string>('')
+
+  async function loadEmailPrefs(): Promise<void> {
+    try {
+      const res = await authStore.authFetch('/api/me/notification-preferences')
+      if (!res.ok) {
+        emailPrefsError.set('Could not load your email settings.')
+        return
+      }
+      const data = await res.json().catch(() => ({})) as { categories?: any[] }
+      emailCategories.set(Array.isArray(data?.categories) ? data.categories : [])
+      emailPrefsError.set('')
+    }
+    catch {
+      emailPrefsError.set('Could not reach the server.')
+    }
+  }
+
+  // Optimistic: the switch moves on click and rolls back if the write
+  // fails. A toggle that waits on a round-trip before moving reads as
+  // broken, and the cost of being wrong here is one stale checkbox.
+  async function toggleEmailPref(id: string, next: boolean): Promise<void> {
+    if (emailPrefSaving()) return
+    const before = emailCategories()
+    emailPrefSaving.set(id)
+    emailCategories.set(before.map((c: any) => (c.id === id ? { ...c, email: next } : c)))
+    try {
+      const res = await authStore.authFetch('/api/me/notification-preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: id, email: next }),
+      })
+      if (!res.ok) {
+        emailCategories.set(before)
+        emailPrefsError.set('Could not save that — try again.')
+        return
+      }
+      emailPrefsError.set('')
+    }
+    catch {
+      emailCategories.set(before)
+      emailPrefsError.set('Could not reach the server.')
+    }
+    finally {
+      emailPrefSaving.set('')
+    }
+  }
+
+  // Every per-row class is precomputed here: an x-class inside a :for must
+  // not carry signal call-syntax, which forces a fallback path that leaves
+  // the loop variable as a signal function.
+  const emailRows = derived(() => emailCategories().map((c: any) => ({
+    id: c.id,
+    label: c.label,
+    description: c.description,
+    email: !!c.email,
+    ariaChecked: c.email ? 'true' : 'false',
+    saving: emailPrefSaving() === c.id,
+    trackCls: c.email ? 'bg-blue-600' : 'bg-gray-300',
+    knobCls: c.email ? 'translate-x-5' : 'translate-x-0.5',
+  })))
+
+  loadEmailPrefs()
+  onMount(() => loadEmailPrefs())
 
   // Avatar source: the user's uploaded photo if set, else a deterministic
   // initials placeholder (NOT a stock face — a misattributed real photo
@@ -523,6 +599,49 @@
             <span>{{ credentialStatus === 'saving' ? 'Submitting…' : 'Submit claim for verification' }}</span>
           </button>
         </div>
+      </div>
+    </section>
+
+    <section class="overflow-hidden mt-6 bg-white border border-gray-200 rounded-2xl shadow-sm">
+      <div class="px-6 py-5 sm:px-8 border-b border-gray-100">
+        <h2 class="font-semibold text-base text-gray-900">Email notifications</h2>
+        <p class="mt-1 text-gray-500 text-sm">Choose what we email you about. Everything stays in your in-app notifications either way.</p>
+      </div>
+
+      {{-- `:show` + static display:none, not an x-class hidden toggle: the
+          pre-rendered page would otherwise paint an error nobody has hit yet
+          (stx-standards 7.3, gate check 19). --}}
+      <div
+        role="alert"
+        :show="emailPrefsError"
+        style="display:none"
+        class="mt-5 mx-6 px-3 py-2 sm:mx-8 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
+      >{{ emailPrefsError }}</div>
+
+      {{-- Rows are server-driven; an empty list simply renders nothing while
+          the fetch is in flight. Toggle buttons, with the label as the
+          switch's accessible name via the sr-only span. --}}
+      <div :for="cat in emailRows()" class="flex gap-6 items-start justify-between px-6 py-5 sm:px-8">
+        <div>
+          <p class="font-medium text-gray-900 text-sm">{{ cat.label }}</p>
+          <p class="mt-0.5 text-gray-500 text-xs">{{ cat.description }}</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          x-aria-checked="cat.ariaChecked"
+          x-disabled="cat.saving"
+          @click="toggleEmailPref(cat.id, !cat.email)"
+          class="inline-flex relative flex-none items-center h-6 w-11 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 disabled:opacity-50 transition-colors"
+          x-class="cat.trackCls"
+        >
+          <span class="sr-only">{{ cat.label }}</span>
+          <span class="inline-block h-5 w-5 bg-white rounded-full shadow transition-transform" x-class="cat.knobCls"></span>
+        </button>
+      </div>
+
+      <div class="px-6 py-4 sm:px-8 bg-gray-50 border-gray-100 border-t">
+        <p class="text-gray-500 text-xs">Account and security email — sign-up confirmation, address verification and password resets — is always sent. Those either confirm something you just did or protect the account itself.</p>
       </div>
     </section>
 
