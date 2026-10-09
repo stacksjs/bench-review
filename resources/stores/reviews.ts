@@ -115,6 +115,12 @@ defineStore('reviews', () => {
 
   const feed = state<JudgeReviewRow[]>([])
   const feedPage = state<number>(1)
+  // Sort order for the public feed: 'recent' (newest first) or 'helpful'
+  // (most helpful marks first). Server-side, like the category filter and
+  // for the same reason: ranking only the current page would mean the most
+  // helpful review on the site never appears on page 1 unless it also
+  // happened to be recent.
+  const feedSort = state<string>('recent')
   const feedLastPage = state<number>(1)
   const feedTotal = state<number>(0)
   const loadingFeed = state<boolean>(false)
@@ -129,6 +135,12 @@ defineStore('reviews', () => {
   // the average + distribution reflect every published review, not just
   // the rows on the current page).
   const byJudgeMeta = state<Record<number, JudgeReviewMeta>>({})
+
+  // Sort order for the judge profile's review list. One signal rather than
+  // a per-judge map: only one profile is on screen at a time, and resetting
+  // to 'recent' when the visitor moves to another judge is the behaviour
+  // they expect anyway.
+  const judgeSort = state<string>('recent')
 
   async function fetchLatest(limit = 6): Promise<void> {
     loadingLatest.set(true)
@@ -169,7 +181,8 @@ defineStore('reviews', () => {
     try {
       const cat = useStore('judges').activeCategory()
       const catParam = cat ? `&category=${encodeURIComponent(cat)}` : ''
-      const res = await useStore('auth').authFetch(`/api/reviews?page=${page}&per_page=${perPage}${catParam}`, { signal: controller.signal })
+      const sortParam = `&sort=${encodeURIComponent(feedSort())}`
+      const res = await useStore('auth').authFetch(`/api/reviews?page=${page}&per_page=${perPage}${catParam}${sortParam}`, { signal: controller.signal })
       // Bail if not ok, or if a newer request superseded this one. Only the
       // still-current request may report an error -- a superseded one failing
       // says nothing about the page the user is now looking at.
@@ -207,6 +220,17 @@ defineStore('reviews', () => {
     return goToFeedPage(1, perPage)
   }
 
+  // Switch the feed's sort order and jump back to page 1. Staying on the
+  // current page would be meaningless — page 4 of "recent" and page 4 of
+  // "helpful" have nothing to do with each other.
+  function setFeedSort(next: string, perPage = 20): Promise<void> {
+    const value = next === 'helpful' ? 'helpful' : 'recent'
+    if (feedSort() === value)
+      return Promise.resolve()
+    feedSort.set(value)
+    return goToFeedPage(1, perPage)
+  }
+
   async function fetchById(id: number): Promise<void> {
     // Reset before fetching so a stale `current` from a previous
     // article doesn't flash while the new one loads.
@@ -241,7 +265,7 @@ defineStore('reviews', () => {
     // parallel without flickering each other's spinners.
     loadingByJudge.set({ ...loadingByJudge(), [judgeId]: true })
     try {
-      const url = `/api/judges/${judgeId}/reviews?page=${page}&per_page=${perPage}`
+      const url = `/api/judges/${judgeId}/reviews?page=${page}&per_page=${perPage}&sort=${encodeURIComponent(judgeSort())}`
       const res = await useStore('auth').authFetch(url)
       if (!res.ok) return
       // bench-review#28 — endpoint returns the canonical paginator
@@ -277,6 +301,16 @@ defineStore('reviews', () => {
       delete next[judgeId]
       loadingByJudge.set(next)
     }
+  }
+
+  // Switch the judge list's sort order and reload from page 1 (same
+  // reasoning as setFeedSort: page N does not survive a re-ranking).
+  function setJudgeSort(judgeId: number, next: string, perPage = 20): Promise<void> {
+    const value = next === 'helpful' ? 'helpful' : 'recent'
+    if (judgeSort() === value)
+      return Promise.resolve()
+    judgeSort.set(value)
+    return fetchByJudge(judgeId, 1, perPage)
   }
 
   function judgeMeta(judgeId: number): JudgeReviewMeta | null {
@@ -553,11 +587,15 @@ defineStore('reviews', () => {
     feedPage,
     feedLastPage,
     feedTotal,
+    feedSort,
     loadingFeed,
     fetchFeed,
+    setFeedSort,
     goToFeedPage,
     fetchLatest,
     fetchByJudge,
+    judgeSort,
+    setJudgeSort,
     judgeMeta,
     fetchById,
     submit,

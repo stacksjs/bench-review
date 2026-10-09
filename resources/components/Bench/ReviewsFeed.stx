@@ -250,6 +250,32 @@
     void reviewsStore.goToFeedPage(reviewsStore.feedPage(), 20)
   }
 
+  // ── Sort order (bench-review#57) ─────────────────────────────────
+  //
+  // The likes pivot has been the source of truth for "helpful" since the
+  // reactions work landed, but nothing ever read it for ordering: both
+  // list endpoints hardcoded created_at desc, so the most useful review
+  // about a judge sank out of sight within a week of being written. That
+  // is the wrong default for a reference site, where the best answer is
+  // usually not the newest one.
+  //
+  // Sorting is SERVER-side (?sort=), like the category filter — ranking
+  // only the rows on screen would leave the site's most-marked review off
+  // page 1 unless it also happened to be recent.
+  //
+  // Routed through local deriveds rather than reading the store signal
+  // inside x-class, per the scope-binding rule.
+  const sortIsRecent = derived<boolean>(() => reviewsStore.feedSort() === 'recent')
+  const sortIsHelpful = derived<boolean>(() => reviewsStore.feedSort() === 'helpful')
+  // Hidden until there is a list to sort. These buttons are inert without
+  // JS, so `:show` (which ships them hidden and reveals on hydration) is
+  // honest here rather than a flash of controls that do not work yet.
+  const showSortBar = derived<boolean>(() => reviews().length > 0)
+  function setSort(next: string): void {
+    void reviewsStore.setFeedSort(next)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   // Numbered pagination. buildPages returns plain objects (no signal
   // calls / no template ternary in the :for — footgun) describing each
   // page button; the pages() derived adds the variant class. goToPage
@@ -332,6 +358,41 @@
     role="alert"
     class="mb-4 px-3 py-2 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
     x-class="likeError() ? '' : 'hidden'">{{ likeError() }}</div>
+  {{-- Sort control. Toggle buttons with aria-pressed, NOT role="tab":
+      they re-order one list rather than switching between panels, and the
+      tab role promises a tabpanel and roving focus that do not exist here
+      (same reasoning as MyReviewsView's status filter).
+
+      `:show` + static display:none, not an x-class 'hidden' toggle --
+      x-class is evaluated in the browser only, so the pre-rendered page
+      would paint this bar before any reviews had loaded
+      (stx-standards 7.3, gate check 19). The class list carries `flex`
+      so bindShow reveals it by clearing the inline property. --}}
+  <div
+    :show="showSortBar"
+    style="display:none"
+    class="flex flex-wrap gap-2 items-center mb-4"
+    role="group"
+    aria-label="Sort reviews"
+  >
+    <span class="mr-1 text-gray-500 text-sm">Sort by</span>
+    <button
+      type="button"
+      aria-pressed="false"
+      x-aria-pressed="sortIsRecent ? 'true' : 'false'"
+      @click="setSort('recent')"
+      class="inline-flex gap-2 items-center px-3 py-1.5 font-medium text-sm border rounded-full transition-colors"
+      x-class="sortIsRecent ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+    >Most recent</button>
+    <button
+      type="button"
+      aria-pressed="false"
+      x-aria-pressed="sortIsHelpful ? 'true' : 'false'"
+      @click="setSort('helpful')"
+      class="inline-flex gap-2 items-center px-3 py-1.5 font-medium text-sm border rounded-full transition-colors"
+      x-class="sortIsHelpful ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+    >Most helpful</button>
+  </div>
   {{-- Loading skeleton (bench-review#35). Renders three placeholder
       review cards matching the eventual layout (avatar circle + name
       line + meta line + 3-line body + footer chip row) so the feed

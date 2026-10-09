@@ -41,6 +41,19 @@
   })
 
   const reviews = derived<JudgeReviewRow[]>(() => reviewsStore.reviewsForJudge(judgeId()))
+
+  // ── Sort order (bench-review#57) ─────────────────────────────────
+  //
+  // Server-side via ?sort=, so the ranking spans every published review
+  // for this judge rather than just the page on screen. On a judge with
+  // four pages of reviews, sorting the visible page would have been
+  // actively misleading -- it would claim to show the most helpful while
+  // only ever reordering the twenty newest.
+  const sortIsRecent = derived<boolean>(() => reviewsStore.judgeSort() === 'recent')
+  const sortIsHelpful = derived<boolean>(() => reviewsStore.judgeSort() === 'helpful')
+  function setSort(next: string): void {
+    void reviewsStore.setJudgeSort(judgeId(), next)
+  }
   const meta = derived<JudgeReviewMeta | null>(() => reviewsStore.judgeMeta(judgeId()))
   // Headline count / average / distribution come from the server
   // `summary` (computed over EVERY published review), not the current
@@ -265,7 +278,32 @@
     </div>
 
     <div class="mt-8">
-      <h3 class="font-semibold text-base text-gray-900">Reviews</h3>
+      {{-- Toggle buttons with aria-pressed, not role="tab": they re-order
+          one list, they do not switch panels (see MyReviewsView for the
+          full reasoning). No `:show` gate needed here -- the whole block
+          is already inside reviewCount() > 0, so there is a list to
+          sort whenever this renders at all. --}}
+      <div class="flex flex-wrap gap-3 items-center justify-between">
+        <h3 class="font-semibold text-base text-gray-900">Reviews</h3>
+        <div class="flex flex-wrap gap-2 items-center" role="group" aria-label="Sort reviews">
+          <button
+            type="button"
+            aria-pressed="true"
+            x-aria-pressed="sortIsRecent ? 'true' : 'false'"
+            @click="setSort('recent')"
+            class="inline-flex gap-2 items-center px-3 py-1.5 font-medium text-sm border rounded-full transition-colors"
+            x-class="sortIsRecent ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+          >Most recent</button>
+          <button
+            type="button"
+            aria-pressed="false"
+            x-aria-pressed="sortIsHelpful ? 'true' : 'false'"
+            @click="setSort('helpful')"
+            class="inline-flex gap-2 items-center px-3 py-1.5 font-medium text-sm border rounded-full transition-colors"
+            x-class="sortIsHelpful ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'"
+          >Most helpful</button>
+        </div>
+      </div>
       {{-- Soft sign-in nudge + error banner for the Helpful button.
           x-class hidden toggle (not :if) so the binding stays subscribed. --}}
       <div role="status" class="mt-3 px-3 py-2 text-blue-800 text-sm bg-blue-50 border border-blue-200 rounded-md" x-class="likeAuthPrompt() ? '' : 'hidden'">
