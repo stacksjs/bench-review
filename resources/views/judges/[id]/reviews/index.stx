@@ -18,7 +18,15 @@ export async function getStaticPaths() {
 @section('content')
   @include('Bench/Judge/ProfileHeader')
   @include('Bench/Judge/JudgeTabs')
-  <div class="mx-auto px-4 py-8 sm:px-6 lg:px-8 max-w-7xl">
-    @include('Bench/Judge/Reviews')
-  </div>
+  {{-- The page container lives INSIDE Bench/Judge/Reviews, unlike the other
+      three tabs. It has to: stx stamps x-cloak at build time on any open tag
+      whose next closing tag comes after an interpolation, and the first thing inside
+      Reviews is a run of nested divs ending in an interpolation -- so
+      this wrapper was being cloaked. Every uncloak site in the runtime is
+      scope-relative (the scope root plus its querySelectorAll descendants),
+      and a container-wide pass only runs for views that compile a setup
+      block, which a view that only pulls in components does not. Nothing ever
+      lifted it, and the whole tab rendered blank. Gate check 17 now fails the
+      build on any recurrence. --}}
+  @include('Bench/Judge/Reviews')
 @endsection

@@ -432,7 +432,7 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   add('app functions declare return types', missing === 0, missing ? `${missing} missing` : '')
 }
 
-// 10. No page ships a cloaked <main> or <body>.
+// 10. No page ships a cloak that nothing will lift.
 //
 //     stx hides un-hydrated markup with x-cloak + `[x-cloak]{display:none}`,
 //     then removes the attribute once a scope hydrates. Every removal site in
@@ -452,19 +452,63 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
 //     completely blank body, while the console showed a healthy 200, correct
 //     auth and every signal resolving. Nothing else in this gate sees it,
 //     because the markup IS all present in the HTML; it is only invisible.
+//
+//     Checking <main> and <body> alone was too narrow. /judges/:id/reviews
+//     shipped the cloak one level lower — on the page container div inside
+//     <main> — and the whole reviews tab rendered blank: the judge's rating
+//     distribution, every review, the pagination. Found by walking the stack
+//     instead, then confirmed in a browser (exactly one [x-cloak] left after
+//     hydration, computed display:none, with all six scopes hydrated).
+//
+//     The exemption is pages whose view compiles a setup block. Those get a
+//     container-wide hydration pass that lifts every cloak under the content
+//     root, so a cloak outside a scope is harmless there — /home carries 50
+//     of them and ends up with zero after hydration, measured. A view that
+//     only pulls in components compiles no setup block and gets no such pass,
+//     so there the scope roots are the only thing lifting anything.
 {
-  const cloaked: string[] = []
-  for (const [p, s] of html) {
-    for (const tag of ['body', 'main']) {
-      const m = s.match(new RegExp(`<${tag}\\b[^>]*>`, 'i'))
-      if (m && /(?:^|\s)x-cloak(?:[=\s/>]|$)/.test(m[0]))
-        cloaked.push(`${p} <${tag}>`)
+  const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr'])
+  const TAG = /<(\/?)([a-zA-Z][\w-]*)((?:"[^"]*"|'[^']*'|[^>"'])*)(\/?)>/g
+
+  const stuck: string[] = []
+  for (const [path, doc] of html) {
+    // A view-level setup block means a container-wide uncloak pass runs.
+    if (doc.includes('__stx_setup_'))
+      continue
+    const stack: { tag: string, scope: boolean }[] = []
+    let scopeDepth = 0
+    let m: RegExpExecArray | null
+    TAG.lastIndex = 0
+    while ((m = TAG.exec(doc))) {
+      const [, slash, rawTag, attrs, selfClose] = m
+      const tag = rawTag.toLowerCase()
+      if (slash) {
+        for (let i = stack.length - 1; i >= 0; i--) {
+          if (stack[i].tag === tag) {
+            for (let j = stack.length - 1; j >= i; j--) if (stack[j].scope) scopeDepth--
+            stack.length = i
+            break
+          }
+        }
+        continue
+      }
+      const scope = /\sdata-stx-scope=/.test(attrs)
+      const cloak = /(?:^|\s)x-cloak(?:[=\s/]|$)/.test(attrs)
+      // A cloak on the scope root itself is fine — the root removes its own.
+      if (cloak && !scope && scopeDepth === 0)
+        stuck.push(`${path.replace('dist/', '')}: <${tag}${attrs.match(/\sclass="([^"]*)"/) ? ` class="${attrs.match(/\sclass="([^"]*)"/)![1].slice(0, 50)}"` : ''}>`)
+      if (!VOID.has(tag) && !selfClose) {
+        stack.push({ tag, scope })
+        if (scope) scopeDepth++
+      }
     }
   }
   add(
-    'no page ships a cloaked <main> or <body>',
-    cloaked.length === 0,
-    cloaked.length ? `${cloaked.slice(0, 5).join(', ')} — nothing ever removes x-cloak above a [data-stx-scope] root; the page body renders display:none` : '',
+    'no page ships a cloak that nothing will lift',
+    stuck.length === 0,
+    stuck.length
+      ? `${stuck.length} elements over ${new Set(stuck.map(h => h.split(': ')[0])).size} pages stay display:none forever — move the element inside a component so it becomes the scope root: ${stuck.slice(0, 3).join(' | ')}`
+      : '',
   )
 }
 

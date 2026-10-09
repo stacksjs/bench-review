@@ -221,6 +221,14 @@
   }
 </script>
 
+{{-- Page container. It used to live in views/judges/[id]/reviews/index.stx,
+    wrapped around the include, which put it ABOVE this component's scope
+    root -- and stx had stamped x-cloak on it at build time (the first
+    closing tag after its own comes only after an interpolation further down).
+    Nothing lifts a cloak above a scope root, so the entire reviews tab
+    rendered blank. Moved in here, it IS the scope root, so the runtime
+    uncloaks it. The emitted DOM is unchanged. --}}
+<div class="mx-auto px-4 py-8 sm:px-6 lg:px-8 max-w-7xl">
 <div class="lg:col-span-2 lg:row-end-2 lg:row-span-2 -mx-4 px-4 py-8 sm:mx-0 sm:pb-14 sm:px-8 xl:pb-20 xl:pt-16 xl:px-16 bg-white ring-1 ring-gray-900/5 sm:rounded-lg shadow-sm">
 
   {{-- Header: summary if reviews exist, write-CTA always --}}
@@ -416,4 +424,5 @@
       </div>
     </div>
   </div>
+</div>
 </div>
