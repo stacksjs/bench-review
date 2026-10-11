@@ -1,0 +1,7 @@
+@extends('layouts/admin')
+
+@section('title', 'Comments - Bench Review')
+
+@section('content')
+@include('Bench/Admin/CommentsTable')
+@endsection

@@ -1,0 +1,157 @@
+<script client>
+  import type { AdminCommentRow } from '~/resources/stores/adminComments'
+
+  // Comment moderation (bench-review#51). Comments auto-publish — right for
+  // the back-and-forth they exist for — which left no way to remove a single
+  // abusive reply short of editing the database by hand.
+  //
+  // Takedown is soft and reversible: status flips, the row stays. A
+  // contested decision can still be looked at, and a moderator who gets one
+  // wrong can put it back.
+  const store = useStore('adminComments')
+
+  let hasFetched = false
+  function bootstrap(): void {
+    if (hasFetched) return
+    hasFetched = true
+    store.fetchComments()
+  }
+  bootstrap()
+  onMount(() => { bootstrap() })
+
+  async function remove(c: AdminCommentRow): Promise<void> {
+    if (typeof window === 'undefined') return
+    const note = window.prompt('Why is this comment being removed? (recorded in the audit log)')
+    if (note === null) return
+    await store.setStatus(c.id, 'rejected', note.trim())
+  }
+
+  async function restore(c: AdminCommentRow): Promise<void> {
+    await store.setStatus(c.id, 'published')
+  }
+
+  function formatDate(value: string | null | undefined): string {
+    if (!value) return ''
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  }
+
+  // Rows precomputed: an x-class or nested call inside a :for must not carry
+  // signal call-syntax.
+  const rows = derived(() => store.comments().map((c: any) => ({
+    id: c.id,
+    body: c.body,
+    status: c.status,
+    statusCls: c.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800',
+    date: formatDate(c.created_at),
+    authorName: c.author?.name || 'Unknown account',
+    // The public thread shows this one unattributed; a moderator still sees
+    // who wrote it, which is the whole point of the queue.
+    anonNote: c.anonymized ? 'shown anonymously' : '',
+    isAnon: !!c.anonymized,
+    reviewTitle: c.review?.title || (c.judge_review_id ? `Review #${c.judge_review_id}` : 'Unknown review'),
+    reviewHref: c.judge_review_id ? `/article/${c.judge_review_id}` : '',
+    hasReview: !!c.judge_review_id,
+    busy: !!store.acting()[c.id],
+    isPublished: c.status === 'published',
+    isRejected: c.status === 'rejected',
+  })))
+
+  const filters = [
+    { key: 'published', label: 'Published' },
+    { key: 'rejected', label: 'Removed' },
+    { key: 'all', label: 'All' },
+  ]
+  const filterRows = derived(() => filters.map(f => ({
+    key: f.key,
+    label: f.label,
+    pressed: store.statusFilter() === f.key ? 'true' : 'false',
+    cls: store.statusFilter() === f.key
+      ? 'bg-blue-600 text-white border-blue-600'
+      : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300',
+  })))
+  function setFilter(key: string): void {
+    void store.setStatusFilter(key)
+  }
+
+  const hasRows = derived<boolean>(() => store.comments().length > 0)
+  // Gated on there being no error: an empty list means either nothing
+  // matches or the request failed, and only one of those is "nothing here".
+  const showEmpty = derived<boolean>(() => !store.loading() && !store.actionError() && store.comments().length === 0)
+  const showError = derived<boolean>(() => !!store.actionError())
+</script>
+
+<div class="space-y-4">
+  <div>
+    <h1 class="font-bold text-2xl text-gray-900">Comments</h1>
+    <p class="mt-1 text-gray-600 text-sm">Replies under reviews. Removing one hides it from the public thread and adjusts the review's comment count; the row is kept and the decision is reversible.</p>
+  </div>
+
+  <div class="flex flex-wrap gap-2" role="group" aria-label="Filter comments by status">
+    <button
+      :for="f in filterRows()"
+      type="button"
+      aria-pressed="false"
+      x-aria-pressed="f.pressed"
+      @click="setFilter(f.key)"
+      class="inline-flex items-center px-3 py-1.5 font-medium text-sm border rounded-full transition-colors"
+      x-class="f.cls"
+    >{{ f.label }}</button>
+  </div>
+
+  <div
+    role="alert"
+    :show="showError"
+    style="display:none"
+    class="px-4 py-3 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
+  >{{ store.actionError() }}</div>
+
+  <div class="overflow-hidden bg-white border border-gray-200 rounded-lg">
+    <div :if="store.loading() && store.comments().length === 0" class="px-4 py-12 text-center text-gray-500 text-sm">
+      Loading comments…
+    </div>
+
+    <div class="px-6 py-16 text-center" :show="showEmpty" style="display:none">
+      <p class="font-semibold text-gray-900 text-sm">Nothing here</p>
+      <p class="mt-1 text-gray-500 text-xs">No comments match this filter.</p>
+    </div>
+
+    <ul class="divide-gray-100 divide-y" :show="hasRows" style="display:none">
+      <li :for="row in rows()" class="px-4 py-4">
+        <div class="flex gap-x-4 justify-between">
+          <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap gap-2 items-center">
+              <span class="inline-block px-2 py-0.5 font-medium text-xs rounded-full" x-class="row.statusCls">{{ row.status }}</span>
+              <span class="text-gray-500 text-xs">{{ row.date }}</span>
+              <span :show="row.isAnon" style="display:none" class="text-amber-700 text-xs">{{ row.anonNote }}</span>
+            </div>
+            <p class="mt-1 font-semibold text-gray-900 text-sm">{{ row.authorName }}</p>
+            <p class="mt-1 text-gray-700 text-sm whitespace-pre-line">{{ row.body }}</p>
+            <p :show="row.hasReview" style="display:none" class="mt-2 text-xs">
+              <a x-href="row.reviewHref" target="_blank" rel="noopener" class="text-blue-700 underline underline-offset-2 hover:text-blue-900">{{ row.reviewTitle }}</a>
+            </p>
+          </div>
+          <div class="flex flex-shrink-0 gap-x-2 items-start">
+            <button
+              type="button"
+              :show="row.isPublished"
+              style="display:none"
+              @click="remove(row)"
+              x-disabled="row.busy"
+              class="px-2.5 py-1 font-medium text-red-800 text-xs bg-red-50 hover:bg-red-100 border border-red-200 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            >Remove</button>
+            <button
+              type="button"
+              :show="row.isRejected"
+              style="display:none"
+              @click="restore(row)"
+              x-disabled="row.busy"
+              class="px-2.5 py-1 font-medium text-emerald-800 text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            >Restore</button>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </div>
+</div>
