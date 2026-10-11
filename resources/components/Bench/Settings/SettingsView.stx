@@ -61,9 +61,11 @@
   // between the two.
   const emailCategories = state<any[]>([])
   const emailPrefsError = state<string>('')
-  // Category id currently in flight, so one row's spinner does not disable
-  // the others.
-  const emailPrefSaving = state<string>('')
+  // Which rows are in flight, keyed by category id. A single id was enough
+  // while there was one category; with two, a plain string both blocks the
+  // other row's toggle and lets whichever save finishes first clear the
+  // other's spinner. Same per-key shape as the like buttons in ReviewsFeed.
+  const emailPrefSaving = state<Record<string, boolean>>({})
 
   async function loadEmailPrefs(): Promise<void> {
     try {
@@ -81,13 +83,22 @@
     }
   }
 
+  // Undo one row's optimistic flip without disturbing the others: restoring
+  // the whole snapshot would also revert a sibling row somebody toggled
+  // while this request was in the air.
+  function rollback(id: string, before: any[]): void {
+    const previous = before.find((c: any) => c.id === id)
+    if (!previous) return
+    emailCategories.set(emailCategories().map((c: any) => (c.id === id ? { ...c, email: previous.email } : c)))
+  }
+
   // Optimistic: the switch moves on click and rolls back if the write
   // fails. A toggle that waits on a round-trip before moving reads as
   // broken, and the cost of being wrong here is one stale checkbox.
   async function toggleEmailPref(id: string, next: boolean): Promise<void> {
-    if (emailPrefSaving()) return
+    if (emailPrefSaving()[id]) return
     const before = emailCategories()
-    emailPrefSaving.set(id)
+    emailPrefSaving.set({ ...emailPrefSaving(), [id]: true })
     emailCategories.set(before.map((c: any) => (c.id === id ? { ...c, email: next } : c)))
     try {
       const res = await authStore.authFetch('/api/me/notification-preferences', {
@@ -96,18 +107,20 @@
         body: JSON.stringify({ category: id, email: next }),
       })
       if (!res.ok) {
-        emailCategories.set(before)
+        rollback(id, before)
         emailPrefsError.set('Could not save that — try again.')
         return
       }
       emailPrefsError.set('')
     }
     catch {
-      emailCategories.set(before)
+      rollback(id, before)
       emailPrefsError.set('Could not reach the server.')
     }
     finally {
-      emailPrefSaving.set('')
+      const next = { ...emailPrefSaving() }
+      delete next[id]
+      emailPrefSaving.set(next)
     }
   }
 
@@ -120,7 +133,7 @@
     description: c.description,
     email: !!c.email,
     ariaChecked: c.email ? 'true' : 'false',
-    saving: emailPrefSaving() === c.id,
+    saving: !!emailPrefSaving()[c.id],
     trackCls: c.email ? 'bg-blue-600' : 'bg-gray-300',
     knobCls: c.email ? 'translate-x-5' : 'translate-x-0.5',
   })))

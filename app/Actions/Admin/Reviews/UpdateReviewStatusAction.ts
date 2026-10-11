@@ -180,9 +180,9 @@ export default new Action({
     if (status === 'published' && existing.status !== status) {
       try {
         const reviewRow = await db.selectFrom('judge_reviews')
-          .select(['judge_id'])
+          .select(['judge_id', 'title'])
           .where('id', '=', reviewId)
-          .executeTakeFirst() as { judge_id: number | null } | undefined
+          .executeTakeFirst() as { judge_id: number | null, title: string | null } | undefined
         const judgeId = Number(reviewRow?.judge_id)
 
         if (Number.isFinite(judgeId) && judgeId > 0) {
@@ -190,10 +190,10 @@ export default new Action({
           // null-comparison on credential_verified_at hits the bqb
           // null-operator quirk the claim action documents.
           const claimants = await db.selectFrom('users')
-            .select(['id', 'credential_verified_at'])
+            .select(['id', 'name', 'email', 'credential_verified_at'])
             .where('claimed_judge_id', '=', judgeId)
             .where('credential_type', '=', 'judge')
-            .execute() as Array<{ id: number, credential_verified_at: string | null }>
+            .execute() as Array<{ id: number, name: string | null, email: string | null, credential_verified_at: string | null }>
           const judgeUser = claimants.find(u => u.credential_verified_at != null)
 
           const recipients = new Map<number, 'judge_review' | 'followed_review'>()
@@ -216,6 +216,54 @@ export default new Action({
 
           for (const [userId, type] of recipients)
             await notify({ userId, actorUserId: adminId, type, reviewId })
+
+          // Email the claimed judge as well as notifying them in-app. The
+          // in-app notification only lands if they happen to come back; this
+          // is a review ABOUT them, published without their involvement, and
+          // the whole point of the claim flow is that they get to answer it.
+          // Followers deliberately get no email — they asked to follow a
+          // judge, not to be mailed about them.
+          //
+          // Driven off the recipients map rather than `judgeUser` directly,
+          // so the author-removal above governs both paths: a judge who
+          // somehow wrote the review themselves is not mailed about it.
+          const emailTarget = judgeUser && recipients.get(Number(judgeUser.id)) === 'judge_review'
+            ? judgeUser
+            : null
+
+          if (emailTarget?.email && await wantsEmail(Number(emailTarget.id), 'reviews_about_me')) {
+            const judgeRow = await db.selectFrom('judges')
+              .select(['name'])
+              .where('id', '=', judgeId)
+              .executeTakeFirst() as { name: string | null } | undefined
+            const judgeName = judgeRow?.name || 'your profile'
+            const reviewTitle = reviewRow?.title || 'A new review'
+            const base = process.env.APP_URL || 'http://localhost:4000'
+            const articleUrl = `${base}/article/${reviewId}`
+
+            // Dynamic import, matching the author-email block above: the
+            // mail driver is pulled in only on the paths that actually send.
+            const { mail } = await import('@stacksjs/email')
+            await mail.send({
+              to: String(emailTarget.email),
+              subject: `A new review of ${judgeName} was published`,
+              text: `A review of ${judgeName} has been published on Bench Review.\n\n"${reviewTitle}"\n\nYou can read it, and respond to it from your claimed profile, here:\n${articleUrl}\n\nResponses appear alongside the review.\n\n— Bench Review\n`,
+              html: renderReviewEmail({
+                preheader: `A review of ${judgeName} has been published.`,
+                heading: 'A new review of you was published',
+                greeting: `Hi ${emailTarget.name || 'there'},`,
+                bodyHtml: `
+                  <p style="margin:0 0 14px 0;">A review of <strong>${escapeHtml(judgeName)}</strong> has been published on Bench Review.</p>
+                  <p style="margin:0 0 14px 0;">&ldquo;${escapeHtml(reviewTitle)}&rdquo;</p>
+                  <p style="margin:0 0 14px 0;">You can respond to it from your claimed profile. Responses appear alongside the review.</p>
+                `,
+                ctaText: 'Read and respond',
+                ctaUrl: articleUrl,
+                accent: 'neutral',
+                footerNote: 'You are getting this because you have a verified claim on this judge profile. You can turn these off in your settings.',
+              }),
+            })
+          }
         }
       }
       catch (err) {

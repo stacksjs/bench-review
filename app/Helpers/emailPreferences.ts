@@ -15,7 +15,7 @@ import { getNotificationPreferences } from '@stacksjs/notifications'
  * site. A category with no send site is a switch wired to nothing, which is
  * worse than no switch at all.
  */
-export type EmailCategory = 'review_activity'
+export type EmailCategory = 'review_activity' | 'reviews_about_me'
 
 export interface EmailCategoryDescriptor {
   id: EmailCategory
@@ -33,6 +33,11 @@ export const EMAIL_CATEGORIES: readonly EmailCategoryDescriptor[] = [
     id: 'review_activity',
     label: 'Updates about my reviews',
     description: 'When a review you wrote is received, published, or declined. Turning this off leaves the in-app notifications in place.',
+  },
+  {
+    id: 'reviews_about_me',
+    label: 'Reviews about me',
+    description: 'When a review of a judge profile you have claimed is published. Only reaches you if your claim has been verified; the in-app notification stays either way.',
   },
 ]
 
