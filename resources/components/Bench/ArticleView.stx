@@ -89,6 +89,17 @@
   if (reviewId > 0)
     reviewsStore.fetchById(reviewId)
 
+  // Request failure, as distinct from the review not existing. Until this
+  // branch existed a 5xx rendered NOTHING: `current` stays null,
+  // `currentNotFound` stays false, and every one of the view's states is
+  // false at once — a blank page with a healthy console (bench-review#57).
+  const showLoadError = derived<boolean>(() => !!reviewsStore.currentError())
+  const loadErrorText = derived<string>(() => reviewsStore.currentError())
+  function retryArticle(): void {
+    if (reviewId > 0)
+      reviewsStore.fetchById(reviewId)
+  }
+
   function formatDate(dateStr: string | null | undefined): string {
     if (!dateStr) return ''
     const d = new Date(dateStr)
@@ -621,6 +632,25 @@
     <StxLink x-to="`/reviews`" class="inline-block mt-8 font-semibold text-gray-900 text-sm underline-offset-4 hover:underline">
       ← Back to all reviews
     </StxLink>
+  </div>
+
+  {{-- Request failure. Deliberately NOT worded as a 404: "this does not
+      exist" and "we could not fetch it" are different claims, and only one
+      of them is the reader's cue to try again. `:show` + static
+      display:none because it starts false (stx-standards 7.3, gate check
+      19). --}}
+  <div :show="showLoadError" style="display:none" role="alert" class="mx-auto pb-32 pt-32 px-4 sm:px-6 lg:px-8 max-w-2xl text-center">
+    <p class="font-medium text-blue-600 text-xs tracking-widest uppercase">Something went wrong</p>
+    <h1 class="mt-4 font-bold font-serif text-4xl text-gray-900 tracking-tight">{{ loadErrorText }}</h1>
+    <p class="mt-4 text-base text-gray-500">This is a problem on our side, not with the review itself.</p>
+    <button
+      type="button"
+      @click="retryArticle()"
+      class="inline-flex items-center mt-8 px-4 py-2 font-medium text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+    >Try again</button>
+    <div class="mt-6">
+      <StxLink to="/reviews" class="font-semibold text-gray-900 text-sm underline-offset-4 hover:underline">← Back to all reviews</StxLink>
+    </div>
   </div>
 
   {{-- Loaded state --}}

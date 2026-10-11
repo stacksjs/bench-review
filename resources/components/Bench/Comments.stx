@@ -55,13 +55,29 @@
   // signal-call-driven per-row visual would break the loop — guard in JS).
   const deletingId = state<number | null>(null)
 
-  async function loadComments(): Promise<void> {
+  // Numbered pagination (the house pattern — not load-more). The endpoint
+  // has returned the canonical paginator since bench-review#44; this side
+  // never caught up and asked for one page of fifty, so a thread longer than
+  // that simply lost its tail with nothing on screen to suggest more existed.
+  const PER_PAGE = 20
+  const commentsPage = state<number>(1)
+  const commentsLastPage = state<number>(1)
+  const commentsTotal = state<number>(0)
+
+  async function loadComments(page = 1): Promise<void> {
     if (!reviewIdForComments) return
     try {
-      const res = await authStore.authFetch(`/api/reviews/${reviewIdForComments}/comments?per_page=50`)
+      const res = await authStore.authFetch(`/api/reviews/${reviewIdForComments}/comments?page=${page}&per_page=${PER_PAGE}`)
       if (!res.ok) return
-      const json = await res.json() as { data?: CommentRow[] } | CommentRow[]
+      const json = await res.json() as { data?: CommentRow[], current_page?: number, last_page?: number, total?: number } | CommentRow[]
+      // The Array.isArray fallback keeps us safe if the endpoint shape ever
+      // regresses to a raw array.
       comments.set(Array.isArray(json) ? json : (json?.data ?? []))
+      if (!Array.isArray(json)) {
+        commentsPage.set(Math.max(1, Number(json?.current_page ?? page)))
+        commentsLastPage.set(Math.max(1, Number(json?.last_page ?? 1)))
+        commentsTotal.set(Number(json?.total ?? 0))
+      }
     }
     catch (err) {
       console.error('[comments] fetch failed:', err)
@@ -72,6 +88,38 @@
   }
 
   onMount(() => { loadComments() })
+
+  // Page buttons are plain objects with their variant class precomputed: an
+  // x-class inside a :for must not carry signal call-syntax.
+  function buildCommentPages(current: number, last: number) {
+    if (last <= 1) return []
+    const cur = Math.max(1, Math.min(current, last))
+    const out: any[] = []
+    const page = (n: number) => out.push({ n, label: String(n), gap: false, active: n === cur })
+    const gap = () => out.push({ n: 0, label: '…', gap: true, active: false })
+    const lo = Math.max(2, cur - 1)
+    const hi = Math.min(last - 1, cur + 1)
+    page(1)
+    if (lo > 2) gap()
+    for (let n = lo; n <= hi; n++) page(n)
+    if (hi < last - 1) gap()
+    page(last)
+    return out
+  }
+  const commentPages = derived(() => buildCommentPages(commentsPage(), commentsLastPage()).map(it => ({
+    ...it,
+    cls: it.gap
+      ? 'text-gray-400 border-transparent pointer-events-none'
+      : (it.active ? 'bg-blue-600 text-white border-blue-600' : 'text-gray-700 border-gray-300 hover:bg-gray-50'),
+  })))
+  const showCommentPager = derived<boolean>(() => commentsLastPage() > 1)
+  const prevCls = derived<string>(() => (commentsPage() <= 1 ? 'text-gray-300 border-gray-200 pointer-events-none' : 'text-gray-700 border-gray-300 hover:bg-gray-50'))
+  const nextCls = derived<string>(() => (commentsPage() >= commentsLastPage() ? 'text-gray-300 border-gray-200 pointer-events-none' : 'text-gray-700 border-gray-300 hover:bg-gray-50'))
+
+  function goToCommentPage(n: number): void {
+    if (n < 1 || n > commentsLastPage() || n === commentsPage()) return
+    void loadComments(n)
+  }
 
   async function submitComment(): Promise<void> {
     if (commentSubmitting()) return
@@ -103,10 +151,13 @@
       commentDraft.set('')
       commentAnon.set(false)
       toast.success('Comment posted', 'Your comment was added.')
-      // Refetch the full list so we see the canonical server-side
-      // ordering + the new comment's gated-author shape (in case the
-      // client guessed wrong on what the public sees).
-      await loadComments()
+      // Refetch so we see the canonical server-side ordering + the new
+      // comment's gated-author shape (in case the client guessed wrong on
+      // what the public sees). Comments are oldest-first, so a new one lands
+      // on the LAST page — computed from the count we already have rather
+      // than spending a round trip to discover it. Refetching page 1 would
+      // hide the comment the person just wrote.
+      await loadComments(Math.max(1, Math.ceil((commentsTotal() + 1) / PER_PAGE)))
     }
     catch (err) {
       const message = err instanceof Error ? err.message : 'Network error'
@@ -129,6 +180,17 @@
       if (!res.ok) return
       comments.set(comments().filter(c => c.id !== commentId))
       toast.success('Comment deleted', 'Your comment was removed.')
+      // Keep the pager honest. Without this the total stays one too high,
+      // which both leaves a page button pointing at nothing and throws off
+      // the "which page did my new comment land on" sum after the next post.
+      const remaining = Math.max(0, commentsTotal() - 1)
+      commentsTotal.set(remaining)
+      const lastPage = Math.max(1, Math.ceil(remaining / PER_PAGE))
+      commentsLastPage.set(lastPage)
+      // Deleting the only comment on the final page strands the reader on an
+      // empty one; step back and refetch.
+      if (commentsPage() > lastPage)
+        await loadComments(lastPage)
     }
     catch (err) {
       console.error('[comments] delete failed:', err)
@@ -297,4 +359,38 @@
       </div>
     </li>
   </ul>
+
+  {{-- Numbered pagination. Hidden until there is more than one page, which
+      is false at first render, so `:show` + static display:none rather than
+      an x-class toggle that the pre-rendered page would paint
+      (stx-standards 7.3, gate check 19). The numbered buttons read
+      item.cls, precomputed in commentPages(), so the :for carries no signal
+      call-syntax; Prev/Next sit outside the loop where call-syntax is
+      fine. --}}
+  <div :show="showCommentPager" style="display:none" class="flex flex-col gap-3 items-center mt-8">
+    <nav class="flex flex-wrap gap-1.5 items-center justify-center" aria-label="Comment pagination">
+      <button
+        type="button"
+        @click="goToCommentPage(commentsPage() - 1)"
+        class="px-2.5 py-1.5 font-medium text-sm border rounded-md transition-colors"
+        x-class="prevCls()"
+        aria-label="Previous page"
+      >Prev</button>
+      <button
+        :for="item in commentPages()"
+        type="button"
+        @click="goToCommentPage(item.n)"
+        class="px-2.5 py-1.5 min-w-[2rem] font-medium tabular-nums text-sm border rounded-md transition-colors"
+        x-class="item.cls"
+      >{{ item.label }}</button>
+      <button
+        type="button"
+        @click="goToCommentPage(commentsPage() + 1)"
+        class="px-2.5 py-1.5 font-medium text-sm border rounded-md transition-colors"
+        x-class="nextCls()"
+        aria-label="Next page"
+      >Next</button>
+    </nav>
+    <p class="text-gray-500 text-xs">{{ 'Page ' + commentsPage() + ' of ' + commentsLastPage() + ' · ' + commentsTotal() + ' comments' }}</p>
+  </div>
 </section>

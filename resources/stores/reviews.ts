@@ -99,6 +99,14 @@ defineStore('reviews', () => {
   const current = state<(JudgeReviewRow & { judge?: { id: number, name: string, court?: string | null, image_url?: string | null } | null }) | null>(null)
   const loadingCurrent = state<boolean>(false)
   const currentNotFound = state<boolean>(false)
+  // Whether the last single-review fetch FAILED, as distinct from the review
+  // not existing. Kept separate from `loadError` (which the feed and the
+  // directories share) so an article failure cannot surface as a feed error
+  // or the other way round. Without it a 5xx left ArticleView rendering
+  // nothing at all: `current` stays null, `currentNotFound` stays false, and
+  // every one of the view's branches is false — a blank page with a healthy
+  // console, which is exactly what bench-review#57 reported.
+  const currentError = state<string>('')
 
   // Public `/reviews` feed slice. Paginated server-side via load-more.
   // Kept SEPARATE from `latest` on purpose: `latest` is read as a
@@ -236,6 +244,7 @@ defineStore('reviews', () => {
     // article doesn't flash while the new one loads.
     current.set(null)
     currentNotFound.set(false)
+    currentError.set('')
     loadingCurrent.set(true)
     try {
       const res = await useStore('auth').authFetch(`/api/reviews/${id}`)
@@ -243,12 +252,19 @@ defineStore('reviews', () => {
         currentNotFound.set(true)
         return
       }
-      if (!res.ok) return
+      if (!res.ok) {
+        // A server error is a different claim from "this review does not
+        // exist", and the reader can act on it — so say so and offer the
+        // retry, rather than returning silently into a blank page.
+        currentError.set('We could not load this review.')
+        return
+      }
       const data = await res.json() as JudgeReviewRow & { judge?: any }
       current.set(data)
     }
     catch (err) {
       console.error('[reviews] fetchById failed:', err)
+      currentError.set('Could not reach the server.')
     }
     finally {
       loadingCurrent.set(false)
@@ -581,6 +597,7 @@ defineStore('reviews', () => {
     current,
     loadingCurrent,
     currentNotFound,
+    currentError,
     hasAnyLatest,
     // Public feed (numbered pagination).
     feed,
