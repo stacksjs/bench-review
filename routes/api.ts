@@ -332,6 +332,13 @@ route.get('/admin/moderation-log', 'Actions/Admin/ModerationLogIndexAction')
   .middleware('auth')
   .middleware('admin')
 
+// Judge-directory search demand (bench-review#57). Zero-result queries are
+// the judge-import backlog; the rows carry no searcher, only the query.
+route.get('/admin/search-demand', 'Actions/Admin/SearchDemandIndexAction')
+  .name('bench.admin.search-demand')
+  .middleware('auth')
+  .middleware('admin')
+
 // Authenticated password change. Settings form (SettingsView.stx)
 // posts here; the action verifies the current password against the
 // stored bcrypt hash before updating. See app/Actions/Me/ChangePasswordAction.ts

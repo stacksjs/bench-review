@@ -6,6 +6,12 @@
   const adminUsers = useStore('adminUsers')
   const adminReviews = useStore('adminReviews')
   const adminFlags = useStore('adminFlags')
+  const adminSearchDemand = useStore('adminSearchDemand')
+
+  // Set once the first demand fetch resolves, so the backlog panels below
+  // start false and exactly one of them turns true. Declared here because
+  // fetchSummary assigns it.
+  const demandLoaded = state<boolean>(false)
 
   // Snapshot signal — refresh once per mount via the same dual-call
   // pattern used elsewhere (hard reload + SPA nav, see
@@ -24,7 +30,9 @@
       adminUsers.fetchUsers(),
       adminReviews.fetchReviews(),
       adminFlags.fetchFlags(),
+      adminSearchDemand.fetchDemand(10),
     ])
+    demandLoaded.set(true)
   }
   fetchSummary()
   onMount(() => { fetchSummary() })
@@ -34,6 +42,41 @@
   // openCount counts loaded open flags; 200 means "200 or more" (the API cap).
   const flagCount = derived<number>(() => adminFlags.openCount())
   const flagCountLabel = derived<string>(() => (adminFlags.openCount() >= 200 ? '200+' : String(adminFlags.openCount())))
+
+  // ── Judge-import backlog (bench-review#57) ──────────────────────
+  //
+  // Searches that found no judge. Each row is somebody who came looking by
+  // name for a judge the directory does not have, which is the most direct
+  // evidence available about what to import next. The rows carry no searcher
+  // -- see app/Helpers/searchDemand.ts -- so nothing here identifies anyone.
+  //
+  // The empty state is gated on demandLoaded, not just on an empty list:
+  // without it the panel is "true" at first render and the pre-rendered page
+  // claims there is no backlog before anything has been asked.
+  const missingTotal = derived<number>(() => adminSearchDemand.missingTotal())
+  // Error-aware rather than hidden behind a toggle: a failed fetch leaves
+  // missingTotal at 0, and "Nobody has come up empty yet." is then a claim
+  // about the data that nothing supports -- the same misleading-empty-state
+  // shape fixed for the public feed in 11b5f704.
+  const missingLabel = derived<string>(() => {
+    if (adminSearchDemand.loadError()) return 'Backlog unavailable right now.'
+    const n = adminSearchDemand.missingTotal()
+    if (n === 0) return 'Nobody has come up empty yet.'
+    return n === 1 ? '1 search found nothing.' : n + ' searches found nothing.'
+  })
+  const missingCountLabel = derived<string>(() => (adminSearchDemand.loadError() ? '—' : String(adminSearchDemand.missingTotal())))
+  // Per-row display values are precomputed here: an x-class or a nested
+  // expression inside a :for must not carry signal call-syntax.
+  const missingRows = derived(() => adminSearchDemand.queries().map((q: any) => ({
+    id: q.id,
+    query: q.query,
+    searches: q.searches,
+    searchesLabel: q.searches === 1 ? '1 search' : q.searches + ' searches',
+  })))
+  const demandError = derived<string>(() => adminSearchDemand.loadError())
+  const showDemandError = derived<boolean>(() => !!adminSearchDemand.loadError())
+  const showDemandRows = derived<boolean>(() => adminSearchDemand.queries().length > 0)
+  const showDemandEmpty = derived<boolean>(() => demandLoaded() && !adminSearchDemand.loadError() && adminSearchDemand.queries().length === 0)
 </script>
 
 <div class="space-y-6">
@@ -67,5 +110,34 @@
         <StxLink to="/" class="font-semibold text-gray-600 text-sm hover:underline">View public site</StxLink>
       </div>
     </div>
+  </div>
+
+  {{-- Judge-import backlog. Searches of the directory that returned no
+      judge, ranked by how many people ran them -- the most direct evidence
+      there is about which judge to add next. Rows carry no searcher.
+
+      The three states below are `:show` + static display:none rather than
+      x-class hidden toggles: x-class is evaluated in the browser only, so
+      the pre-rendered page would paint all three at once before the fetch
+      resolves (stx-standards 7.3, gate check 19). --}}
+  <div class="p-6 bg-white border border-gray-200 rounded-lg">
+    <div class="flex gap-4 items-start justify-between">
+      <div>
+        <h2 class="font-semibold text-base text-gray-900">Judges people couldn't find</h2>
+        <p class="mt-1 text-gray-600 text-sm">{{ missingLabel }}</p>
+      </div>
+      <p class="font-bold text-3xl" x-class="missingTotal() > 0 ? 'text-amber-600' : 'text-gray-900'" :text="missingCountLabel()"></p>
+    </div>
+
+    <p :show="showDemandError" style="display:none" role="alert" class="mt-5 text-red-600 text-sm">{{ demandError }}</p>
+
+    <ul :show="showDemandRows" style="display:none" class="mt-5 divide-gray-100 divide-y">
+      <li :for="row in missingRows()" class="flex gap-4 items-center justify-between py-2.5">
+        <span class="font-medium text-gray-900 text-sm">{{ row.query }}</span>
+        <span class="flex-none tabular-nums text-gray-500 text-xs">{{ row.searchesLabel }}</span>
+      </li>
+    </ul>
+
+    <p :show="showDemandEmpty" style="display:none" class="mt-5 text-gray-500 text-sm">No searches recorded yet — this fills in as people use the directory search.</p>
   </div>
 </div>
