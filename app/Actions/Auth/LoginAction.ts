@@ -1,6 +1,7 @@
 import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { Auth, createTwoFactorChallenge, getTwoFactorState } from '@stacksjs/auth'
+import { db } from '@stacksjs/database'
 import { User } from '@stacksjs/orm'
 import { response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
@@ -14,9 +15,10 @@ import { withSessionCookie } from '../../Support/sessionCookie'
  * the vendored tree — which matters because `storage/framework/` is replaced
  * wholesale on a framework sync.
  *
- * The ONLY behavioural difference from the default is that the session token is
- * also returned as an `HttpOnly` cookie instead of being left for the browser
- * to write via `document.cookie`. See `app/Support/sessionCookie.ts` for why.
+ * Two behavioural differences from the default. The session token is also
+ * returned as an `HttpOnly` cookie instead of being left for the browser to
+ * write via `document.cookie` (see `app/Support/sessionCookie.ts` for why),
+ * and a suspended account is refused a token at all (bench-review#49).
  *
  * The JSON body is kept byte-compatible with the framework's shape
  * (`access_token` / `refresh_token` / `token_type` / `expires_in` / the legacy
@@ -59,6 +61,32 @@ export default new Action({
     const authedUser = await User.where('email', '=', email).first()
     if (!authedUser)
       return response.unauthorized('Incorrect email or password')
+
+    // Suspended accounts get no token. app/Middleware/Auth.ts already refuses
+    // every auth-gated request from a banned user, so the door was shut —
+    // but login itself still succeeded, which left a suspended person with a
+    // session that failed on the next click and no idea why.
+    //
+    // Says so plainly rather than returning the generic credential error.
+    // This point is only reachable with a CORRECT password, so naming the
+    // suspension reveals nothing an attacker could not already infer, and
+    // the alternative tells someone who typed their password correctly that
+    // they got it wrong — inviting them to retry forever.
+    //
+    // Matches the middleware's status and wording so the two paths cannot
+    // drift into telling the same user different stories.
+    //
+    // Read straight off the table rather than from the model row:
+    // `banned_at` is written by SuspendUserAction through `db.updateTable`
+    // and is declared on neither app/Models/User.ts nor the generated row
+    // types, so trusting the model to carry it would risk a check that
+    // silently never fires. app/Middleware/Auth.ts queries it the same way.
+    const suspension = await db.selectFrom('users')
+      .select(['banned_at'])
+      .where('id', '=', Number(authedUser.id))
+      .executeTakeFirst() as { banned_at: string | null } | undefined
+    if (suspension?.banned_at)
+      return response.json({ message: 'This account has been suspended. Contact support if you believe this is a mistake.' }, 403)
 
     const { enabled: twoFactorEnabled } = await getTwoFactorState(authedUser.id as number)
     if (twoFactorEnabled) {
