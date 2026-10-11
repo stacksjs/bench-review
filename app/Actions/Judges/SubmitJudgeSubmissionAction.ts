@@ -1,6 +1,7 @@
 import { Action } from '@stacksjs/actions'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
+import { notifyModeratorsOfJudgeSubmission } from '../../Helpers/notifyModerators'
 
 /**
  * POST /api/judges/submit — public "suggest a judge for the directory"
@@ -57,6 +58,21 @@ export default new Action({
       created_at: now,
       updated_at: now,
     } as any).execute()
+
+    // Tell the moderators. The queue at /admin/judge-submissions does not
+    // poll and nobody sits on it, so without this a suggestion is invisible
+    // until an admin happens to look — backwards for a directory whose whole
+    // problem is coverage (bench-review#48).
+    //
+    // Not awaited, and the helper swallows its own errors: the submission is
+    // already saved and the person is owed their 201 regardless of whether
+    // SMTP is reachable.
+    const inserted = await db.selectFrom('judge_submissions')
+      .select(['id'])
+      .where('uuid', '=', uuid)
+      .executeTakeFirst() as { id: number } | undefined
+    if (inserted?.id)
+      void notifyModeratorsOfJudgeSubmission(Number(inserted.id), judgeName)
 
     return response.json({ ok: true }, 201)
   },
