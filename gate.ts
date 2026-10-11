@@ -616,6 +616,69 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   )
 }
 
+// 21. Every notification type is spelled out on both surfaces.
+//
+//     The bell dropdown (Bench/BenchHeader `notificationLabel`) and the
+//     /notifications page (Bench/NotificationsView `labelFor` + `detailFor`)
+//     each carry their own copy of the type-to-wording mapping. They cannot
+//     share a module: the stx bundler silently drops value imports from
+//     outside resources/stores, so an extracted helper would arrive as
+//     undefined at scope-setup time.
+//
+//     Neither function throws on a type it does not know — both fall through
+//     to a bare "New notification" — so a type added to NotificationType and
+//     wired into a dispatch site, but missed in one of these, ships a
+//     delivered, clickable, meaningless row. Nothing else in the build would
+//     notice. This check reads the union from app/Helpers/notifications.ts
+//     and requires each member on both surfaces.
+{
+  const src = await Bun.file('app/Helpers/notifications.ts').text()
+  const union = src.match(/export type NotificationType\s*=\s*([^\n]+)/)?.[1] ?? ''
+  const types = [...union.matchAll(/'([a-z_]+)'/g)].map(m => m[1])
+
+  const surfaces: Array<{ fn: string, path: string }> = [
+    { fn: 'notificationLabel', path: 'resources/components/Bench/BenchHeader.stx' },
+    { fn: 'labelFor', path: 'resources/components/Bench/NotificationsView.stx' },
+  ]
+
+  // Scope the search to the LABEL function's own body. A file-wide search is
+  // not enough and was wrong on the first attempt: NotificationsView also has
+  // detailFor, so deleting a case from labelFor left the type still mentioned
+  // in the file and the check passed a page that had lost its wording. Only
+  // the label matters — detailFor falling through to '' just omits a
+  // subtitle, which is a fine outcome for a type that needs no elaboration.
+  function bodyOf(src: string, fn: string): string {
+    const start = src.indexOf(`function ${fn}(`)
+    if (start === -1) return ''
+    const end = src.indexOf('\n  }', start)
+    return end === -1 ? src.slice(start) : src.slice(start, end)
+  }
+
+  const missing: string[] = []
+  for (const surface of surfaces) {
+    const src = await Bun.file(surface.path).text()
+    const body = bodyOf(src, surface.fn)
+    if (!body) {
+      missing.push(`${surface.path} has no ${surface.fn}()`)
+      continue
+    }
+    for (const t of types) {
+      // The wording differs per surface; what has to exist is a branch on
+      // the type at all.
+      if (!body.includes(`n.type === '${t}'`))
+        missing.push(`${surface.fn}() has no case for '${t}'`)
+    }
+  }
+
+  add(
+    'every notification type is worded on both surfaces',
+    types.length > 0 && missing.length === 0,
+    types.length === 0
+      ? 'could not read the NotificationType union from app/Helpers/notifications.ts'
+      : (missing.length ? `${missing.join(', ')} — the fallback is a bare "New notification", so the row ships delivered and meaningless` : ''),
+  )
+}
+
 const failed = checks.filter(c => !c.ok)
 console.log(`\n  bench conformance gate — ${pages.length} built pages\n`)
 for (const c of checks)

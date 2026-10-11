@@ -12,12 +12,21 @@ import { db } from '@stacksjs/database'
  *                    trigger the right-of-reply path never had.
  *   followed_review  a user following that judge.
  *
+ * `comment` goes back to the review's AUTHOR when somebody replies under it.
+ * It is NOT deduped: a second comment from the same person is a second thing
+ * said, not a repeat of the first, and collapsing them would hide half a
+ * conversation. The comment endpoint's own throttle (20 per 5 minutes) is
+ * what caps the volume.
+ *
  * Any new value needs a case in BOTH `notificationLabel` (Bench/BenchHeader)
  * and `labelFor`/`detailFor` (Bench/NotificationsView). Neither throws on an
  * unknown type -- they fall back to a bare "New notification" -- so a missing
- * case ships a delivered-but-meaningless row rather than an error.
+ * case ships a delivered-but-meaningless row rather than an error. The two
+ * surfaces cannot share a module (the stx bundler drops value imports from
+ * outside resources/stores), so gate.ts check 21 fails the build when a type
+ * declared here is missing from either of them.
  */
-export type NotificationType = 'like' | 'approved' | 'rejected' | 'judge_review' | 'followed_review'
+export type NotificationType = 'like' | 'approved' | 'rejected' | 'judge_review' | 'followed_review' | 'comment'
 
 interface DispatchInput {
   userId: number

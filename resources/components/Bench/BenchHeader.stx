@@ -127,6 +127,12 @@
     // the phrasing must not say "your review" (bench-review#57).
     if (n.type === 'judge_review') return `A new review of you was published: "${truncated}"`
     if (n.type === 'followed_review') return `New review of a judge you follow: "${truncated}"`
+    // Back to the review's author. "your review" is correct here, unlike the
+    // two fan-out types above.
+    if (n.type === 'comment') {
+      const who = n.actor?.name ?? 'Someone'
+      return `${who} commented on "${truncated}"`
+    }
     return 'New notification'
   }
 

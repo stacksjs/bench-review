@@ -52,6 +52,11 @@
     // may say "your review".
     if (n.type === 'judge_review') return `A new review of you was published: "${title}"`
     if (n.type === 'followed_review') return `New review of a judge you follow: "${title}"`
+    // Back to the review's author, so "your review" is right here.
+    if (n.type === 'comment') {
+      const who = n.actor?.name ?? 'Someone'
+      return `${who} commented on "${title}"`
+    }
     return 'New notification'
   }
 
@@ -61,6 +66,7 @@
     if (n.type === 'like') return 'Click to view the review.'
     if (n.type === 'judge_review') return 'You can respond to it from your claimed profile.'
     if (n.type === 'followed_review') return 'Click to read it.'
+    if (n.type === 'comment') return 'Click to read the thread.'
     return ''
   }
 

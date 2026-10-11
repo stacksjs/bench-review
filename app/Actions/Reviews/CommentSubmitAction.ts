@@ -3,6 +3,7 @@ import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { notify } from '../../Helpers/notifications'
 import { sanitizeReviewHtml } from '../../Helpers/sanitizeReviewHtml'
 
 /**
@@ -104,6 +105,27 @@ export default new Action({
       .where('id', '=', reviewId)
       .execute()
       .catch(() => {})
+
+    // Tell the review's author somebody replied. Until now a comment was a
+    // message into the void: the person it was addressed to had no way to
+    // learn it existed short of revisiting their own review (bench-review#57).
+    //
+    // No self-notification: the action already 403s an author commenting on
+    // their own review, and the explicit check keeps that guarantee local
+    // rather than depending on a gate twenty lines up. Seeded rows with a
+    // null user_id have nobody to tell.
+    //
+    // Best-effort, like every other notify() call: a dropped notification
+    // must not fail a comment that is already in the database. notify()
+    // swallows and logs its own errors.
+    if (review.user_id != null && Number(review.user_id) !== Number(userId)) {
+      await notify({
+        userId: Number(review.user_id),
+        actorUserId: Number(userId),
+        type: 'comment',
+        reviewId,
+      })
+    }
 
     // Return the inserted row so the client can append optimistically.
     const inserted = await db.selectFrom('review_comments')
