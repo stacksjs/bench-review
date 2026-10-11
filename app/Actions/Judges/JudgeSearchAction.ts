@@ -1,5 +1,6 @@
 import { Action } from '@stacksjs/actions'
 import { request, response } from '@stacksjs/router'
+import { recordJudgeSearch } from '../../Helpers/searchDemand'
 
 /**
  * GET /api/judges/search?q=… — server-side typeahead.
@@ -19,6 +20,12 @@ import { request, response } from '@stacksjs/router'
  * ORM doesn't surface `.leftJoin()` on `Model.query()`. The seed set
  * is small; if volumes climb past a few hundred judges, swap to a
  * raw `db.raw(...)` SQL JOIN.
+ *
+ * Every search is counted (see `app/Helpers/searchDemand.ts`). A query that
+ * returns nothing is the clearest available signal about which judge to
+ * import next, and until now it was discarded the moment the response went
+ * out. Nothing about the searcher is recorded, only the query and how many
+ * judges it found.
  */
 const MIN_LEN = 1
 const LIMIT = 20
@@ -69,6 +76,12 @@ export default new Action({
           ? { id: court.id, name: court.name, image: court.image }
           : { id: null, name: 'Unknown court', image: null },
       }))
+
+    // Deliberately NOT awaited. This is a typeahead that fires per debounced
+    // keystroke, so two extra round-trips on the response path would be paid
+    // on every one of them; a demand statistic is not worth making the search
+    // feel slower. The helper swallows its own errors.
+    void recordJudgeSearch(raw, matches.length)
 
     return response.json(matches)
   },
