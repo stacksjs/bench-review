@@ -1,0 +1,7 @@
+@extends('layouts/admin')
+
+@section('title', 'Judge Submissions - Bench Review')
+
+@section('content')
+@include('Bench/Admin/JudgeSubmissionsTable')
+@endsection

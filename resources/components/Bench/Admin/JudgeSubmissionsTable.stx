@@ -1,0 +1,189 @@
+<script client>
+  import type { JudgeSubmission } from '~/resources/stores/adminJudgeSubmissions'
+
+  // Admin queue for public judge suggestions (bench-review#48).
+  //
+  // The endpoints have existed since the submit form was wired, and nothing
+  // ever called them — so every submission persisted a row and stopped
+  // there. A contribution form that silently goes nowhere is worse than one
+  // that is visibly broken, because the person who filled it in believes
+  // they helped.
+  const store = useStore('adminJudgeSubmissions')
+
+  let hasFetched = false
+  function bootstrap(): void {
+    if (hasFetched) return
+    hasFetched = true
+    store.fetchSubmissions()
+  }
+  bootstrap()
+  onMount(() => { bootstrap() })
+
+  async function approve(s: JudgeSubmission): Promise<void> {
+    await store.review(s.id, 'approve')
+  }
+
+  async function reject(s: JudgeSubmission): Promise<void> {
+    if (typeof window === 'undefined') return
+    const note = window.prompt('Why is this being rejected? (recorded on the submission)')
+    if (!note || !note.trim()) return
+    await store.review(s.id, 'reject', note.trim())
+  }
+
+  function formatDate(value: string | null | undefined): string {
+    if (!value) return ''
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  }
+
+  // Where the judge sits, from whichever of the free-text fields were filled.
+  function placeOf(s: JudgeSubmission): string {
+    const parts = [s.court, [s.city, s.state].filter(Boolean).join(', '), s.department].filter(Boolean)
+    return parts.join(' · ')
+  }
+
+  // `source_url` is whatever the submitter typed. Only ever linked when it
+  // is plainly http(s) — a `javascript:` or `data:` URL in an admin's
+  // browser is the one place this field could do real damage. Anything else
+  // renders as text, which still lets a moderator read and judge it.
+  function safeSourceUrl(s: JudgeSubmission): string {
+    const raw = String(s.source_url ?? '').trim()
+    return /^https?:\/\//i.test(raw) ? raw : ''
+  }
+
+  // Rows are precomputed: an x-class or nested call inside a :for must not
+  // carry signal call-syntax.
+  const rows = derived(() => store.submissions().map((s: any) => ({
+    id: s.id,
+    judge_name: s.judge_name,
+    place: placeOf(s),
+    bio: s.bio || '',
+    hasBio: !!s.bio,
+    submitter: [s.submitter_role, s.submitter_email].filter(Boolean).join(' · '),
+    hasSubmitter: !!(s.submitter_role || s.submitter_email),
+    sourceUrl: safeSourceUrl(s),
+    hasSafeSource: !!safeSourceUrl(s),
+    rawSource: String(s.source_url ?? ''),
+    hasUnsafeSource: !!s.source_url && !safeSourceUrl(s),
+    note: s.review_note || '',
+    hasNote: !!s.review_note,
+    status: s.status,
+    statusCls: s.status === 'approved'
+      ? 'bg-emerald-100 text-emerald-800'
+      : (s.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'),
+    date: formatDate(s.created_at),
+    busy: !!store.acting()[s.id],
+    // Approve/reject only mean anything while the row is still pending.
+    actionable: s.status === 'pending',
+  })))
+
+  const filters = [
+    { key: 'pending', label: 'Pending' },
+    { key: 'approved', label: 'Approved' },
+    { key: 'rejected', label: 'Rejected' },
+    { key: 'all', label: 'All' },
+  ]
+  const filterRows = derived(() => filters.map(f => ({
+    key: f.key,
+    label: f.label,
+    pressed: store.statusFilter() === f.key ? 'true' : 'false',
+    cls: store.statusFilter() === f.key
+      ? 'bg-blue-600 text-white border-blue-600'
+      : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300',
+  })))
+  function setFilter(key: string): void {
+    void store.setStatusFilter(key)
+  }
+
+  const hasRows = derived<boolean>(() => store.submissions().length > 0)
+  // Gated on there being no error too. An empty list means one of two very
+  // different things — nothing matches this filter, or the request failed —
+  // and "Nothing here" is a claim about the queue that a 500 does not
+  // support. Same correction already made for the public feed (11b5f704)
+  // and the dashboard's backlog panel.
+  const showEmpty = derived<boolean>(() => !store.loading() && !store.actionError() && store.submissions().length === 0)
+  const showError = derived<boolean>(() => !!store.actionError())
+</script>
+
+<div class="space-y-4">
+  <div>
+    <h1 class="font-bold text-2xl text-gray-900">Judge submissions</h1>
+    <p class="mt-1 text-gray-600 text-sm">Judges suggested by the public. Approving creates a bare directory entry from the name — enrich the profile afterwards. Rejecting records a reason on the submission.</p>
+  </div>
+
+  {{-- Toggle buttons with aria-pressed, not tabs: they filter one list
+      rather than switching panels, and the tab role promises a tabpanel
+      and roving focus this page does not have. --}}
+  <div class="flex flex-wrap gap-2" role="group" aria-label="Filter submissions by status">
+    <button
+      :for="f in filterRows()"
+      type="button"
+      aria-pressed="false"
+      x-aria-pressed="f.pressed"
+      @click="setFilter(f.key)"
+      class="inline-flex items-center px-3 py-1.5 font-medium text-sm border rounded-full transition-colors"
+      x-class="f.cls"
+    >{{ f.label }}</button>
+  </div>
+
+  {{-- `:show` + static display:none, not an x-class hidden toggle: these
+      start false, so an x-class toggle would paint them in the
+      pre-rendered page (stx-standards 7.3, gate check 19). --}}
+  <div
+    role="alert"
+    :show="showError"
+    style="display:none"
+    class="px-4 py-3 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
+  >{{ store.actionError() }}</div>
+
+  <div class="overflow-hidden bg-white border border-gray-200 rounded-lg">
+    <div :if="store.loading() && store.submissions().length === 0" class="px-4 py-12 text-center text-gray-500 text-sm">
+      Loading submissions…
+    </div>
+
+    <div class="px-6 py-16 text-center" :show="showEmpty" style="display:none">
+      <p class="font-semibold text-gray-900 text-sm">Nothing here</p>
+      <p class="mt-1 text-gray-500 text-xs">No submissions match this filter.</p>
+    </div>
+
+    <ul class="divide-gray-100 divide-y" :show="hasRows" style="display:none">
+      <li :for="row in rows()" class="px-4 py-4">
+        <div class="flex gap-x-4 justify-between">
+          <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap gap-2 items-center">
+              <span class="inline-block px-2 py-0.5 font-medium text-xs rounded-full" x-class="row.statusCls">{{ row.status }}</span>
+              <span class="text-gray-500 text-xs">{{ row.date }}</span>
+            </div>
+            <h3 class="mt-1 font-semibold text-base text-gray-900">{{ row.judge_name }}</h3>
+            <p class="mt-0.5 text-gray-600 text-sm">{{ row.place }}</p>
+            <p :show="row.hasBio" style="display:none" class="mt-2 text-gray-600 text-sm">{{ row.bio }}</p>
+            <p :show="row.hasSubmitter" style="display:none" class="mt-2 text-gray-500 text-xs">Submitted by {{ row.submitter }}</p>
+            <p :show="row.hasSafeSource" style="display:none" class="mt-1 text-xs">
+              <a x-href="row.sourceUrl" target="_blank" rel="noopener noreferrer nofollow" class="text-blue-700 underline underline-offset-2 hover:text-blue-900">Source</a>
+            </p>
+            {{-- Not a link: the submitter typed something that is not an
+                http(s) URL, so it is shown verbatim for a human to judge
+                rather than made clickable. --}}
+            <p :show="row.hasUnsafeSource" style="display:none" class="mt-1 break-all text-gray-500 text-xs">Source (not linked): {{ row.rawSource }}</p>
+            <p :show="row.hasNote" style="display:none" class="mt-2 px-2 py-1 text-amber-800 text-xs bg-amber-50 border border-amber-200 rounded">Note: {{ row.note }}</p>
+          </div>
+          <div :show="row.actionable" style="display:none" class="flex flex-shrink-0 gap-x-2 items-start">
+            <button
+              type="button"
+              @click="approve(row)"
+              x-disabled="row.busy"
+              class="px-2.5 py-1 font-medium text-emerald-800 text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            >Approve</button>
+            <button
+              type="button"
+              @click="reject(row)"
+              x-disabled="row.busy"
+              class="px-2.5 py-1 font-medium text-red-800 text-xs bg-red-50 hover:bg-red-100 border border-red-200 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            >Reject</button>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </div>
+</div>

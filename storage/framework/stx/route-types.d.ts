@@ -3,6 +3,7 @@ declare module '@stacksjs/stx' {
   interface KnownRoutes {
     '/admin/credentials': {  }
     '/admin/flags': {  }
+    '/admin/judge-submissions': {  }
     '/admin/login': {  }
     '/admin/moderation': {  }
     '/admin/reviews': {  }
