@@ -17,13 +17,20 @@ export default defineModel({
     },
     useApi: {
       uri: 'campaigns',
-      // SECURITY: read-only. The ORM auto-CRUD generator emits POST/PUT/DELETE
-      // handlers with NO authentication — storage/framework/orm/routes.ts
-      // resolves the authed user only to feed the optional `authedFill` hook,
-      // and the 401 branch exists solely inside `if (own.enforced)`, which
-      // requires an `ownership` config this model does not declare. Writes go
-      // through explicit, gated Actions instead (see routes/api.ts).
-      routes: ['index', 'show'],
+      // SECURITY: no generated routes at all. The ORM auto-CRUD generator
+      // emits POST/PUT/DELETE handlers with NO authentication —
+      // storage/framework/orm/routes.ts resolves the authed user only to
+      // feed the optional `authedFill` hook, and the 401 branch exists
+      // solely inside `if (own.enforced)`, which requires an `ownership`
+      // config this model does not declare.
+      //
+      // `index`/`show` were left on while the table was empty. It is not
+      // any more: SendWeeklyDigest records one row per run, carrying the
+      // subject line, the audience size and the number delivered. That is
+      // operational data about who we can reach, readable by anyone who
+      // guesses the URL, in exchange for an endpoint nothing in the app
+      // calls. Writes go through the job; reads have no consumer.
+      routes: [],
     },
   },
 
