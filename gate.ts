@@ -679,6 +679,66 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   )
 }
 
+// 22. Nothing removes the focus outline without putting one back.
+//
+//     `focus:outline-none` with no replacement is WCAG 2.4.7: a keyboard
+//     user loses track of where they are. bench had this on the review
+//     form's star rows, which is the core conversion flow — five unnamed
+//     buttons with no visible focus.
+//
+//     The second half is the one a human reviewer misses. An element can
+//     carry its replacement in only SOME x-class branches: the review form's
+//     title input paired `focus:outline-none` with a focus ring in its
+//     healthy branch and nothing at all in its error branch, so the field
+//     had no focus indicator at precisely the moment it was flagged invalid
+//     and the user was sent back to it. Both shapes are checked here.
+//
+//     Source files, not dist, because an x-class branch is the thing being
+//     inspected and the built page only ever shows one of them.
+{
+  const TAG = /<(\w[\w-]*)((?:"[^"]*"|'[^']*'|[^>"'])*)>/g
+  const REPLACEMENT = ['focus:ring', 'focus-visible:', 'focus:border', 'focus-within:ring', 'focus:shadow']
+  const hasReplacement = (s: string): boolean => REPLACEMENT.some(k => s.includes(k))
+
+  const bare: string[] = []
+  const partial: string[] = []
+
+  for await (const path of new Bun.Glob('resources/**/*.stx').scan('.')) {
+    const src = await Bun.file(path).text()
+    TAG.lastIndex = 0
+    let m: RegExpExecArray | null
+    while ((m = TAG.exec(src))) {
+      const attrs = m[2]
+      if (!attrs.includes('focus:outline-none'))
+        continue
+      const line = src.slice(0, m.index).split('\n').length
+      const where = `${path}:${line} <${m[1]}>`
+
+      if (hasReplacement(attrs.match(/\sclass="([^"]*)"/)?.[1] ?? ''))
+        continue
+
+      const xclass = attrs.match(/x-class="([^"]*)"/)?.[1]
+      if (!xclass) {
+        bare.push(where)
+        continue
+      }
+      // Every branch the toggle can land on has to carry its own.
+      const branches = [...xclass.matchAll(/'([^']*)'/g)].map(b => b[1]).filter(Boolean)
+      if (branches.some(b => !hasReplacement(b)))
+        partial.push(where)
+    }
+  }
+
+  const all = [...bare, ...partial]
+  add(
+    'nothing removes the focus outline without a replacement',
+    all.length === 0,
+    all.length
+      ? `${all.length} element(s) suppress focus-visible styling with no visible replacement${partial.length ? ` (${partial.length} only in some x-class branches)` : ''}: ${all.slice(0, 3).join(', ')}`
+      : '',
+  )
+}
+
 const failed = checks.filter(c => !c.ok)
 console.log(`\n  bench conformance gate — ${pages.length} built pages\n`)
 for (const c of checks)

@@ -360,6 +360,27 @@
     })
 
     host.__richtextEditor = editor
+
+    // Name the editable, and say what it is. MediumEditor creates this div
+    // at runtime, so nothing in the template can carry an id for a
+    // `label for=` to point at — a caller instead marks an ancestor with
+    // `data-richtext-label="<id of the visible label>"` and we wire
+    // aria-labelledby here. Without it a screen reader reaches an unnamed
+    // editing region and announces nothing about what it is for
+    // (bench-review#58).
+    //
+    // Set AFTER the constructor so the library's own attribute writes do not
+    // clobber these, and only filled in where missing, so a future
+    // MediumEditor that sets role itself stays authoritative.
+    const labelHost = host.closest('[data-richtext-label]')
+    const labelId = labelHost ? labelHost.getAttribute('data-richtext-label') : ''
+    if (labelId)
+      editable.setAttribute('aria-labelledby', labelId)
+    else if (!editable.getAttribute('aria-label'))
+      editable.setAttribute('aria-label', placeholderText)
+    if (!editable.getAttribute('role'))
+      editable.setAttribute('role', 'textbox')
+    editable.setAttribute('aria-multiline', 'true')
     let saveTimer: ReturnType<typeof setTimeout> | null = null
 
     // Swap each toolbar button's plaintext content for a modern SVG
