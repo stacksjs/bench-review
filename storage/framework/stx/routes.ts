@@ -37,6 +37,7 @@ export const routes = [
   { pattern: '/search', filePath: 'resources/views/search.stx', isDynamic: false, params: [] },
   { pattern: '/settings', filePath: 'resources/views/settings.stx', isDynamic: false, params: [] },
   { pattern: '/terms', filePath: 'resources/views/terms.stx', isDynamic: false, params: [] },
+  { pattern: '/unsubscribe', filePath: 'resources/views/unsubscribe.stx', isDynamic: false, params: [] },
   { pattern: '/verify-email', filePath: 'resources/views/verify-email.stx', isDynamic: false, params: [] },
   { pattern: '/article/:id/edit', filePath: 'resources/views/article/[id]/edit/index.stx', isDynamic: true, params: ["id"] },
   { pattern: '/court-houses/:id/bench', filePath: 'resources/views/court-houses/[id]/bench/index.stx', isDynamic: true, params: ["id"] },

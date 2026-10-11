@@ -45,6 +45,11 @@
       </div>
     </div>
 
+    {{-- Newsletter capture. Lives in its own component so this footer stays
+        markup-only: giving BenchFooter a <script client> would turn it into
+        a scope root on every page in the site. --}}
+    @include('Bench/NewsletterSignup')
+
     {{-- Bottom bar --}}
     <div class="flex flex-col gap-6 items-center justify-between md:flex-row mt-12 pt-8 border-t border-white/10">
       <div class="flex gap-4 items-center">

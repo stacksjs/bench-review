@@ -36,6 +36,7 @@ declare module '@stacksjs/stx' {
     '/search': {  }
     '/settings': {  }
     '/terms': {  }
+    '/unsubscribe': {  }
     '/verify-email': {  }
     '/article/:id/edit': { id: string }
     '/court-houses/:id/bench': { id: string }

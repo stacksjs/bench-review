@@ -542,6 +542,10 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
     // JudgeSignup.stx — "sign in first" prompt; whoever lands on
     // /judges/signup is not signed in yet.
     `!isAuthed() ? '' : 'hidden'`,
+    // NewsletterSignup.stx — the footer signup form, on every page. Correct
+    // to paint on arrival (anyone can subscribe); it steps aside only once
+    // somebody has signed up during this visit.
+    `showForm() ? '' : 'hidden'`,
   ])
   const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr'])
   const TAG = /<(\/?)([a-zA-Z][\w-]*)((?:"[^"]*"|'[^']*'|[^>"'])*)(\/?)>/g

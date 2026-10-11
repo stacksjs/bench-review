@@ -1,0 +1,103 @@
+<script client>
+  // Newsletter capture for the site footer, i.e. every page.
+  //
+  // Until now the only signup form on the site lived in BenchComingSoon,
+  // which is included by `/` and `/coming-soon` only — so the moment the
+  // launch switch flips `/` to the real home page, the one place anyone
+  // could subscribe disappears (bench-review#57).
+  //
+  // The copy promises a weekly email of new reviews because that is now
+  // what actually happens: app/Jobs/SendWeeklyDigest.ts, Tuesdays. Do not
+  // loosen it to something vaguer than the job really sends.
+
+  const subscribeStore = useStore('subscribe')
+
+  const email = state<string>('')
+  const sending = state<boolean>(false)
+  const done = state<boolean>(false)
+  const errorText = state<string>('')
+
+  function parseError(status: number, body: string): string {
+    if (status === 0) return 'Could not reach the server — please try again.'
+    // The subscribe action answers 422 for an address already on the list.
+    // That is not an error worth alarming anyone about: the outcome they
+    // wanted is already true.
+    if (status === 422 && /already/i.test(body)) return ''
+    try {
+      const json = JSON.parse(body) as { errors?: Array<{ message?: string }>, message?: string }
+      return json?.errors?.[0]?.message || json?.message || 'Please try again.'
+    }
+    catch {
+      return 'Please try again.'
+    }
+  }
+
+  async function submit(): Promise<void> {
+    if (sending()) return
+    const value = email().trim()
+    if (!value) return
+    sending.set(true)
+    errorText.set('')
+    const result = await subscribeStore.subscribe(value, 'footer')
+    if (result.ok) {
+      done.set(true)
+      email.set('')
+    }
+    else {
+      const message = parseError(result.status, result.body)
+      // An "already subscribed" 422 lands here with an empty message and is
+      // treated as success — telling someone their address is already on the
+      // list just invites them to try again with the same result.
+      if (message === '') done.set(true)
+      else errorText.set(message)
+    }
+    sending.set(false)
+  }
+
+  const showForm = derived<boolean>(() => !done())
+  const showDone = derived<boolean>(() => done())
+  const showError = derived<boolean>(() => !!errorText())
+  const buttonLabel = derived<string>(() => (sending() ? 'Signing up…' : 'Sign up'))
+</script>
+
+<div class="flex flex-col gap-6 items-start justify-between lg:flex-row mt-12 pt-8 border-t border-white/10">
+  <div class="max-w-md">
+    <h3 class="font-semibold text-sm text-white">Get the weekly digest</h3>
+    <p class="mt-2 leading-6 text-slate-400 text-sm">
+      New reviews from the past week, every Tuesday. No more than one email a week, and you can unsubscribe from any of them.
+    </p>
+  </div>
+
+  <div class="w-full lg:max-w-sm">
+    {{-- The form is correct to paint on arrival — anyone can subscribe — so
+        it stays visible in the pre-rendered page and uses an x-class toggle
+        to step aside once somebody has signed up. Cloaking it would trade a
+        flash-out for a flash-in on content that should just be there
+        (stx-standards 7.3; registered in gate check 19's STARTS_VISIBLE). --}}
+    <form @submit.prevent="submit()" class="flex gap-x-3" x-class="showForm() ? '' : 'hidden'">
+      <label for="footer-newsletter-email" class="sr-only">Email address</label>
+      <input
+        id="footer-newsletter-email"
+        type="email"
+        x-model="email"
+        required
+        autocomplete="email"
+        placeholder="you@example.com"
+        x-disabled="sending"
+        class="block flex-auto px-3 py-2 min-w-0 text-sm text-white placeholder:text-slate-500 bg-white/5 border border-white/10 rounded-md focus:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+      >
+      <button
+        type="submit"
+        x-disabled="sending"
+        class="flex-none px-3.5 py-2 font-semibold text-sm text-white bg-blue-600 disabled:bg-blue-600/50 hover:bg-blue-500 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 transition-colors disabled:cursor-not-allowed"
+      >{{ buttonLabel }}</button>
+    </form>
+
+    {{-- Both of these start false, so they ship hidden rather than painting
+        before anyone has done anything. --}}
+    <p :show="showDone" style="display:none" role="status" class="text-emerald-300 text-sm">
+      You are on the list — the next digest goes out Tuesday.
+    </p>
+    <p :show="showError" style="display:none" role="alert" class="mt-2 text-red-300 text-sm">{{ errorText }}</p>
+  </div>
+</div>

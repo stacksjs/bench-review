@@ -18,13 +18,19 @@ export interface SubscribeResult {
 defineStore('subscribe', () => {
   const submitting = state<boolean>(false)
 
-  async function subscribe(email: string): Promise<SubscribeResult> {
+  /**
+   * `source` records WHERE a signup came from; the column already exists and
+   * the action defaults it to 'homepage' when omitted, which is what the
+   * coming-soon form still relies on. Worth passing from every new surface:
+   * it is the only way to tell which placement is actually earning signups.
+   */
+  async function subscribe(email: string, source?: string): Promise<SubscribeResult> {
     submitting.set(true)
     try {
       const res = await fetch('/api/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify(source ? { email, source } : { email }),
       })
       const body = res.ok ? '' : await res.text().catch(() => '')
       return { ok: res.ok, status: res.status, body }
