@@ -1,5 +1,5 @@
 import { Action } from '@stacksjs/actions'
-import { Auth } from '@stacksjs/auth'
+import { Auth, isEmailVerified } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
@@ -43,6 +43,13 @@ export default new Action({
     const userId = (authUser as any)?.id
     if (!userId)
       return response.json({ error: 'Not authenticated' }, 401)
+
+    // Same gate as writing a review (SubmitReviewAction). Commenting was
+    // the one way to put text on a judge's page without ever proving an
+    // address, which made a throwaway account's first useful action free
+    // (bench-review#51).
+    if (!isEmailVerified(authUser as any))
+      return response.json({ error: 'Please verify your email address before commenting.' }, 403)
 
     const reviewId = Number(request.params?.id)
 

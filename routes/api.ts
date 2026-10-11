@@ -247,6 +247,20 @@ route.delete('/me/comments/{id}', 'Actions/Me/DeleteMyCommentAction')
   .middleware('auth')
   .skipCsrf()
 
+// Moderator takedown for a single comment (bench-review#51). Soft: sets
+// status, keeps the row, so the thing acted on survives for review. The
+// author's own DELETE above is still the only path that removes a row.
+route.get('/admin/comments', 'Actions/Admin/Comments/CommentIndexAction')
+  .name('bench.admin.comments.index')
+  .middleware('auth')
+  .middleware('admin')
+
+route.patch('/admin/comments/{id}', 'Actions/Admin/Comments/UpdateCommentStatusAction')
+  .name('bench.admin.comments.update')
+  .middleware('auth')
+  .middleware('admin')
+  .skipCsrf()
+
 // Community report/flag on a review. Anonymous flagging is allowed
 // — the trust model needs friction-free reporting. Signed-in flags
 // are idempotent on (review_id, user_id). See FlagReviewAction for

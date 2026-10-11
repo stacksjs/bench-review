@@ -16,6 +16,8 @@
     'review.publish': 'Published review',
     'review.reject': 'Rejected review',
     'review.delete': 'Deleted review',
+    'comment.reject': 'Removed comment',
+    'comment.publish': 'Restored comment',
     'user.delete': 'Deleted user',
     'credential.approve': 'Approved claim',
     'credential.reject': 'Rejected claim',
