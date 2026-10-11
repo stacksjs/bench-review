@@ -25,6 +25,10 @@ export default defineModel({
   indexes: [
     { name: 'review_flags_status_idx', columns: ['status'] },
     { name: 'review_flags_review_idx', columns: ['judge_review_id'] },
+    // One flag per reporter per review. Partial on purpose: anonymous flags
+    // carry a NULL user_id, and without the WHERE every anonymous report on
+    // a review would collide into one row (bench-review#47).
+    { name: 'review_flags_reporter_unique', columns: ['judge_review_id', 'user_id'], unique: true, where: '"user_id" IS NOT NULL' },
   ],
 
   traits: {

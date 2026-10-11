@@ -2,6 +2,7 @@ import { Action } from '@stacksjs/actions'
 import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
+import { isUniqueViolation } from '../../Helpers/dbErrors'
 
 /**
  * GET /api/me/draft — fetch the user's compose-draft.
@@ -104,10 +105,29 @@ export default new Action({
           .set(values as any)
           .where('id', '=', existing.id)
           .execute()
+        return response.json({ ok: true })
       }
-      else {
+
+      // The lookup above and this insert are not atomic, and autosave fires
+      // from every open tab — so two tabs that both find no draft will both
+      // try to create one. That used to produce two rows, because the index
+      // on user_id was not actually unique (bench-review#47); one tab's
+      // edits then vanished depending on which row the next GET happened to
+      // return. The index is real now, so the loser of that race lands here
+      // instead, and the right answer is to update the row the winner just
+      // wrote rather than to fail a keystroke.
+      try {
         values.created_at = now
         await db.insertInto('review_drafts').values(values as any).execute()
+      }
+      catch (err) {
+        if (!isUniqueViolation(err))
+          throw err
+        delete values.created_at
+        await db.updateTable('review_drafts')
+          .set(values as any)
+          .where('user_id', '=', Number(userId))
+          .execute()
       }
       return response.json({ ok: true })
     }

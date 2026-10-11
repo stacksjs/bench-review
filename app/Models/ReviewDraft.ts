@@ -21,7 +21,10 @@ export default defineModel({
   autoIncrement: true,
 
   indexes: [
-    { name: 'review_drafts_user_unique', columns: ['user_id'] },
+    // `unique: true` was missing, so the generator emitted a plain
+    // CREATE INDEX and the one-draft-per-user rule below was a comment
+    // rather than a constraint (bench-review#47).
+    { name: 'review_drafts_user_unique', columns: ['user_id'], unique: true },
   ],
 
   traits: {

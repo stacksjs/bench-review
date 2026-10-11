@@ -2,6 +2,7 @@ import { Action } from '@stacksjs/actions'
 import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
+import { isUniqueViolation } from '../../Helpers/dbErrors'
 import { schema } from '@stacksjs/validation'
 import { notifyModeratorsOfFlag } from '../../Helpers/notifyModerators'
 
@@ -17,11 +18,15 @@ import { notifyModeratorsOfFlag } from '../../Helpers/notifyModerators'
  *
  * Status starts at 'open'. Admin queue surfaces these; the moderator
  * dismisses (no review change) or actions (review gets edited/
- * rejected as a result). Dedup is enforced at the APP layer below (an
- * explicit lookup) — there is NO unique DB index on review_flags.
- * Signed-in repeat-flags collapse to a silent 200; anonymous
- * repeat-flags are bounded only by the route throttle (no per-anon
- * identifier is persisted to dedup on).
+ * rejected as a result). Dedup for signed-in reporters is enforced in TWO
+ * places: the explicit lookup below, which turns a repeat flag into a
+ * silent 200, and a partial unique index on
+ * `(judge_review_id, user_id) WHERE user_id IS NOT NULL` that closes the
+ * race between that lookup and the insert (bench-review#47). The lookup is
+ * the UX layer — a friendly answer — and the index is the guarantee.
+ * Anonymous repeat-flags are bounded only by the route throttle: the index
+ * deliberately excludes them, since NULL user_ids would otherwise collapse
+ * every anonymous report on a review into one row.
  *
  * Resolves bench-review#27.
  */
@@ -107,15 +112,26 @@ export default new Action({
     catch { /* non-fatal */ }
 
     const now = new Date().toISOString()
-    await db.insertInto('review_flags').values({
-      judge_review_id: reviewId,
-      user_id: userId,
-      reason,
-      details,
-      status: 'open',
-      created_at: now,
-      updated_at: now,
-    } as any).execute()
+    try {
+      await db.insertInto('review_flags').values({
+        judge_review_id: reviewId,
+        user_id: userId,
+        reason,
+        details,
+        status: 'open',
+        created_at: now,
+        updated_at: now,
+      } as any).execute()
+    }
+    catch (err) {
+      // Lost the race against another tab or a double-tap: the index did the
+      // job the lookup above could not guarantee. Same answer the lookup
+      // gives, for the same reason — a repeat flag is not an error, and
+      // saying so would reveal that the reporter had flagged this before.
+      if (!isUniqueViolation(err))
+        throw err
+      return response.json({ ok: true, duplicate: true })
+    }
 
     // Best-effort moderator alert (non-fatal — a mail failure must never
     // fail the flag itself).
