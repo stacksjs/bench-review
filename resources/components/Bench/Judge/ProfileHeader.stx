@@ -183,14 +183,33 @@
             ordinary click — meaning the menu closed only when clicked INSIDE,
             and never on an outside click. focusout bubbles, unlike blur. --}}
         <div class="sm:hidden relative" @focusout="closeMoreMenu($event)">
-          <button type="button" class="block -m-3 p-3" @click="menuOpen.set(!menuOpen())" id="more-menu-button" aria-expanded="false" aria-haspopup="true">
+          {{-- aria-expanded has to TRACK the state, not state it once. It was
+              a static "false", so the panel opened and a screen reader kept
+              being told it was collapsed. aria-haspopup is gone with the
+              menu roles below: the panel is a disclosure, not an ARIA menu,
+              and haspopup="true" means specifically "menu". --}}
+          <button type="button" class="block -m-3 p-3" @click="menuOpen.set(!menuOpen())" id="more-menu-button" aria-expanded="false" x-aria-expanded="menuOpen() ? 'true' : 'false'">
             <span class="sr-only">More</span>
             <Icon name="ellipsis-vertical" size="20" class="text-gray-500" />
           </button>
 
-          <div :if="menuOpen" class="absolute right-0 z-10 mt-0.5 py-2 w-32 bg-white ring-1 ring-gray-900/5 rounded-md focus:outline-none shadow-lg origin-top-right" role="menu" aria-orientation="vertical" aria-labelledby="more-menu-button" tabindex="-1">
-            <button type="button" class="block px-3 py-1 w-full text-gray-900 text-left text-sm/6" role="menuitem" tabindex="-1" id="more-menu-item-0" @click="shareProfile()">Share Profile</button>
-            <StxLink to="/review" class="block px-3 py-1 text-gray-900 text-sm/6" role="menuitem" tabindex="-1" id="more-menu-item-1">Write Review</StxLink>
+          {{-- A disclosure, not a menu. This carried role="menu" with
+              role="menuitem" children and tabindex="-1" on all three, which
+              is the ARIA menu pattern — and that pattern promises roving
+              focus driven by arrow keys, which nothing here implements. The
+              result was a panel no keyboard user could reach at all: the
+              only focusable thing was the trigger, and opening it led
+              nowhere. Two ordinary controls in normal tab order is what this
+              actually is, and the trigger already carries aria-expanded.
+              Same reasoning as MyReviewsView's filters, which are toggle
+              buttons rather than tabs (bench-review#58).
+
+              focus:outline-none is gone too: nothing ever focused this
+              container programmatically, so it was suppressing an indicator
+              that could only have helped. --}}
+          <div :if="menuOpen" class="absolute right-0 z-10 mt-0.5 py-2 w-32 bg-white ring-1 ring-gray-900/5 rounded-md shadow-lg origin-top-right" aria-labelledby="more-menu-button">
+            <button type="button" class="block px-3 py-1 w-full text-gray-900 text-left text-sm/6 focus-visible:bg-gray-50 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-[-2px]" id="more-menu-item-0" @click="shareProfile()">Share Profile</button>
+            <StxLink to="/review" class="block px-3 py-1 text-gray-900 text-sm/6 focus-visible:bg-gray-50 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-[-2px]" id="more-menu-item-1">Write Review</StxLink>
           </div>
         </div>
       </div>

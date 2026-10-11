@@ -447,7 +447,10 @@
               x-model="userEmail"
               autocomplete="email"
               readonly
-              class="block mt-2 px-3 py-2 w-full text-gray-500 text-sm placeholder:text-gray-400 bg-gray-50 border border-gray-300 rounded-md focus:outline-none cursor-not-allowed"
+              {{-- readonly, not disabled: the value still matters to the
+                  reader, so the field stays in the tab order — which means
+                  it needs a focus indicator. It had none (WCAG 2.4.7). --}}
+              class="block mt-2 px-3 py-2 w-full text-gray-500 text-sm placeholder:text-gray-400 bg-gray-50 border border-gray-300 rounded-md focus-visible:ring-2 focus-visible:ring-gray-400 focus:outline-none cursor-not-allowed"
             >
             <p class="mt-1 text-gray-400 text-xs">Email can't be changed yet.</p>
           </div>
