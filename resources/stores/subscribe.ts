@@ -37,5 +37,29 @@ defineStore('subscribe', () => {
     }
   }
 
-  return { submitting, subscribe }
+  /**
+   * Drop the subscriber identified by an emailed token. POST, not a link:
+   * mail scanners prefetch every URL in a message, so a GET that unsubscribed
+   * would drop people who never clicked. Unauthenticated — the token is the
+   * authorisation — so a plain fetch rather than authFetch.
+   */
+  async function unsubscribe(token: string): Promise<{ ok: boolean, message?: string }> {
+    try {
+      const res = await fetch('/api/email/unsubscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ token }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string }
+        return { ok: false, message: data.error || 'We could not complete that right now.' }
+      }
+      return { ok: true }
+    }
+    catch {
+      return { ok: false, message: 'Could not reach the server — please try again.' }
+    }
+  }
+
+  return { submitting, subscribe, unsubscribe }
 })

@@ -1,0 +1,98 @@
+<script client>
+  // Newsletter opt-out landing. The confirmation email links here with
+  // ?token=<subscriber uuid>; the button posts it to /api/email/unsubscribe.
+  //
+  // Why a page and a button rather than a one-click link: mail scanners and
+  // link-rewriting proxies fetch every URL in a message, so a GET that
+  // unsubscribes would drop people who never clicked anything.
+  //
+  // The token is read from the QUERY STRING, not from useRoute().params.
+  // stx-standards 9.10 is about route params -- re-parsing the path to
+  // recover an :id the router already has. This is not one: a static site
+  // cannot pre-render a page per token, so the token travels as a query
+  // param, and URLSearchParams is how you read one. `window.location`
+  // rather than bare `location`, which a store signal can shadow inside an
+  // stx scope.
+
+  const subscribeStore = useStore('subscribe')
+
+  // 'checking' | 'confirm' | 'working' | 'done' | 'error'
+  const phase = state<string>('checking')
+  const errorText = state<string>('')
+
+  function readToken(): string {
+    if (typeof window === 'undefined') return ''
+    try {
+      return new URLSearchParams(window.location.search).get('token') || ''
+    }
+    catch {
+      return ''
+    }
+  }
+
+  const token = state<string>('')
+
+  function init(): void {
+    const t = readToken()
+    token.set(t)
+    if (!t) {
+      errorText.set('This link is missing its token. Please use the unsubscribe link from the email itself.')
+      phase.set('error')
+      return
+    }
+    phase.set('confirm')
+  }
+  init()
+  onMount(() => { init() })
+
+  async function confirmUnsubscribe(): Promise<void> {
+    if (phase() === 'working') return
+    phase.set('working')
+    const result = await subscribeStore.unsubscribe(token())
+    if (!result.ok) {
+      errorText.set(result.message || 'We could not complete that right now. Please try again.')
+      phase.set('error')
+      return
+    }
+    phase.set('done')
+  }
+
+  // One always-visible line whose TEXT changes, rather than four panels
+  // toggling: at first paint the page genuinely does not know yet whether
+  // there is a token, and 'Checking your link…' is the only honest thing to
+  // say. Panels would each have to start hidden, leaving a blank page.
+  const message = derived<string>(() => {
+    const p = phase()
+    if (p === 'checking') return 'Checking your link…'
+    if (p === 'confirm') return 'You will stop receiving Bench Review updates. Your account and any reviews you have written are unaffected.'
+    if (p === 'working') return 'Unsubscribing…'
+    if (p === 'done') return 'Done — you are unsubscribed. We will not email you updates again.'
+    return errorText()
+  })
+  const showButton = derived<boolean>(() => phase() === 'confirm')
+  const showDone = derived<boolean>(() => phase() === 'done')
+  const isError = derived<boolean>(() => phase() === 'error')
+</script>
+
+<div class="mx-auto px-4 py-20 sm:px-6 lg:px-8 max-w-xl">
+  <div class="p-8 bg-white border border-gray-200 rounded-2xl shadow-sm">
+    <h1 class="font-bold text-2xl text-gray-900">Unsubscribe</h1>
+    <p class="mt-3 text-sm" x-class="isError() ? 'text-red-600' : 'text-gray-600'">{{ message }}</p>
+
+    {{-- `:show` + static display:none rather than an x-class hidden toggle:
+        both of these start false, so an x-class toggle would paint them in
+        the pre-rendered page before the token has even been looked at
+        (stx-standards 7.3, gate check 19). --}}
+    <button
+      type="button"
+      :show="showButton"
+      style="display:none"
+      @click="confirmUnsubscribe()"
+      class="inline-flex items-center justify-center mt-6 px-4 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 shadow-sm transition-colors"
+    >Unsubscribe me</button>
+
+    <div :show="showDone" style="display:none" class="mt-6">
+      <StxLink to="/" class="font-semibold text-blue-700 text-sm underline underline-offset-2 hover:text-blue-900">Back to Bench Review</StxLink>
+    </div>
+  </div>
+</div>

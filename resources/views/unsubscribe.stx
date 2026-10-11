@@ -1,0 +1,12 @@
+@extends('layouts/default')
+
+@section('title', 'Unsubscribe - Bench Review')
+
+@section('content')
+{{-- Thin shell — the logic lives in the Bench/Unsubscribe component. The
+    page container sits inside that component rather than wrapping the
+    include here: a wrapper above a component's scope root can pick up a
+    build-time x-cloak that nothing ever lifts, which is what blanked the
+    judge reviews tab (gate check 17). --}}
+@include('Bench/Unsubscribe')
+@endsection

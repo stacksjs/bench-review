@@ -1,6 +1,5 @@
 import { config } from '@stacksjs/config'
 import { mail, template } from '@stacksjs/email'
-import { url } from '@stacksjs/router'
 
 export interface SubscriptionConfirmationOptions {
   to: string
@@ -16,7 +15,13 @@ export async function sendSubscriptionConfirmation(options: SubscriptionConfirma
   const { to, subscriberUuid } = options
 
   const appName = config.app.name || 'Stacks'
-  const unsubscribeUrl = url('email.unsubscribe', { token: subscriberUuid })
+  // Built from APP_URL rather than url('email.unsubscribe', …): that named
+  // route did not exist, so this line THREW on every call and the
+  // confirmation mail was never sent — the failure showed up only as a
+  // logged line in the subscribe action's catch. The same APP_URL string
+  // concatenation the other mailers use (see SubmitReviewAction).
+  const base = process.env.APP_URL || 'http://localhost:4000'
+  const unsubscribeUrl = `${base}/unsubscribe?token=${encodeURIComponent(subscriberUuid)}`
 
   const { html, text } = await template('subscription-confirmation', {
     variables: {

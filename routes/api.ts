@@ -65,6 +65,16 @@ route.post('/subscribe', 'Actions/SubscriberEmailAction')
   .name('bench.email.subscribe')
   .skipCsrf()
 
+// Newsletter opt-out. Unauthenticated by necessity — somebody who is not
+// signed in has to be able to get off the list — so the emailed token is the
+// authorisation. POST rather than GET so mail scanners prefetching the link
+// cannot unsubscribe people who never clicked; /unsubscribe is the page that
+// posts here. Throttled because the endpoint is open and writes.
+route.post('/email/unsubscribe', 'Actions/Email/UnsubscribeAction')
+  .name('bench.email.unsubscribe')
+  .middleware('throttle:20,10m')
+  .skipCsrf()
+
 // Auth — login / register / logout. Framework defaults register these
 // without `.skipCsrf()`, which means a JSON fetch from a logged-out
 // page (no session, no CSRF token) gets a 403 "CSRF token mismatch".
