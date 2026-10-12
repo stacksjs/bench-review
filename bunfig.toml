@@ -2,6 +2,15 @@
 preload = [ "./storage/framework/defaults/resources/plugins/preloader.ts" ]
 
 [test]
+# Scope `bun test` to this app's own tests.
+#
+# Without it Bun walks node_modules, and `@stacksjs/stx` is a SYMLINK to the
+# local stx clone (~/Documents/Projects/stx) — so a bare `bun test` on a
+# machine with that fork runs the FRAMEWORK's entire suite instead of
+# bench's, takes minutes, and reports failures from another repository. CI
+# never saw it because a runner has no symlinked fork; locally it meant
+# `bun test` gave no signal about this app at all.
+root = "./tests"
 preload = [ "./tests/setup.ts" ]
 coverage = false
 
