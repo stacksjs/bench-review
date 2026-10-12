@@ -534,6 +534,13 @@ route.patch('/admin/reviews/{id}/status', 'Actions/Admin/Reviews/UpdateReviewSta
   .middleware('admin')
   .skipCsrf()
 
+// Bulk moderation — approve or reject a page of the queue in one request.
+route.post('/admin/reviews/bulk-status', 'Actions/Admin/Reviews/BulkUpdateReviewStatusAction')
+  .name('bench.admin.reviews.bulkStatus')
+  .middleware('auth')
+  .middleware('admin')
+  .skipCsrf()
+
 route.delete('/admin/reviews/{id}', 'Actions/Admin/Reviews/DeleteReviewAction')
   .name('bench.admin.reviews.destroy')
   .middleware('auth')
