@@ -60,6 +60,30 @@ export default new Action({
       .where('id', '=', reviewId)
       .execute()
 
+    // Taking a review down closes the flags that asked for it.
+    //
+    // Not housekeeping — it re-arms the alert. Moderators are emailed only
+    // on the FIRST open flag against a review (FlagReviewAction counts open
+    // rows before inserting, so anonymous flagging cannot spam them). Flags
+    // left open after the review was dealt with mean that count is never
+    // zero again, so a review that is rejected, edited and re-published can
+    // be flagged a hundred more times in silence.
+    //
+    // Resolved rather than dismissed: the flag was acted on. Deleting a
+    // review already clears its flags (DeleteReviewAction); this is the same
+    // idea for the outcome that keeps the row. Best-effort — the moderation
+    // decision stands either way.
+    if (status === 'rejected' && existing.status !== status) {
+      await db.updateTable('review_flags')
+        .set({ status: 'resolved', updated_at: new Date().toISOString() } as any)
+        .where('judge_review_id', '=', reviewId)
+        .where('status', '=', 'open')
+        .execute()
+        .catch((err: unknown) => {
+          console.warn(`[admin-review-status] could not close open flags for review ${reviewId}:`, err instanceof Error ? err.message : err)
+        })
+    }
+
     // Audit trail — record who moderated, and to what. Logged on every
     // status change (independent of whether the author gets notified).
     if (existing.status !== status) {

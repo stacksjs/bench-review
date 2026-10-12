@@ -23,6 +23,13 @@ export interface AdminReviewRow {
    * and the queue used to render none of them (bench-review#51).
    */
   photos?: Array<{ id: number, thumb_url: string | null, full_url: string | null }>
+  /**
+   * Open reports against this review. Surfaced on the row because the
+   * decision is made here, not on the flags page — a moderator should not
+   * have to know to go and look before publishing something that has been
+   * reported (bench-review#51).
+   */
+  open_flags?: number
 }
 
 defineStore('adminReviews', () => {

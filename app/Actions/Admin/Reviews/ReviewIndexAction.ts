@@ -138,6 +138,28 @@ export default new Action({
       }
     }
 
+    // Open flags per review. A moderator working the queue could not see
+    // that a review had been reported at all — flags lived on their own
+    // page, so deciding whether to publish something meant knowing to go
+    // and look. The count rides along with the row that the decision is
+    // made on (bench-review#51).
+    const openFlagsByReview = new Map<number, number>()
+    if (reviewIdsForCount.length > 0) {
+      try {
+        const flagRows = await (db.selectFrom('review_flags') as any)
+          .select(['judge_review_id', 'COUNT(*) as c'])
+          .where('judge_review_id', 'in', reviewIdsForCount as any)
+          .where('status', '=', 'open')
+          .groupBy('judge_review_id')
+          .execute() as Array<{ judge_review_id: number, c: number | string }>
+        for (const row of flagRows)
+          openFlagsByReview.set(Number(row.judge_review_id), Number(row.c))
+      }
+      catch {
+        // review_flags not migrated yet — no counts to surface.
+      }
+    }
+
     // Photos, so a moderator can see what they are approving.
     //
     // Images are the highest-risk content this site accepts — a face, a
@@ -184,6 +206,7 @@ export default new Action({
         user: u ? { id: u.id, name: u.name, email: u.email } : null,
         response: responseByReview.get(Number(r.id)) ?? null,
         photos: photosByReview.get(Number(r.id)) ?? [],
+        open_flags: openFlagsByReview.get(Number(r.id)) ?? 0,
       }
     })
 
