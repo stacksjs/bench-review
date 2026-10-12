@@ -17,6 +17,12 @@ export interface AdminReviewRow {
   user: { id: number, name: string, email: string } | null
   // Judge right-of-reply: the official response body, or null if none.
   response?: string | null
+  /**
+   * Attached photos, thumbnails first. Present so a moderator can see what
+   * they are approving — images are the highest-risk content this site takes
+   * and the queue used to render none of them (bench-review#51).
+   */
+  photos?: Array<{ id: number, thumb_url: string | null, full_url: string | null }>
 }
 
 defineStore('adminReviews', () => {

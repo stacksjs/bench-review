@@ -238,6 +238,35 @@
               <span class="text-gray-400"> · </span>
               <span>{{ '★ ' + review.rating }}</span>
             </p>
+
+            {{-- Attached photos. A moderator approving a review with images
+                was deciding blind: nothing in this queue rendered them, and
+                images are the highest-risk content the site accepts — a
+                face, a document, an address. Thumbnails only; the link opens
+                the full size in a new tab for a closer look
+                (bench-review#51). --}}
+            <div class="flex flex-wrap gap-2 mt-3">
+              <a
+                :for="photo in review.photos"
+                x-href="photo.full_url"
+                target="_blank"
+                rel="noopener noreferrer"
+                {{-- flex-none, or the thumbnail collapses. As a shrinkable child of
+                    the wrapping flex row it shrinks to min-content, and
+                    min-content for an image that has not loaded yet is zero —
+                    measured at 2px wide (the borders) with a correct 64px
+                    height, which is a confusing shape to debug later. --}}
+                class="block overflow-hidden flex-none h-16 w-16 bg-gray-100 border border-gray-200 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+              >
+                {{-- Static src as well as the binding. An <img> whose only
+                    source is x-src ships with no src at all in the
+                    pre-rendered page: a broken-image glyph until the runtime
+                    boots, and in some browsers a request back at the page
+                    URL. Gate check 2 catches it; same pattern as
+                    ProfileHeader's avatar. --}}
+                <img src="/images/avatars/default-user.svg" x-src="photo.thumb_url" alt="Photo attached to this review" loading="lazy" class="object-cover h-full w-full" />
+              </a>
+            </div>
           </div>
           <div class="flex flex-col flex-shrink-0 gap-y-1 items-end">
             <div class="flex gap-x-2">

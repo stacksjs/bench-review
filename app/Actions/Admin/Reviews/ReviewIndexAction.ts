@@ -138,6 +138,34 @@ export default new Action({
       }
     }
 
+    // Photos, so a moderator can see what they are approving.
+    //
+    // Images are the highest-risk content this site accepts — a face, a
+    // document, an address — and the queue rendered none of them, so every
+    // publish decision about a review with photos was made blind. Thumbnails
+    // only: the card and full sizes are a click away on the article itself.
+    // Defensive try/catch to match the judge_responses block below it; a
+    // pre-migrate environment should show no photos, not a 500.
+    const photosByReview = new Map<number, Array<{ id: number, thumb_url: string | null, full_url: string | null }>>()
+    if (reviewIdsForCount.length > 0) {
+      try {
+        const photoRows = await db.selectFrom('review_photos')
+          .select(['id', 'judge_review_id', 'thumb_url', 'full_url', 'order_index'])
+          .where('judge_review_id', 'in', reviewIdsForCount as any)
+          .orderBy('order_index', 'asc')
+          .execute() as Array<{ id: number, judge_review_id: number, thumb_url: string | null, full_url: string | null }>
+        for (const row of photoRows) {
+          const key = Number(row.judge_review_id)
+          const list = photosByReview.get(key) ?? []
+          list.push({ id: Number(row.id), thumb_url: row.thumb_url, full_url: row.full_url })
+          photosByReview.set(key, list)
+        }
+      }
+      catch {
+        // review_photos not migrated yet — no photos to surface.
+      }
+    }
+
     const hydrated = reviewRows.map((r) => {
       const j = r.judge_id != null ? judgeById.get(r.judge_id) : null
       const u = r.user_id != null ? userById.get(r.user_id) : null
@@ -155,6 +183,7 @@ export default new Action({
         judge: j ? { id: j.id, name: j.name } : { id: r.judge_id, name: '(unknown judge)' },
         user: u ? { id: u.id, name: u.name, email: u.email } : null,
         response: responseByReview.get(Number(r.id)) ?? null,
+        photos: photosByReview.get(Number(r.id)) ?? [],
       }
     })
 
