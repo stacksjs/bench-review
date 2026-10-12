@@ -109,11 +109,8 @@ Local ports: views `4000`, API `4008`.
 > unset, which is what a CI runner or a fresh deploy container gets. Two
 > things then happen quietly:
 >
-> 1. The judge, courthouse and article pages are enumerated from the database
->    at build time. No database ⇒ none of those pages are generated, and the
->    artifact is a shell of the real site that still builds successfully.
-> 2. `buildSitemapXml` returns only static paths (it fails soft since
->    `58980566`), so the sitemap is correct but incomplete.
+> 1. The judge, courthouse and article pages are enumerated from the database at build time. No database means none of those pages are generated, and the artifact is a shell of the real site that still builds successfully.
+> 2. `buildSitemapXml` returns only static paths (it fails soft since `58980566`), so the sitemap is correct but incomplete.
 >
 > Before that commit the second one was worse: the sitemap generation threw,
 > build.ts swallowed it, and the stock page-derived sitemap that `buildApp()`
