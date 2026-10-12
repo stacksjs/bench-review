@@ -58,27 +58,48 @@ describe('committed migrations', () => {
       expect(names).toContain(table)
   })
 
-  // Pinned because it is surprising and because something depends on it.
-  //
-  // `user_notifications`, `notification_preferences` and
-  // `notification_deliveries` are created by the FRAMEWORK during
-  // `buddy migrate` (migrateNotificationTables), not by anything in
-  // database/migrations. They exist in the dev database and the app writes to
-  // all three — every in-app notification, the publish fan-out, the comment
-  // notifications, the email opt-outs.
-  //
-  // So a database provisioned by replaying only the committed .sql files is
-  // INCOMPLETE, and the notification system would 500 against it. That is
-  // fine as long as provisioning goes through `buddy migrate`; it is a trap
-  // the moment someone reaches for the migrations directory alone. If a
-  // future change starts creating these in-repo, this test should fail and be
-  // deleted — that would be the improvement.
-  test('notification tables come from the framework, not the committed migrations', () => {
+  /*
+   * `user_notifications` is the bell feed — every "your review was
+   * approved", every like, the whole publish fan-out. Its migration was
+   * deleted by accident on 2026-05-27, swept into an unrelated `chore: wip`
+   * commit next to a sqlite-wal checkpoint, and nothing noticed for four
+   * months: the table already existed in the dev database, and notify()
+   * swallows its own errors by design, so locally everything kept working.
+   *
+   * A fresh database would have had no such table, every notification write
+   * would have failed into a console.warn, and the bell would have been
+   * permanently empty in production with no error to find.
+   *
+   * This test is what the gap cost. Asserting the table here means the
+   * migration cannot be deleted again in silence.
+   */
+  test('the bell-feed table has a committed migration', () => {
     const db = freshSchema()
     const names = new Set((db.query('SELECT name FROM sqlite_master WHERE type = \'table\'').all() as Array<{ name: string }>).map(r => r.name))
     db.close()
 
-    for (const frameworkOwned of ['user_notifications', 'notification_preferences', 'notification_deliveries'])
+    expect(names).toContain('user_notifications')
+  })
+
+  // Pinned because it is surprising and because something depends on it.
+  //
+  // `notification_preferences` and `notification_deliveries` really are
+  // created by the FRAMEWORK during `buddy migrate`
+  // (@stacksjs/database's migrateNotificationTables), not by anything in
+  // database/migrations — the app reads both, for the email opt-outs.
+  //
+  // So a database provisioned by replaying only the committed .sql files is
+  // INCOMPLETE. That is fine as long as provisioning goes through
+  // `buddy migrate`; it is a trap the moment someone reaches for the
+  // migrations directory alone. If a future change starts creating these
+  // in-repo, this test should fail and be deleted — that would be the
+  // improvement.
+  test('the framework still owns the notification-preference tables', () => {
+    const db = freshSchema()
+    const names = new Set((db.query('SELECT name FROM sqlite_master WHERE type = \'table\'').all() as Array<{ name: string }>).map(r => r.name))
+    db.close()
+
+    for (const frameworkOwned of ['notification_preferences', 'notification_deliveries'])
       expect(names).not.toContain(frameworkOwned)
   })
 
