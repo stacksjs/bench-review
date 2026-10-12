@@ -823,6 +823,56 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   )
 }
 
+// 23. Every shipped image is actually an image.
+//
+//     Fifteen of the PNGs under public/images were undecodable: their
+//     signature read `89 50 4e 47 0a 1a 0a` — the `0d` stripped by a
+//     text-mode transfer somewhere upstream, every CRLF in the file
+//     collapsed to LF. They had been committed that way since May 2025 and
+//     shipped in every artifact since (#93).
+//
+//     Nothing catches this otherwise. The build copies them without looking,
+//     `fetch()` returns 200 with `content-type: image/png`, and only an
+//     actual decode attempt fails — so it reads as a loading problem rather
+//     than a corrupt file. It cost an hour of debugging the wrong layer when
+//     one was picked as a test fixture.
+//
+//     Magic bytes rather than a real decode: this class of damage is a
+//     mangled header, and a dependency-free check that runs over every
+//     shipped image in milliseconds is worth more here than a thorough one
+//     that needs a decoder.
+{
+  const SIGNATURES: Array<{ ext: string[], label: string, ok: (b: Uint8Array) => boolean }> = [
+    { ext: ['.png'], label: 'PNG', ok: b => b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47 && b[4] === 0x0D && b[5] === 0x0A && b[6] === 0x1A && b[7] === 0x0A },
+    { ext: ['.jpg', '.jpeg'], label: 'JPEG', ok: b => b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF },
+    { ext: ['.gif'], label: 'GIF', ok: b => b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38 },
+    // RIFF....WEBP
+    { ext: ['.webp'], label: 'WebP', ok: b => b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50 },
+    { ext: ['.ico'], label: 'ICO', ok: b => b[0] === 0x00 && b[1] === 0x00 && (b[2] === 0x01 || b[2] === 0x02) },
+  ]
+
+  const broken: string[] = []
+  let checked = 0
+  for await (const path of new Bun.Glob('dist/**/*.{png,jpg,jpeg,gif,webp,ico}').scan('.')) {
+    const lower = path.toLowerCase()
+    const sig = SIGNATURES.find(s2 => s2.ext.some(e => lower.endsWith(e)))
+    if (!sig)
+      continue
+    checked++
+    const head = new Uint8Array(await Bun.file(path).slice(0, 16).arrayBuffer())
+    if (head.byteLength < 12 || !sig.ok(head))
+      broken.push(`${path.replace('dist/', '')} (not a ${sig.label})`)
+  }
+
+  add(
+    `all ${checked} shipped images decode`,
+    broken.length === 0,
+    broken.length
+      ? `${broken.length} file(s) have a corrupt header and will not render: ${broken.slice(0, 4).join(', ')}`
+      : '',
+  )
+}
+
 const failed = checks.filter(c => !c.ok)
 console.log(`\n  bench conformance gate — ${pages.length} built pages\n`)
 for (const c of checks)
