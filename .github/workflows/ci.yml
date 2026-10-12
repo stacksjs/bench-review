@@ -106,3 +106,16 @@ jobs:
 
       - name: Build
         run: bun run build
+
+      # The gate is what actually validates the artifact: 22 checks over the
+      # built dist/, not the source. It has caught a blanked page, controls
+      # painted before hydration, a notification type with no wording, an
+      # invisible focus ring and a sitemap advertising files that were never
+      # written — none of which lint, typecheck or unit tests can see,
+      # because every one of them is a property of the OUTPUT.
+      #
+      # Separate step, and `bun gate.ts` rather than `bun run gate`, so it
+      # checks the artifact the Build step just produced instead of
+      # rebuilding it.
+      - name: Conformance gate
+        run: bun gate.ts
