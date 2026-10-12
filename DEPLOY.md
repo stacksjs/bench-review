@@ -94,7 +94,7 @@ be the production origin at build time, not at serve time.
 | `APP_URL` | Canonical origin, baked into the artifact | **Required for a deployable build.** Unset ⇒ the gate fails with `APP_URL unset — artifact carries N loopback URLs` |
 | `APP_ENV` | `production` | |
 | `APP_KEY` | Encryption/signing key | `./buddy key:generate` |
-| `DB_CONNECTION` / `DB_*` | Database | dev is `sqlite`; production should be `postgres` |
+| `DB_CONNECTION` / `DB_*` | Database | dev is `sqlite`; production should be `postgres`. **Must be set on the build runner too** — unset defaults to `mysql` (`config/database.ts`), see the warning below |
 | `MAIL_*` | SMTP | **On the critical path** — email verification and password reset do not work without it. Dev points at a local catcher (`127.0.0.1:2525`) |
 | `FILESYSTEM_DISK` | `local` or `s3` | Review photos + avatars. See `app/Storage/disk.ts` |
 | `AWS_*` | S3 credentials | Only when `FILESYSTEM_DISK=s3` |
@@ -102,6 +102,28 @@ be the production origin at build time, not at serve time.
 | `TS_ANALYTICS_*` | Analytics endpoint override | Optional; the App ID lives in `config/ts-analytics.ts` |
 
 Local ports: views `4000`, API `4008`.
+
+> **The build runner needs database access, and needs to say which database.**
+>
+> `config/database.ts` defaults `DB_CONNECTION` to **`mysql`** when it is
+> unset, which is what a CI runner or a fresh deploy container gets. Two
+> things then happen quietly:
+>
+> 1. The judge, courthouse and article pages are enumerated from the database
+>    at build time. No database ⇒ none of those pages are generated, and the
+>    artifact is a shell of the real site that still builds successfully.
+> 2. `buildSitemapXml` returns only static paths (it fails soft since
+>    `58980566`), so the sitemap is correct but incomplete.
+>
+> Before that commit the second one was worse: the sitemap generation threw,
+> build.ts swallowed it, and the stock page-derived sitemap that `buildApp()`
+> emits survived — advertising `/admin/*`, `/settings`, `/profile` and every
+> other path `robots.txt` disallows. CI caught it the first time the gate ran
+> on a runner.
+>
+> A release build must therefore set `DB_CONNECTION`/`DB_*` **and** reach a
+> populated database. `bun gate.ts` enforces it: with a non-loopback
+> `APP_URL`, the three database-backed checks fail rather than report.
 
 ## Build
 
@@ -123,11 +145,24 @@ the analytics tag, webfont tags, the CSP meta, and finally a DB-derived
 ## Validate before shipping
 
 ```bash
-bun run gate              # build + 17 build/SEO integrity checks
+bun run gate              # build + 22 build/SEO/a11y integrity checks
 bun run ui:validate       # accessibility lint over resources/
 bun run visual:validate   # headless-Chrome contrast / overflow / focus audit
 bun run release:validate  # route text contracts, assets, metadata, migrations
 ```
+
+The gate also runs in CI on every push (`.github/workflows/ci.yml`), against
+the artifact the Build step produced. It is the only check that reads the
+OUTPUT — lint, typecheck and the unit tests all read the source, and every
+bug the gate has caught was a property of the built pages: a region blanked
+by a cloak nothing lifts, controls painted before hydration, a focus ring
+suppressed with no replacement, a notification type delivered with no
+wording, a sitemap advertising the admin panel.
+
+Run it with a production `APP_URL` before shipping. That switches four checks
+from reporting to failing — loopback URLs, and the three that need a
+populated database — which is the difference between "this build is fine for
+preview" and "this build is fit to deploy".
 
 `release:validate` asserts that `sitemap.xml` and `robots.txt` name
 `benchreview.org` and contain no `localhost` URLs, so it **only passes on a
@@ -179,15 +214,19 @@ on natural keys, so re-running is safe.
 ## Outstanding before first deploy
 
 1. **Pick a host** and implement the two deploy-contract rules above.
-2. **`config/cloud.ts` is still stock Stacks** — it declares sites for
-   `stacksjs.org`, `docs.stacksjs.org`, `tlsx.stacksjs.org` and an AWS
-   serverless target. Nothing in it describes bench-review. Either rewrite it
-   for the chosen host or delete it; do not assume `./buddy deploy` works.
+2. ~~**`config/cloud.ts` is still stock Stacks**~~ — done in `32d07255`.
+   `sites` is now empty, so `./buddy deploy` has nothing to act on rather than
+   aiming at `stacksjs.org`. Fill it in only if the chosen host is one
+   `./buddy deploy` actually drives; bench's model (pre-rendered `dist/` plus
+   the API) does not go through that file.
 3. **Set a production `APP_URL`** — without it the artifact is not deployable.
 4. **Configure real SMTP** — verification and password reset are dead without it.
 5. **Seed or restore the database** so dynamic pages are pre-rendered. Federal
    coverage comes from `bun scripts/ingest-courtlistener.ts` followed by
    `bun scripts/enrich-courthouse-geodata.ts`; both are idempotent and safe to
    re-run after each quarterly CourtListener snapshot.
-6. **`MAIL_FROM_ADDRESS`** still reads `no-reply@benchreview.com`; the
-   canonical domain is `benchreview.org`.
+6. **`MAIL_FROM_ADDRESS`** — `.env.example` is correct
+   (`no-reply@benchreview.org`) and the config fallback no longer points at
+   `stacksjs.org` (`32d07255`), but a local `.env` may still read
+   `no-reply@benchreview.com`. Check it before the first send: mail from a
+   domain you do not control fails SPF/DKIM and lands in spam.
