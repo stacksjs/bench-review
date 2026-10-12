@@ -5,35 +5,28 @@ import security from './security'
 /**
  * **Cloud**
  *
- * This configuration defines your cloud. Because Stacks is fully-typed, you may hover
- * any of the options below and the definitions will be provided. In case you have
- * any questions, feel free to reach out via Discord or GitHub Discussions.
+ * EMPTY ON PURPOSE. This file arrived as stock Stacks scaffolding and still
+ * described somebody else's infrastructure: `stacksjs.org` as the root site
+ * plus `docs.`, `tlsx.`, `dtsx.` and `spreadsheets.` subdomains, pointing at
+ * paths like `../../tlsx/docs/dist` that do not exist in this repository.
+ *
+ * That is not inert. `./buddy deploy` reads this file, so running it would
+ * have aimed an AWS serverless deployment at domains bench-review does not
+ * own, from paths it does not have. DEPLOY.md has flagged it as outstanding
+ * since it was written: "Either rewrite it for the chosen host or delete it;
+ * do not assume `./buddy deploy` works."
+ *
+ * The host is not chosen yet (#85), so rewriting it would be inventing an
+ * answer. Clearing `sites` means `./buddy deploy` has nothing to act on
+ * instead of acting on the wrong thing.
+ *
+ * bench's actual deploy model is in DEPLOY.md and does not go through here:
+ * production is the pre-rendered `dist/` plus the API, and stx is
+ * build-time-only, so there is no publish step. Fill this in only if the
+ * chosen host is one `./buddy deploy` actually drives.
  */
 export default {
-  sites: {
-    root: 'stacksjs.org',
-    path: '../storage/framework/views/web',
-
-    docs: {
-      domain: 'docs.stacksjs.org',
-      path: '../storage/framework/docs/dist',
-    },
-
-    tlsx: {
-      domain: 'tlsx.stacksjs.org',
-      path: '../../tlsx/docs/dist',
-    },
-
-    dtsx: {
-      domain: 'dtsx.stacksjs.org',
-      path: '../../dtsx/docs/dist',
-    },
-
-    spreadsheets: {
-      domain: 'spreadsheets.stacksjs.org',
-      path: '../../spreadsheets/docs/dist',
-    },
-  },
+  sites: {},
 
   infrastructure: {
     type: 'serverless',
