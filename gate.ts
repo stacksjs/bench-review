@@ -13,9 +13,32 @@
  * Run `bun run gate` (builds first, then verifies). Exits non-zero on any
  * failure, so it works as a pre-push or CI step.
  */
-import { readdirSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { NOINDEX_PAGES, SEO_PAGES } from './app/Helpers/seoPages'
+
+// ── Database pre-flight ─────────────────────────────────────────────────
+// Three checks below read the database, and it is not always there. The
+// first CI run of this gate proved it: a runner has no `.env`, so
+// DB_CONNECTION is unset and config/database.ts defaults to **mysql**. The
+// driver's failure then surfaced from its own connection teardown — an
+// unhandled rejection that killed the process instead of failing a check,
+// which a try/catch around the query cannot help with.
+//
+// Decided once, before anything opens a connection.
+const dbDriver = (process.env.DB_CONNECTION ?? '').trim().toLowerCase()
+const dbPath = (process.env.DB_DATABASE ?? 'database/stacks.sqlite').trim()
+const dbReachable = dbDriver === 'sqlite' && existsSync(dbPath)
+// Is this artifact a release candidate? The same test check 10 applies, and
+// it is NOT merely "APP_URL is set": the local .env sets it to
+// http://localhost:4000, so a bare truthiness test calls every local run a
+// release and fails checks that could not run for ordinary reasons. A deploy
+// build is one pointed at a host that is not this machine.
+const appHost = process.env.APP_URL?.trim()
+const isReleaseBuild = !!appHost && !/localhost|127\.0\.0\.1/.test(appHost)
+const dbSkipReason = dbDriver === 'sqlite'
+  ? `no database at ${dbPath}`
+  : `DB_CONNECTION is ${dbDriver || 'unset (defaults to mysql)'}, not sqlite`
 
 interface Check { name: string, ok: boolean, detail: string }
 const checks: Check[] = []
@@ -117,8 +140,12 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
 //     from the database, so a schema change or a failed query degrades them
 //     silently back to the SSG's generic per-route title.
 {
-  const { loadEntitySeo } = await import('./app/Helpers/entitySeo')
-  const entities = await loadEntitySeo('https://bench.review')
+  // Database-backed, so it honours the pre-flight at the top of this file.
+  // This is the check that actually crashed CI: it runs long before the
+  // getStaticPaths ones and pulls the db client in through entitySeo.
+  const entities = dbReachable
+    ? await (await import('./app/Helpers/entitySeo')).loadEntitySeo('https://bench.review')
+    : new Map<string, { title: string }>()
   const bad: string[] = []
   for (const [file, seo] of entities) {
     const h = html.get(`dist/${file}`)
@@ -137,7 +164,13 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
     if (!hasDesc || !hasLd || !ownTitle)
       bad.push(`${file}${!ownTitle ? ' (generic title)' : ''}${!hasDesc ? ' (no description)' : ''}${!hasLd ? ' (no json-ld)' : ''}`)
   }
-  add(`all ${entities.size} entity pages have their own head`, bad.length === 0, bad.slice(0, 4).join(', '))
+  add(
+    dbReachable ? `all ${entities.size} entity pages have their own head` : 'entity pages have their own head',
+    dbReachable ? bad.length === 0 : !isReleaseBuild,
+    dbReachable
+      ? bad.slice(0, 4).join(', ')
+      : `not checked — ${dbSkipReason}${isReleaseBuild ? '' : '. APP_URL is unset, so this is reported rather than failed'}`,
+  )
 }
 
 // 6d. Every dynamic route is either pre-rendered or explicitly rewritten.
@@ -327,7 +360,24 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
 //     to make the gate green, which is the exact thing the preceding commits
 //     removed. Zero articles is now reported, not failed.
 {
-  const { articlePaths, courtPaths, judgePaths } = await import('./app/Helpers/staticPaths')
+  // PRE-FLIGHT, before anything opens a connection.
+  //
+  // These are the only two checks that touch the database, and the first CI
+  // run died here: a runner has no `.env`, so DB_CONNECTION is unset and
+  // config/database.ts defaults to **mysql**, and the driver's failure
+  // surfaced from its own connection teardown — an unhandled rejection that
+  // killed the process rather than failing a check. A try/catch around the
+  // query does not help, because the rejection does not come from the query.
+  //
+  // So decide up front whether a database is reachable, and never construct
+  // the connection otherwise. bench runs on SQLite (config/database.ts,
+  // DEPLOY.md); anything else, or a missing file, means these two checks
+  // cannot run here.
+
+  // Imported lazily, and only when there is something to connect to:
+  // pulling staticPaths in constructs the db client as a side effect of the
+  // module graph, which is exactly what must not happen here.
+  const staticPaths = dbReachable ? await import('./app/Helpers/staticPaths') : null
 
   interface Route {
     label: string
@@ -337,7 +387,7 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
     reference: boolean
   }
 
-  const routes: Route[] = [
+  const routes: Route[] = !dbReachable ? [] : [
     // The canonical judge page, not judges/:id/profile: the profile tab is
     // deliberately no longer pre-rendered (six pages per judge OOM'd the build
     // at 20,028 pages).
@@ -347,23 +397,46 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
     // and review.html, which exist on every build, so it counted a healthy 3
     // against a database holding no judges at all — defeating, for the busiest
     // route in the app, the one thing this check exists to catch.
-    { label: 'judges', ids: judgePaths, file: id => `judges/${id}.html`, reference: true },
+    { label: 'judges', ids: staticPaths!.judgePaths, file: id => `judges/${id}.html`, reference: true },
     // The canonical courthouse page, not court-houses/:id/profile: the three
     // courthouse tabs are now served by one shared shell each, exactly like the
     // judge tabs above, so probing for a per-id profile file would report an
     // empty database on every healthy build. This is the drift that check
     // caught when the tabs were converted -- 202 of 202 "missing" -- which is
     // the check working, not failing.
-    { label: 'court-houses', ids: courtPaths, file: id => `court-houses/${id}.html`, reference: true },
-    { label: 'article', ids: articlePaths, file: id => `article/${id}.html`, reference: false },
+    { label: 'court-houses', ids: staticPaths!.courtPaths, file: id => `court-houses/${id}.html`, reference: true },
+    { label: 'article', ids: staticPaths!.articlePaths, file: id => `article/${id}.html`, reference: false },
   ]
 
   const missing: string[] = []
   const empty: string[] = []
   const pending: string[] = []
 
-  for (const route of routes) {
-    const ids = (await route.ids()).paths.map(p => p.params.id)
+  // These two checks are the only ones that touch the database, and the
+  // database is not always there. CI has no `.env`, so `DB_CONNECTION` is
+  // unset and config/database.ts defaults to **mysql** — the gate died with
+  // an unhandled `MySQLError: Failed to connect` the first time it ran on a
+  // runner. A conformance gate should fail a CHECK, never explode: the
+  // artifact it is examining is sitting right there either way.
+  //
+  // Unreachable database is reported, not failed, for the same reason empty
+  // reference data is on a preview build — it says nothing about the commit.
+  // An unreachable database on a RELEASE build is a different matter and is
+  // treated as one.
+  let dbError = dbReachable ? '' : dbSkipReason
+  // Same release-candidate signal check 10 uses: with APP_URL set this build
+  // is meant to ship, and both of these become hard failures.
+
+  for (const route of dbReachable ? routes : []) {
+    let ids: string[] = []
+    try {
+      ids = (await route.ids()).paths.map(p => p.params.id)
+    }
+    catch (err) {
+      // Second line of defence: reachable, but the query still failed.
+      dbError = err instanceof Error ? err.message : String(err)
+      break
+    }
     if (!ids.length) {
       ;(route.reference ? empty : pending).push(route.label)
       continue
@@ -375,10 +448,12 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
 
   add(
     'every getStaticPaths id has a built page',
-    missing.length === 0,
-    missing.length
-      ? `${missing.join('; ')} — getStaticPaths returned these ids and the build emitted no file for them`
-      : pending.map(l => `${l}: no ids yet, so no pages — correct for user-generated content until the first one is published`).join('; '),
+    dbError ? !isReleaseBuild : missing.length === 0,
+    dbError
+      ? `database unreachable (${dbError.slice(0, 80)}) — this check needs it to enumerate ids${isReleaseBuild ? '' : '. APP_URL is unset, so this is reported rather than failed'}`
+      : (missing.length
+          ? `${missing.join('; ')} — getStaticPaths returned these ids and the build emitted no file for them`
+          : pending.map(l => `${l}: no ids yet, so no pages — correct for user-generated content until the first one is published`).join('; ')),
   )
 
   // Strictness follows the same signal check 10 uses to decide whether this
@@ -388,13 +463,14 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   // has never run the importer — there, empty reference data is the expected
   // state, not a defect, and failing on it would make the gate unusable in
   // exactly the place it is most worth running.
-  const isReleaseBuild = !!process.env.APP_URL?.trim()
   add(
     'reference-data routes are not empty',
-    empty.length === 0 || !isReleaseBuild,
-    empty.length
-      ? `no ids for: ${empty.join(', ')} — these come from the CourtListener/Wikidata import, so an empty result means the import is missing, not that content is pending (run \`bun scripts/ingest-courtlistener.ts\`)${isReleaseBuild ? '' : '. APP_URL is unset, so this is reported rather than failed — a preview build is not expected to carry imported data'}`
-      : '',
+    dbError ? !isReleaseBuild : (empty.length === 0 || !isReleaseBuild),
+    dbError
+      ? `database unreachable (${dbError.slice(0, 80)}) — reference data could not be counted${isReleaseBuild ? '' : '. APP_URL is unset, so this is reported rather than failed'}`
+      : (empty.length
+          ? `no ids for: ${empty.join(', ')} — these come from the CourtListener/Wikidata import, so an empty result means the import is missing, not that content is pending (run \`bun scripts/ingest-courtlistener.ts\`)${isReleaseBuild ? '' : '. APP_URL is unset, so this is reported rather than failed — a preview build is not expected to carry imported data'}`
+          : ''),
   )
 }
 
