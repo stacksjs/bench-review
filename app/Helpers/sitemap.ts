@@ -66,19 +66,51 @@ export const CANONICAL_BASE: string = site.url.replace(/\/+$/, '')
  * URLs with no file behind them. The gate catches exactly that drift
  * ("every sitemap URL has a built file"), which is how this was found.
  */
+type SitemapRow = { id: number, updated_at: string | null }
+
+/**
+ * Entity URLs for the sitemap, or none if the database cannot be reached.
+ *
+ * Fails SOFT on purpose. The entity queries used to be the first thing this
+ * function did, so an unreachable database threw before a single static path
+ * was written — build.ts caught it, logged "sitemap/robots generation
+ * skipped", and left in place the stock page-derived sitemap that `buildApp()`
+ * emits. That one is built by walking the output directory, so it advertised
+ * /admin/users, /admin/reviews, /settings, /profile, /my-reviews,
+ * /notifications and /reset-password: every page robots.txt disallows.
+ *
+ * The build still looked successful. CI found it the first time the
+ * conformance gate ran there, on a runner with no database — which is
+ * exactly the shape of a deploy runner that cannot reach one.
+ *
+ * A sitemap without entity URLs is incomplete; a sitemap advertising the
+ * admin panel is wrong. Incomplete is recoverable, so this returns what it
+ * can and lets the caller write a correct, smaller file.
+ */
+async function entityRows(): Promise<{ judges: SitemapRow[], courts: SitemapRow[], reviews: SitemapRow[] }> {
+  try {
+    const [judges, courts, reviews] = await Promise.all([
+      (db.selectFrom('judges') as any)
+        .select(['id', 'updated_at'])
+        .execute() as Promise<SitemapRow[]>,
+      (db.selectFrom('court_houses') as any)
+        .select(['id', 'updated_at'])
+        .execute() as Promise<SitemapRow[]>,
+      (db.selectFrom('judge_reviews') as any)
+        .select(['id', 'updated_at'])
+        .where('status', '=', 'published')
+        .execute() as Promise<SitemapRow[]>,
+    ])
+    return { judges, courts, reviews }
+  }
+  catch (err) {
+    console.warn(`[sitemap] no entity URLs — the database was unreachable (${err instanceof Error ? err.message : String(err)}). The static-page sitemap is still written, so the stock one cannot survive.`)
+    return { judges: [], courts: [], reviews: [] }
+  }
+}
+
 export async function buildSitemapXml(base: string): Promise<string> {
-  const [judges, courts, reviews] = await Promise.all([
-    (db.selectFrom('judges') as any)
-      .select(['id', 'updated_at'])
-      .execute() as Promise<Array<{ id: number, updated_at: string | null }>>,
-    (db.selectFrom('court_houses') as any)
-      .select(['id', 'updated_at'])
-      .execute() as Promise<Array<{ id: number, updated_at: string | null }>>,
-    (db.selectFrom('judge_reviews') as any)
-      .select(['id', 'updated_at'])
-      .where('status', '=', 'published')
-      .execute() as Promise<Array<{ id: number, updated_at: string | null }>>,
-  ])
+  const { judges, courts, reviews } = await entityRows()
 
   const today = new Date().toISOString().slice(0, 10)
   const toLastMod = (raw: string | null): string => {
