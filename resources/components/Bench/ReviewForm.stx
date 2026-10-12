@@ -179,6 +179,14 @@
         return
       }
       photoCount.set(photoCount() + (res.added || 0))
+      // Adding a photo to a review that was already live takes it back off
+      // the site until a moderator looks at the image. Say so: an author
+      // whose review silently disappeared would reasonably think the upload
+      // broke something. (From this screen the review is normally still
+      // pending, so this is the uncommon path — but the endpoint accepts a
+      // published review from anywhere, and that is where the rule lives.)
+      if (res.returnedToQueue)
+        toast.info('Back in review', 'Your review returns to moderation while we check the new photo.')
     }
     catch (err) {
       photoError.set(err instanceof Error ? err.message : 'Network error')

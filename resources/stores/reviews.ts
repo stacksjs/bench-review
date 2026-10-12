@@ -373,7 +373,7 @@ defineStore('reviews', () => {
    * Multipart payload; the server handles EXIF strip + 3-size resize
    * + storage. Returns the count of successfully persisted photos.
    */
-  async function uploadPhotos(reviewId: number, formData: FormData): Promise<{ ok: boolean, added?: number, error?: string }> {
+  async function uploadPhotos(reviewId: number, formData: FormData): Promise<{ ok: boolean, added?: number, error?: string, returnedToQueue?: boolean }> {
     try {
       // Don't set Content-Type — let the browser pick the multipart
       // boundary. authFetch's default headers don't include it.
@@ -381,10 +381,14 @@ defineStore('reviews', () => {
         method: 'POST',
         body: formData,
       })
-      const data = await res.json().catch(() => ({})) as { ok?: boolean, added?: number, error?: string }
+      const data = await res.json().catch(() => ({})) as { ok?: boolean, added?: number, error?: string, returned_to_queue?: boolean }
       if (!res.ok || !data.ok)
         return { ok: false, error: data.error || 'Photo upload failed' }
-      return { ok: true, added: data.added ?? 0 }
+      // Adding a photo to a PUBLISHED review sends it back for moderation,
+      // because the page now shows something no moderator has seen. Passed
+      // through so the caller can say so — an author whose review quietly
+      // vanished from the site would reasonably think something broke.
+      return { ok: true, added: data.added ?? 0, returnedToQueue: !!data.returned_to_queue }
     }
     catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : 'Network error' }

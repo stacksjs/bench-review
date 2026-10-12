@@ -18,6 +18,15 @@ import { processAndPersistReviewPhoto } from '../../Helpers/reviewPhotos'
  * triple. The action then persists one `review_photos` row per
  * successful processing.
  *
+ * **A photo added to a PUBLISHED review sends it back to pending.** Text
+ * edits have always done this (UpdateMyReviewAction); photos did not, so the
+ * one channel that could put an unreviewed image on a live page about a named
+ * judge was also the one channel that bypassed moderation entirely. An
+ * uploader could publish text, wait for approval, then attach anything.
+ * Images are the highest-risk content this site accepts — a face, a document,
+ * an address — and they were the only kind no moderator ever saw
+ * (bench-review#51).
+ *
  * Resolves bench-review#31 (upload half).
  */
 const MAX_PHOTOS_PER_REVIEW = 4
@@ -43,9 +52,9 @@ export default new Action({
 
     // Verify ownership + grab the review's uuid for the storage path.
     const review = await db.selectFrom('judge_reviews')
-      .select(['id', 'user_id', 'uuid'])
+      .select(['id', 'user_id', 'uuid', 'status'])
       .where('id', '=', reviewId)
-      .executeTakeFirst() as { id: number, user_id: number | null, uuid: string | null } | undefined
+      .executeTakeFirst() as { id: number, user_id: number | null, uuid: string | null, status: string | null } | undefined
 
     if (!review || review.user_id == null || Number(review.user_id) !== Number(userId))
       return response.json({ error: 'Review not found' }, 404)
@@ -104,10 +113,29 @@ export default new Action({
     if (persisted.length === 0)
       return response.json({ error: failures.join(' / ') || 'All uploads failed.' }, 422)
 
+    // Back into the queue, if it had left it. Done AFTER the writes, so a
+    // review is never knocked offline by an upload that then failed — and
+    // only when something actually landed, so a batch that was entirely
+    // rejected leaves a published review alone.
+    //
+    // Matches what a text edit does, deliberately: the author changed what
+    // the page shows, so the page is unreviewed again. A pending or rejected
+    // review is already out of public view and needs no touch.
+    const returnedToQueue = review.status === 'published' && persisted.length > 0
+    if (returnedToQueue) {
+      await db.updateTable('judge_reviews')
+        .set({ status: 'pending', updated_at: new Date().toISOString() } as any)
+        .where('id', '=', reviewId)
+        .execute()
+    }
+
     return response.json({
       ok: true,
       added: persisted.length,
       failures,
+      // The client needs to know: the author just took their own review off
+      // the site, and silently doing that would be worse than not doing it.
+      returned_to_queue: returnedToQueue,
       photos: persisted,
     }, 201)
   },
