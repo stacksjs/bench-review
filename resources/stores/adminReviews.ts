@@ -41,6 +41,14 @@ defineStore('adminReviews', () => {
   const page = state<number>(1)
   const perPage = state<number>(25)
   const actionError = state<string>('')
+  /**
+   * Ids ticked for a bulk action. Page-scoped: `fetchReviews` clears it, so
+   * a selection can never outlive the rows it was made against and a
+   * moderator cannot publish something that scrolled off a page they are no
+   * longer looking at (bench-review#51).
+   */
+  const selectedIds = state<number[]>([])
+  const bulkRunning = state<boolean>(false)
 
   const totalPages = derived<number>(() => Math.max(1, Math.ceil(total() / perPage())))
 
@@ -48,6 +56,7 @@ defineStore('adminReviews', () => {
 
   async function fetchReviews(): Promise<void> {
     loading.set(true)
+    selectedIds.set([])
     try {
       const params = new URLSearchParams({
         status: statusFilter(),
@@ -123,6 +132,75 @@ defineStore('adminReviews', () => {
     }
   }
 
+  function toggleSelected(id: number): void {
+    const current = selectedIds()
+    selectedIds.set(current.includes(id) ? current.filter(x => x !== id) : [...current, id])
+  }
+
+  /** Tick every row on the current page, or clear them all if already ticked. */
+  function toggleSelectAll(): void {
+    const visible = reviews().map(r => r.id)
+    const allTicked = visible.length > 0 && visible.every(id => selectedIds().includes(id))
+    selectedIds.set(allTicked ? [] : visible)
+  }
+
+  function clearSelection(): void {
+    selectedIds.set([])
+  }
+
+  /**
+   * Moderate every selected row in one request.
+   *
+   * Refetches rather than reconciling the list in place. The single-row
+   * version can reason about one row's new status; a batch comes back split
+   * across updated / unchanged / failed, and guessing which of those still
+   * belong under the current filter is exactly the kind of arithmetic that
+   * leaves a queue showing rows that are no longer in it. The moderator
+   * wants to see the real queue depth after a batch anyway.
+   */
+  async function bulkSetStatus(status: 'published' | 'rejected'): Promise<boolean> {
+    const ids = selectedIds()
+    if (ids.length === 0 || bulkRunning())
+      return false
+    bulkRunning.set(true)
+    try {
+      const res = await useStore('auth').authFetch('/api/admin/reviews/bulk-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, status }),
+      })
+      const data = await res.json().catch(() => ({})) as {
+        ok?: boolean
+        error?: string
+        updated?: number[]
+        failed?: Array<{ id: number, error: string }>
+      }
+      if (!res.ok || !data.ok) {
+        actionError.set(data.error || 'Bulk update failed')
+        return false
+      }
+      const failed = data.failed ?? []
+      await fetchReviews()
+      // A partial result is reported, not swallowed: silence here would mean
+      // a moderator believing they had cleared the queue.
+      //
+      // Set AFTER the refetch, not before. fetchReviews() clears actionError
+      // on success, so the obvious order — report, then refresh — wiped the
+      // message before it could be painted. Measured: the harness returned
+      // one failed row of three and the page showed nothing at all.
+      if (failed.length > 0)
+        actionError.set(`${failed.length} of ${ids.length} could not be updated (ids ${failed.map(f => f.id).join(', ')}).`)
+      return failed.length === 0
+    }
+    catch (err) {
+      actionError.set(err instanceof Error ? err.message : 'Network error')
+      return false
+    }
+    finally {
+      bulkRunning.set(false)
+    }
+  }
+
   async function deleteReview(id: number): Promise<boolean> {
     try {
       const res = await useStore('auth').authFetch(`/api/admin/reviews/${id}`, { method: 'DELETE' })
@@ -195,11 +273,17 @@ defineStore('adminReviews', () => {
     page,
     perPage,
     actionError,
+    selectedIds,
+    bulkRunning,
     fetchReviews,
     setStatusFilter,
     setSearch,
     setPage,
     setReviewStatus,
+    toggleSelected,
+    toggleSelectAll,
+    clearSelection,
+    bulkSetStatus,
     deleteReview,
     postResponse,
     deleteResponse,

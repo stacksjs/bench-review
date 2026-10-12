@@ -67,6 +67,64 @@
     store.setStatusFilter(next)
   }
 
+  /**
+   * The rows, each carrying its own tick state and accessible name.
+   *
+   * Precomputed in a derived rather than read per row in the template:
+   * signal call-syntax inside a `:for` silently leaves the loop variable as
+   * a function, so `x-checked="store.selectedIds().includes(review.id)"`
+   * would bind every box to the same wrong answer. The `:key` on the row
+   * means bindFor reuses the existing node, so ticking a box does not
+   * rebuild the list under the moderator's cursor.
+   */
+  const rowsView = derived<Array<AdminReviewRow & { selected: boolean, selectLabel: string }>>(() => {
+    const picked = new Set(store.selectedIds())
+    return store.reviews().map(r => ({
+      ...r,
+      selected: picked.has(r.id),
+      selectLabel: `Select review: ${r.title}`,
+    }))
+  })
+
+  const selectedCount = derived<number>(() => store.selectedIds().length)
+  const allVisibleSelected = derived<boolean>(() => {
+    const visible = store.reviews()
+    return visible.length > 0 && visible.every(r => store.selectedIds().includes(r.id))
+  })
+  // Tri-state: some but not all. Drives the header box's indeterminate dash,
+  // which is a live DOM property with no HTML attribute behind it.
+  const someVisibleSelected = derived<boolean>(() => selectedCount() > 0 && !allVisibleSelected())
+  const bulkSummary = derived<string>(() => {
+    const n = selectedCount()
+    return n === 1 ? '1 review selected' : `${n} reviews selected`
+  })
+
+  /**
+   * Confirmed, both ways round. A batch publish is not the safer direction:
+   * it emails every author, notifies the claimed judge and every follower of
+   * each judge, and puts the text in front of the public. Twenty-five of
+   * those from one mis-click is worth a sentence first.
+   */
+  async function bulkModerate(status: 'published' | 'rejected'): Promise<void> {
+    if (typeof window === 'undefined' || store.bulkRunning() || store.selectedIds().length === 0)
+      return
+    const n = store.selectedIds().length
+    const noun = n === 1 ? 'review' : 'reviews'
+    const ok = await confirmStore.ask(status === 'published'
+      ? { title: `Publish ${n} ${noun}`, message: `Publish ${n} ${noun}? Each author is emailed, and the reviews become visible to the public.`, confirmLabel: 'Publish all' }
+      : { title: `Reject ${n} ${noun}`, message: `Reject ${n} ${noun}? Each author is emailed, and the reviews are hidden from the public.`, confirmLabel: 'Reject all', danger: true })
+    if (!ok)
+      return
+    expandedId.set(0)
+    const clean = await store.bulkSetStatus(status)
+    if (clean) {
+      toast.success(
+        status === 'published' ? `Published ${n} ${noun}` : `Rejected ${n} ${noun}`,
+        status === 'published' ? 'The reviews are now visible to the public.' : 'The reviews are hidden from the public.',
+      )
+    }
+  }
+
   async function approve(review: AdminReviewRow): Promise<void> {
     if (mutatingId()) return
     mutatingId.set(review.id)
@@ -191,6 +249,37 @@
     class="px-4 py-3 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
     x-class="store.actionError() ? '' : 'hidden'">{{ store.actionError() }}</div>
 
+  {{-- Bulk action bar. `:show` + inline display:none, not an x-class
+      toggle: x-class is evaluated in the browser only, so the
+      pre-rendered admin page would paint this bar before the runtime
+      booted and then hide it. stx-standards 7.3; gate check 19. --}}
+  <div
+    class="flex flex-wrap gap-3 items-center justify-between px-4 py-3 bg-blue-50 border border-blue-200 rounded-md"
+    :show="selectedCount() > 0"
+    style="display:none"
+  >
+    <p class="font-medium text-blue-900 text-sm" aria-live="polite">{{ bulkSummary() }}</p>
+    <div class="flex flex-wrap gap-x-2 gap-y-2">
+      <button
+        type="button"
+        @click="bulkModerate('published')"
+        x-disabled="store.bulkRunning"
+        class="px-3 py-1.5 font-semibold text-white text-xs bg-emerald-600 hover:bg-emerald-700 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-700 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+      >{{ store.bulkRunning() ? 'Working…' : 'Publish selected' }}</button>
+      <button
+        type="button"
+        @click="bulkModerate('rejected')"
+        x-disabled="store.bulkRunning"
+        class="px-3 py-1.5 font-semibold text-white text-xs bg-red-600 hover:bg-red-700 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+      >Reject selected</button>
+      <button
+        type="button"
+        @click="store.clearSelection()"
+        class="px-3 py-1.5 font-medium text-gray-700 text-xs bg-white hover:bg-gray-50 border border-gray-300 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-600 focus-visible:outline-offset-2"
+      >Clear</button>
+    </div>
+  </div>
+
   <div class="overflow-hidden bg-white border border-gray-200 rounded-lg">
     <div :if="store.loading() && store.reviews().length === 0" class="px-4 py-12 text-center text-gray-500 text-sm">
       Loading reviews…
@@ -219,9 +308,38 @@
         subscription across the loading -> loaded transition. The
         :if remove/re-add cycle drops the :for binding on re-add and
         the rows never render even after reviews() populates. --}}
+    {{-- Select-all for the current page. Page-scoped on purpose: the store
+        clears the selection on every fetch, so this can only ever act on
+        rows the moderator is actually looking at. --}}
+    <div
+      class="flex gap-x-3 items-center px-4 py-2.5 bg-gray-50 border-b border-gray-200"
+      :show="store.reviews().length > 0"
+      style="display:none"
+    >
+      <input
+        id="reviews-select-all"
+        type="checkbox"
+        @change="store.toggleSelectAll()"
+        x-checked="allVisibleSelected"
+        x-indeterminate="someVisibleSelected"
+        class="h-4 w-4 text-blue-600 border-gray-300 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+      >
+      <label for="reviews-select-all" class="font-medium text-gray-600 text-xs">Select all on this page</label>
+    </div>
     <ul class="divide-gray-100 divide-y" :show="store.reviews().length > 0" style="display:none">
-      <li :for="review in store.reviews" class="px-4 py-4">
+      {{-- `:key` so bindFor reuses each row's existing node. Without it the
+          key falls back to the index, and ticking a box would rebuild the
+          whole list — blurring the checkbox the moderator just used and
+          detaching an open row's response textarea mid-edit. --}}
+      <li :for="review in rowsView()" :key="review.id" class="px-4 py-4">
         <div class="flex gap-x-4 justify-between">
+          <input
+            type="checkbox"
+            @change="store.toggleSelected(review.id)"
+            x-checked="review.selected"
+            x-aria-label="review.selectLabel"
+            class="flex-none mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+          >
           <div class="flex-1 min-w-0">
             <div class="flex gap-x-2 items-center">
               <span
