@@ -4,6 +4,7 @@ import { Auth, register } from '@stacksjs/auth'
 import { dispatch } from '@stacksjs/events'
 import { response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { isUniqueViolation } from '../../Helpers/dbErrors'
 import { isDisposableEmail } from '../../Helpers/disposableEmail'
 import { verifyTurnstile } from '../../Helpers/turnstile'
 import { withSessionCookie } from '../../Support/sessionCookie'
@@ -82,7 +83,26 @@ export default new Action({
       }, 422)
     }
 
-    const result = await register({ email, password, name })
+    // `users.email` carries a UNIQUE index, so a second signup with the same
+    // address loses at the database rather than quietly creating a duplicate
+    // account (bench-review#52). Without this the constraint escapes as a 500
+    // and the person is told the site is broken, when the actual answer is
+    // "you already have an account".
+    //
+    // Deliberately not a check-then-insert: that has a race, and the index is
+    // the real guard. This reads the loss.
+    let result: Awaited<ReturnType<typeof register>>
+    try {
+      result = await register({ email, password, name })
+    }
+    catch (err) {
+      if (isUniqueViolation(err)) {
+        return response.json({
+          message: 'An account with that email already exists. Try signing in instead.',
+        }, 409)
+      }
+      throw err
+    }
 
     if (result) {
       const user = await Auth.getUserFromToken(result.token)

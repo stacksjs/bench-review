@@ -3,6 +3,7 @@ import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { deleteReviewCascade } from '../../../Helpers/reviewCascade'
 import { logModeration } from '../../../Helpers/auditLog'
 
 /**
@@ -42,12 +43,11 @@ export default new Action({
     // DeleteMyReviewAction). Best-effort on children so a missing table
     // doesn't 500; the judge_reviews delete is the must-succeed step.
     // (Photo FILES on disk aren't removed here — separate storage sweep.)
-    await db.deleteFrom('judge_reviews_likes').where('judge_review_id', '=', reviewId).execute().catch(() => {})
-    await db.deleteFrom('review_comments').where('judge_review_id', '=', reviewId).execute().catch(() => {})
-    await db.deleteFrom('review_photos').where('judge_review_id', '=', reviewId).execute().catch(() => {})
-    await db.deleteFrom('review_flags').where('judge_review_id', '=', reviewId).execute().catch(() => {})
-    await db.deleteFrom('user_notifications').where('review_id', '=', reviewId).execute().catch(() => {})
-    await db.deleteFrom('judge_reviews').where('id', '=', reviewId).execute()
+    // Shared cascade (bench-review#52). This list used to be inline here and
+    // in DeleteMyReviewAction, and both copies omitted `judge_responses` —
+    // whose foreign key then refused the parent delete, so a review a judge
+    // had replied to could not be taken down at all.
+    await deleteReviewCascade(reviewId)
 
     const admin = await Auth.user().catch(() => null)
     if ((admin as any)?.id)

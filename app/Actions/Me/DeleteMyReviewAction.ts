@@ -3,14 +3,15 @@ import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { deleteReviewCascade } from '../../Helpers/reviewCascade'
 
 /**
  * DELETE /api/me/reviews/{id} — author removes their own review.
  *
  * Permitted on ANY status (pending / rejected / published) — the
  * author is in charge of their own content. Cascades the same way as
- * the admin delete: likes, comments, photos, flags, the review's
- * notifications, and the row itself.
+ * the admin delete, through the shared helper: likes, comments, photos,
+ * flags, the judge's response, the review's notifications, and the row.
  *
  * Non-owners get 404 (response indistinguishable from a missing row).
  */
@@ -41,18 +42,20 @@ export default new Action({
     if (!existing || existing.user_id == null || Number(existing.user_id) !== Number(userId))
       return response.json({ error: 'Review not found' }, 404)
 
-    // Cascade to every child table that FKs judge_reviews (SQLite has no
-    // FK constraints here, so app-level cascade is the only cleanup).
-    // Best-effort on the children so a missing table on a fresh checkout
-    // doesn't 500 the request — the judge_reviews delete is the only
-    // must-succeed step. (Photo FILES on disk are not removed here — a
-    // separate storage-sweep concern; only the rows go.)
-    await db.deleteFrom('judge_reviews_likes').where('judge_review_id', '=', reviewId).execute().catch(() => {})
-    await db.deleteFrom('review_comments').where('judge_review_id', '=', reviewId).execute().catch(() => {})
-    await db.deleteFrom('review_photos').where('judge_review_id', '=', reviewId).execute().catch(() => {})
-    await db.deleteFrom('review_flags').where('judge_review_id', '=', reviewId).execute().catch(() => {})
-    await db.deleteFrom('user_notifications').where('review_id', '=', reviewId).execute().catch(() => {})
-    await db.deleteFrom('judge_reviews').where('id', '=', reviewId).execute()
+    // Shared cascade (bench-review#52). This list used to be inline here and
+    // in the admin DeleteReviewAction, and both copies omitted
+    // `judge_responses`.
+    //
+    // The comment that stood here said SQLite had no FK constraints on these
+    // tables so an app-level cascade was the only cleanup. That stopped being
+    // true when the FK repair pass ran: every child table now holds a real
+    // foreign key with ON DELETE NO ACTION, and they are enforced. The missing
+    // table was therefore not an orphan-row problem but a hard block — a
+    // review a judge had replied to could not be deleted at all.
+    //
+    // (Photo FILES on disk are still not removed here — a separate
+    // storage-sweep concern; only the rows go.)
+    await deleteReviewCascade(reviewId)
 
     return response.json({ ok: true, deleted: reviewId })
   },

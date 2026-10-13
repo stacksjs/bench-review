@@ -1,4 +1,5 @@
 import { db } from '@stacksjs/database'
+import { deleteReviewsByUser } from './reviewCascade'
 
 /**
  * Everything keyed to a user, in one place, so the two deletion paths cannot
@@ -17,7 +18,8 @@ import { db } from '@stacksjs/database'
  * is exactly how a list like this rots into decoration.
  */
 export const USER_OWNED_TABLES: readonly string[] = [
-  'judge_reviews',
+  // NOT 'judge_reviews' — see deleteUserOwnedRows below. Deleting it from
+  // this list is what broke erasure.
   'judge_reviews_likes',
   'judge_follows',
   'review_comments',
@@ -49,6 +51,18 @@ export const USER_OWNED_TABLES: readonly string[] = [
  * notifications this user generated for OTHER people survived erasure.
  */
 export async function deleteUserOwnedRows(userId: number): Promise<void> {
+  // The user's REVIEWS go first, each with its own children (bench-review#52).
+  //
+  // `judge_reviews` used to be the first entry in the list above, deleted by
+  // user_id like everything else — and every child table holds a foreign key
+  // to it with ON DELETE NO ACTION. So any review carrying a comment, photo,
+  // flag or judge response failed its constraint, the error went into the
+  // per-table `.catch(() => {})` below, and the review SURVIVED while the rows
+  // around it were erased. An erasure request that leaves the person's
+  // published writing on a site about named judges is the worst version of
+  // this bug, and it failed silently by construction.
+  await deleteReviewsByUser(userId)
+
   for (const table of USER_OWNED_TABLES)
     await db.deleteFrom(table as any).where('user_id', '=', userId).execute().catch(() => {})
 
