@@ -8,6 +8,8 @@ export interface CredentialClaim {
   credential_state: string | null
   credential_claimed_at: string | null
   credential_rejection_note: string | null
+  credential_evidence: string | null
+  credential_evidence_url: string | null
   claimed_judge_id: number | null
   claimed_judge: { id: number, name: string } | null
 }

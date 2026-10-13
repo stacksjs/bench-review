@@ -27,6 +27,12 @@
   const phase = state('idle') // 'idle' | 'claimed' | 'error'
   const errorMsg = state('')
   const claimedName = state('')
+  // What establishes the claim, and an optional link an admin can open.
+  // Required because approval unlocks posting an official response under
+  // this judge's identity (bench-review#51).
+  const evidence = state('')
+  const evidenceUrl = state('')
+  const MIN_EVIDENCE = 20
 
   let searchTimer = 0
   function onSearch(e: Event): void {
@@ -65,13 +71,20 @@
     const judge = selected()
     if (!judge || submitting())
       return
+    // Checked here as well as server-side so the person gets the message
+    // next to the field rather than as a 422 after a round trip. The server
+    // is the one that counts.
+    if (evidence().trim().length < MIN_EVIDENCE) {
+      errorMsg.set('Please tell us what establishes that this profile is yours.')
+      return
+    }
     submitting.set(true)
     errorMsg.set('')
     try {
       const res = await authStore.authFetch('/api/me/judge-claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ judgeId: judge.id }),
+        body: JSON.stringify({ judgeId: judge.id, evidence: evidence().trim(), evidenceUrl: evidenceUrl().trim() }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.ok) {
@@ -97,6 +110,15 @@
 
   const hasResults = derived(() => results().length > 0)
   const hasSelection = derived(() => !!selected())
+  const evidenceShort = derived(() => evidence().trim().length < MIN_EVIDENCE)
+  // Both reasons in one derived: x-disabled takes a single expression, and
+  // binding it to evidenceShort alone would have dropped the in-flight guard
+  // that stops a double-click filing the claim twice.
+  const submitBlocked = derived(() => submitting() || evidenceShort())
+  const evidenceHint = derived(() => {
+    const n = evidence().trim().length
+    return n === 0 ? '' : (n < MIN_EVIDENCE ? `${MIN_EVIDENCE - n} more characters` : 'Thanks — that gives us something to check.')
+  })
 </script>
 
 <div class="mx-auto px-4 py-16 max-w-xl">
@@ -163,15 +185,38 @@
       </li>
     </ul>
 
-    {{-- Selected confirmation + submit --}}
+    {{-- Selected confirmation + evidence + submit --}}
     <div x-class="hasSelection() ? '' : 'hidden'" class="mt-4 p-3 bg-blue-50/60 border border-blue-200 rounded-md">
       <p class="text-gray-700 text-sm">
         Claiming: <span class="font-semibold">{{ selected() ? selected().name : '' }}</span>
       </p>
+
+      <label for="judge-claim-evidence" class="block mt-4 font-semibold text-gray-900 text-sm">How can we confirm this is you?</label>
+      <p class="mt-0.5 leading-relaxed text-gray-500 text-xs">
+        A verified claim lets you post official responses to reviews of you, so we check before approving. Your department and courthouse, your title, or anything else a court directory would confirm.
+      </p>
+      <textarea
+        id="judge-claim-evidence"
+        x-model="evidence"
+        rows="4"
+        class="block mt-2 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+      ></textarea>
+      <p class="mt-1 text-gray-400 text-xs">{{ evidenceHint() }}</p>
+
+      <label for="judge-claim-evidence-url" class="block mt-3 font-semibold text-gray-900 text-sm">Supporting link <span class="font-normal text-gray-400">(optional)</span></label>
+      <p class="mt-0.5 text-gray-500 text-xs">A court staff page, official biography or bar profile.</p>
+      <input
+        id="judge-claim-evidence-url"
+        type="url"
+        x-model="evidenceUrl"
+        placeholder="https://"
+        class="block mt-2 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+      >
+
       <button
         type="button"
         @click="submitClaim()"
-        x-disabled="submitting"
+        x-disabled="submitBlocked"
         class="inline-flex items-center justify-center mt-3 px-4 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
       >
         <svg :if="submitting()" class="-ml-0.5 mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
