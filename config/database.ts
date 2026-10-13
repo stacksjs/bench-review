@@ -37,7 +37,13 @@ export default {
     postgres: {
       name: env.DB_DATABASE || 'stacks',
       host: env.DB_HOST || '127.0.0.1',
-      port: env.DB_PORT || 3306,
+      // 5432, not the 3306 this block was copied from. Nothing selects
+      // postgres yet, so the wrong default was invisible - and would have
+      // stayed invisible for anyone who copied .env.example, which sets
+      // DB_PORT=5432 explicitly. The first deploy that set
+      // DB_CONNECTION=postgres and left DB_PORT alone would have dialled
+      // MySQL's port and failed with a connection error naming neither.
+      port: env.DB_PORT || 5432,
       username: env.DB_USERNAME || '',
       password: env.DB_PASSWORD || '',
       prefix: '',
