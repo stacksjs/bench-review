@@ -25,6 +25,8 @@ const CLAIMANT_ID = 8601
 const JUDGE_ID = 8602
 
 const GOOD_EVIDENCE = 'I am the sitting judge for this department; my chambers listing is on the court website.'
+/** Claims now also require an explicit attestation (bench-review#54). */
+const ATTESTED = { attestation: true }
 
 function seed(): void {
   const raw = openTestDatabase()
@@ -91,6 +93,7 @@ describe('judge claim evidence', () => {
 
   test('a claim with evidence is stored and queued', async () => {
     const res = await invoke(claimAction, {
+      ...ATTESTED,
       judgeId: JUDGE_ID,
       evidence: GOOD_EVIDENCE,
       evidenceUrl: 'https://courts.example.gov/judges/under-claim',
@@ -105,7 +108,7 @@ describe('judge claim evidence', () => {
   })
 
   test('the admin queue shows what the claimant submitted', async () => {
-    await invoke(claimAction, { judgeId: JUDGE_ID, evidence: GOOD_EVIDENCE, evidenceUrl: 'https://courts.example.gov/j' })
+    await invoke(claimAction, { ...ATTESTED, judgeId: JUDGE_ID, evidence: GOOD_EVIDENCE, evidenceUrl: 'https://courts.example.gov/j' })
 
     const res = await invoke(queueAction, {}, 'GET')
     const mine = (res.body?.claims ?? []).find((c: any) => Number(c.id) === CLAIMANT_ID)
@@ -118,9 +121,20 @@ describe('judge claim evidence', () => {
     expect(mine.claimed_judge?.name).toBe('Judge Under Claim')
   })
 
+  test('a claim without the attestation is refused', async () => {
+    const res = await invoke(claimAction, { judgeId: JUDGE_ID, evidence: GOOD_EVIDENCE })
+
+    expect(res.status).toBe(422)
+    // Impersonating a sitting judge is the sharpest abuse this site can
+    // suffer, and a verified claim grants the power to post official
+    // responses under that judge's name. The attestation is the sentence a
+    // false claim has to go through deliberately.
+    expect(claimRow().credential_claimed_at).toBeNull()
+  })
+
   test('a non-http link is refused rather than quietly dropped', async () => {
     for (const bad of ['javascript:alert(1)', 'data:text/html,<script>', 'not a url']) {
-      const res = await invoke(claimAction, { judgeId: JUDGE_ID, evidence: GOOD_EVIDENCE, evidenceUrl: bad })
+      const res = await invoke(claimAction, { ...ATTESTED, judgeId: JUDGE_ID, evidence: GOOD_EVIDENCE, evidenceUrl: bad })
       // 422, not a silent drop: an admin seeing no link cannot tell whether
       // one was offered. And the queue renders this for the one session that
       // can approve the claim, so a javascript: URL there is the worst place
@@ -131,7 +145,7 @@ describe('judge claim evidence', () => {
   })
 
   test('evidence does not outlive the claim it was given for', async () => {
-    await invoke(claimAction, { judgeId: JUDGE_ID, evidence: GOOD_EVIDENCE, evidenceUrl: 'https://courts.example.gov/j' })
+    await invoke(claimAction, { ...ATTESTED, judgeId: JUDGE_ID, evidence: GOOD_EVIDENCE, evidenceUrl: 'https://courts.example.gov/j' })
     expect(claimRow().credential_evidence).toBe(GOOD_EVIDENCE)
 
     // Switch to an ordinary reviewer-credential claim, supplying none.

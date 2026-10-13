@@ -48,9 +48,43 @@
       </section>
 
       <section>
-        <h2 class="font-semibold text-2xl text-gray-900">Subscriptions and billing</h2>
+        <h2 class="font-semibold text-2xl text-gray-900">Impersonation and identity</h2>
         <p class="mt-4">
-          Paid subscriptions are billed monthly or annually in advance. You can cancel anytime; access continues through the end of the current billing period. Refunds are issued at our discretion.
+          Do not claim to be a judge, court official, attorney, or anyone else you are
+          not. Claiming a judge's profile requires you to confirm that you are that judge
+          or are authorized to act on their behalf, and we verify claims before granting
+          the ability to post an official response. A profile claim we find to be false
+          will be rejected, and the account may be suspended or removed.
+        </p>
+        <p class="mt-4">
+          If you believe someone has claimed your profile or is posting as you,
+          <StxLink to="/contact" class="text-blue-700 underline underline-offset-2 hover:text-blue-900">contact us</StxLink>
+          and select &ldquo;Legal request&rdquo;.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Copyright and DMCA</h2>
+        <p class="mt-4">
+          Do not post content you do not have the right to publish. If you believe
+          material on Bench Review infringes your copyright, send a notice to our
+          designated agent including: your contact details; identification of the
+          copyrighted work; the URL of the material you want removed; a statement that
+          you have a good-faith belief the use is not authorized; a statement, under
+          penalty of perjury, that the information is accurate and that you are the
+          owner or authorized to act for them; and your signature.
+        </p>
+        <p class="mt-4">
+          Send notices through
+          <StxLink to="/contact" class="text-blue-700 underline underline-offset-2 hover:text-blue-900">our contact form</StxLink>
+          under &ldquo;Legal request&rdquo;. You can also report a specific review as
+          &ldquo;Copyright infringement&rdquo; using the report link on that review.
+          We remove or disable infringing material expeditiously once a valid notice is
+          received, and we terminate the accounts of repeat infringers.
+        </p>
+        <p class="mt-4 text-gray-500 text-sm">
+          If you believe your content was removed in error, you may send a counter-notice
+          through the same channel.
         </p>
       </section>
 

@@ -290,6 +290,12 @@
       to respond to reviews.
     </p>
 
+    {{-- Opinion, not fact (bench-review#54). On the profile header because
+        this is the page a judge or their counsel lands on first. --}}
+    <div class="mt-6">
+      @include('Bench/ReviewDisclaimer')
+    </div>
+
     {{-- Correction channel. Quiet by design — it sits under the claim line as
         a text link, not a button, because it is addressed to the small number
         of readers who spot an error rather than to everyone. --}}

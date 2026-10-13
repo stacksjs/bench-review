@@ -37,6 +37,12 @@ const ALLOWED_REASONS = new Set([
   'spam',
   'privacy',
   'inaccurate',
+  // Copyright, separately from 'other' (bench-review#54). A DMCA notice
+  // routed into a generic bucket is a DMCA notice nobody can find, and
+  // §512 safe harbour turns on acting expeditiously on notices you
+  // received — which is hard to evidence if the taxonomy never recorded
+  // that one arrived.
+  'copyright',
   'other',
 ])
 

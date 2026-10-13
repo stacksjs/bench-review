@@ -59,7 +59,55 @@
       <section>
         <h2 class="font-semibold text-2xl text-gray-900">Cookies</h2>
         <p class="mt-4">
-          We use first-party cookies for authentication and to remember your preferences. Analytics cookies are set with your consent. You can clear or block cookies in your browser at any time.
+          We use first-party cookies for authentication and to remember your preferences.
+          We do not currently set advertising or third-party tracking cookies, and we do
+          not sell your data. If that changes, we will ask for your consent before setting
+          any non-essential cookie. You can clear or block cookies in your browser at any
+          time, though signing in will not work without the authentication cookie.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">How long we keep things</h2>
+        <p class="mt-4">
+          <strong>Your account.</strong> We keep account data for as long as the account
+          exists. When you delete your account we remove your profile, your reviews and
+          comments, your drafts, your saved preferences and the notifications attached to
+          them. Deletion is not reversible.
+        </p>
+        <p class="mt-4">
+          <strong>Anonymous reviews.</strong> Posting anonymously hides your name from the
+          public review. We still hold the link between you and that review internally,
+          because without it we cannot let you edit or delete your own review, and we
+          cannot act on abuse. We keep that link for as long as the review is published.
+          If you delete the review or your account, the link goes with it.
+        </p>
+        <p class="mt-4">
+          <strong>Moderation records.</strong> When a moderator approves, declines or
+          removes something, we keep a record of that decision — who made it, when, and
+          what it concerned — for two years. We keep these even after the underlying
+          content is gone, because they are how we answer a later complaint about how a
+          decision was made.
+        </p>
+        <p class="mt-4">
+          <strong>Server and email logs.</strong> Operational logs are kept for 90 days.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Legal demands for reviewer identity</h2>
+        <p class="mt-4">
+          We are sometimes asked — by a subpoena, court order or demand letter — to
+          identify the person behind an anonymous review. We do not hand over a reviewer's
+          identity in response to a demand letter alone. Where we receive legal process,
+          we review it for validity and scope, and where the law allows it we notify the
+          affected user first and give them a reasonable opportunity to object before we
+          respond, unless we are legally prohibited from telling them.
+        </p>
+        <p class="mt-4">
+          Legal process should be sent through
+          <StxLink to="/contact" class="font-medium text-gray-900 hover:underline">our contact form</StxLink>
+          under &ldquo;Legal request&rdquo;.
         </p>
       </section>
 

@@ -252,6 +252,7 @@
     { value: 'spam', label: 'Spam or promotional content' },
     { value: 'privacy', label: 'Reveals private information' },
     { value: 'inaccurate', label: 'Factually inaccurate' },
+    { value: 'copyright', label: 'Copyright infringement' },
     { value: 'other', label: 'Other — see details' },
   ]
 
@@ -804,6 +805,12 @@
       >
         View judge →
       </StxLink>
+    </div>
+
+    {{-- Opinion, not fact (bench-review#54). Directly under the byline, above
+        the review body, so it is read with the content rather than after it. --}}
+    <div class="mt-4">
+      @include('Bench/ReviewDisclaimer')
     </div>
 
     {{-- Body. Serif typography, generous leading, drop cap on the

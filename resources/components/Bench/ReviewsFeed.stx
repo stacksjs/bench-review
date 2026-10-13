@@ -87,6 +87,7 @@
     { value: 'spam', label: 'Spam or promotional content' },
     { value: 'privacy', label: 'Reveals private information' },
     { value: 'inaccurate', label: 'Factually inaccurate' },
+    { value: 'copyright', label: 'Copyright infringement' },
     { value: 'other', label: 'Other — see details' },
   ]
 

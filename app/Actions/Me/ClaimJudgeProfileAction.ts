@@ -27,6 +27,13 @@ import { MIN_EVIDENCE_LENGTH, normalizeEvidence, normalizeEvidenceUrl } from '..
  *   - judgeId      : the judge profile being claimed
  *   - evidence     : required free text — what establishes the claim
  *   - evidenceUrl  : optional http(s) link an admin can open to check it
+ *   - attestation  : required — the claimant states who they are
+ *
+ * The attestation is separate from the evidence and is the point at which a
+ * false claim becomes a false statement the claimant made deliberately rather
+ * than an ambiguous form submission (bench-review#54). Impersonating a sitting
+ * judge is the sharpest abuse this site can suffer, and a verified claim grants
+ * the power to post official responses under that judge's name.
  */
 export default new Action({
   name: 'Claim Judge Profile',
@@ -64,6 +71,16 @@ export default new Action({
     const evidenceUrl = normalizeEvidenceUrl(request.get?.('evidenceUrl'))
     if (evidenceUrl === null)
       return response.json({ error: 'The supporting link must be a full http:// or https:// URL.' }, 422)
+
+    // Checked server-side as well as in the form: a checkbox only the browser
+    // enforces is a checkbox a scripted claim never sees.
+    const attestation = request.get?.('attestation')
+    const attested = attestation === true || attestation === 'true' || attestation === 1 || attestation === '1' || attestation === 'on'
+    if (!attested) {
+      return response.json({
+        error: 'Please confirm you are this judge, or are authorized to act on their behalf.',
+      }, 422)
+    }
 
     const judge = await db.selectFrom('judges')
       .select(['id', 'name'])

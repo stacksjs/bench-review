@@ -1,0 +1,17 @@
+{{-- Reviews are opinion, not findings of fact (bench-review#54).
+
+    One line, one wording, three surfaces — the judge profile header, the
+    reviews feed and the article page. It exists because of where a dispute
+    starts: a judge's counsel reads the page the review is on, not the Terms,
+    and "we said so on /terms" is a weaker position than the statement being
+    visible next to the content it describes.
+
+    Deliberately markup-only: no <script>, so there is no component scope to
+    register and nothing that can fail to hydrate. A disclaimer that depends
+    on JavaScript having booted is a disclaimer that is absent exactly when
+    the page is being screenshotted. --}}
+<p class="leading-relaxed text-gray-500 text-xs">
+  Reviews on Bench Review are the opinions of individual users, not verified
+  statements of fact, and are not endorsed by any court.
+  <StxLink to="/terms" class="underline underline-offset-2 hover:text-gray-700">Terms of Service</StxLink>
+</p>
