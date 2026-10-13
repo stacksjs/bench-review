@@ -151,6 +151,15 @@ route.get('/court-houses', 'Actions/CourtHouses/CourtHouseIndexAction')
   .name('bench.courtHouses.index')
   .middleware('throttle:60,1m')
 
+// Public contact form. Two of its topics - "Report a review" and "Legal
+// request" - are the channels this site designates for takedown demands, and
+// this route did not exist at all until #54. Throttled like the other public
+// intakes.
+route.post('/contact', 'Actions/Contact/SubmitContactAction')
+  .name('bench.contact.submit')
+  .middleware('throttle:5,10m')
+  .skipCsrf()
+
 // Public "suggest a judge" intake (resources/views/judges/submit.stx).
 // No auth — anyone can suggest — so throttle hard. Lands as pending for
 // admin review in the submissions queue.

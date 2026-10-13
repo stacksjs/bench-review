@@ -20,6 +20,8 @@ interface RegisterPayload {
   email: string
   password: string
   password_confirmation?: string
+  /** Explicit assent to the Terms + 18+ (bench-review#54). */
+  terms_accepted?: boolean
 }
 
 // Cookies read by stx-serve's page-level auth gate. `AUTH_COOKIE` must
@@ -351,6 +353,7 @@ defineStore('auth', () => {
         email: payload.email,
         password: payload.password,
         password_confirmation: payload.password_confirmation ?? payload.password,
+        terms_accepted: payload.terms_accepted === true,
         turnstileToken: turnstileToken(),
       }
       const res = await fetch('/api/auth/register', {

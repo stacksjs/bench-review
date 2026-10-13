@@ -1061,6 +1061,7 @@ declare module '@stacksjs/database' {
       credential_rejection_note: string
       credential_evidence: string
       credential_evidence_url: string
+      terms_accepted_at: string | null
       email_verified_at: string
       claimed_judge_id: number
     }

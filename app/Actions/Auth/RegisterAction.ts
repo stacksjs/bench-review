@@ -1,6 +1,7 @@
 import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { Auth, register } from '@stacksjs/auth'
+import { db } from '@stacksjs/database'
 import { dispatch } from '@stacksjs/events'
 import { response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
@@ -29,6 +30,12 @@ import { withSessionCookie } from '../../Support/sessionCookie'
  *
  * In that order on purpose: no reason to ask Cloudflare about a signup we are
  * going to refuse anyway.
+ *
+ * Registration also requires explicit agreement to the Terms and confirmation
+ * of being 18 or over, stamped on the row (bench-review#54). The site used to
+ * rely on browsewrap — terms.stx asserting that use implies agreement — which
+ * courts routinely decline to enforce, and the clauses that matter here are
+ * the content licence, the content standards and the liability cap.
  */
 export default new Action({
   name: 'RegisterAction',
@@ -54,6 +61,16 @@ export default new Action({
     const email = request.get('email')
     const password = request.get('password')
     const name = request.get('name')
+
+    // Checked server-side, not merely in the form. A checkbox the browser
+    // enforces is a checkbox a scripted signup never sees.
+    const acceptedTerms = request.get('terms_accepted')
+    const accepted = acceptedTerms === true || acceptedTerms === 'true' || acceptedTerms === 1 || acceptedTerms === '1' || acceptedTerms === 'on'
+    if (!accepted) {
+      return response.json({
+        message: 'Please confirm you are 18 or older and agree to the Terms of Service and Privacy Policy.',
+      }, 422)
+    }
 
     // Cheap and local first.
     if (isDisposableEmail(email)) {
@@ -106,6 +123,22 @@ export default new Action({
 
     if (result) {
       const user = await Auth.getUserFromToken(result.token)
+
+      // Stamp WHEN they agreed, not that they did: the Terms change, and what
+      // a dispute turns on is which version was in front of them. Written
+      // after the account exists, and best-effort — a failed stamp must not
+      // leave someone with no account after a successful registration. It is
+      // recoverable (the column is nullable and means "never asked"); an
+      // account that silently did not get created is not.
+      if (user?.id) {
+        await db.updateTable('users')
+          .set({ terms_accepted_at: new Date().toISOString() } as any)
+          .where('id', '=', Number(user.id))
+          .execute()
+          .catch((err: unknown) => {
+            console.warn(`[register] could not stamp terms acceptance for user ${user.id}:`, err instanceof Error ? err.message : err)
+          })
+      }
 
       // Fire `user:registered` so app/Events.ts listeners (welcome email, CRM
       // sync, etc.) run. Fire-and-forget — listener errors are caught by the

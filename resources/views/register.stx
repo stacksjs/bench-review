@@ -26,12 +26,18 @@
   const submitError = state<string>('')
   const passwordError = state<boolean>(false)
   const confirmError = state<boolean>(false)
+  // Explicit assent, not browsewrap (bench-review#54). Unchecked by default —
+  // a pre-ticked box is not agreement, and it is the first thing picked apart
+  // when the Terms are what you are relying on.
+  const acceptedTerms = state<boolean>(false)
+  const termsError = state<boolean>(false)
 
   async function submit(): Promise<void> {
     loading.set(true)
     submitError.set('')
     passwordError.set(false)
     confirmError.set(false)
+    termsError.set(false)
 
     // Quick client-side check before round-tripping. The server enforces
     // the full rule (min length, uppercase, lowercase, numbers) — these
@@ -54,11 +60,19 @@
       return
     }
 
+    if (!acceptedTerms()) {
+      submitError.set('Please confirm you are 18 or older and agree to the Terms of Service and Privacy Policy.')
+      termsError.set(true)
+      loading.set(false)
+      return
+    }
+
     const result = await auth.signUp({
       name: name(),
       email: email(),
       password: password(),
       password_confirmation: confirmPwd(),
+      terms_accepted: acceptedTerms(),
     })
     loading.set(false)
     if (!result.ok) {
@@ -143,6 +157,28 @@
               class="block px-3 py-2 w-full text-base text-gray-900 sm:text-sm/6 placeholder:text-gray-400 bg-white border rounded-md focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-600 shadow-sm disabled:opacity-50"
             >
           </div>
+        </div>
+
+        {{-- Explicit assent (bench-review#54). The site previously relied on
+            browsewrap — terms.stx asserting that use implies agreement — which
+            courts routinely decline to enforce, and the clauses that matter
+            here are the content licence, the content standards and the
+            liability cap. Both links open in a new tab so reading them does
+            not discard a half-filled form. --}}
+        <div class="flex gap-x-3 items-start">
+          <input
+            id="terms-accepted"
+            type="checkbox"
+            x-model="acceptedTerms"
+            @change="termsError.set(false)"
+            class="flex-none mt-0.5 h-4 w-4 text-blue-600 border-gray-300 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+          >
+          <label for="terms-accepted" class="text-gray-600 text-sm" x-class="termsError() ? 'text-red-700' : 'text-gray-600'">
+            I am 18 or older and agree to the
+            <a href="/terms" target="_blank" rel="noopener" class="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900">Terms of Service</a>
+            and
+            <a href="/privacy" target="_blank" rel="noopener" class="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900">Privacy Policy</a>.
+          </label>
         </div>
 
         {{-- Turnstile mount point. Empty in the source on purpose: build.ts
