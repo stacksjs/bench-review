@@ -61,6 +61,17 @@ export default new Action({
     if (sourceUrl && !/^https?:\/\//i.test(sourceUrl))
       return response.json({ error: 'Source URL must be http(s)://...' }, 422)
 
+    // Provenance is required, not optional (bench-review#50).
+    //
+    // "Recent Rulings" are statements this site publishes about how a named,
+    // sitting judge decided a real case. An entry with no source is an
+    // unsourced factual claim about a person's professional conduct, authored
+    // by us — which is first-party content, not something a reader can check
+    // and not something CDA 230 covers. A citation is accepted in place of a
+    // URL: a reported case is traceable from `410 U.S. 113` without a link.
+    if (!sourceUrl && !citation)
+      return response.json({ error: 'A source URL or a citation is required — a ruling cannot be published without provenance.' }, 422)
+
     const now = new Date().toISOString()
     await db.insertInto('judge_opinions').values({
       judge_id: judgeId,
