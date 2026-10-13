@@ -3,6 +3,7 @@ import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { normalizeEvidence, normalizeEvidenceUrl } from '../../Helpers/credentialEvidence'
 
 /**
  * PATCH /api/me/credentials — user submits or updates their
@@ -17,6 +18,8 @@ import { schema } from '@stacksjs/validation'
  *   - credential_type     : 'bar_admission' / 'clerk_position' /
  *                           'court_staff' / 'judicial_appointment'
  *   - credential_state    : 2-letter state code or 'FEDERAL'
+ *   - evidence            : optional free text supporting the claim
+ *   - evidence_url        : optional http(s) link an admin can open
  *
  * Side effects:
  *   - sets `credential_claimed_at` to now()
@@ -24,6 +27,11 @@ import { schema } from '@stacksjs/validation'
  *     `credential_rejection_note` — a fresh claim resets the queue.
  *     Editing the credential type means the previous verification
  *     no longer applies; the admin needs to look again.
+ *   - OVERWRITES `credential_evidence` / `credential_evidence_url`, always,
+ *     including with empty. Evidence here is optional, but it is the same
+ *     column group a judge claim writes: leaving it alone would let a user
+ *     file a judge claim with evidence, switch to a bar-admission claim, and
+ *     have the admin read evidence for a claim that no longer exists.
  *
  * Resolves bench-review#37 (claim half).
  */
@@ -59,11 +67,18 @@ export default new Action({
     if (!STATE_PATTERN.test(stateRaw))
       return response.json({ error: 'State must be a 2-letter code (e.g. CA, NY) or "FEDERAL".' }, 422)
 
+    const evidence = normalizeEvidence(request.get?.('evidence'))
+    const evidenceUrl = normalizeEvidenceUrl(request.get?.('evidence_url'))
+    if (evidenceUrl === null)
+      return response.json({ error: 'The supporting link must be a full http:// or https:// URL.' }, 422)
+
     const now = new Date().toISOString()
     await db.updateTable('users')
       .set({
         credential_type: type,
         credential_state: stateRaw,
+        credential_evidence: evidence || null,
+        credential_evidence_url: evidenceUrl || null,
         credential_claimed_at: now,
         // Reset verification when the claim changes. The admin must
         // look at the new claim independently.

@@ -24,6 +24,10 @@ export default new Action({
         'id', 'name', 'email',
         'credential_type', 'credential_state',
         'credential_claimed_at', 'credential_rejection_note',
+        // What the claimant says establishes the claim, and a link to check
+        // it against. Without these an admin approving a judge claim is
+        // approving a name and a dropdown selection (bench-review#51).
+        'credential_evidence', 'credential_evidence_url',
         'claimed_judge_id',
       ])
       .where('credential_claimed_at', 'is not', null)

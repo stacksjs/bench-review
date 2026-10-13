@@ -3,6 +3,7 @@ import { Auth, isEmailVerified } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { MIN_EVIDENCE_LENGTH, normalizeEvidence, normalizeEvidenceUrl } from '../../Helpers/credentialEvidence'
 
 /**
  * POST /api/me/judge-claim — a signed-in user claims a judge profile
@@ -15,7 +16,17 @@ import { schema } from '@stacksjs/validation'
  * who can respond to reviews of that profile (see SubmitJudgeResponseAction).
  *
  * Identity is confirmed out-of-band by the admin — anyone can submit a
- * claim, nobody can act on it until verified.
+ * claim, nobody can act on it until verified. The claim therefore has to
+ * carry something to confirm it AGAINST: this action used to accept nothing
+ * but `judgeId`, so the queue showed an admin a name, an email and a judge
+ * picked from a dropdown, and approving meant approving on nothing. Approval
+ * is what unlocks posting an official response under that judge's identity
+ * (bench-review#51).
+ *
+ * Body:
+ *   - judgeId      : the judge profile being claimed
+ *   - evidence     : required free text — what establishes the claim
+ *   - evidenceUrl  : optional http(s) link an admin can open to check it
  */
 export default new Action({
   name: 'Claim Judge Profile',
@@ -44,6 +55,16 @@ export default new Action({
     if (!Number.isFinite(judgeId) || judgeId <= 0)
       return response.json({ error: 'A valid judge must be selected.' }, 422)
 
+    const evidence = normalizeEvidence(request.get?.('evidence'))
+    if (evidence.length < MIN_EVIDENCE_LENGTH)
+      return response.json({ error: `Please describe what establishes this is your profile (at least ${MIN_EVIDENCE_LENGTH} characters).` }, 422)
+
+    // null means "given but unusable" — answer 422 rather than dropping it,
+    // because an admin seeing no link cannot tell whether one was offered.
+    const evidenceUrl = normalizeEvidenceUrl(request.get?.('evidenceUrl'))
+    if (evidenceUrl === null)
+      return response.json({ error: 'The supporting link must be a full http:// or https:// URL.' }, 422)
+
     const judge = await db.selectFrom('judges')
       .select(['id', 'name'])
       .where('id', '=', judgeId)
@@ -69,6 +90,8 @@ export default new Action({
       .set({
         claimed_judge_id: judgeId,
         credential_type: 'judge',
+        credential_evidence: evidence,
+        credential_evidence_url: evidenceUrl || null,
         credential_claimed_at: new Date().toISOString(),
         credential_verified_at: null,
         credential_verified_by_user_id: null,
