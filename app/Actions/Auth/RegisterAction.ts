@@ -4,6 +4,8 @@ import { Auth, register } from '@stacksjs/auth'
 import { dispatch } from '@stacksjs/events'
 import { response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { isDisposableEmail } from '../../Helpers/disposableEmail'
+import { verifyTurnstile } from '../../Helpers/turnstile'
 import { withSessionCookie } from '../../Support/sessionCookie'
 
 /**
@@ -14,6 +16,18 @@ import { withSessionCookie } from '../../Support/sessionCookie'
  * Registration logs the user straight in, so it mints a session and therefore
  * needs the same cookie treatment as login; without it a freshly registered
  * user would be the one remaining path that persisted a script-readable token.
+ *
+ * Two abuse checks run AHEAD of register() (bench-review#51). Until now the
+ * only guard was `throttle:5,10m` on the route, so scripted signups were a
+ * matter of rotating IPs — and on a site that publishes reviews of named,
+ * sitting judges, cheap verified accounts are the raw material for harassment
+ * and impersonation.
+ *
+ *   1. a disposable-inbox check, which is local and free
+ *   2. Cloudflare Turnstile, which costs a round trip
+ *
+ * In that order on purpose: no reason to ask Cloudflare about a signup we are
+ * going to refuse anyway.
  */
 export default new Action({
   name: 'RegisterAction',
@@ -39,6 +53,34 @@ export default new Action({
     const email = request.get('email')
     const password = request.get('password')
     const name = request.get('name')
+
+    // Cheap and local first.
+    if (isDisposableEmail(email)) {
+      return response.json({
+        message: 'Please sign up with a permanent email address — reviews are tied to a verifiable account.',
+      }, 422)
+    }
+
+    // `cf-turnstile-response` is the field name Turnstile's own widget writes
+    // into the form; `turnstileToken` is what this app's store sends. Accept
+    // both so the check does not depend on how the page submitted.
+    const token = String(request.get('turnstileToken') ?? request.get('cf-turnstile-response') ?? '')
+    const verdict = await verifyTurnstile(token)
+    if (!verdict.ok) {
+      // Separated because they are different situations for the person in
+      // front of the form. 'unreachable' is our problem and retrying works;
+      // the others mean the check did not pass.
+      if (verdict.reason === 'unreachable') {
+        return response.json({
+          message: 'We could not complete the security check just now. Please try again in a moment.',
+        }, 503)
+      }
+      if (verdict.reason === 'rejected')
+        console.warn('[register] turnstile rejected a signup:', verdict.codes?.join(', ') || '(no codes)')
+      return response.json({
+        message: 'Please complete the security check and try again.',
+      }, 422)
+    }
 
     const result = await register({ email, password, name })
 
