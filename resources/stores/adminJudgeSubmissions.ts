@@ -16,6 +16,11 @@ export interface JudgeSubmission {
   status: 'pending' | 'approved' | 'rejected'
   review_note: string | null
   created_at: string | null
+  /** 'new' for a suggested judge, 'correction' for a report on an existing one. */
+  kind: string | null
+  judge_id: number | null
+  /** The correction's free text. `bio` keeps its "suggested biography" meaning. */
+  details: string | null
 }
 
 export type SubmissionStatusFilter = 'pending' | 'approved' | 'rejected' | 'all'

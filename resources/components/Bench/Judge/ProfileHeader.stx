@@ -97,6 +97,54 @@
   // Gate the claim prompt on the name having loaded, so it never renders
   // "Are you ?" while the fetch is in flight.
   const hasJudgeName = derived<boolean>(() => !!judgeName())
+
+  // "Report incorrect information" (bench-review#50). The FAQ has promised a
+  // correction link on every judge profile since launch and it existed on no
+  // component, so the one channel the site advertises for fixing a record
+  // about a named, sitting judge went nowhere.
+  const correctionOpen = state<boolean>(false)
+  const correctionDetails = state<string>('')
+  const correctionSource = state<string>('')
+  const correctionEmail = state<string>('')
+  const correctionSending = state<boolean>(false)
+  const correctionDone = state<boolean>(false)
+  const correctionError = state<string>('')
+  const MIN_CORRECTION = 15
+
+  const correctionTooShort = derived<boolean>(() => correctionDetails().trim().length < MIN_CORRECTION)
+  const correctionBlocked = derived<boolean>(() => correctionSending() || correctionTooShort())
+
+  function toggleCorrection(): void {
+    correctionOpen.set(!correctionOpen())
+    correctionError.set('')
+  }
+
+  async function sendCorrection(): Promise<void> {
+    if (correctionBlocked())
+      return
+    correctionSending.set(true)
+    correctionError.set('')
+    try {
+      const ok = await judgesStore.reportJudgeCorrection(judgeId(), {
+        details: correctionDetails().trim(),
+        sourceUrl: correctionSource().trim(),
+        submitterEmail: correctionEmail().trim(),
+      })
+      if (ok === true) {
+        correctionDone.set(true)
+        correctionOpen.set(false)
+        correctionDetails.set('')
+        correctionSource.set('')
+        correctionEmail.set('')
+      }
+      else {
+        correctionError.set(typeof ok === 'string' ? ok : 'Could not send that — please try again.')
+      }
+    }
+    finally {
+      correctionSending.set(false)
+    }
+  }
   const followPending = derived<boolean>(() => followsStore.isPending(judgeId()))
 
   async function toggleFollow(): Promise<void> {
@@ -241,5 +289,66 @@
       <StxLink to="/judges/signup" class="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900">Claim this profile</StxLink>
       to respond to reviews.
     </p>
+
+    {{-- Correction channel. Quiet by design — it sits under the claim line as
+        a text link, not a button, because it is addressed to the small number
+        of readers who spot an error rather than to everyone. --}}
+    <p class="mt-2 text-gray-500 text-sm" :show="hasJudgeName" style="display:none">
+      Something wrong on this page?
+      <button
+        type="button"
+        @click="toggleCorrection()"
+        class="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+      >Report incorrect information</button>
+    </p>
+
+    <p class="mt-2 text-emerald-700 text-sm" :show="correctionDone" style="display:none">
+      Thanks — a moderator will check this against the record.
+    </p>
+
+    <div class="mt-3 p-4 max-w-xl bg-white border border-gray-200 rounded-lg" :show="correctionOpen" style="display:none">
+      <label for="judge-correction-details" class="block font-semibold text-gray-900 text-sm">What is incorrect?</label>
+      <p class="mt-0.5 text-gray-500 text-xs">Tell us what the page gets wrong and what it should say.</p>
+      <textarea
+        id="judge-correction-details"
+        x-model="correctionDetails"
+        rows="4"
+        class="block mt-2 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+      ></textarea>
+
+      <label for="judge-correction-source" class="block mt-3 font-semibold text-gray-900 text-sm">Source <span class="font-normal text-gray-400">(optional)</span></label>
+      <input
+        id="judge-correction-source"
+        x-model="correctionSource"
+        type="url"
+        placeholder="https://"
+        class="block mt-1 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+      >
+
+      <label for="judge-correction-email" class="block mt-3 font-semibold text-gray-900 text-sm">Your email <span class="font-normal text-gray-400">(optional)</span></label>
+      <p class="mt-0.5 text-gray-500 text-xs">Only so we can follow up if we need to.</p>
+      <input
+        id="judge-correction-email"
+        x-model="correctionEmail"
+        type="email"
+        class="block mt-1 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+      >
+
+      <p class="mt-2 text-red-700 text-xs" :show="correctionError" style="display:none">{{ correctionError() }}</p>
+
+      <div class="flex gap-x-2 mt-3">
+        <button
+          type="button"
+          @click="sendCorrection()"
+          x-disabled="correctionBlocked"
+          class="px-3 py-1.5 font-semibold text-white text-xs bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+        >{{ correctionSending() ? 'Sending…' : 'Send report' }}</button>
+        <button
+          type="button"
+          @click="toggleCorrection()"
+          class="px-3 py-1.5 font-medium text-gray-700 text-xs bg-white hover:bg-gray-50 border border-gray-300 rounded"
+        >Cancel</button>
+      </div>
+    </div>
   </div>
 </header>

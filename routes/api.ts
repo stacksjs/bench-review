@@ -159,6 +159,15 @@ route.post('/judges/submit', 'Actions/Judges/SubmitJudgeSubmissionAction')
   .middleware('throttle:5,10m')
   .skipCsrf()
 
+// "Report incorrect information" on an existing profile. Same posture as the
+// suggestion intake above — public, throttled, lands pending in the same
+// queue — but attached to a judge_id so a moderator knows which of 2,740
+// profiles it is about (#50).
+route.post('/judges/{id}/correction', 'Actions/Judges/SubmitJudgeCorrectionAction')
+  .name('bench.judges.correction')
+  .middleware('throttle:5,10m')
+  .skipCsrf()
+
 // Reviews — split into lazy reads + auth-gated writes.
 // - GET /api/reviews                 : latest across all judges (home feed)
 // - GET /api/judges/:id/reviews      : reviews for a single judge (detail page)

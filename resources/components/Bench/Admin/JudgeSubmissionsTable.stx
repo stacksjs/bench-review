@@ -73,6 +73,17 @@
       ? 'bg-emerald-100 text-emerald-800'
       : (s.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'),
     date: formatDate(s.created_at),
+    // Corrections ride this queue too (bench-review#50). A moderator reading
+    // "Judge X" with a paragraph under it needs to know whether that is a
+    // suggested NEW judge or a report that an EXISTING profile is wrong —
+    // the two call for opposite actions.
+    isCorrection: s.kind === 'correction',
+    kindLabel: s.kind === 'correction' ? 'Correction' : 'New judge',
+    kindCls: s.kind === 'correction' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700',
+    details: s.details || '',
+    hasDetails: !!s.details,
+    profileHref: s.judge_id ? `/judges/${s.judge_id}` : '',
+    hasProfile: !!s.judge_id,
     busy: !!store.acting()[s.id],
     // Approve/reject only mean anything while the row is still pending.
     actionable: s.status === 'pending',
@@ -153,11 +164,20 @@
           <div class="flex-1 min-w-0">
             <div class="flex flex-wrap gap-2 items-center">
               <span class="inline-block px-2 py-0.5 font-medium text-xs rounded-full" x-class="row.statusCls">{{ row.status }}</span>
+              <span class="inline-block px-2 py-0.5 font-medium text-xs rounded-full" x-class="row.kindCls">{{ row.kindLabel }}</span>
               <span class="text-gray-500 text-xs">{{ row.date }}</span>
             </div>
             <h3 class="mt-1 font-semibold text-base text-gray-900">{{ row.judge_name }}</h3>
             <p class="mt-0.5 text-gray-600 text-sm">{{ row.place }}</p>
             <p :show="row.hasBio" style="display:none" class="mt-2 text-gray-600 text-sm">{{ row.bio }}</p>
+            {{-- What the reporter says is wrong, and a link straight to the
+                profile they are talking about. --}}
+            <p :show="row.hasDetails" style="display:none" class="mt-2 px-3 py-2 text-gray-800 text-sm whitespace-pre-line bg-blue-50/60 border border-blue-200 rounded">{{ row.details }}</p>
+            <a
+              x-href="row.profileHref"
+              x-class="row.hasProfile ? 'inline-block' : 'hidden'"
+              class="mt-1 text-blue-700 text-xs hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+            >View the profile this is about →</a>
             <p :show="row.hasSubmitter" style="display:none" class="mt-2 text-gray-500 text-xs">Submitted by {{ row.submitter }}</p>
             <p :show="row.hasSafeSource" style="display:none" class="mt-1 text-xs">
               <a x-href="row.sourceUrl" target="_blank" rel="noopener noreferrer nofollow" class="text-blue-700 underline underline-offset-2 hover:text-blue-900">Source</a>

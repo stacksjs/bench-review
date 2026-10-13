@@ -189,6 +189,32 @@ defineStore('judges', () => {
    * own result list independent of the header typeahead. Keeps fetch out of the
    * component (see: no fetches in components).
    */
+  /**
+   * Report incorrect information on a judge profile (bench-review#50).
+   *
+   * Returns true, or the server's message so the form can show the specific
+   * reason rather than a generic failure.
+   */
+  async function reportJudgeCorrection(
+    judgeId: number,
+    payload: { details: string, sourceUrl?: string, submitterEmail?: string },
+  ): Promise<true | string> {
+    try {
+      const res = await fetch(`/api/judges/${judgeId}/correction`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean, error?: string }
+      if (!res.ok || !data.ok)
+        return data.error || 'Could not send that report.'
+      return true
+    }
+    catch (err) {
+      return err instanceof Error ? err.message : 'Network error'
+    }
+  }
+
   async function fetchJudgeSearch(query: string): Promise<Judge[]> {
     const trimmed = query.trim()
     if (!trimmed)
@@ -249,6 +275,7 @@ defineStore('judges', () => {
     fetchCourtHouses,
     searchJudges,
     fetchJudgeSearch,
+    reportJudgeCorrection,
     submitJudge,
   }
 })

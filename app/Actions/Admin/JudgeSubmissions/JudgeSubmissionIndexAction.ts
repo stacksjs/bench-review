@@ -35,6 +35,13 @@ export default new Action({
         'status',
         'review_note',
         'created_at',
+        // Corrections ride this same queue (bench-review#50). Without these
+        // a moderator sees a report with no indication of which profile it is
+        // about or what it says — the exact failure the dead contact-form
+        // route had.
+        'kind',
+        'judge_id',
+        'details',
       ])
 
     // Apply the status filter BEFORE orderBy — bqb emits clauses in

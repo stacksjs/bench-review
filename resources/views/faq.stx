@@ -32,7 +32,7 @@
     },
     {
       q: 'How do I correct factual information about a judge?',
-      a: 'Use the "Suggest an edit" link on any judge profile, or email us at hello@bench.review with details. We update verified information promptly.'
+      a: 'Use the "Report incorrect information" link on any judge profile, or email us at hello@bench.review with details. Reports go to a moderator who checks them against the record.'
     },
     {
       q: 'Do you sell my data?',
