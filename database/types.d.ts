@@ -450,6 +450,16 @@ declare module '@stacksjs/database' {
       image_url: string
       practice_area: string
       court_house_id: number
+      // Added by migration rather than by the model, which is this repo's
+      // convention for columns the ORM generator should not own.
+      education: string | null
+      jurisdiction: string | null
+      state: string | null
+      status: string
+      external_id: string | null
+      bio: string | null
+      appointed_year: number | null
+      slug: string | null
     }
     labels: {
       // columns

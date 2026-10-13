@@ -331,7 +331,7 @@ async function main(): Promise<void> {
 
   // ── Judges in scope ──────────────────────────────────────────────────
   const peopleById = new Map(people.map(p => [p.id, p]))
-  const seats: Array<{ person: Row, court: Row }> = []
+  const seats: Array<{ person: Row, court: Row, position: Row }> = []
   const seen = new Set<string>()
 
   for (const position of positions) {
@@ -357,7 +357,7 @@ async function main(): Promise<void> {
       continue
     seen.add(key)
 
-    seats.push({ person, court: federalCourts.get(position.court_id)! })
+    seats.push({ person, court: federalCourts.get(position.court_id)!, position })
   }
 
   // ── Education ────────────────────────────────────────────────────────
@@ -457,12 +457,30 @@ async function main(): Promise<void> {
     judgeKeys.add(key)
 
     const education = educationByPerson.get(seat.person.id)
+    // Identity columns (bench-review#50). external_id is the CourtListener
+    // person id: it makes re-identification exact instead of name-dependent,
+    // which is what the dedupe above has to fall back on today.
+    //
+    // jurisdiction is 'federal' for every row this script writes and only
+    // because of what it ingests — federalCourts is the filter a few hundred
+    // lines up. It is set HERE rather than in the migration precisely because
+    // here it is a fact about the source, not a guess about the table.
+    //
+    // appointed_year comes from the position's start date, which is the date
+    // the judge took THIS seat. For a judge elevated from district to circuit
+    // that is the elevation, not their first appointment; the column is named
+    // for the seat, and the row is per seat.
+    const startYear = Number((seat.position.date_start || '').slice(0, 4))
     await db.insertInto('judges' as any).values({
       name,
       image_url: avatar(name),
       practice_area: PRACTICE_AREA[seat.court.jurisdiction] ?? 'other',
       court_house_id: courtHouseId,
       education: education ? JSON.stringify(education) : null,
+      external_id: seat.person.id ? `cl:${seat.person.id}` : null,
+      jurisdiction: 'federal',
+      status: 'active',
+      appointed_year: Number.isFinite(startYear) && startYear > 1700 ? startYear : null,
       uuid: crypto.randomUUID(),
     } as any).execute()
     insertedJudges++
