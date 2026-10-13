@@ -5,6 +5,7 @@ declare module '@stacksjs/stx' {
     '/admin/credentials': {  }
     '/admin/flags': {  }
     '/admin/judge-submissions': {  }
+    '/admin/judges': {  }
     '/admin/login': {  }
     '/admin/moderation': {  }
     '/admin/reviews': {  }
