@@ -99,6 +99,8 @@ be the production origin at build time, not at serve time.
 | `FILESYSTEM_DISK` | `local` or `s3` | Review photos + avatars. See `app/Storage/disk.ts` |
 | `AWS_*` | S3 credentials | Only when `FILESYSTEM_DISK=s3` |
 | `API_ORIGIN` | Where `preview.ts` forwards `/api/*` | Local preview only; defaults to `http://localhost:4008` |
+| `TURNSTILE_SITE_KEY` | Signup bot check (widget) | **Required for a deployable build**, and needed **on the build runner** — it is baked into `register.html` at build time |
+| `TURNSTILE_SECRET_KEY` | Signup bot check (verification) | **Required in production**, read by the API at request time. Unset ⇒ every signup is accepted |
 | `TS_ANALYTICS_*` | Analytics endpoint override | Optional; the App ID lives in `config/ts-analytics.ts` |
 
 Local ports: views `4000`, API `4008`.

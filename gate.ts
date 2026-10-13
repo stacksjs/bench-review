@@ -873,6 +873,41 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   )
 }
 
+// 24. The signup form is actually protected in a release build.
+//
+//     Both halves of the Turnstile check degrade to "off" when unconfigured,
+//     and they do it quietly and independently: no TURNSTILE_SITE_KEY and
+//     build.ts ships the form without a widget; no TURNSTILE_SECRET_KEY and
+//     verifyTurnstile() passes everything through. That pairing is correct
+//     for local development and indistinguishable, from the outside, from a
+//     production deploy whose keys were never set.
+//
+//     So this asserts the artifact and the environment agree, and only for a
+//     release build (APP_URL on a real host). A keyless local build reports
+//     rather than fails, exactly like the database-dependent checks above.
+{
+  const siteKey = (process.env.TURNSTILE_SITE_KEY ?? '').trim()
+  const secret = (process.env.TURNSTILE_SECRET_KEY ?? '').trim()
+  const signupPath = pages.find(p => p.endsWith('register.html'))
+  const widgetShipped = !!signupPath && (html.get(signupPath) ?? '').includes('challenges.cloudflare.com')
+
+  const problems: string[] = []
+  if (!siteKey)
+    problems.push('TURNSTILE_SITE_KEY is unset, so the signup form ships with no widget')
+  if (!secret)
+    problems.push('TURNSTILE_SECRET_KEY is unset, so the server accepts any signup')
+  if (siteKey && !widgetShipped)
+    problems.push('a site key is set but register.html carries no widget — the build step did not run')
+
+  add(
+    'the signup form carries a working Turnstile check',
+    isReleaseBuild ? problems.length === 0 : true,
+    problems.length === 0
+      ? ''
+      : `${problems.join('; ')}${isReleaseBuild ? '' : '. APP_URL is not a real host, so this is reported rather than failed'}`,
+  )
+}
+
 const failed = checks.filter(c => !c.ok)
 console.log(`\n  bench conformance gate — ${pages.length} built pages\n`)
 for (const c of checks)
