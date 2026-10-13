@@ -59,7 +59,6 @@ export default class ReviewSeeder extends Seeder {
       rating: number
       type: 'positive' | 'negative' | 'neutral'
       likes: number
-      comments: number
     }> = [
       // Supreme Court
       {
@@ -69,7 +68,6 @@ export default class ReviewSeeder extends Seeder {
         rating: 5,
         type: 'positive',
         likes: 142,
-        comments: 18,
       },
       {
         judge: 'Hon. Sonia Sotomayor',
@@ -78,7 +76,6 @@ export default class ReviewSeeder extends Seeder {
         rating: 5,
         type: 'positive',
         likes: 98,
-        comments: 12,
       },
       {
         judge: 'Hon. Elena Kagan',
@@ -87,7 +84,6 @@ export default class ReviewSeeder extends Seeder {
         rating: 5,
         type: 'positive',
         likes: 76,
-        comments: 9,
       },
 
       // 9th Circuit
@@ -98,7 +94,6 @@ export default class ReviewSeeder extends Seeder {
         rating: 5,
         type: 'positive',
         likes: 54,
-        comments: 6,
       },
 
       // Stanley Mosk (LA County)
@@ -109,7 +104,6 @@ export default class ReviewSeeder extends Seeder {
         rating: 5,
         type: 'positive',
         likes: 89,
-        comments: 14,
       },
       {
         judge: 'Hon. Samantha P. Jessner',
@@ -118,7 +112,6 @@ export default class ReviewSeeder extends Seeder {
         rating: 2,
         type: 'negative',
         likes: 31,
-        comments: 22,
       },
 
       // NY County Supreme
@@ -129,7 +122,6 @@ export default class ReviewSeeder extends Seeder {
         rating: 4,
         type: 'positive',
         likes: 67,
-        comments: 11,
       },
       {
         judge: 'Hon. Arthur F. Engoron',
@@ -138,7 +130,6 @@ export default class ReviewSeeder extends Seeder {
         rating: 4,
         type: 'positive',
         likes: 45,
-        comments: 7,
       },
 
       // SDNY
@@ -149,7 +140,6 @@ export default class ReviewSeeder extends Seeder {
         rating: 5,
         type: 'positive',
         likes: 112,
-        comments: 16,
       },
       {
         judge: 'Hon. Lewis A. Kaplan',
@@ -158,7 +148,6 @@ export default class ReviewSeeder extends Seeder {
         rating: 5,
         type: 'positive',
         likes: 38,
-        comments: 4,
       },
 
       // DDC / DC Circuit
@@ -169,7 +158,6 @@ export default class ReviewSeeder extends Seeder {
         rating: 5,
         type: 'positive',
         likes: 91,
-        comments: 13,
       },
       {
         judge: 'Hon. Tanya S. Chutkan',
@@ -178,7 +166,6 @@ export default class ReviewSeeder extends Seeder {
         rating: 5,
         type: 'positive',
         likes: 73,
-        comments: 8,
       },
 
       // A few neutral / mixed entries to round out the dataset
@@ -189,7 +176,6 @@ export default class ReviewSeeder extends Seeder {
         rating: 5,
         type: 'positive',
         likes: 156,
-        comments: 24,
       },
       {
         judge: 'Hon. Elena Kagan',
@@ -198,7 +184,6 @@ export default class ReviewSeeder extends Seeder {
         rating: 5,
         type: 'positive',
         likes: 82,
-        comments: 9,
       },
       {
         judge: 'Hon. Arthur F. Engoron',
@@ -207,7 +192,6 @@ export default class ReviewSeeder extends Seeder {
         rating: 3,
         type: 'neutral',
         likes: 19,
-        comments: 5,
       },
     ]
 
@@ -234,7 +218,12 @@ export default class ReviewSeeder extends Seeder {
             content: r.content,
             rating: r.rating,
             type: r.type,
-            comments: r.comments,
+            // 0, not a fixture number: the seeder creates no review_comments
+            // rows, so any other value is a count of something that does not
+            // exist (bench-review#52). The counter is now recounted from the
+            // table on every mutation, and seeding a lie means the first real
+            // comment appears to delete seventeen.
+            comments: 0,
           } as any)
           .where('id' as any, '=', existing.id)
           .execute()
@@ -254,7 +243,7 @@ export default class ReviewSeeder extends Seeder {
         rating: r.rating,
         type: r.type,
         status: 'published',
-        comments: r.comments,
+        comments: 0,
         judge_id: judgeId,
         user_id: null,
         uuid: crypto.randomUUID(),

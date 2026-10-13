@@ -3,6 +3,7 @@ import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { recountReviewComments } from '../../Helpers/commentCount'
 
 /**
  * DELETE /api/me/comments/{id} — author removes their own comment.
@@ -49,17 +50,15 @@ export default new Action({
       .where('id', '=', commentId)
       .execute()
 
-    // Counter sync. Decrement clamped at 0 in case the denormalised
-    // value already drifted out of sync.
-    const reviewRow = await db.selectFrom('judge_reviews')
-      .select(['comments'])
-      .where('id', '=', existing.judge_review_id)
-      .executeTakeFirst() as { comments: number | null } | undefined
-    if (reviewRow) {
-      await db.updateTable('judge_reviews')
-        .set({ comments: Math.max(0, Number(reviewRow.comments ?? 0) - 1) } as any)
-        .where('id', '=', existing.judge_review_id)
-        .execute()
+    // Counter sync: recount, not a decrement (bench-review#52). What stood
+    // here read the current value and subtracted one, clamped at zero — and
+    // that clamp was the tell, since it only exists if the number is already
+    // expected to be wrong. Recounting makes this self-healing instead.
+    //
+    // Best-effort: the comment is already gone and the deletion is the thing
+    // the user asked for.
+    if (existing.judge_review_id != null) {
+      await recountReviewComments(Number(existing.judge_review_id))
         .catch(() => {})
     }
 

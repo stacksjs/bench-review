@@ -4,6 +4,7 @@ import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
 import { logModeration } from '../../../Helpers/auditLog'
+import { recountReviewComments } from '../../../Helpers/commentCount'
 
 /**
  * PATCH /api/admin/comments/{id} — take a comment down, or put it back.
@@ -82,15 +83,7 @@ export default new Action({
     // of drifting further.
     if (existing.judge_review_id != null) {
       try {
-        const published = await db.selectFrom('review_comments')
-          .select(['id'])
-          .where('judge_review_id', '=', Number(existing.judge_review_id))
-          .where('status', '=', 'published')
-          .execute() as Array<{ id: number }>
-        await db.updateTable('judge_reviews')
-          .set({ comments: published.length } as any)
-          .where('id', '=', Number(existing.judge_review_id))
-          .execute()
+        await recountReviewComments(Number(existing.judge_review_id))
       }
       catch (err) {
         console.warn(`[admin-comment-status] counter resync failed for review ${existing.judge_review_id}:`, err instanceof Error ? err.message : err)

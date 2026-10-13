@@ -5,6 +5,7 @@ import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
 import { notify } from '../../Helpers/notifications'
 import { sanitizeReviewHtml } from '../../Helpers/sanitizeReviewHtml'
+import { recountReviewComments } from '../../Helpers/commentCount'
 
 /**
  * POST /api/reviews/{id}/comments — author a comment under a review.
@@ -107,10 +108,10 @@ export default new Action({
     // read the count without JOINing. Best-effort — if the update
     // fails, the comment still landed; the count just drifts by one
     // until the next refresh. Tolerable.
-    await db.updateTable('judge_reviews')
-      .set({ comments: Number(review.comments ?? 0) + 1 } as any)
-      .where('id', '=', reviewId)
-      .execute()
+    // Recount rather than nudge by one (bench-review#52). A read-modify-write
+    // loses an update when two comments land together, and the loss is
+    // permanent — every later +1 builds on a number nobody rechecks.
+    await recountReviewComments(reviewId)
       .catch(() => {})
 
     // Tell the review's author somebody replied. Until now a comment was a
