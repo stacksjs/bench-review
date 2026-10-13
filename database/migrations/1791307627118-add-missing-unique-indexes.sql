@@ -23,9 +23,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS "judge_opinions_uuid_unique" ON "judge_opinion
 CREATE UNIQUE INDEX IF NOT EXISTS "judge_reviews_uuid_unique" ON "judge_reviews" ("uuid");
 CREATE UNIQUE INDEX IF NOT EXISTS "judges_uuid_unique" ON "judges" ("uuid");
 CREATE UNIQUE INDEX IF NOT EXISTS "notifications_uuid_unique" ON "notifications" ("uuid");
-CREATE UNIQUE INDEX IF NOT EXISTS "payment_methods_uuid_unique" ON "payment_methods" ("uuid");
-CREATE UNIQUE INDEX IF NOT EXISTS "payment_products_uuid_unique" ON "payment_products" ("uuid");
-CREATE UNIQUE INDEX IF NOT EXISTS "payment_transactions_uuid_unique" ON "payment_transactions" ("uuid");
 CREATE UNIQUE INDEX IF NOT EXISTS "personal_access_tokens_token_unique" ON "personal_access_tokens" ("token");
 CREATE UNIQUE INDEX IF NOT EXISTS "releases_uuid_unique" ON "releases" ("uuid");
 CREATE UNIQUE INDEX IF NOT EXISTS "review_comments_uuid_unique" ON "review_comments" ("uuid");
@@ -35,8 +32,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS "review_photos_uuid_unique" ON "review_photos"
 CREATE UNIQUE INDEX IF NOT EXISTS "social_posts_uuid_unique" ON "social_posts" ("uuid");
 CREATE UNIQUE INDEX IF NOT EXISTS "subscribers_email_unique" ON "subscribers" ("email");
 CREATE UNIQUE INDEX IF NOT EXISTS "subscribers_uuid_unique" ON "subscribers" ("uuid");
-CREATE UNIQUE INDEX IF NOT EXISTS "subscriptions_provider_id_unique" ON "subscriptions" ("provider_id");
-CREATE UNIQUE INDEX IF NOT EXISTS "subscriptions_uuid_unique" ON "subscriptions" ("uuid");
 CREATE UNIQUE INDEX IF NOT EXISTS "tags_name_unique" ON "tags" ("name");
 CREATE UNIQUE INDEX IF NOT EXISTS "tags_slug_unique" ON "tags" ("slug");
 CREATE UNIQUE INDEX IF NOT EXISTS "tags_uuid_unique" ON "tags" ("uuid");

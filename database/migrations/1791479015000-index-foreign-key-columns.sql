@@ -33,12 +33,8 @@ CREATE INDEX IF NOT EXISTS "idx_judges_court_house_id" ON "judges" ("court_house
 CREATE INDEX IF NOT EXISTS "idx_oauth_access_tokens_user_id" ON "oauth_access_tokens" ("user_id");
 CREATE INDEX IF NOT EXISTS "idx_oauth_access_tokens_oauth_client_id" ON "oauth_access_tokens" ("oauth_client_id");
 CREATE INDEX IF NOT EXISTS "idx_oauth_clients_user_id" ON "oauth_clients" ("user_id");
-CREATE INDEX IF NOT EXISTS "idx_payment_methods_user_id" ON "payment_methods" ("user_id");
-CREATE INDEX IF NOT EXISTS "idx_payment_transactions_user_id" ON "payment_transactions" ("user_id");
-CREATE INDEX IF NOT EXISTS "idx_payment_transactions_payment_method_id" ON "payment_transactions" ("payment_method_id");
 CREATE INDEX IF NOT EXISTS "idx_personal_access_tokens_user_id" ON "personal_access_tokens" ("user_id");
 CREATE INDEX IF NOT EXISTS "idx_review_drafts_judge_id" ON "review_drafts" ("judge_id");
 CREATE INDEX IF NOT EXISTS "idx_review_flags_user_id" ON "review_flags" ("user_id");
 CREATE INDEX IF NOT EXISTS "idx_social_posts_user_id" ON "social_posts" ("user_id");
 CREATE INDEX IF NOT EXISTS "idx_subscribers_user_id" ON "subscribers" ("user_id");
-CREATE INDEX IF NOT EXISTS "idx_subscriptions_user_id" ON "subscriptions" ("user_id");

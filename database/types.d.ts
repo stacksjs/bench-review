@@ -630,49 +630,6 @@ declare module '@stacksjs/database' {
       conversions: number
       author_id: number
     }
-    payment_methods: {
-      // columns
-      id: number
-      uuid: string
-      created_at: string
-      updated_at: string | null
-      type: string
-      last_four: number
-      brand: string
-      exp_month: number
-      exp_year: number
-      is_default: boolean
-      provider_id: string
-      user_id: number
-    }
-    payment_products: {
-      // columns
-      id: number
-      uuid: string
-      created_at: string
-      updated_at: string | null
-      name: string
-      description: string
-      key: string
-      unit_price: number
-      status: string
-      image: string
-      provider_id: string
-    }
-    payment_transactions: {
-      // columns
-      id: number
-      uuid: string
-      created_at: string
-      updated_at: string | null
-      name: string
-      description: string
-      amount: number
-      type: string
-      provider_id: string
-      user_id: number
-      payment_method_id: number
-    }
     payments: {
       // columns
       id: number
@@ -1006,25 +963,6 @@ declare module '@stacksjs/database' {
       status: string
       source: string
       unsubscribed_at: string
-      user_id: number
-    }
-    subscriptions: {
-      // columns
-      id: number
-      uuid: string
-      created_at: string
-      updated_at: string | null
-      type: string
-      plan: string
-      provider_id: string
-      provider_status: string
-      unit_price: number
-      provider_type: string
-      provider_price_id: string
-      quantity: number
-      trial_ends_at: string
-      ends_at: string
-      last_used_at: string
       user_id: number
     }
     tags: {

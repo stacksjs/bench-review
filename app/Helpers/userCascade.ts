@@ -5,10 +5,16 @@ import { db } from '@stacksjs/database'
  * drift apart.
  *
  * They had. Self-serve account deletion cleaned 21 tables; the admin delete
- * cleaned 6, leaving that user's comments, likes, flags, review photos, drafts,
- * notification preferences, subscriptions and payment rows behind, still
- * pointing at an id that no longer exists. Whether a user's data is actually
- * erased should not depend on who pressed the button.
+ * cleaned 6, leaving that user's comments, likes, flags, review photos, drafts
+ * and notification preferences behind, still pointing at an id that no longer
+ * exists. Whether a user's data is actually erased should not depend on who
+ * pressed the button.
+ *
+ * The list is deliberately short of dead names. `subscriptions`,
+ * `payment_methods` and `payment_transactions` were in it until those tables
+ * were dropped - unused Stacks commerce scaffolding bench never wired up. The
+ * per-table `.catch` below would have gone on swallowing them forever, which
+ * is exactly how a list like this rots into decoration.
  */
 export const USER_OWNED_TABLES: readonly string[] = [
   'judge_reviews',
@@ -27,10 +33,7 @@ export const USER_OWNED_TABLES: readonly string[] = [
   'oauth_access_tokens',
   'user_roles',
   'user_permissions',
-  'subscriptions',
   'subscribers',
-  'payment_methods',
-  'payment_transactions',
   'social_posts',
 ]
 
