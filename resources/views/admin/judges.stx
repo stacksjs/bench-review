@@ -1,0 +1,7 @@
+@extends('layouts/admin')
+
+@section('title', 'Judges - Bench Review')
+
+@section('content')
+@include('Bench/Admin/JudgesTable')
+@endsection

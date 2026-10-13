@@ -1,0 +1,311 @@
+<script client>
+  import type { AdminJudgeRow, JudgeStatusFilter } from '~/resources/stores/adminJudges'
+
+  const store = useStore('adminJudges')
+  const confirmStore = useStore('confirm')
+  const toast = useStore('toast')
+
+  let hasFetched = false
+  function bootstrap(): void {
+    if (hasFetched) return
+    hasFetched = true
+    store.fetchJudges()
+  }
+  bootstrap()
+  onMount(() => { bootstrap() })
+
+  const TABS: Array<{ key: JudgeStatusFilter, label: string }> = [
+    { key: 'all', label: 'All' },
+    { key: 'active', label: 'Active' },
+    { key: 'retired', label: 'Retired' },
+    { key: 'deceased', label: 'Deceased' },
+  ]
+
+  // Editor state. One judge open at a time keeps the page calm and means a
+  // single draft object rather than a per-row map.
+  const editingId = state<number>(0)
+  const saving = state<boolean>(false)
+  const draftName = state<string>('')
+  const draftStatus = state<string>('active')
+  const draftJurisdiction = state<string>('')
+  const draftState = state<string>('')
+  const draftPractice = state<string>('')
+  const draftAppointed = state<string>('')
+  const draftBio = state<string>('')
+  const draftCourt = state<string>('')
+  // 0 = not merging. Holds the id of the judge being folded INTO the open one.
+  const mergeSourceId = state<string>('')
+
+  function openEditor(judge: AdminJudgeRow): void {
+    editingId.set(editingId() === judge.id ? 0 : judge.id)
+    mergeSourceId.set('')
+    if (editingId() === 0) return
+    draftName.set(judge.name ?? '')
+    draftStatus.set(judge.status ?? 'active')
+    draftJurisdiction.set(judge.jurisdiction ?? '')
+    draftState.set(judge.state ?? '')
+    draftPractice.set(judge.practice_area ?? '')
+    draftAppointed.set(judge.appointed_year ? String(judge.appointed_year) : '')
+    draftBio.set('')
+    draftCourt.set(judge.court_house_id ? String(judge.court_house_id) : '')
+  }
+
+  function openCreate(): void {
+    editingId.set(-1)
+    mergeSourceId.set('')
+    draftName.set('')
+    draftStatus.set('active')
+    draftJurisdiction.set('')
+    draftState.set('')
+    draftPractice.set('')
+    draftAppointed.set('')
+    draftBio.set('')
+    draftCourt.set('')
+  }
+
+  async function save(): Promise<void> {
+    if (saving()) return
+    saving.set(true)
+    try {
+      const id = editingId() > 0 ? editingId() : 0
+      const ok = await store.saveJudge(id, {
+        name: draftName(),
+        status: draftStatus(),
+        jurisdiction: draftJurisdiction(),
+        state: draftState(),
+        practice_area: draftPractice(),
+        appointed_year: draftAppointed(),
+        bio: draftBio(),
+        court_house_id: draftCourt(),
+      })
+      if (ok) {
+        editingId.set(0)
+        toast.success(id > 0 ? 'Judge updated' : 'Judge added', 'The directory has been updated.')
+      }
+    }
+    finally {
+      saving.set(false)
+    }
+  }
+
+  async function merge(): Promise<void> {
+    if (typeof window === 'undefined') return
+    const target = editingId()
+    const source = Number(mergeSourceId())
+    if (target <= 0 || !Number.isFinite(source) || source <= 0) {
+      toast.error('Merge', 'Enter the id of the duplicate profile to fold in.')
+      return
+    }
+    const ok = await confirmStore.ask({
+      title: 'Merge profiles',
+      message: `Fold judge #${source} into #${target}? Every review, ruling, response, draft, follow and claim moves across, and #${source} is deleted. This cannot be undone.`,
+      confirmLabel: 'Merge',
+      danger: true,
+    })
+    if (!ok) return
+    if (await store.mergeJudges(target, source)) {
+      editingId.set(0)
+      toast.success('Profiles merged', `Judge #${source} was folded into #${target}.`)
+    }
+  }
+
+  function onSearchInput(e: Event): void {
+    store.setSearch((e.target as HTMLInputElement).value)
+  }
+  function nextPage(): void { if (store.page() < store.totalPages()) store.setPage(store.page() + 1) }
+  function prevPage(): void { if (store.page() > 1) store.setPage(store.page() - 1) }
+
+  // Per-row display values, precomputed: signal call-syntax inside a `:for`
+  // leaves the loop variable as a function, so anything conditional has to be
+  // resolved out here. `:key` keeps bindFor from rebuilding the list.
+  const rows = derived(() => store.judges().map((j: AdminJudgeRow) => ({
+    ...j,
+    courtName: j.court_house ? j.court_house.name : 'No courthouse on file',
+    whereLine: [j.jurisdiction, j.state].filter(Boolean).join(' · ') || 'Jurisdiction not recorded',
+    reviewLine: j.review_count === 1 ? '1 review' : `${j.review_count} reviews`,
+    statusCls: j.status === 'active'
+      ? 'bg-emerald-100 text-emerald-800'
+      : (j.status === 'retired' ? 'bg-gray-200 text-gray-700' : 'bg-amber-100 text-amber-800'),
+    identity: j.external_id ? j.external_id : 'no external id',
+  })))
+
+  const emptyTitle = derived<string>(() => store.query().trim() ? `No judges match "${store.query().trim()}"` : 'No judges yet')
+  const isCreating = derived<boolean>(() => store.judges().length >= 0 && editingId() === -1)
+  const conflictLines = derived(() => store.mergeConflicts().map((c: any) => ({
+    text: c.source_review_id
+      ? `reviewer #${c.user_id}: review #${c.source_review_id} and review #${c.target_review_id}`
+      : `user #${c.user_id} claims judge #${c.claimed_judge_id}`,
+  })))
+</script>
+
+<div class="space-y-4">
+  <div class="flex flex-wrap gap-3 items-end justify-between">
+    <div>
+      <h1 class="font-bold text-2xl text-gray-900">Judges</h1>
+      <p class="mt-1 text-gray-600 text-sm"><span>{{ store.total() }}</span> in the directory</p>
+    </div>
+    <div class="flex gap-x-2 items-center">
+      <label for="judges-search" class="sr-only">Search judges</label>
+      <input
+        id="judges-search"
+        type="text"
+        placeholder="Search by name…"
+        @input="onSearchInput($event)"
+        class="block px-3 py-2 sm:w-64 text-gray-900 sm:text-sm placeholder:text-gray-400 bg-white border-0 ring-1 ring-gray-200 ring-inset rounded-md focus:ring-2 focus:ring-gray-600 focus:ring-inset"
+      >
+      <button
+        type="button"
+        @click="openCreate()"
+        class="px-3 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+      >Add judge</button>
+    </div>
+  </div>
+
+  <div class="flex gap-x-1 border-b border-gray-200">
+    <button
+      :for="tab in TABS"
+      type="button"
+      @click="store.setStatusFilter(tab.key)"
+      class="px-4 py-2 font-medium text-sm border-b-2 transition-colors"
+      x-class="store.statusFilter() === tab.key ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300'">{{ tab.label }}</button>
+  </div>
+
+  <div
+    role="alert"
+    class="px-4 py-3 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
+    x-class="store.actionError() ? '' : 'hidden'">{{ store.actionError() }}</div>
+
+  {{-- The rows a refused merge named. Showing only "could not merge" would
+      leave the admin with nowhere to go. --}}
+  <div
+    class="px-4 py-3 text-amber-900 text-sm bg-amber-50 border border-amber-200 rounded-md"
+    :show="store.mergeConflicts().length > 0"
+    style="display:none"
+  >
+    <p class="font-semibold">Resolve these first:</p>
+    <ul class="mt-1 pl-5 list-disc">
+      <li :for="c in conflictLines()" class="text-xs">{{ c.text }}</li>
+    </ul>
+  </div>
+
+  {{-- Create form. `:show`, not an x-class toggle: x-class is browser-only,
+      so a pre-rendered page paints the form before the runtime boots.
+      stx-standards 7.3, gate check 19. --}}
+  <div class="p-4 bg-white border border-blue-200 rounded-lg" :show="isCreating()" style="display:none">
+    <h2 class="font-semibold text-base text-gray-900">Add a judge</h2>
+    <div class="grid gap-3 sm:grid-cols-2 mt-3">
+      <div>
+        <label for="new-judge-name" class="block font-medium text-gray-700 text-xs">Name</label>
+        <input id="new-judge-name" x-model="draftName" type="text" class="block mt-1 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+      </div>
+      <div>
+        <label for="new-judge-court" class="block font-medium text-gray-700 text-xs">Courthouse id</label>
+        <input id="new-judge-court" x-model="draftCourt" type="text" class="block mt-1 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+      </div>
+      <div>
+        <label for="new-judge-jurisdiction" class="block font-medium text-gray-700 text-xs">Jurisdiction</label>
+        <input id="new-judge-jurisdiction" x-model="draftJurisdiction" type="text" placeholder="federal / state" class="block mt-1 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+      </div>
+      <div>
+        <label for="new-judge-state" class="block font-medium text-gray-700 text-xs">State</label>
+        <input id="new-judge-state" x-model="draftState" type="text" class="block mt-1 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+      </div>
+    </div>
+    <div class="flex gap-x-2 mt-3">
+      <button type="button" @click="save()" x-disabled="saving" class="px-3 py-1.5 font-semibold text-white text-xs bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50">{{ saving() ? 'Saving…' : 'Add judge' }}</button>
+      <button type="button" @click="editingId.set(0)" class="px-3 py-1.5 font-medium text-gray-700 text-xs bg-white hover:bg-gray-50 border border-gray-300 rounded">Cancel</button>
+    </div>
+  </div>
+
+  <div class="overflow-hidden bg-white border border-gray-200 rounded-lg">
+    <div :if="store.loading() && store.judges().length === 0" class="px-4 py-12 text-center text-gray-500 text-sm">Loading judges…</div>
+
+    <div class="px-6 py-16 text-center" :show="!store.loading() && store.judges().length === 0" style="display:none">
+      <p class="font-semibold text-gray-900 text-sm">{{ emptyTitle() }}</p>
+      <p class="mt-1 text-gray-500 text-xs">Try a different search, or add the judge.</p>
+    </div>
+
+    <ul class="divide-gray-100 divide-y" :show="store.judges().length > 0" style="display:none">
+      <li :for="judge in rows()" :key="judge.id" class="px-4 py-4">
+        <div class="flex gap-x-4 items-start justify-between">
+          <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap gap-2 items-center">
+              <span class="inline-block px-2 py-0.5 font-medium text-xs rounded-full" x-class="judge.statusCls">{{ judge.status }}</span>
+              <span class="text-gray-400 text-xs">#{{ judge.id }}</span>
+              <span class="text-gray-400 text-xs">{{ judge.identity }}</span>
+            </div>
+            <h3 class="mt-1 font-semibold text-base text-gray-900">{{ judge.name }}</h3>
+            {{-- Courthouse and jurisdiction on the row: with 22 duplicate rows
+                across 10 names in the directory, the name alone does not
+                identify anyone. --}}
+            <p class="mt-0.5 text-gray-600 text-sm">{{ judge.courtName }}</p>
+            <p class="mt-0.5 text-gray-500 text-xs">{{ judge.whereLine }} · {{ judge.reviewLine }}</p>
+          </div>
+          <button
+            type="button"
+            @click="openEditor(judge)"
+            class="flex-none px-2.5 py-1 font-medium text-gray-700 text-xs bg-white hover:bg-gray-50 border border-gray-300 rounded"
+          >Edit</button>
+        </div>
+
+        <div class="mt-3 p-3 bg-gray-50 border border-gray-200 rounded" x-class="editingId() === judge.id ? '' : 'hidden'">
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label class="block font-medium text-gray-700 text-xs">Name</label>
+              <input x-model="draftName" type="text" aria-label="Judge name" class="block mt-1 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+            </div>
+            <div>
+              <label class="block font-medium text-gray-700 text-xs">Status</label>
+              <select x-model="draftStatus" aria-label="Status" class="block mt-1 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                <option value="active">active</option>
+                <option value="retired">retired</option>
+                <option value="deceased">deceased</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-medium text-gray-700 text-xs">Jurisdiction</label>
+              <input x-model="draftJurisdiction" type="text" aria-label="Jurisdiction" class="block mt-1 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+            </div>
+            <div>
+              <label class="block font-medium text-gray-700 text-xs">State</label>
+              <input x-model="draftState" type="text" aria-label="State" class="block mt-1 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+            </div>
+            <div>
+              <label class="block font-medium text-gray-700 text-xs">Appointed year</label>
+              <input x-model="draftAppointed" type="text" aria-label="Appointed year" class="block mt-1 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+            </div>
+            <div>
+              <label class="block font-medium text-gray-700 text-xs">Courthouse id</label>
+              <input x-model="draftCourt" type="text" aria-label="Courthouse id" class="block mt-1 px-3 py-2 w-full text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-x-2 gap-y-2 mt-3">
+            <button type="button" @click="save()" x-disabled="saving" class="px-3 py-1.5 font-semibold text-white text-xs bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50">{{ saving() ? 'Saving…' : 'Save changes' }}</button>
+            <button type="button" @click="editingId.set(0)" class="px-3 py-1.5 font-medium text-gray-700 text-xs bg-white hover:bg-gray-50 border border-gray-300 rounded">Close</button>
+          </div>
+
+          {{-- Merge. The import keys judges on (name, courthouse) and a judge
+              can hold two seats, so duplicates are a normal state of this
+              directory rather than an error condition. --}}
+          <div class="mt-4 pt-3 border-gray-200 border-t">
+            <p class="font-semibold text-gray-700 text-xs tracking-wide uppercase">Merge a duplicate into this profile</p>
+            <p class="mt-0.5 text-gray-500 text-xs">Everything on the other profile moves here and that profile is deleted. Reviewers with a live review of both, or two verified claimants, block the merge.</p>
+            <div class="flex flex-wrap gap-2 items-center mt-2">
+              <input x-model="mergeSourceId" type="text" placeholder="Duplicate judge id" aria-label="Duplicate judge id" class="block px-3 py-2 w-48 text-gray-900 sm:text-sm bg-white border border-gray-300 rounded-md focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200">
+              <button type="button" @click="merge()" class="px-3 py-1.5 font-semibold text-white text-xs bg-red-600 hover:bg-red-700 rounded">Merge into #{{ judge.id }}</button>
+            </div>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <div class="flex items-center justify-between">
+    <p class="text-gray-500 text-sm">Page <span>{{ store.page() }}</span> of <span>{{ store.totalPages() }}</span></p>
+    <div class="flex gap-x-2">
+      <button type="button" @click="prevPage()" x-disabled="store.page() <= 1" class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+      <button type="button" @click="nextPage()" x-disabled="store.page() >= store.totalPages()" class="px-3 py-1.5 font-medium text-gray-700 text-sm bg-white hover:bg-gray-50 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+    </div>
+  </div>
+</div>

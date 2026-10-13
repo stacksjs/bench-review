@@ -114,6 +114,11 @@
             x-class="isActive('/admin/reviews') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'"
           >Reviews</StxLink>
           <StxLink
+            to="/admin/judges"
+            class="inline-flex items-center px-3 py-2 font-medium text-sm rounded-md"
+            x-class="isActive('/admin/judges') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'"
+          >Judges</StxLink>
+          <StxLink
             to="/admin/credentials"
             class="inline-flex items-center px-3 py-2 font-medium text-sm rounded-md"
             x-class="isActive('/admin/credentials') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'"
