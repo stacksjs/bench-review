@@ -522,6 +522,33 @@ route.post('/admin/flags/{id}/resolve', 'Actions/Admin/Flags/ResolveFlagAction')
   .middleware('admin')
   .skipCsrf()
 
+// Admin judge directory — the auth-gated replacement for the auto-CRUD
+// POST /api/judges the ORM used to generate unauthenticated (#50). Merge is
+// declared before the '{id}' routes purely for readability; the paths differ
+// in shape so there is no match race.
+route.get('/admin/judges', 'Actions/Admin/Judges/JudgeIndexAction')
+  .name('bench.admin.judges.index')
+  .middleware('auth')
+  .middleware('admin')
+
+route.post('/admin/judges', 'Actions/Admin/Judges/SaveJudgeAction')
+  .name('bench.admin.judges.store')
+  .middleware('auth')
+  .middleware('admin')
+  .skipCsrf()
+
+route.patch('/admin/judges/{id}', 'Actions/Admin/Judges/SaveJudgeAction')
+  .name('bench.admin.judges.update')
+  .middleware('auth')
+  .middleware('admin')
+  .skipCsrf()
+
+route.post('/admin/judges/{id}/merge', 'Actions/Admin/Judges/MergeJudgesAction')
+  .name('bench.admin.judges.merge')
+  .middleware('auth')
+  .middleware('admin')
+  .skipCsrf()
+
 // Admin review moderation.
 route.get('/admin/reviews', 'Actions/Admin/Reviews/ReviewIndexAction')
   .name('bench.admin.reviews.index')

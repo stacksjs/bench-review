@@ -5,7 +5,7 @@ export interface ModerationEntry {
   actorUserId: number
   /** Dotted verb, e.g. 'review.publish', 'user.delete', 'credential.approve'. */
   action: string
-  targetType: 'review' | 'review_comment' | 'user' | 'credential' | 'judge_submission'
+  targetType: 'review' | 'review_comment' | 'user' | 'credential' | 'judge_submission' | 'judge'
   targetId?: number | null
   /** Optional context — rejection reason, deleted user's email, etc. */
   note?: string | null
