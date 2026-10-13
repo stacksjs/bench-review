@@ -415,6 +415,7 @@ async function main(): Promise<void> {
       continue
 
     const inserted = await db.insertInto('court_houses' as any).values({
+      created_at: new Date().toISOString(),
       name,
       // Left null on purpose — see the header note. The source has no street
       // address, city, zip or coordinates for federal courts.
@@ -472,6 +473,11 @@ async function main(): Promise<void> {
     // for the seat, and the row is per seat.
     const startYear = Number((seat.position.date_start || '').slice(0, 4))
     await db.insertInto('judges' as any).values({
+      // Explicit, in ISO. Relying on the column's CURRENT_TIMESTAMP default is
+      // what put 2,740 rows in `2026-10-13 12:00:00` shape while every app
+      // action wrote `…T…Z` into the same column — and those columns are
+      // compared as strings, so a mix reorders the feed (bench-review#52).
+      created_at: new Date().toISOString(),
       name,
       image_url: avatar(name),
       practice_area: PRACTICE_AREA[seat.court.jurisdiction] ?? 'other',
