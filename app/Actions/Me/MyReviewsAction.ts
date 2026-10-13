@@ -1,5 +1,6 @@
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
+import { attachJudgeContext } from '../../Helpers/judgeContext'
 import { hydrateLikeData } from '../../Helpers/reviewLikes'
 
 /**
@@ -30,16 +31,6 @@ export default new Action({
     if (!rows || rows.length === 0)
       return response.json([])
 
-    // Join each row to its judge (one extra query per distinct judge,
-    // not per row — small datasets, cheap enough not to optimise).
-    const judgeIds = Array.from(new Set(rows.map(r => r.judge_id).filter((v: any) => v != null)))
-    const judges = judgeIds.length > 0
-      ? await Judge.whereIn('id', judgeIds).get() as Array<Record<string, any>>
-      : []
-    const judgesById: Record<number, any> = {}
-    for (const j of judges)
-      judgesById[j.id as number] = j
-
     // Hydrate `likes` so the profile's "total reactions received"
     // tally has real data to sum (resources/stores/profile.ts:78
     // accumulates `r.likes || 0` across this response). `liked_by_me`
@@ -47,10 +38,11 @@ export default new Action({
     // own rows when they've reacted to their own review pre-author-
     // gate, false otherwise.
     const hydrated = await hydrateLikeData(rows)
-    const enriched = hydrated.map(r => ({
-      ...r,
-      judge: r.judge_id != null ? (judgesById[r.judge_id as number] ?? null) : null,
-    }))
+    // Judge + courthouse + jurisdiction, through the shared helper the feed
+    // and article page use. "My reviews" is where someone checks what they
+    // wrote about whom, so naming the wrong same-name judge here is the
+    // version of this bug they would notice first (bench-review#50).
+    const enriched = await attachJudgeContext(hydrated)
 
     return response.json(enriched)
   },

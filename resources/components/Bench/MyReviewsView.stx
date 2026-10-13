@@ -301,6 +301,12 @@
             <StxLink
               x-to="`/judges/${r.judge.id}/profile`"
               class="text-gray-700 underline-offset-2 hover:underline">{{ r.judge.name }}</StxLink>
+            {{-- Which judge of that name — this is where someone checks what
+                they wrote about whom (bench-review#50). --}}
+            {{-- ml-1, not a literal space: the newline between this and the
+                link above is stripped at build, so the two would render as
+                "Wimes(District Court…". --}}
+            <span :show="r.judge.context_line" style="display:none" class="ml-1 text-gray-400">({{ r.judge.context_line }})</span>
           </span>
           <span class="text-gray-300">·</span>
           <span>{{ formatDate(r.created_at) }}</span>

@@ -3,6 +3,7 @@ import { Action } from '@stacksjs/actions'
 import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
+import { judgeContextFor } from '../../Helpers/judgeContext'
 import { hydrateLikeData } from '../../Helpers/reviewLikes'
 import { publicReviewerFor } from '../../Helpers/reviewerLabel'
 
@@ -43,14 +44,11 @@ export default new Action({
     if (!hydrated)
       return response.json({ error: 'Not Found' }, 404)
 
-    let judge: any = null
-    if (hydrated.judge_id) {
-      const j = await Judge.where('id', hydrated.judge_id).first()
-      if (j) {
-        const jr = (j as any).toJSON ? (j as any).toJSON() : j
-        judge = { id: jr.id, name: jr.name, court: jr.court ?? null, image_url: jr.image_url ?? null }
-      }
-    }
+    // Courthouse + jurisdiction with the name, same shape as the feed, so the
+    // article page identifies WHICH judge of a given name this is about
+    // (bench-review#50). Resolved through the shared helper rather than the
+    // model, whose declared attributes do not include the identity columns.
+    const judge = hydrated.judge_id ? await judgeContextFor(Number(hydrated.judge_id)) : null
 
     // Author payload with anonymity gating (bench-review#36).
     //

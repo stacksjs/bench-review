@@ -2,6 +2,7 @@ import { Action } from '@stacksjs/actions'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { attachJudgeContext } from '../../Helpers/judgeContext'
 import { buildPaginatorMeta, resolvePaginatorArgs } from '../../Helpers/paginate'
 import { hydrateLikeData } from '../../Helpers/reviewLikes'
 
@@ -99,11 +100,15 @@ export default new Action({
       liked_by_me: r.liked_by_me ?? false,
       created_at: r.created_at,
       judge_id: r.judge_id,
-      judge: r.judge_id != null
-        ? { id: r.judge_id, name: r.judge_name, image_url: r.judge_image }
-        : null,
     }))
 
-    return response.json(buildPaginatorMeta(shaped, total, page, perPage))
+    // Courthouse + jurisdiction on the judge, through the shared helper, so
+    // this profile's cards identify WHICH judge of a given name each review is
+    // about — the same shape the feed, article and my-reviews now return
+    // (bench-review#50). The join above still carries name and image for the
+    // rows the helper cannot resolve.
+    const withJudge = await attachJudgeContext(shaped)
+
+    return response.json(buildPaginatorMeta(withJudge, total, page, perPage))
   },
 })

@@ -493,11 +493,16 @@
 
       {{-- Judge name + rating + actions --}}
       <div class="flex items-center justify-between mt-4">
-        <div class="flex items-center space-x-3">
+        <div class="flex flex-wrap items-center space-x-3">
           <StxLink x-to="`/judges/${review.judge.id}/profile`" class="relative z-10 font-semibold text-base text-gray-900 hover:underline">{{ review.judge.name }}</StxLink>
           <div class="flex items-center">
             <Icon :for="star in stars" name="heroicons:star-solid" size="16" x-class="star <= review.rating ? 'text-amber-400' : 'text-gray-300'" />
           </div>
+          {{-- Which judge of that name. The directory holds 22 rows across 10
+              names, so the feed is where a review is least attributable to the
+              right person (bench-review#50). Server-composed so every surface
+              shows the same line and absent parts are simply dropped. --}}
+          <span :show="review.judge.context_line" style="display:none" class="basis-full text-gray-500 text-xs">{{ review.judge.context_line }}</span>
         </div>
         <div class="flex items-center space-x-4">
           {{-- Reader: clickable heart + count. --}}

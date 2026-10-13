@@ -2,6 +2,7 @@ import { Action } from '@stacksjs/actions'
 import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
+import { attachJudgeContext } from '../../Helpers/judgeContext'
 import { hydrateLikeData } from '../../Helpers/reviewLikes'
 import { buildPaginatorMeta, resolvePaginatorArgs } from '../../Helpers/paginate'
 import { attachReviewers, toPublicReviewRow } from '../../Helpers/reviewerLabel'
@@ -139,7 +140,10 @@ export default new Action({
 
       const hydrated = await hydrateLikeData(rows ?? [])
       const withReviewer = await attachReviewers(hydrated, loadUsers)
-      const publicRows = withReviewer.map(r => toPublicReviewRow(r, viewerId))
+      // Courthouse + jurisdiction alongside the name: the feed is where two
+      // same-name judges are least distinguishable (bench-review#50).
+      const withJudge = await attachJudgeContext(withReviewer)
+      const publicRows = withJudge.map(r => toPublicReviewRow(r, viewerId))
       return response.json(buildPaginatorMeta(publicRows, total, page, perPage))
     }
 
@@ -170,7 +174,8 @@ export default new Action({
 
     const hydrated = await hydrateLikeData(rows ?? [])
     const withReviewer = await attachReviewers(hydrated, loadUsers)
-    const publicRows = withReviewer.map(r => toPublicReviewRow(r, viewerId))
+    const withJudge = await attachJudgeContext(withReviewer)
+    const publicRows = withJudge.map(r => toPublicReviewRow(r, viewerId))
     return response.json(publicRows)
   },
 })

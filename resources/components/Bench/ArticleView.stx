@@ -425,7 +425,14 @@
   const readMinutes = derived<number>(() => estimateReadTime(reviewsStore.current()?.content))
   const judgeName = derived<string>(() => (reviewsStore.current() as any)?.judge?.name ?? 'Judge')
   const judgeId = derived<number | null>(() => (reviewsStore.current() as any)?.judge?.id ?? null)
-  const judgeCourt = derived<string>(() => (reviewsStore.current() as any)?.judge?.court ?? '')
+  // Courthouse, jurisdiction and state as one server-composed line, so the
+  // article names WHICH judge of that name it is about and matches what the
+  // feed shows (bench-review#50). Falls back to the courthouse alone for a
+  // response shape that predates the identity columns.
+  const judgeCourt = derived<string>(() => {
+    const j = (reviewsStore.current() as any)?.judge
+    return j?.context_line || j?.court || ''
+  })
   const judgeImage = derived<string>(() => (reviewsStore.current() as any)?.judge?.image_url ?? '')
 
   // Attached photos (bench-review#31). Returned by ShowReviewAction
