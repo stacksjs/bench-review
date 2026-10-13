@@ -314,13 +314,44 @@ defineStore('auth', () => {
     }
   }
 
+  /**
+   * The token Cloudflare's widget wrote into the signup form, if the widget
+   * is on the page at all (it is spliced in at build time, and only when
+   * TURNSTILE_SITE_KEY is set — see build.ts).
+   *
+   * Read here rather than in register.stx because templates must not touch
+   * `document` directly, and the store is the layer that already owns talking
+   * to the API.
+   */
+  function turnstileToken(): string {
+    if (typeof document === 'undefined')
+      return ''
+    const field = document.querySelector('[data-turnstile-slot] input[name="cf-turnstile-response"]') as HTMLInputElement | null
+    return field?.value ?? ''
+  }
+
+  /**
+   * A Turnstile token is single-use. Without this, a signup refused for any
+   * reason — an email already taken, a weak password — leaves a spent token
+   * in the form, and the person's second attempt fails the security check
+   * instead, with a message about robots that has nothing to do with what
+   * they got wrong.
+   */
+  function resetTurnstile(): void {
+    try {
+      (globalThis as any).turnstile?.reset?.()
+    }
+    catch { /* widget absent or not yet loaded — nothing to reset */ }
+  }
+
   async function signUp(payload: RegisterPayload): Promise<AuthResult> {
     try {
-      const body: RegisterPayload = {
+      const body: RegisterPayload & { turnstileToken?: string } = {
         name: payload.name,
         email: payload.email,
         password: payload.password,
         password_confirmation: payload.password_confirmation ?? payload.password,
+        turnstileToken: turnstileToken(),
       }
       const res = await fetch('/api/auth/register', {
         method: 'POST',
@@ -330,12 +361,14 @@ defineStore('auth', () => {
       const data = await res.json().catch(() => ({})) as AuthResponse
       if (!res.ok) {
         const msg = data?.errors?.[0]?.message || data?.message || 'Registration failed'
+        resetTurnstile()
         return { ok: false, error: msg }
       }
       persistAuth(data.token ?? '', data.user)
       return { ok: true, user: data.user, token: data.token }
     }
     catch (err) {
+      resetTurnstile()
       return { ok: false, error: err instanceof Error ? err.message : 'Network error' }
     }
   }

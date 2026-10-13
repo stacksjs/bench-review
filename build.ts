@@ -179,6 +179,58 @@ catch (err) {
 }
 
 
+// Cloudflare Turnstile on the signup form (bench-review#51). The widget needs
+// a site key, which is deployment-specific, so the .stx source ships an empty
+// `data-turnstile-slot` div and this step fills it in — the same post-build
+// splice the SEO, analytics and colour-scheme steps use, and for the same
+// reason (buildApp()'s SSG ignores config.app.head).
+//
+// MUST run before the CSP step, which hashes and enumerates what is actually
+// on the page: the script tag added here is what tells cspPolicyFor to allow
+// challenges.cloudflare.com.
+//
+// No key, no widget — and no key is committed. A build without
+// TURNSTILE_SITE_KEY ships the form unprotected, which matches the server:
+// verifyTurnstile() passes through when TURNSTILE_SECRET_KEY is unset. The
+// conformance gate is what stops that pairing reaching production.
+try {
+  const siteKey = (process.env.TURNSTILE_SITE_KEY ?? '').trim()
+  if (!siteKey) {
+    console.log('[build] TURNSTILE_SITE_KEY unset — signup ships without the widget')
+  }
+  else {
+    const glob = new Bun.Glob('**/*.html')
+    let injected = 0
+    // eslint-disable-next-line ts/no-top-level-await
+    for await (const file of glob.scan('dist')) {
+      const path = `dist/${file}`
+      // eslint-disable-next-line ts/no-top-level-await
+      const html = await Bun.file(path).text()
+      if (!html.includes('data-turnstile-slot') || html.includes('challenges.cloudflare.com'))
+        continue
+      // Only the data-sitekey is added. The `cf-turnstile` class Turnstile
+      // scans for lives in the template alongside the layout classes: adding
+      // a second `class` attribute here would have produced
+      // `class="cf-turnstile" ... class="flex justify-center"`, and a browser
+      // keeps the FIRST and silently drops the rest.
+      const withWidget = html.replace(
+        /<div data-turnstile-slot/g,
+        `<div data-turnstile-slot data-sitekey="${siteKey}"`,
+      )
+      // defer, so the widget script never blocks first paint of the form.
+      const loader = '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" defer></script>'
+      // eslint-disable-next-line ts/no-top-level-await
+      await Bun.write(path, withWidget.replace('</head>', `${loader}</head>`))
+      injected++
+    }
+    console.log(`[build] injected Turnstile widget into ${injected} static pages`)
+  }
+}
+catch (err) {
+  console.warn('[build] Turnstile injection skipped:', err instanceof Error ? err.message : err)
+}
+
+
 // Content-Security-Policy (bench-review#3 hardening). Splice a CSP <meta>
 // into every built page's <head>, same post-build mechanism as the SEO +
 // analytics steps. Ships only the provably-non-breaking baseline

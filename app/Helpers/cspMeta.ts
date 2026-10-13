@@ -100,7 +100,20 @@ export function scriptSrcFor(html: string, analyticsOrigin?: string): string {
   // reaches a raw x-html sink can still be executed through that path. That is
   // the sink sanitizeReviewHtml exists to guard, and it is why this is a
   // meaningful improvement rather than a complete answer.
-  const origins = ['\'self\'', ...(analyticsOrigin ? [analyticsOrigin] : []), '\'unsafe-eval\'']
+  // Turnstile's widget loads from challenges.cloudflare.com, so the signup
+  // page needs that origin or the check silently never renders — a CSP block
+  // leaves the form looking complete and the button doing nothing. Added only
+  // to pages that actually reference it, which keeps every other page's
+  // script-src exactly as tight as it was. Its iframe needs no frame-src
+  // entry: this policy sets no default-src, so unlisted directives are
+  // unrestricted.
+  const needsTurnstile = html.includes('challenges.cloudflare.com')
+  const origins = [
+    '\'self\'',
+    ...(analyticsOrigin ? [analyticsOrigin] : []),
+    ...(needsTurnstile ? ['https://challenges.cloudflare.com'] : []),
+    '\'unsafe-eval\'',
+  ]
   return `script-src ${[...origins, ...new Set(hashes)].join(' ')}`
 }
 

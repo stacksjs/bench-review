@@ -145,6 +145,14 @@
           </div>
         </div>
 
+        {{-- Turnstile mount point. Empty in the source on purpose: build.ts
+            adds the `cf-turnstile` class, the data-sitekey and the loader
+            script, and only when TURNSTILE_SITE_KEY is set — so no key is
+            ever committed, and a build without one simply ships a form with
+            no widget (which the server then does not require, since the
+            secret is unset there too). See app/Helpers/turnstile.ts. --}}
+        <div data-turnstile-slot class="flex justify-center cf-turnstile"></div>
+
         <div
           role="alert"
           aria-live="polite"
