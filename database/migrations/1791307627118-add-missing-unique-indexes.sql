@@ -22,7 +22,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS "email_subscriptions_email_unique" ON "email_s
 CREATE UNIQUE INDEX IF NOT EXISTS "judge_opinions_uuid_unique" ON "judge_opinions" ("uuid");
 CREATE UNIQUE INDEX IF NOT EXISTS "judge_reviews_uuid_unique" ON "judge_reviews" ("uuid");
 CREATE UNIQUE INDEX IF NOT EXISTS "judges_uuid_unique" ON "judges" ("uuid");
-CREATE UNIQUE INDEX IF NOT EXISTS "notifications_uuid_unique" ON "notifications" ("uuid");
 CREATE UNIQUE INDEX IF NOT EXISTS "personal_access_tokens_token_unique" ON "personal_access_tokens" ("token");
 CREATE UNIQUE INDEX IF NOT EXISTS "releases_uuid_unique" ON "releases" ("uuid");
 CREATE UNIQUE INDEX IF NOT EXISTS "review_comments_uuid_unique" ON "review_comments" ("uuid");

@@ -1,0 +1,27 @@
+-- Drop the unused `notifications` scaffold table.
+--
+-- `./buddy migrate` warns on every run:
+--
+--   WARN [notifications] "notifications" already exists without data.
+--   CREATE TABLE IF NOT EXISTS left it untouched, so the notification driver
+--   will fail on those columns. Something else owns this table.
+--
+-- The "something else" was us. `app/Models/Notification.ts` was a scaffold
+-- model from `buddy new`, and the migration generated from it created a
+-- `notifications` table in the shape the MODEL describes, which is not the
+-- shape the framework's notification driver expects. Neither of them then
+-- used it: bench's own bell feed is `user_notifications`, written by
+-- app/Helpers/notifications.ts, and the framework driver was never wired up.
+--
+-- Zero rows, no reader, no writer. The only app reference outside the model
+-- was `USER_OWNED_TABLES`, removed in the same commit — the frontend's
+-- `useStore('notifications')` calls are the store's NAME, not this table.
+--
+-- Same shape as the payment scaffolding dropped earlier: an unused model
+-- whose table collides with a framework expectation, generating a warning on
+-- every migrate that trains people to ignore warnings.
+--
+-- NOT dropped: `notification_preferences` and `notification_deliveries`, which
+-- the framework creates and which `wantsEmail()` actually reads.
+
+DROP TABLE IF EXISTS "notifications";

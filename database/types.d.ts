@@ -553,23 +553,6 @@ declare module '@stacksjs/database' {
       target_id: number
       note: string
     }
-    notifications: {
-      // columns
-      id: number
-      uuid: string
-      created_at: string
-      updated_at: string | null
-      type: string
-      channel: string
-      recipient: string
-      subject: string
-      body: string
-      status: string
-      read_at: string
-      sent_at: string
-      metadata: string
-      user_id: number
-    }
     oauth_access_tokens: {
       // columns
       id: number

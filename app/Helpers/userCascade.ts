@@ -26,7 +26,8 @@ export const USER_OWNED_TABLES: readonly string[] = [
   'review_drafts',
   'review_flags',
   'review_photos',
-  'notifications',
+  // NOT 'notifications' — that scaffold table was dropped; the bell feed is
+  // user_notifications.
   'user_notifications',
   'notification_preferences',
   'email_verifications',
