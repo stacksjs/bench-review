@@ -629,7 +629,7 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
     'stx script blocks declare return types',
     offenders.length === 0,
     offenders.length
-      ? `${offenders.length} function(s) in .stx script blocks have no return type — tsc cannot see these, so nothing else will tell you: ${offenders.slice(0, 4).join(', ')}`
+      ? `${offenders.length} functions in .stx script blocks have no return type — tsc cannot see these, so nothing else will tell you: ${offenders.slice(0, 4).join(', ')}`
       : '',
   )
 }
@@ -1078,7 +1078,7 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
     'every roving-focus ARIA role implements its keyboard contract',
     unimplemented.length === 0,
     unimplemented.length
-      ? `${unimplemented.length} file(s) claim a role that promises arrow-key navigation but handle no keys — implement it or drop the role: ${unimplemented.slice(0, 3).join(', ')}`
+      ? `${unimplemented.length} files claim a role that promises arrow-key navigation but handle no keys — implement it or drop the role: ${unimplemented.slice(0, 3).join(', ')}`
       : '',
   )
 }
