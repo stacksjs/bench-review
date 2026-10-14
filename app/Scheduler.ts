@@ -38,11 +38,36 @@ export default function () {
     .onDays([2])
     .setTimeZone('America/Los_Angeles')
 
-  // Run a custom action every five minutes
-  // schedule.action('CleanupTempFiles').everyFiveMinutes()
+  // ── Maintenance (bench-review#55) ─────────────────────────────────────────
+  //
+  // One cadence method each, deliberately. They do not refine one another —
+  // every one of them assigns `cronPattern` outright, so `.daily().at('03:00')`
+  // is just `at('03:00')` and `.at('03:00').daily()` is just `daily()`. There
+  // is no raw-cron setter to escape to. Chaining them here would silently
+  // produce a schedule nobody chose, which for the backup means believing
+  // there is a daily snapshot when there is not.
 
-  // Run a shell command daily at midnight
-  // schedule.command('echo "Daily maintenance complete"').daily()
+  // The database is the site: every review, every moderation decision, every
+  // credential claim. `.daily()` is midnight in the configured zone.
+  schedule
+    .job('BackupDatabase')
+    .daily()
+    .setTimeZone('America/Los_Angeles')
+
+  // Expired and revoked tokens carry the user_id ↔ session linkage for every
+  // sign-in the site has ever had. Keeping them forever is a liability with no
+  // matching benefit on a site built around reviewer anonymity.
+  schedule
+    .job('PruneAuthTokens')
+    .daily()
+    .setTimeZone('America/Los_Angeles')
+
+  // Unbounded logs are how a small instance fills its disk, and a full disk
+  // takes SQLite down with it.
+  schedule
+    .job('PruneLogs')
+    .weekly()
+    .setTimeZone('America/Los_Angeles')
 }
 
 process.on('SIGINT', () => {
