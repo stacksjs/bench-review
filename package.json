@@ -22,7 +22,11 @@
     "ui:validate": "bun scripts/validate-ui.ts",
     "visual:validate": "bun scripts/validate-visual.ts",
     "release:validate": "bun scripts/validate-release.ts",
-    "deployment:smoke": "bun scripts/smoke-deployment.ts"
+    "deployment:smoke": "bun scripts/smoke-deployment.ts",
+    "test:e2e:ios": "bun scripts/run-mobile-e2e.ts",
+    "preview:ios": "MOBILE_E2E=1 bun run build:offline-bundle && MOBILE_E2E=1 ./buddy build:ios",
+    "preview:ios:local": "MOBILE_URL=http://localhost:4000 ./buddy build:ios",
+    "preview:ios:production": "MOBILE_URL=https://benchreview.org ./buddy build:ios"
   },
   "dependencies": {
     "@stacksjs/components": "^0.2.170",

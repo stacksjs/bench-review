@@ -1,0 +1,30 @@
+appId: ${APP_ID}
+name: Native shell navigation
+tags:
+  - mobile
+  - smoke
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: Transparency in the US Chambers of Secrets
+    timeout: 90000
+
+# Below `lg` the header's three regions are hidden and navigation lives behind
+# the hamburger (bench-review#90). The app is iPhone-only, so this is the only
+# path a user has — and it is therefore the one worth testing.
+- tapOn: "Open main menu"
+- extendedWaitUntil:
+    visible: "Find Judges"
+    timeout: 30000
+- takeScreenshot: mobile-menu
+
+- tapOn: "Find Judges"
+# The directory renders its own heading from the bundled page; the rows need
+# the API, which the bundle deliberately does not have.
+- extendedWaitUntil:
+    visible: Judicial Directory
+    timeout: 30000
+- takeScreenshot: judges

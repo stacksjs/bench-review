@@ -1,0 +1,45 @@
+appId: ${APP_ID}
+name: Offline fallback serves the bundle
+tags:
+  - mobile
+  - offline
+onFlowComplete:
+  - setAirplaneMode: disabled
+---
+# The reason this suite exists. The offline path only runs when the network or
+# the server has already failed, so it is the least likely thing to be
+# exercised by hand and the most likely to rot unnoticed.
+- setAirplaneMode: enabled
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+
+- extendedWaitUntil:
+    visible: Transparency in the US Chambers of Secrets
+    timeout: 90000
+- takeScreenshot: offline-cold-start
+
+# A SECOND bundled page, reached with the network off. One page could be a
+# cached shell; two proves the bundle is being served.
+#
+# Reached through the menu rather than `benchreview://judges`, which is what
+# this originally did: the custom scheme is declared in config/mobile.ts but
+# does not route the WebView (see 03-deep-link, and the issue it is parked
+# against). Depending on it here would have made the offline test fail for a
+# reason that has nothing to do with being offline.
+- tapOn: "Open main menu"
+- extendedWaitUntil:
+    visible: "Find Judges"
+    timeout: 30000
+- tapOn: "Find Judges"
+- extendedWaitUntil:
+    visible: Judicial Directory
+    timeout: 30000
+
+# What the directory must NOT say with the API unreachable. "No judges yet" is
+# a claim about the content and it is false during an outage; the store carries
+# a loadError for exactly this, and the offline bundle shipped a week-stale
+# copy that predated it (found writing this suite, bench-review#81).
+- assertNotVisible: "No judges yet"
+- takeScreenshot: offline-directory

@@ -1,0 +1,37 @@
+appId: ${APP_ID}
+name: Bundled cold start
+tags:
+  - mobile
+  - smoke
+---
+# The single most valuable flow: it is the one that catches a broken or stale
+# offline bundle, and the offline bundle only runs when something else has
+# already gone wrong.
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+
+# 90s rather than 30s. A cold simulator spends a long time in launchApp before
+# the WebView paints, and this returns as soon as the text appears, so a
+# generous timeout costs nothing on a healthy run and prevents a flaky failure
+# on a slow one.
+#
+# This asserts the COMING SOON page, not the marketing homepage, because that
+# is genuinely what `/` serves today — see bench-review#62. When that is fixed
+# this assertion has to change with it, which is the point: the flow should
+# fail loudly rather than quietly keep passing against the wrong page.
+- extendedWaitUntil:
+    visible: Transparency in the US Chambers of Secrets
+    timeout: 90000
+- takeScreenshot: cold-start
+
+# The site chrome reached the WebView. Without this a blank page under a
+# correct <title> would pass.
+#
+# NOT the nav links: below `lg` the header's three regions are hidden and
+# navigation lives behind the hamburger (bench-review#90), so "Find Judges" is
+# not on screen on an iPhone. Asserting it failed here on the first run — the
+# flow was written from the desktop rendering, and the app was right.
+- assertVisible: "Coming soon"
+- assertVisible: "Open main menu"
