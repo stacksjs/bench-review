@@ -481,6 +481,15 @@ route.post('/admin/auth/login', 'Actions/Admin/Auth/AdminLoginAction')
   .skipCsrf()
   .middleware('throttle:5,1m') // admin brute-force guard: tighter than public login
 
+// Step two: the emailed code. Throttled harder than the password step — six
+// digits is a small keyspace, and the per-challenge attempt cap only stops
+// guessing against ONE challenge. This stops someone cycling fresh challenges
+// to get five fresh guesses each time.
+route.post('/admin/auth/mfa', 'Actions/Admin/Auth/AdminMfaVerifyAction')
+  .name('bench.admin.auth.mfa')
+  .skipCsrf()
+  .middleware('throttle:10,10m')
+
 // Admin user management — all auth + admin gated. `admin` middleware
 // resolves the current user via Auth.user() and checks the role itself,
 // so chaining `.middleware('auth').middleware('admin')` covers both
