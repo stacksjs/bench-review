@@ -10,7 +10,8 @@ import { request, response } from '@stacksjs/router'
  * moderation queue actually has something to moderate.
  *
  * Query:
- *   - status   : 'all' | 'pending' | 'published' | 'rejected', default 'all'
+ *   - status   : 'all' | 'pending' | 'published' | 'rejected' | 'removed',
+ *                default 'all'
  *   - q        : substring matched against `title` OR `content`
  *   - page, perPage : 1-indexed, 25 default, max 100
  *
@@ -18,7 +19,11 @@ import { request, response } from '@stacksjs/router'
  * so the admin table can show "Review of <Judge> by <Author>" without
  * an extra client-side join.
  */
-const VALID_STATUS = new Set(['all', 'pending', 'published', 'rejected'])
+// 'removed' included so a moderator can still find a taken-down review
+// (bench-review#53). It is invisible to the public and to its author, but the
+// whole point of a soft delete is that the people handling a threat report or
+// a privacy removal can see what was taken down and when.
+const VALID_STATUS = new Set(['all', 'pending', 'published', 'rejected', 'removed'])
 
 export default new Action({
   name: 'Admin Review Index',

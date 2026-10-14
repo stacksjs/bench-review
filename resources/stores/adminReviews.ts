@@ -1,13 +1,13 @@
 import { defineStore, derived, state, useStore } from '@stacksjs/stx'
 
-export type ReviewStatusFilter = 'all' | 'pending' | 'published' | 'rejected'
+export type ReviewStatusFilter = 'all' | 'pending' | 'published' | 'rejected' | 'removed'
 
 export interface AdminReviewRow {
   id: number
   title: string
   content: string
   rating: number
-  status: 'pending' | 'published' | 'rejected'
+  status: 'pending' | 'published' | 'rejected' | 'removed'
   type?: string | null
   likes?: number | null
   comments?: number | null

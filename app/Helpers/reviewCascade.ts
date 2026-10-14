@@ -30,7 +30,15 @@ const REVIEW_CHILDREN = [
   'judge_responses',
 ] as const
 
-export async function deleteReviewCascade(reviewId: number): Promise<void> {
+/**
+ * Clear everything hanging off a review, WITHOUT deleting the review.
+ *
+ * Used by the admin takedown, which soft-deletes the parent (bench-review#53):
+ * the review is preserved as evidence of what was published, but its comments,
+ * photos, flags, likes and the judge's response are not that evidence and
+ * should not outlive it in public.
+ */
+export async function deleteReviewCascadeChildren(reviewId: number): Promise<void> {
   for (const table of REVIEW_CHILDREN) {
     await db.deleteFrom(table as any)
       .where('judge_review_id', '=', reviewId)
@@ -47,6 +55,11 @@ export async function deleteReviewCascade(reviewId: number): Promise<void> {
     .where('review_id', '=', reviewId)
     .execute()
     .catch(() => {})
+}
+
+/** Children, then the review itself. Used where the row really should go. */
+export async function deleteReviewCascade(reviewId: number): Promise<void> {
+  await deleteReviewCascadeChildren(reviewId)
 
   // Deliberately NOT caught. If a child table still holds rows, the foreign
   // key refuses this and the caller must hear about it — a silently skipped

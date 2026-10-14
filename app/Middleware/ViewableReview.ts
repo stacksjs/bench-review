@@ -76,6 +76,15 @@ export default new Middleware({
     const authorId = review.user_id
     const viewerIsAuthor = authorId != null && viewerId != null && Number(viewerId) === Number(authorId)
 
+    // A taken-down review is gone for EVERYONE, including its author
+    // (bench-review#53). That is the line between moderation and takedown:
+    // 'rejected' is a decision the author can see and resubmit against,
+    // 'removed' is a review pulled for cause — a threat, or a judicial-privacy
+    // removal request — and letting its author keep reading it, or edit their
+    // way back out of it, defeats the removal.
+    if (review.status === 'removed')
+      throw new HttpError(404, 'Not Found')
+
     if (review.status !== 'published' && !viewerIsAuthor)
       throw new HttpError(404, 'Not Found')
 

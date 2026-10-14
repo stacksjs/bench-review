@@ -3,7 +3,7 @@ import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
-import { deleteReviewCascade } from '../../../Helpers/reviewCascade'
+import { deleteReviewCascadeChildren } from '../../../Helpers/reviewCascade'
 import { logModeration } from '../../../Helpers/auditLog'
 
 /**
@@ -38,16 +38,29 @@ export default new Action({
     if (!existing)
       return response.json({ error: 'Review not found.' }, 404)
 
-    // Cascade to every child table that FKs judge_reviews (SQLite has no
-    // FK constraints, so app-level cascade is the only cleanup — mirrors
-    // DeleteMyReviewAction). Best-effort on children so a missing table
-    // doesn't 500; the judge_reviews delete is the must-succeed step.
-    // (Photo FILES on disk aren't removed here — separate storage sweep.)
-    // Shared cascade (bench-review#52). This list used to be inline here and
-    // in DeleteMyReviewAction, and both copies omitted `judge_responses` —
-    // whose foreign key then refused the parent delete, so a review a judge
-    // had replied to could not be taken down at all.
-    await deleteReviewCascade(reviewId)
+    // Soft delete, not a hard one (bench-review#53).
+    //
+    // The two situations most likely to require an admin takedown are a
+    // threat and a judicial-privacy removal request, and both are ones where
+    // the question afterwards is "what exactly was published, and when did
+    // you remove it". A hard DELETE answers neither.
+    //
+    // `status = 'removed'` is what hides it: every public query already
+    // filters `status = 'published'`, so the row leaves the feed, the judge
+    // page, the article route and the sitemap the moment this lands — no new
+    // WHERE clause to remember anywhere. `deleted_at` records when.
+    //
+    // The CHILDREN are still hard-deleted. Comments, photos, flags, likes and
+    // the judge's response are not evidence of what the author wrote, and
+    // leaving a removed review's photo rows behind means the files stay
+    // referenced. What is preserved is the review itself plus the snapshot
+    // below.
+    await deleteReviewCascadeChildren(reviewId)
+
+    await db.updateTable('judge_reviews')
+      .set({ status: 'removed', deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() } as any)
+      .where('id', '=', reviewId)
+      .execute()
 
     const admin = await Auth.user().catch(() => null)
     if ((admin as any)?.id)
@@ -56,9 +69,11 @@ export default new Action({
         action: 'review.delete',
         targetType: 'review',
         targetId: reviewId,
+        // The row survives as `status='removed'`, but its content can still be
+        // redacted later. The snapshot is what the original said.
         metadata: { snapshot: existing },
       })
 
-    return response.json({ ok: true, deleted: reviewId })
+    return response.json({ ok: true, removed: reviewId })
   },
 })

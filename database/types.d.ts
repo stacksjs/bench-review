@@ -439,6 +439,7 @@ declare module '@stacksjs/database' {
       anonymized: number
       judge_id: number
       user_id: number
+      deleted_at: string | null
     }
     judges: {
       // columns

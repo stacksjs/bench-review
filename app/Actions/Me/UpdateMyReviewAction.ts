@@ -13,7 +13,8 @@ import { sanitizeReviewHtml } from '../../Helpers/sanitizeReviewHtml'
  *   - Only the row's author can call this. Non-owners get 404 (same
  *     response shape as a missing row — non-existence and access-
  *     denial indistinguishable from outside).
- *   - All statuses are editable (pending / rejected / published). The
+ *   - Editable at pending / rejected / published; NOT at 'removed', which is
+ *     a takedown rather than a moderation decision (bench-review#53). The
  *     bait-and-switch risk on published edits is mitigated by the
  *     side effect below: every edit drops the row back into the
  *     moderation queue, so swapped content has to be re-approved
@@ -54,6 +55,15 @@ export default new Action({
       .executeTakeFirst() as { id: number, user_id: number | null, status: string, judge_id: number | null } | undefined
 
     if (!existing || existing.user_id == null || Number(existing.user_id) !== Number(userId))
+      return response.json({ error: 'Review not found' }, 404)
+
+    // A taken-down review is not editable by its author (bench-review#53).
+    // 404 rather than 403, matching what they already see everywhere else:
+    // the review is gone for them, and an explicit "you may not edit this"
+    // would confirm it still exists. Editing would otherwise reset status to
+    // 'pending' and walk the review straight back out of a removal that may
+    // have been legally compelled.
+    if (existing.status === 'removed')
       return response.json({ error: 'Review not found' }, 404)
 
     // Body fields. All optional individually — we accept partial
