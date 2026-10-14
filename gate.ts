@@ -630,6 +630,10 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
     // to paint on arrival (anyone can subscribe); it steps aside only once
     // somebody has signed up during this visit.
     `showForm() ? '' : 'hidden'`,
+    // admin/login.stx — the email+password step of admin login. It is the
+    // state the page arrives in; the emailed-code step it hands off to is the
+    // one that must not paint (bench-review#56).
+    `codeStep() ? 'hidden' : ''`,
   ])
   const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr'])
   const TAG = /<(\/?)([a-zA-Z][\w-]*)((?:"[^"]*"|'[^']*'|[^>"'])*)(\/?)>/g

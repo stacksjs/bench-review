@@ -19,16 +19,45 @@
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('expired'),
   )
 
+  // The emailed second factor (bench-review#56). `codeStep` drives which half
+  // of the form is showing; it is a derived over the store's challenge rather
+  // than its own flag, so a challenge the store drops (expired, used up) puts
+  // the password step back without anything here having to remember to.
+  const code = state<string>('')
+  const codeStep = derived<boolean>(() => adminStore.mfaChallenge() !== '')
+  const sentTo = derived<string>(() => `We emailed a 6-digit code to ${adminStore.mfaSentTo()}. It expires in 10 minutes.`)
+
   async function submitAdminLogin(): Promise<void> {
     loading.set(true)
     submitError.set('')
-    const ok = await adminStore.adminLogin(email(), password())
+    const outcome = await adminStore.adminLogin(email(), password())
     loading.set(false)
-    if (!ok) {
+    if (outcome === 'failed') {
       submitError.set(adminStore.loginError() || 'Login failed. Please try again.')
       return
     }
+    // A correct password gets a code, not a session. Clear the password out of
+    // the signal now that it is spent — it has no further use on this page.
+    password.set('')
+    code.set('')
+  }
+
+  async function submitAdminCode(): Promise<void> {
+    loading.set(true)
+    submitError.set('')
+    const outcome = await adminStore.verifyAdminCode(code().trim())
+    loading.set(false)
+    if (outcome !== 'ok') {
+      submitError.set(adminStore.loginError() || 'That code is not right.')
+      return
+    }
     navigate('/admin', true)
+  }
+
+  function startOver(): void {
+    adminStore.cancelMfa()
+    code.set('')
+    submitError.set('')
   }
 </script>
 
@@ -50,7 +79,13 @@
         Your admin session expired. Please sign in again.
       </div>
 
-      <form @submit.prevent="submitAdminLogin()" class="space-y-6">
+      {{-- Step one: credentials. An x-class toggle rather than `:show`,
+          because this step IS the state the page arrives in — `:show` makes
+          stx stamp x-cloak at build time, which would hide the login form
+          until JS boots and trade a flash-out for a flash-of-nothing on the
+          primary path. Allowlisted in gate.ts's STARTS_VISIBLE, which exists
+          for exactly this case. --}}
+      <form @submit.prevent="submitAdminLogin()" class="space-y-6" x-class="codeStep() ? 'hidden' : ''">
         <div>
           <label for="admin-email" class="block font-medium text-gray-900 text-sm/6">Email address</label>
           <div class="mt-2">
@@ -94,6 +129,51 @@
           x-disabled="loading"
           class="flex justify-center px-3 py-1.5 w-full font-semibold text-sm/6 text-white bg-blue-600 hover:bg-blue-700 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >{{ loading() ? 'Signing in...' : 'Sign in to admin' }}</button>
+      </form>
+
+      {{-- Step two: the emailed code. The password alone does not reach the
+          admin panel any more, because the panel is where someone can see
+          which real person wrote an anonymous review of a named judge
+          (bench-review#56). --}}
+      <form @submit.prevent="submitAdminCode()" class="space-y-6" :show="codeStep" style="display:none">
+        <p class="text-gray-600 text-sm">{{ sentTo() }}</p>
+
+        <div>
+          <label for="admin-code" class="block font-medium text-gray-900 text-sm/6">6-digit code</label>
+          <div class="mt-2">
+            <input
+              x-model="code"
+              type="text"
+              name="code"
+              id="admin-code"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              maxlength="6"
+              pattern="[0-9]{6}"
+              required
+              x-disabled="loading"
+              class="block px-3 py-2 w-full font-mono text-center text-gray-900 text-lg tracking-[0.4em] placeholder:text-gray-400 bg-white border border-gray-400 rounded-md focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-600 shadow-sm disabled:opacity-50"
+            >
+          </div>
+        </div>
+
+        <div
+          role="alert"
+          aria-live="polite"
+          class="px-4 py-3 text-red-800 text-sm bg-red-50 border border-red-200 rounded-md"
+          x-class="submitError() ? '' : 'hidden'">{{ submitError() }}</div>
+
+        <button
+          type="submit"
+          x-disabled="loading"
+          class="flex justify-center px-3 py-1.5 w-full font-semibold text-sm/6 text-white bg-blue-600 hover:bg-blue-700 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >{{ loading() ? 'Checking...' : 'Verify and sign in' }}</button>
+
+        <button
+          type="button"
+          @click="startOver()"
+          class="block mx-auto font-medium text-gray-500 text-sm hover:text-gray-700 hover:underline"
+        >Start over</button>
       </form>
     </div>
 
