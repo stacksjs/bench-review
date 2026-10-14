@@ -2,6 +2,7 @@ import { Action } from '@stacksjs/actions'
 import { passwordResets } from '@stacksjs/auth'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
+import { reportError } from '../../Support/reportError'
 
 /**
  * POST /api/auth/password/forgot — send a password-reset link.
@@ -37,14 +38,21 @@ export default new Action({
     const uniform = { ok: true, message: 'If an account exists for that email, a reset link has been sent.' }
 
     if (email) {
-      try {
-        await passwordResets(email).sendEmail()
-      }
-      catch (err) {
-        // Don't leak failure (anti-enumeration) and don't crash — the
-        // token is already persisted; the user can retry once mail is configured.
-        console.warn('[password-reset] send failed (configure MAIL_* to deliver):', err instanceof Error ? err.message : err)
-      }
+      // NOT awaited (bench-review#55). The response body is deliberately
+      // identical whether or not an account exists — but awaiting the send
+      // made the response TIME depend on whether one happened, since
+      // `sendEmail()` returns immediately for an unknown address and talks to
+      // SMTP for a known one. The uniform message said nothing while the clock
+      // said everything, which is the same enumeration oracle in a slower
+      // disguise.
+      //
+      // Detaching also means a dead mail server cannot hold this endpoint open
+      // for the driver's full timeout. Failures are reported rather than
+      // surfaced: the token is already persisted, so a retry works once mail
+      // is configured.
+      void passwordResets(email).sendEmail().catch((err: unknown) => {
+        reportError('mail.password-reset', err)
+      })
     }
 
     return response.json(uniform)

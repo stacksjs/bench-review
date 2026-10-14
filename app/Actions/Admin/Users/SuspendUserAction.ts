@@ -4,6 +4,7 @@ import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
 import { logModeration } from '../../../Helpers/auditLog'
+import { reportError } from '../../../Support/reportError'
 
 /**
  * POST /api/admin/users/{id}/suspend — suspend or reinstate an account.
@@ -68,7 +69,9 @@ export default new Action({
         await revokeAllTokens(targetUserId)
       }
       catch (err) {
-        console.warn('[suspend-user] revokeAllTokens failed — user still suspended.', err instanceof Error ? err.message : err)
+        // Reported, not just logged: the account is suspended but its tokens
+        // are still live, so this is a suspension that has not taken effect yet.
+        reportError('suspend-user.revoke-tokens', err, { targetUserId })
       }
 
       await logModeration({

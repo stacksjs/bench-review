@@ -4,6 +4,7 @@ import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { makeHash, verifyHash } from '@stacksjs/security'
 import { schema } from '@stacksjs/validation'
+import { reportError } from '../../Support/reportError'
 
 /**
  * PATCH /api/me/password — authenticated user changes their own password.
@@ -96,7 +97,10 @@ export default new Action({
       await revokeOtherTokens(Number(userId))
     }
     catch (err) {
-      console.warn('[change-password] revokeOtherTokens failed — password still changed.', err instanceof Error ? err.message : err)
+      // The password changed but the other sessions did not go away, which is
+      // the opposite of what someone changing a password after a compromise
+      // believes just happened.
+      reportError('change-password.revoke-others', err, { userId })
     }
 
     return response.json({ ok: true })

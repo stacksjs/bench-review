@@ -4,6 +4,7 @@ import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { authorRef, isAnonymized } from '../../../Helpers/anonymityMask'
 import { logModeration } from '../../../Helpers/auditLog'
+import { reportError } from '../../../Support/reportError'
 
 /**
  * POST /api/admin/reviews/{id}/author — reveal one anonymized author's
@@ -95,7 +96,7 @@ export default new Action({
       } as any).execute()
     }
     catch (err) {
-      console.error('[reveal-author] audit write failed — reveal refused.', err instanceof Error ? err.message : err)
+      reportError('reveal-author.audit-write', err, { reviewId, adminId })
       return response.json({ error: 'Could not record this reveal, so it was not performed. Try again.' }, 500)
     }
 

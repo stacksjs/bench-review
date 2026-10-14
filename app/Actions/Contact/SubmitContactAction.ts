@@ -2,6 +2,7 @@ import process from 'node:process'
 import { Action } from '@stacksjs/actions'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
+import { sendMailDetached } from '../../Support/sendMail'
 
 /**
  * POST /api/contact — the public contact form (bench-review#54).
@@ -84,20 +85,16 @@ export default new Action({
       updated_at: now,
     } as any).execute()
 
-    // Best-effort from here. The message is saved; the sender is owed their
-    // confirmation whether or not SMTP answers.
-    try {
-      const to = recipientFor(topic)
-      const { mail } = await import('@stacksjs/email')
-      await mail.send({
-        to,
-        subject: `[bench:${topic}] ${name}`,
-        text: `Topic: ${topic}\nFrom: ${name} <${email}>\n\n${message}\n`,
-      })
-    }
-    catch (err) {
-      console.warn(`[contact] could not deliver a '${topic}' message from ${email}. It is stored as contact_messages.${uuid}.`, err instanceof Error ? err.message : err)
-    }
+    // Detached from here. The message is already saved — which is the part
+    // that matters for a legal demand — so the sender gets their confirmation
+    // without waiting on SMTP, and a delivery failure is reported rather than
+    // swallowed to a console nobody reads. The stored row is the record that
+    // it arrived.
+    sendMailDetached('mail.contact', {
+      to: recipientFor(topic),
+      subject: `[bench:${topic}] ${name}`,
+      text: `Topic: ${topic}\nFrom: ${name} <${email}>\n\n${message}\n`,
+    })
 
     return response.json({ ok: true }, 201)
   },

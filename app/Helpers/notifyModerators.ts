@@ -1,5 +1,6 @@
 import { db } from '@stacksjs/database'
 import { escapeHtml, renderReviewEmail } from './reviewEmailTemplate'
+import { reportError } from '../Support/reportError'
 
 /**
  * Moderator alerts.
@@ -124,11 +125,14 @@ export async function notifyModeratorsOfFlag(reviewId: number, reason: string): 
           accent: 'red',
           footerNote: 'You receive this because you moderate Bench Review.',
         }),
-      }).catch(() => {})
+      }).catch((err: unknown) => reportError('mail.moderator-flag-alert', err, { reviewId }))
     }
   }
-  catch {
-    // Best-effort — never let a moderator-alert failure break flagging.
+  catch (err) {
+    // Best-effort — never let a moderator-alert failure break flagging. But a
+    // flag nobody was told about is a report sitting unseen in the queue, so
+    // it is reported rather than discarded silently.
+    reportError('notify-moderators.flag', err, { reviewId })
   }
 }
 
@@ -166,10 +170,11 @@ export async function notifyModeratorsOfJudgeSubmission(submissionId: number, ju
           accent: 'neutral',
           footerNote: 'You receive this because you moderate Bench Review.',
         }),
-      }).catch(() => {})
+      }).catch((err: unknown) => reportError('mail.moderator-submission-alert', err, { submissionId }))
     }
   }
-  catch {
+  catch (err) {
     // Best-effort — never let a moderator-alert failure break a submission.
+    reportError('notify-moderators.submission', err, { submissionId })
   }
 }

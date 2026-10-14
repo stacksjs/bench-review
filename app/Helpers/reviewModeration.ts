@@ -3,6 +3,8 @@ import { logModeration } from './auditLog'
 import { wantsEmail } from './emailPreferences'
 import { notify } from './notifications'
 import { escapeHtml, renderReviewEmail } from './reviewEmailTemplate'
+import { reportError } from '../Support/reportError'
+import { sendMailDetached } from '../Support/sendMail'
 
 /**
  * One review status change, with every consequence attached.
@@ -144,10 +146,8 @@ export async function applyReviewStatus(
         const reviewerName = author.name || 'there'
         const articleUrl = `${process.env.APP_URL || 'http://localhost:4000'}/article/${reviewId}`
         const safeJudge = escapeHtml(judgeName)
-        const { mail } = await import('@stacksjs/email')
-
         if (status === 'published') {
-          await mail.send({
+          sendMailDetached('mail.review-published', {
             to: author.email,
             subject: `Your review of ${judgeName} is now live`,
             text: `Hi ${reviewerName},\n\nGreat news — your review of ${judgeName} has been approved and is live on Bench Review.\n\nView it here:\n${articleUrl}\n\nThanks for contributing.\n\n— Bench Review\n`,
@@ -167,7 +167,7 @@ export async function applyReviewStatus(
           })
         }
         else {
-          await mail.send({
+          sendMailDetached('mail.review-declined', {
             to: author.email,
             subject: `Your review of ${judgeName} was declined`,
             text: `Hi ${reviewerName},\n\nA moderator declined your review of ${judgeName}. Only you can see it from your account — readers won't.\n\nYou can edit and resubmit it, or write a fresh one:\n${articleUrl}/edit\n\nIf you think this was a mistake, reply to this email and we'll take another look.\n\n— Bench Review\n`,
@@ -190,7 +190,11 @@ export async function applyReviewStatus(
       }
     }
     catch (err) {
-      console.warn(`[review-moderation] mail.send failed for review ${reviewId} → ${status}. The status change is persisted; the email could not be delivered.`, err instanceof Error ? err.message : err)
+      // The sends themselves are detached and report their own failures; this
+      // still catches everything AROUND them — the author lookup, the judge
+      // name query — so a moderation decision is never lost to a failure in
+      // the notification it triggers.
+      reportError('review-moderation.notify', err, { reviewId, status })
     }
   }
 
@@ -271,10 +275,7 @@ export async function applyReviewStatus(
           const base = process.env.APP_URL || 'http://localhost:4000'
           const articleUrl = `${base}/article/${reviewId}`
 
-          // Dynamic import, matching the author-email block above: the
-          // mail driver is pulled in only on the paths that actually send.
-          const { mail } = await import('@stacksjs/email')
-          await mail.send({
+          sendMailDetached('mail.review-about-you', {
             to: String(emailTarget.email),
             subject: `A new review of ${judgeName} was published`,
             text: `A review of ${judgeName} has been published on Bench Review.\n\n"${reviewTitle}"\n\nYou can read it, and respond to it from your claimed profile, here:\n${articleUrl}\n\nResponses appear alongside the review.\n\n— Bench Review\n`,

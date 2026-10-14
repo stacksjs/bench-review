@@ -50,6 +50,11 @@ async function send(fields: Record<string, unknown>): Promise<number> {
     all: () => fields,
   }
   const res: any = await runWithRequest(req as any, () => (contactAction as any).handle())
+  // The send is detached now (bench-review#55) — the row is stored first and
+  // the sender is not made to wait on SMTP — so the response comes back before
+  // the mail has gone. Let the detached task run before asserting on it; it
+  // awaits a dynamic import, so a microtask flush is not enough.
+  await new Promise(resolve => setTimeout(resolve, 25))
   return typeof res?.status === 'number' ? res.status : 200
 }
 
