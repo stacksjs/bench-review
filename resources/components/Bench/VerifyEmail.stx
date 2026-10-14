@@ -31,7 +31,7 @@
     return { id: Number(m[1]), token: decodeURIComponent(m[2]) }
   }
 
-  async function verify() {
+  async function verify(): Promise<void> {
     const link = parseLink()
     if (!link)
       return
@@ -51,7 +51,7 @@
     redirectTimer = setTimeout(() => { navigate('/profile', true) }, 1800)
   }
 
-  async function resend() {
+  async function resend(): Promise<void> {
     if (resending())
       return
     resending.set(true)

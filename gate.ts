@@ -516,6 +516,124 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   add('app functions declare return types', missing === 0, missing ? `${missing} missing` : '')
 }
 
+// 9b. Rule 10, the half nothing could verify — .stx script blocks.
+//
+//     `tsc --noEmit` cannot see inside a .stx file, so a missing or wrong
+//     annotation in a script block is invisible to every tool in the repo.
+//     The stx-standards triage (bench-review#88) flagged rule 10 as
+//     unfalsifiable for exactly that reason, which is a bad place for a rule
+//     to sit: it can only ever be claimed, never checked.
+//
+//     This checks it. Not with a type-checker — extracting script blocks into
+//     a compilable program is its own project — but with the same shape as the
+//     check above, which is enough to catch the thing that actually happens:
+//     someone adds a function and does not annotate it.
+//
+//     ── Two exemptions, both forced by stx, not by taste ────────────────────
+//
+//     `getStaticPaths` is pulled out of the file by REGEX and run through
+//     `new Function` (see the project note on its body constraints), so its
+//     signature is not ordinary TypeScript and annotating it risks breaking
+//     the extraction.
+//
+//     The pagination helpers return arrays of inline object literals, and
+//     stx's type-stripping leaks the nested colons of an inline object type
+//     and breaks the compiled script — JudgeDirectory carries a comment
+//     saying so. A named type would dodge it, but declaring one inside a
+//     script block puts the same colons back in a different place, so the
+//     omission stands until the stripper is fixed upstream.
+{
+  const EXEMPT_NAMES = new Set([
+    // regex-extracted + new Function; not ordinary TS
+    'getStaticPaths',
+    // inline-object returns break stx type-stripping
+    'buildPages',
+    'buildCommentPages',
+    'page',
+    'gap',
+    // returns `null | { id, token }`; same inline-object problem
+    'parseLink',
+  ])
+
+  const SCRIPT = /<script\b[^>]*>([\s\S]*?)<\/script>/gi
+  const LINE_COMMENT = /\/\/[^\n]*/g
+  const BLOCK_COMMENT = /\/\*[\s\S]*?\*\//g
+  // Only the NAME and the opening paren are matched here. The parameter list
+  // is walked by hand below, because a regex that stops at the first `)`
+  // mis-reads any callback parameter — `close: () => void` ends the match
+  // early and the annotation after the real closing paren is never seen. That
+  // reported an already-annotated function as missing on this check's first
+  // run.
+  const FN_HEAD = /^[ \t]*(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*(?:<[^>]*>)?\s*\(/gm
+  const ARROW_HEAD = /^[ \t]*(?:export\s+)?const\s+(\w+)\s*(?::\s*[^=]+)?=\s*(?:async\s+)?\(/gm
+
+  /** Index just past the `)` that closes the param list opened at `open`. */
+  const closeParen = (text: string, open: number): number => {
+    let depth = 0
+    for (let i = open; i < text.length; i++) {
+      if (text[i] === '(')
+        depth++
+      else if (text[i] === ')') {
+        depth--
+        if (depth === 0)
+          return i + 1
+      }
+    }
+    return -1
+  }
+
+  const offenders: string[] = []
+  for await (const path of new Bun.Glob('resources/**/*.stx').scan('.')) {
+    const src = await Bun.file(path).text()
+    SCRIPT.lastIndex = 0
+    let block: RegExpExecArray | null
+    while ((block = SCRIPT.exec(src))) {
+      // Comments routinely TALK about function signatures; stripping them
+      // keeps the check measuring code.
+      const body = block[1].replace(BLOCK_COMMENT, '').replace(LINE_COMMENT, '')
+      for (const re of [FN_HEAD, ARROW_HEAD]) {
+        re.lastIndex = 0
+        let m: RegExpExecArray | null
+        while ((m = re.exec(body))) {
+          const name = m[1]
+          if (EXEMPT_NAMES.has(name))
+            continue
+          const end = closeParen(body, body.indexOf('(', m.index + m[0].length - 1))
+          if (end < 0)
+            continue
+          const after = body.slice(end, end + 120)
+
+          // Annotated: a colon directly after the parameter list.
+          if (/^\s*:/.test(after))
+            continue
+
+          // `const x = (…)` is a parenthesised EXPRESSION, not an arrow —
+          // `const value = (e.target as HTMLInputElement).value` is not a
+          // function and has no return type to declare. Only count it when an
+          // arrow actually follows. This check's second run reported five of
+          // these before the distinction was made.
+          if (re === ARROW_HEAD && !/^\s*=>/.test(after))
+            continue
+
+          // A function declaration is only unannotated if its body starts here.
+          if (re === FN_HEAD && !/^\s*\{/.test(after))
+            continue
+
+          offenders.push(`${path.replace('resources/', '')} ${name}()`)
+        }
+      }
+    }
+  }
+
+  add(
+    'stx script blocks declare return types',
+    offenders.length === 0,
+    offenders.length
+      ? `${offenders.length} function(s) in .stx script blocks have no return type — tsc cannot see these, so nothing else will tell you: ${offenders.slice(0, 4).join(', ')}`
+      : '',
+  )
+}
+
 // 10. No page ships a cloak that nothing will lift.
 //
 //     stx hides un-hydrated markup with x-cloak + `[x-cloak]{display:none}`,

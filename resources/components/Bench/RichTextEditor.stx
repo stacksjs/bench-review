@@ -438,7 +438,7 @@
       })
     })
 
-    function emitChange() {
+    function emitChange(): void {
       // Read `editable.innerHTML` directly. `ts-medium-editor`'s
       // `editor.getContent()` and its `editableInput` subscription
       // both silently no-op on this build, so the DOM is ground truth.
@@ -485,7 +485,7 @@
     }
   }
 
-  function mountAll() {
+  function mountAll(): void {
     document.querySelectorAll('[data-richtext-host]').forEach(mountRichTextHost)
   }
 

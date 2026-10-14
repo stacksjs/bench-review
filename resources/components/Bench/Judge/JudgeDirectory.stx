@@ -70,7 +70,7 @@
   function syncFilterUrl(): void {
     if (typeof window === 'undefined') return
     const url = new URL(window.location.href)
-    const apply = (key: string, value: string, defaultVal: string) => {
+    const apply = (key: string, value: string, defaultVal: string): void => {
       if (value === defaultVal) url.searchParams.delete(key)
       else url.searchParams.set(key, value)
     }

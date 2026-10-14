@@ -51,7 +51,7 @@
     searchTimer = window.setTimeout(runSearch, 220)
   }
 
-  async function runSearch() {
+  async function runSearch(): Promise<void> {
     const q = query().trim()
     if (!q)
       return
@@ -70,7 +70,7 @@
     query.set(judge.name)
   }
 
-  async function submitClaim() {
+  async function submitClaim(): Promise<void> {
     const judge = selected()
     if (!judge || submitting())
       return
