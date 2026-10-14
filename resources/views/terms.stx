@@ -48,6 +48,44 @@
       </section>
 
       <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Threats and personal safety</h2>
+        <p class="mt-4">
+          Do not post threats of violence against a judge, a court official, their
+          families, or anyone else. This is not the same as criticism — you may say a
+          judge was wrong, unfair, rude or incompetent. You may not say anything a
+          reasonable person would read as an intention to harm someone.
+        </p>
+        <p class="mt-4">
+          Where we receive a credible threat we remove it from public view and
+          <strong>preserve a copy</strong>, including what was posted and when, and we
+          may report it to law enforcement. We may do this without notifying the person
+          who posted it.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="font-semibold text-2xl text-gray-900">Judicial security and personal information</h2>
+        <p class="mt-4">
+          Do not post anyone's home address, personal phone number, personal email
+          address, vehicle details, or the name, school or employer of a judge's spouse
+          or children. This applies whether or not the information is available
+          elsewhere.
+        </p>
+        <p class="mt-4">
+          Judges and their immediate family — and anyone acting on their behalf — may
+          request removal of this information through
+          <StxLink to="/contact" class="text-blue-700 underline underline-offset-2 hover:text-blue-900">our contact form</StxLink>
+          under &ldquo;Legal request&rdquo;. Tell us the page and what to remove. We aim
+          to act within 72 hours of receiving a request.
+        </p>
+        <p class="mt-4">
+          Where we can, we remove the covered information and leave the rest of the
+          review in place, rather than deleting a review for one sentence. Where nothing
+          useful remains once the information is gone, we remove the review.
+        </p>
+      </section>
+
+      <section>
         <h2 class="font-semibold text-2xl text-gray-900">Impersonation and identity</h2>
         <p class="mt-4">
           Do not claim to be a judge, court official, attorney, or anyone else you are

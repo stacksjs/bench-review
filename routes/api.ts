@@ -586,6 +586,14 @@ route.post('/admin/reviews/bulk-status', 'Actions/Admin/Reviews/BulkUpdateReview
   .middleware('admin')
   .skipCsrf()
 
+// Redaction: excise covered information without deleting an otherwise-lawful
+// review (#53). Distinct from the status endpoint, which is whole-review.
+route.patch('/admin/reviews/{id}/content', 'Actions/Admin/Reviews/RedactReviewAction')
+  .name('bench.admin.reviews.redact')
+  .middleware('auth')
+  .middleware('admin')
+  .skipCsrf()
+
 route.delete('/admin/reviews/{id}', 'Actions/Admin/Reviews/DeleteReviewAction')
   .name('bench.admin.reviews.destroy')
   .middleware('auth')

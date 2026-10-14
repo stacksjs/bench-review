@@ -28,7 +28,7 @@
     },
     {
       q: 'Can a judge get a review removed?',
-      a: 'A judge can flag a review for moderation review. If the review violates our content standards (personal attacks, doxxing, disclosing protected case information), we will remove or edit it. We do not remove reviews simply because they are unflattering.'
+      a: 'A judge can flag a review for moderation review, or write to us under "Legal request" on the contact page. If the review violates our content standards (personal attacks, doxxing, disclosing protected case information), we will remove or edit it — where we can we remove just the offending information and leave the rest of the review in place. Requests to remove a judge\'s home address or other personal safety information are handled within 72 hours. We do not remove reviews simply because they are unflattering.'
     },
     {
       q: 'How do I correct factual information about a judge?',
