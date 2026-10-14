@@ -73,6 +73,23 @@ export async function deleteReviewCascade(reviewId: number): Promise<void> {
  * carrying a comment, photo, flag or judge response failed its foreign key,
  * the error went into a `.catch(() => {})`, and the review SURVIVED an
  * erasure request while the user's own rows around it were removed.
+ *
+ * ── Why this HARD deletes, when admin takedown soft deletes ────────────
+ * Decided deliberately, not overlooked (bench-review#53).
+ *
+ * `DeleteReviewAction` keeps the row as `status='removed'` because a takedown
+ * is the platform acting for cause — a threat, a privacy removal — and the
+ * question afterwards is what was published and when it came down. A person
+ * deleting their own account is the opposite situation: they are exercising
+ * an erasure right, and the Privacy Policy tells them in plain words that
+ * their reviews and comments are removed and that deletion is not reversible.
+ *
+ * Keeping their writing as a soft-deleted row would make that sentence false.
+ * Between a weaker evidence trail for user-initiated deletion and a privacy
+ * promise we do not honour, the promise wins.
+ *
+ * If this is ever revisited, the Privacy Policy's "How long we keep things"
+ * section has to change in the same commit.
  */
 export async function deleteReviewsByUser(userId: number): Promise<number> {
   const rows = await db.selectFrom('judge_reviews')
