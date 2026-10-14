@@ -1094,6 +1094,75 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   )
 }
 
+// 27. Universal links: the web half of the entitlement is present and sane.
+//
+//     `config/mobile.ts` entitles `applinks:benchreview.org`. iOS then fetches
+//     `/.well-known/apple-app-site-association` and will only open links in the
+//     app if that file names the exact team+bundle and claims the path.
+//
+//     When it is wrong, iOS says nothing. It declines and falls back to Safari,
+//     so a broken association looks identical to a product decision not to have
+//     universal links. That is the entire reason for checking it here rather
+//     than trusting a tap on a device nobody has run yet (bench-review#80).
+//
+//     Reported rather than failed when APPLE_TEAM_ID is unset, matching the
+//     Turnstile check: a checkout that is not building the app legitimately has
+//     no team id, and failing every local build over it would teach people to
+//     ignore the gate.
+{
+  const teamId = process.env.APPLE_TEAM_ID?.trim()
+  const bundleId = process.env.IOS_BUNDLE_ID?.trim() || 'org.benchreview.app'
+  const problems: string[] = []
+  const file = Bun.file('dist/.well-known/apple-app-site-association')
+
+  if (!await file.exists()) {
+    problems.push('dist/.well-known/apple-app-site-association is missing — every universal link falls back to Safari, silently')
+  }
+  else {
+    let parsed: any
+    try {
+      parsed = JSON.parse(await file.text())
+    }
+    catch (err) {
+      problems.push(`it is not valid JSON (${err instanceof Error ? err.message : String(err)}) — iOS discards it without comment`)
+    }
+
+    const detail = parsed?.applinks?.details?.[0]
+    if (parsed && !detail)
+      problems.push('no applinks.details entry')
+
+    if (detail && teamId) {
+      const expected = `${teamId}.${bundleId}`
+      if (!detail.appIDs?.includes(expected))
+        problems.push(`appIDs ${JSON.stringify(detail.appIDs)} does not contain the built app's ${expected}`)
+    }
+
+    // Order is load-bearing and the mistake is invisible: iOS takes the FIRST
+    // matching component, so an exclusion listed after the include it is
+    // carving out of is simply never reached. The excludes are present, they
+    // just do nothing.
+    const components: Array<Record<string, unknown>> = detail?.components ?? []
+    const firstInclude = components.findIndex(c => !c.exclude)
+    const lastExclude = components.map(c => !!c.exclude).lastIndexOf(true)
+    if (firstInclude !== -1 && lastExclude > firstInclude)
+      problems.push(`an exclusion is listed after an inclusion (first include at ${firstInclude}, last exclude at ${lastExclude}) — iOS takes the first match, so that exclusion never applies`)
+
+    // The admin surface is where an anonymized reviewer can be unmasked. It
+    // must not be a universal link target.
+    const claimsAdmin = components.some(c => String(c['/'] ?? '').startsWith('/admin') && !c.exclude)
+    if (claimsAdmin)
+      problems.push('/admin is claimed as a universal link target')
+  }
+
+  add(
+    'universal links carry a usable site association',
+    teamId ? problems.length === 0 : true,
+    problems.length === 0
+      ? ''
+      : `${problems.join('; ')}${teamId ? '' : '. APPLE_TEAM_ID is unset, so this is reported rather than failed'}`,
+  )
+}
+
 const failed = checks.filter(c => !c.ok)
 console.log(`\n  bench conformance gate — ${pages.length} built pages\n`)
 for (const c of checks)

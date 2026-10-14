@@ -23,8 +23,8 @@ self-contained.
 
 ## The deploy contract
 
-The host must provide two things that are **not** part of the built artifact.
-A host that skips them serves a site that looks fine and is broken in two
+The host must provide a few things that are **not** part of the built
+artifact. A host that skips them serves a site that looks fine and is broken in
 specific ways.
 
 ### 1. Rewrite `/verify-email/:id/:token` → `/verify-email.html` (status 200)
@@ -82,6 +82,33 @@ On CloudFront these are both cache behaviours: an `/api/*` behaviour with the
 API as origin, and a CloudFront Function (or a `/verify-email/*` behaviour)
 rewriting the URI. On nginx/Caddy they are a `try_files`/`rewrite` and a
 `proxy_pass`. Whatever the host, **these two are the deploy contract.**
+
+### 4. Serve `/.well-known/apple-app-site-association` as `application/json`
+
+The file is in the artifact — `build.ts` writes it whenever `APPLE_TEAM_ID` is
+set — but it has **no file extension**, by Apple's requirement, so a host that
+infers the type from the extension will serve it as `application/octet-stream`.
+Verified locally: that is exactly what Bun's static file handling does with it.
+
+iOS rejects any content type other than `application/json`, and it must be
+reachable at that exact path with **no redirect** — iOS does not follow one.
+
+When any of that is wrong, nothing reports a problem. iOS declines quietly and
+opens the link in Safari, so a broken association is indistinguishable from
+having decided not to support universal links. Gate check 27 verifies the file
+in the artifact; only the host can get the content type right.
+
+```nginx
+# Caddy
+handle /.well-known/apple-app-site-association {
+  header Content-Type application/json
+}
+
+# nginx
+location = /.well-known/apple-app-site-association {
+  default_type application/json;
+}
+```
 
 ## Environment
 
