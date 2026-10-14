@@ -201,6 +201,33 @@ defineStore('adminReviews', () => {
     }
   }
 
+  /**
+   * Edit a review's content to remove covered information, leaving the rest in
+   * place (bench-review#53). A reason is required and is stored with a
+   * snapshot of the original.
+   */
+  async function redactReview(id: number, content: string, note: string): Promise<boolean> {
+    try {
+      const res = await useStore('auth').authFetch(`/api/admin/reviews/${id}/content`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, note }),
+      })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean, error?: string }
+      if (!res.ok || !data.ok) {
+        actionError.set(data.error || 'Could not redact the review')
+        return false
+      }
+      reviews.set(reviews().map(r => r.id === id ? { ...r, content } : r))
+      actionError.set('')
+      return true
+    }
+    catch (err) {
+      actionError.set(err instanceof Error ? err.message : 'Network error')
+      return false
+    }
+  }
+
   async function deleteReview(id: number): Promise<boolean> {
     try {
       const res = await useStore('auth').authFetch(`/api/admin/reviews/${id}`, { method: 'DELETE' })
@@ -280,6 +307,7 @@ defineStore('adminReviews', () => {
     setSearch,
     setPage,
     setReviewStatus,
+    redactReview,
     toggleSelected,
     toggleSelectAll,
     clearSelection,

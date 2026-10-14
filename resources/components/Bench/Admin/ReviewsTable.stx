@@ -30,12 +30,43 @@
   const expandedId = state<number>(0)
   const responseDraft = state<string>('')
   const savingResponse = state<boolean>(false)
+  // Redaction (bench-review#53): excise covered information — a home address,
+  // a phone number — without deleting an otherwise lawful review.
+  const redactDraft = state<string>('')
+  const redactNote = state<string>('')
+  const redacting = state<boolean>(false)
+  const redactOpen = state<number>(0)
   // In-flight guard for the per-row Approve/Reject/Delete mutations.
   // The buttons live inside the :for, where signal call-syntax in
   // x-disabled/:text is the forbidden footgun (silently breaks the
   // loop), so this is used purely as a JS re-entry guard to stop
   // rapid double-clicks double-firing. No per-row visual binding.
   const mutatingId = state<number | null>(null)
+  function openRedact(review: AdminReviewRow): void {
+    redactOpen.set(redactOpen() === review.id ? 0 : review.id)
+    redactDraft.set(review.content ?? '')
+    redactNote.set('')
+  }
+
+  async function saveRedaction(review: AdminReviewRow): Promise<void> {
+    if (redacting())
+      return
+    if (redactNote().trim().length < 5) {
+      toast.error('Reason required', 'Say why this is being redacted — it is the compliance record.')
+      return
+    }
+    redacting.set(true)
+    try {
+      if (await store.redactReview(review.id, redactDraft(), redactNote().trim())) {
+        redactOpen.set(0)
+        toast.success('Review redacted', 'The original is preserved in the moderation log.')
+      }
+    }
+    finally {
+      redacting.set(false)
+    }
+  }
+
   function toggleExpand(review: AdminReviewRow): void {
     const opening = expandedId() !== review.id
     expandedId.set(opening ? review.id : 0)
@@ -427,6 +458,44 @@
         </div>
         <div class="mt-3 space-y-3" x-class="expandedId() === review.id ? '' : 'hidden'">
           <div class="px-4 py-3 max-w-none bg-gray-50 rounded prose prose-sm" x-html="review.content"></div>
+
+          {{-- Redaction (bench-review#53). Separate from the status buttons
+              because it is a different decision: the review stays published,
+              only the covered information goes. Deleting a lawful review for
+              one sentence is over-removal. --}}
+          <div class="px-4 py-3 bg-red-50/40 border border-red-200 rounded">
+            <div class="flex items-center justify-between">
+              <label class="block font-semibold text-red-800 text-xs tracking-wide uppercase">Redact content</label>
+              <button
+                type="button"
+                @click="openRedact(review)"
+                class="px-2 py-0.5 font-medium text-red-800 text-xs bg-white hover:bg-red-50 border border-red-200 rounded"
+              >{{ redactOpen() === review.id ? 'Close' : 'Edit content' }}</button>
+            </div>
+            <p class="mt-0.5 text-gray-500 text-xs">Removes a home address, phone number or similar while leaving the review up. The original is preserved in the moderation log.</p>
+
+            <div x-class="redactOpen() === review.id ? '' : 'hidden'">
+              <textarea
+                x-model="redactDraft"
+                rows="6"
+                aria-label="Redacted review content"
+                class="block mt-2 px-3 py-2 w-full font-mono text-gray-900 text-xs bg-white border border-gray-300 rounded-md focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+              ></textarea>
+              <input
+                x-model="redactNote"
+                type="text"
+                placeholder="Why — e.g. removal request, home address"
+                aria-label="Reason for redaction"
+                class="block mt-2 px-3 py-2 w-full text-gray-900 text-xs bg-white border border-gray-300 rounded-md focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+              >
+              <button
+                type="button"
+                @click="saveRedaction(review)"
+                x-disabled="redacting"
+                class="mt-2 px-3 py-1.5 font-semibold text-white text-xs bg-red-600 hover:bg-red-700 rounded disabled:opacity-50"
+              >{{ redacting() ? 'Saving…' : 'Save redaction' }}</button>
+            </div>
+          </div>
 
           {{-- Judge right-of-reply composer. Posted on the judge's behalf
               (admin-mediated); renders publicly under the review. --}}
