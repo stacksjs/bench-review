@@ -21,12 +21,32 @@ import { response } from '@stacksjs/router'
  *
  * Resolves bench-review#40 (the hardcoded "24 / 1287 / 4.4 / 12k" placeholders).
  */
+/** Ceiling on rows returned. See the note at the query below. */
+const MAX_ROWS = 2000
+
 export default new Action({
   name: 'CourtHouse Index',
   description: 'List all courthouses, hydrated with active-judges count + review aggregates',
   method: 'GET',
   async handle() {
-    const rows = await CourtHouse.all() as Array<Record<string, any>>
+    // Plain rows, not `CourtHouse.all()` (bench-review#56): hydrating ORM
+    // model instances for an unauthenticated list endpoint is work nothing
+    // here needs — every field below is read as data. `selectAll` rather than
+    // a column list on purpose: the payload is spread into the response and
+    // components read `address`, `zip_code`, `latitude` and `longitude` off
+    // it, so narrowing would be a silent breakage for a table of ~200 rows
+    // where there is nothing to win.
+    //
+    // The LIMIT is a ceiling, not a page size: 202 courthouses today, and a
+    // list endpoint with no bound at all is the thing that eventually falls
+    // over without anyone having changed it.
+    const rows = await (db.selectFrom('court_houses') as any)
+      .selectAll()
+      .limit(MAX_ROWS)
+      .execute() as Array<Record<string, any>>
+
+    if (rows.length >= MAX_ROWS)
+      console.warn(`[court-houses.index] hit the ${MAX_ROWS}-row ceiling — the list is now truncated and needs pagination.`)
 
     // Active-judges count, keyed by court_house_id.
     const judgeCounts = await (db.selectFrom('judges') as any)
