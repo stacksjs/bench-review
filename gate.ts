@@ -1067,11 +1067,22 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
     const roles = ROVING.filter(r => new RegExp(`role="${r}"`).test(src))
     if (roles.length === 0)
       continue
-    // The file has to handle keys somewhere. Deliberately file-scoped rather
-    // than element-scoped: the handler is almost never on the container that
-    // carries the role, it is on the children, and in a `:for` at that.
-    if (!/@keydown/.test(src))
-      unimplemented.push(`${path} (${roles.join(', ')})`)
+
+    // Two signals, because the first one alone is too weak. The handler is
+    // almost never on the container carrying the role — it is on the children,
+    // often inside a `:for` — so this is file-scoped, and a file with ANY
+    // `@keydown` passed. BenchHeader's user dropdown slipped through exactly
+    // that way: seven `role="menuitem"` children with no keyboard handling at
+    // all, in a file whose search box happens to have a `@keydown`
+    // (bench-review#90).
+    //
+    // Roving focus is IMPOSSIBLE without moving tabindex around — that is what
+    // the pattern is — so a file declaring one of these roles and containing
+    // no tabindex at all cannot be implementing it, whatever else it handles.
+    const handlesKeys = /@keydown/.test(src)
+    const managesFocus = /\btabindex=|x-tabindex=/.test(src)
+    if (!handlesKeys || !managesFocus)
+      unimplemented.push(`${path} (${roles.join(', ')}${handlesKeys ? '' : ', no @keydown'}${managesFocus ? '' : ', no tabindex'})`)
   }
 
   add(

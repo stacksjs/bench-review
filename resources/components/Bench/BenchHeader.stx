@@ -575,7 +575,6 @@
             type="button"
             @click="toggleUserMenu()"
             class="inline-flex gap-2 items-center px-1.5 py-1 hover:bg-blue-50 rounded-full focus-visible:ring-2 focus-visible:ring-blue-400 focus:outline-none transition-colors"
-            aria-haspopup="true"
             x-aria-expanded="userMenuOpen() ? 'true' : 'false'"
           >
             <span
@@ -590,10 +589,22 @@
             </svg>
           </button>
 
+          {{-- A disclosure, not a menu (bench-review#90).
+              This carried role="menu" with seven role="menuitem" children and
+              no tabindex management anywhere. The ARIA menu pattern promises
+              roving focus driven by arrow keys — a screen reader announces it
+              and tells the user to press them — and nothing here implements
+              it. Roving focus is not even possible without tabindex, so the
+              markup was making a promise it structurally could not keep.
+
+              Same conclusion the judge profile's "More" menu reached
+              (bench-review#58) and the review filters before it: this is a
+              disclosure of ordinary links, the trigger's aria-expanded says
+              whether it is open, and the items are in normal tab order where
+              Tab already works. --}}
           <div
             class="absolute overflow-hidden right-0 z-30 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg"
             x-class="userMenuOpen() ? '' : 'hidden'"
-            role="menu"
           >
             {{-- Identity header. Restates who's signed in so admins
                 toggling between accounts don't fire an action against
@@ -612,7 +623,6 @@
             <div class="py-1">
               <StxLink
                 to="/profile"
-                role="menuitem"
                 @mousedown="closeUserMenu()"
                 class="flex gap-3 items-center px-4 py-2 text-gray-700 text-sm hover:bg-gray-50"
               >
@@ -624,7 +634,6 @@
               </StxLink>
               <StxLink
                 to="/my-reviews"
-                role="menuitem"
                 @mousedown="closeUserMenu()"
                 class="flex gap-3 items-center px-4 py-2 text-gray-700 text-sm hover:bg-gray-50"
               >
@@ -637,7 +646,6 @@
               </StxLink>
               <StxLink
                 to="/notifications"
-                role="menuitem"
                 @mousedown="closeUserMenu()"
                 class="flex gap-3 items-center px-4 py-2 text-gray-700 text-sm hover:bg-gray-50"
               >
@@ -648,7 +656,6 @@
               </StxLink>
               <StxLink
                 to="/settings"
-                role="menuitem"
                 @mousedown="closeUserMenu()"
                 class="flex gap-3 items-center px-4 py-2 text-gray-700 text-sm hover:bg-gray-50"
               >
@@ -668,7 +675,6 @@
               <StxLink
                 :if="auth.isAdmin"
                 to="/admin"
-                role="menuitem"
                 @mousedown="closeUserMenu()"
                 class="flex gap-3 items-center px-4 py-2 text-gray-700 text-sm hover:bg-gray-50"
               >
@@ -680,7 +686,6 @@
               </StxLink>
               <StxLink
                 to="/faq"
-                role="menuitem"
                 @mousedown="closeUserMenu()"
                 class="flex gap-3 items-center px-4 py-2 text-gray-700 text-sm hover:bg-gray-50"
               >
@@ -699,7 +704,6 @@
             <div class="py-1 border-gray-100 border-t">
               <button
                 type="button"
-                role="menuitem"
                 @mousedown.prevent="handleLogout()"
                 class="flex gap-3 items-center px-4 py-2 w-full text-red-600 text-sm hover:bg-red-50"
               >
