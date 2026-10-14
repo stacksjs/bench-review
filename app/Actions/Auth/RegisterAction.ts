@@ -102,12 +102,27 @@ export default new Action({
 
     // `users.email` carries a UNIQUE index, so a second signup with the same
     // address loses at the database rather than quietly creating a duplicate
-    // account (bench-review#52). Without this the constraint escapes as a 500
-    // and the person is told the site is broken, when the actual answer is
-    // "you already have an account".
+    // account (bench-review#52). Deliberately not a check-then-insert: that
+    // has a race, and the index is the real guard. This reads the loss.
     //
-    // Deliberately not a check-then-insert: that has a race, and the index is
-    // the real guard. This reads the loss.
+    // The response must NOT say that the address is taken (bench-review#56).
+    // Login and password reset are both uniform, which left registration as
+    // the only auth surface that answered "does this person have an account
+    // here" — and on a site publishing anonymous criticism of named, sitting
+    // judges, confirming that a particular clerk or lawyer holds an account is
+    // the first half of unmasking them. It used to answer with a 409 and
+    // "An account with that email already exists. Try signing in instead."
+    //
+    // `register()` itself now returns a generic 422 for a duplicate and hashes
+    // the password BEFORE it looks, so neither the body nor the response time
+    // distinguishes the two cases (stacksjs/stacks#1953). This catch exists so
+    // that a constraint error escaping by some other route — a second unique
+    // index, a driver that reports the violation differently — cannot widen
+    // again what the framework narrowed. Same status and wording, so the two
+    // paths stay indistinguishable.
+    //
+    // Someone who genuinely owns the address and forgot is not left stuck:
+    // password reset is uniform too, and tells them out of band.
     let result: Awaited<ReturnType<typeof register>>
     try {
       result = await register({ email, password, name })
@@ -115,8 +130,8 @@ export default new Action({
     catch (err) {
       if (isUniqueViolation(err)) {
         return response.json({
-          message: 'An account with that email already exists. Try signing in instead.',
-        }, 409)
+          message: 'Registration could not be completed. Please check your details and try again.',
+        }, 422)
       }
       throw err
     }
