@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite'
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
@@ -94,9 +94,20 @@ describe('database backup', () => {
     // In WAL mode a committed row can live in `stacks.sqlite-wal` and not yet
     // be in the main database file, so copying that file alone silently loses
     // it — the backup restores clean and STALE, which is worse than failing.
-    // This keeps a connection open so the write stays uncheckpointed.
-    const live = new Database(TEST_DB_PATH)
+    //
+    // On a database of its OWN, deliberately. `PRAGMA journal_mode = WAL` is
+    // persistent: it is written into the file, not scoped to the connection.
+    // Setting it on the shared test database leaked into every later test —
+    // locally that was invisible because the file was already in WAL mode, and
+    // CI, which builds it fresh, failed eight unrelated judge-admin tests with
+    // SQLITE_BUSY_SNAPSHOT.
+    const scratch = join(STAGE, 'wal-probe.sqlite')
+    copyFileSync(TEST_DB_PATH, scratch)
+    process.env.DB_DATABASE = scratch
+
+    const live = new Database(scratch)
     live.run('PRAGMA journal_mode = WAL')
+    live.run('DELETE FROM judges')
     live.run('INSERT INTO judges (id, name, created_at) VALUES (4199, \'Uncheckpointed\', datetime(\'now\'))')
 
     let result: any
@@ -105,6 +116,7 @@ describe('database backup', () => {
     }
     finally {
       live.close()
+      process.env.DB_DATABASE = TEST_DB_PATH
     }
 
     const restored = new Database(result.destination, { readonly: true })
