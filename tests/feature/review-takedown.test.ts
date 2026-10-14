@@ -137,3 +137,36 @@ describe('admin takedown', () => {
     expect(await invoke(deleteAction, { id: '999999' })).toBe(404)
   })
 })
+
+describe('evidence trail on the other mutations', () => {
+  test('an author edit preserves the version it overwrote', async () => {
+    const id = seed()
+    ;(Auth as any).user = async () => ({ id: AUTHOR })
+
+    await invoke(updateMine, { id: String(id) }, { title: 'Softened title', content: '<p>a milder version</p>' })
+
+    const entry = logs().find(l => l.action === 'review.edit')
+    expect(entry).toBeTruthy()
+    const meta = JSON.parse(entry.metadata)
+    // The failure this closes: a review could be published, reported, then
+    // quietly rewritten, and nothing held what it said when the report was
+    // made.
+    expect(meta.snapshot.content).toBe('<p>the original text</p>')
+    expect(meta.snapshot.title).toBe('Threatening review')
+    expect(row(id).content).toBe('<p>a milder version</p>')
+  })
+
+  test('a status change records what was decided about', async () => {
+    const id = seed()
+    ;(Auth as any).user = async () => ({ id: ADMIN })
+    const { applyReviewStatus } = await import('../../app/Helpers/reviewModeration')
+
+    await applyReviewStatus(id, 'rejected', ADMIN)
+
+    const entry = logs().find(l => l.action === 'review.reject')
+    const meta = JSON.parse(entry.metadata)
+    expect(meta.from).toBe('published')
+    expect(meta.to).toBe('rejected')
+    expect(meta.snapshot.content).toBe('<p>the original text</p>')
+  })
+})

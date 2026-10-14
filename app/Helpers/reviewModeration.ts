@@ -44,9 +44,12 @@ export async function applyReviewStatus(
   adminId: number,
 ): Promise<ReviewStatusOutcome> {
   const existing = await db.selectFrom('judge_reviews')
-    .select(['id', 'user_id', 'status'])
+    // title/content so the audit entry can snapshot what the review said at
+    // the moment of the decision (bench-review#53). A status flip is the most
+    // common moderation action and left no record of WHAT was decided about.
+    .select(['id', 'user_id', 'status', 'title', 'content'])
     .where('id', '=', reviewId)
-    .executeTakeFirst() as { id: number, user_id: number | null, status: string } | undefined
+    .executeTakeFirst() as { id: number, user_id: number | null, status: string, title: string | null, content: string | null } | undefined
   if (!existing)
     return { id: reviewId, ok: false, error: 'Review not found.', code: 404 }
 
@@ -90,6 +93,11 @@ export async function applyReviewStatus(
       action: status === 'published' ? 'review.publish' : 'review.reject',
       targetType: 'review',
       targetId: reviewId,
+      metadata: {
+        from: existing.status,
+        to: status,
+        snapshot: { title: existing.title, content: existing.content },
+      },
     })
   }
 

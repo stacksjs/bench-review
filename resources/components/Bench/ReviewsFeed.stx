@@ -84,6 +84,7 @@
   const flagReasonOptions = [
     { value: 'off_topic', label: 'Off-topic — not actually about this judge' },
     { value: 'harassment', label: 'Harassment or personal attack' },
+    { value: 'threat', label: 'Threat of violence' },
     { value: 'spam', label: 'Spam or promotional content' },
     { value: 'privacy', label: 'Reveals private information' },
     { value: 'inaccurate', label: 'Factually inaccurate' },

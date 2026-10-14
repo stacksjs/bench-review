@@ -4,6 +4,7 @@ import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { schema } from '@stacksjs/validation'
 import { sanitizeReviewHtml } from '../../Helpers/sanitizeReviewHtml'
+import { logModeration } from '../../Helpers/auditLog'
 
 /**
  * PATCH /api/me/reviews/{id} — author edits their own review and
@@ -50,9 +51,11 @@ export default new Action({
 
     const existing = await db.selectFrom('judge_reviews')
       // judge_id is needed for the resubmit collision check below.
-      .select(['id', 'user_id', 'status', 'judge_id'])
+      // title/content so the prior version can be preserved before the edit
+      // overwrites it in place (bench-review#53).
+      .select(['id', 'user_id', 'status', 'judge_id', 'title', 'content'])
       .where('id', '=', reviewId)
-      .executeTakeFirst() as { id: number, user_id: number | null, status: string, judge_id: number | null } | undefined
+      .executeTakeFirst() as { id: number, user_id: number | null, status: string, judge_id: number | null, title: string | null, content: string | null } | undefined
 
     if (!existing || existing.user_id == null || Number(existing.user_id) !== Number(userId))
       return response.json({ error: 'Review not found' }, 404)
@@ -165,6 +168,26 @@ export default new Action({
 
     patch.status = 'pending'
     patch.updated_at = new Date().toISOString()
+
+    // Preserve the prior version BEFORE the edit overwrites it in place
+    // (bench-review#53). Author edits were the one mutation that destroyed
+    // content with no record at all: a review could be published, reported,
+    // then quietly rewritten, and nothing anywhere held what it had said when
+    // the report was made.
+    //
+    // Logged as the author's own action rather than a moderator's — it is
+    // their review — and best-effort, because failing to record history must
+    // not stop someone correcting their own writing.
+    await logModeration({
+      actorUserId: Number(userId),
+      action: 'review.edit',
+      targetType: 'review',
+      targetId: reviewId,
+      metadata: {
+        from_status: existing.status,
+        snapshot: { title: existing.title, content: existing.content },
+      },
+    }).catch(() => {})
 
     await db.updateTable('judge_reviews')
       .set(patch as any)

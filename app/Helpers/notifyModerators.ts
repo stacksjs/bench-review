@@ -52,11 +52,14 @@ export async function notifyModeratorsOfFlag(reviewId: number, reason: string): 
     if (admins.length === 0)
       return
 
-    // Judge name for context.
+    // Judge name AND the flagged text (bench-review#53). The email used to
+    // carry only links, which meant a moderator could not triage without
+    // opening the admin UI — and for the one category where minutes matter,
+    // a threat, the whole decision is "what does it actually say".
     const review = await db.selectFrom('judge_reviews')
-      .select(['judge_id'])
+      .select(['judge_id', 'title', 'content'])
       .where('id', '=', reviewId)
-      .executeTakeFirst() as { judge_id: number | null } | undefined
+      .executeTakeFirst() as { judge_id: number | null, title: string | null, content: string | null } | undefined
     let judgeName = 'a judge'
     if (review?.judge_id) {
       const j = await db.selectFrom('judges')
@@ -73,6 +76,26 @@ export async function notifyModeratorsOfFlag(reviewId: number, reason: string): 
     const adminUrl = `${base}/admin/reviews`
     const safeJudge = escapeHtml(judgeName)
     const safeReason = escapeHtml(reasonLabel)
+
+    // A threat is escalated, not just reported. It is the one flag reason
+    // where the platform may have to act within hours and may have to talk to
+    // law enforcement, and a subject line that looks like every other
+    // moderation notice is how it waits in a queue overnight. See
+    // docs/THREAT-RESPONSE.md.
+    const isThreat = reason === 'threat'
+
+    // The review's own text, plain and truncated. HTML is stripped rather
+    // than rendered: this is an email to a moderator about content that is by
+    // definition hostile, and the one thing it must not do is execute or
+    // reformat it.
+    const plainText = String(review?.content ?? '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 1500)
+    const safeExcerpt = escapeHtml(plainText)
+    const safeTitle = escapeHtml(String(review?.title ?? '').slice(0, 300))
+
     const { mail } = await import('@stacksjs/email')
 
     for (const admin of admins) {
@@ -80,13 +103,22 @@ export async function notifyModeratorsOfFlag(reviewId: number, reason: string): 
         continue
       await mail.send({
         to: admin.email,
-        subject: `A review of ${judgeName} was flagged (${reasonLabel})`,
-        text: `A review of ${judgeName} was flagged for "${reasonLabel}".\n\nReview: ${articleUrl}\nModerate: ${adminUrl}\n\n— Bench Review`,
+        subject: isThreat
+          ? `URGENT: threat reported on a review of ${judgeName}`
+          : `A review of ${judgeName} was flagged (${reasonLabel})`,
+        text: `${isThreat ? 'THREAT REPORTED — see docs/THREAT-RESPONSE.md. Preserve the content; do not hard-delete.\n\n' : ''}A review of ${judgeName} was flagged for "${reasonLabel}".\n\nTitle: ${review?.title ?? '(none)'}\n\n${plainText || '(no text)'}\n\nReview: ${articleUrl}\nModerate: ${adminUrl}\n\n— Bench Review`,
         html: renderReviewEmail({
-          preheader: `A review of ${judgeName} was flagged for ${reasonLabel}.`,
-          heading: 'A review was flagged',
+          preheader: isThreat
+            ? `A threat was reported on a review of ${judgeName}.`
+            : `A review of ${judgeName} was flagged for ${reasonLabel}.`,
+          heading: isThreat ? 'A threat was reported' : 'A review was flagged',
           greeting: 'Hi moderator,',
-          bodyHtml: `<p style="margin:0 0 14px 0;">A review of <strong>${safeJudge}</strong> was flagged for <strong>${safeReason}</strong>. Please take a look and decide whether to keep, edit, or take it down.</p>`,
+          bodyHtml: `
+            ${isThreat ? '<p style="margin:0 0 14px 0;padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;"><strong>Reported as a threat.</strong> Follow the threat-response runbook. Preserve the content — take it down through the admin UI, which keeps it, rather than deleting the row.</p>' : ''}
+            <p style="margin:0 0 14px 0;">A review of <strong>${safeJudge}</strong> was flagged for <strong>${safeReason}</strong>.</p>
+            <p style="margin:0 0 6px 0;font-weight:600;">${safeTitle || '(no title)'}</p>
+            <p style="margin:0 0 14px 0;padding:10px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;white-space:pre-line;">${safeExcerpt || '(no text)'}</p>
+          `,
           ctaText: 'Review it',
           ctaUrl: articleUrl,
           accent: 'red',
