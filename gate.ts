@@ -912,6 +912,59 @@ for (const p of pages) html.set(p, await Bun.file(p).text())
   )
 }
 
+// 25. An ARIA role that promises arrow-key navigation has to implement it.
+//
+//     `role="radiogroup"`, `menu`, `tablist`, `listbox` and `tree` are not
+//     labels — each one is a contract with assistive technology that says
+//     "Tab enters this once, then arrow keys move within it". A screen reader
+//     announces that contract to the user. If nothing handles the keys, the
+//     user is told to press arrows that do nothing.
+//
+//     bench has hit this twice. The judge profile's "More" menu carried
+//     `role="menu"` + `role="menuitem"` + `tabindex="-1"` with no roving
+//     focus, which made the whole panel unreachable by keyboard — the roles
+//     were removed rather than implemented, because it was a disclosure and
+//     not a menu. The review form's star rating carried `role="radiogroup"`
+//     with five separately tabbable buttons and no arrow handling; there the
+//     role was right and the contract got implemented (bench-review#58).
+//
+//     Either answer is fine. Claiming the role and doing neither is not, and
+//     that is what this catches.
+//
+//     Source files, because the handler lives in a sibling `<script client>`
+//     and the built page only carries the binding.
+{
+  const ROVING = ['radiogroup', 'menu', 'menubar', 'tablist', 'listbox', 'tree', 'grid']
+  const unimplemented: string[] = []
+
+  for await (const path of new Bun.Glob('resources/**/*.stx').scan('.')) {
+    const raw = await Bun.file(path).text()
+    // Strip comments first. The files that got this right carry a comment
+    // explaining which role was removed and why, and matching that text would
+    // report the fix as the defect — which is exactly what the first run of
+    // this check did on ProfileHeader.
+    const src = raw
+      .replace(/\{\{--[\s\S]*?--\}\}/g, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+    const roles = ROVING.filter(r => new RegExp(`role="${r}"`).test(src))
+    if (roles.length === 0)
+      continue
+    // The file has to handle keys somewhere. Deliberately file-scoped rather
+    // than element-scoped: the handler is almost never on the container that
+    // carries the role, it is on the children, and in a `:for` at that.
+    if (!/@keydown/.test(src))
+      unimplemented.push(`${path} (${roles.join(', ')})`)
+  }
+
+  add(
+    'every roving-focus ARIA role implements its keyboard contract',
+    unimplemented.length === 0,
+    unimplemented.length
+      ? `${unimplemented.length} file(s) claim a role that promises arrow-key navigation but handle no keys — implement it or drop the role: ${unimplemented.slice(0, 3).join(', ')}`
+      : '',
+  )
+}
+
 const failed = checks.filter(c => !c.ok)
 console.log(`\n  bench conformance gate — ${pages.length} built pages\n`)
 for (const c of checks)

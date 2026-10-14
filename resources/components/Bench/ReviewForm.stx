@@ -139,6 +139,100 @@
     }
   }
 
+  /**
+   * One object per star, so the `:for` below carries no signal call-syntax —
+   * inside a loop that silently leaves the loop variable as a function and
+   * binds every star to the same answer.
+   *
+   * `tab` is the radiogroup's ROVING TABINDEX. `role="radiogroup"` promises a
+   * specific keyboard contract: Tab enters the group once and arrow keys move
+   * within it, selecting as they go. Five separately tabbable buttons is not
+   * that contract, and claiming an ARIA pattern without implementing its
+   * keyboard behaviour is the same defect this form's own "More" menu had
+   * (bench-review#58) — a role that tells a screen-reader user to press arrow
+   * keys that do nothing.
+   *
+   * Exactly one star is reachable by Tab: the selected one, or the first when
+   * nothing is selected yet, which is what the ARIA practices specify for an
+   * unselected group.
+   *
+   * `checked` is the single selected value, while `filled` is cumulative —
+   * four filled stars, one of them checked. Those are deliberately different:
+   * the visual is "a rating of 4", the semantics are "the 4 radio is the one
+   * selected".
+   */
+  const starViews = derived<Array<{ n: StarRating, checked: string, tab: number, filled: boolean, label: string }>>(() => {
+    const current = rating()
+    const shown = (hoverRating() || current) as number
+    return stars.map(n => ({
+      n,
+      checked: current === n ? 'true' : 'false',
+      tab: (current === n || (current === 0 && n === 1)) ? 0 : -1,
+      filled: shown >= n,
+      label: `Rate ${n} of 5`,
+    }))
+  })
+
+  function setRating(star: StarRating): void {
+    rating.set(star)
+    ratingError.set(false)
+    // Drop any hover preview. `hoverRating` takes precedence over `rating` in
+    // both the fill and the live-region readout, and nothing clears it when the
+    // rating is set by keyboard — `mouseleave` only fires for a pointer. So a
+    // user who hovered one star and then arrowed to another saw the hovered
+    // value, and the aria-live region ANNOUNCED it: aria-checked said "Rate 4
+    // of 5" while the only spoken confirmation said "Poor", which is 1.
+    // Measured on the live form, not reasoned about (bench-review#58).
+    hoverRating.set(0)
+  }
+
+  /**
+   * Arrow / Home / End within the rating group.
+   *
+   * Selection follows focus, which is standard for a radio group and right
+   * here: landing on a value on the way past costs nothing, and it means a
+   * keyboard user can set a rating with arrows alone.
+   *
+   * The next value is computed from the CURRENT RATING, deliberately, and not
+   * from the star that received the event. Focus moves on a later tick (the
+   * roving tabindex has to rebind first), so while a key is held down every
+   * repeat still arrives at the star the user started on — anchoring on that
+   * element made a held arrow key set the same value over and over and never
+   * advance. Measured; it stopped at the second star.
+   *
+   * From an empty rating the first press selects an end of the scale rather
+   * than stepping off one, so that a user arrowing through the group can
+   * actually reach 1 without knowing to press Home.
+   */
+  function onStarKeydown(event: KeyboardEvent): void {
+    const key = event.key
+    const current = rating() as number
+    const forward = key === 'ArrowRight' || key === 'ArrowDown'
+    const back = key === 'ArrowLeft' || key === 'ArrowUp'
+
+    let next = 0
+    if (key === 'Home')
+      next = 1
+    else if (key === 'End')
+      next = 5
+    else if (forward)
+      next = current === 0 ? 1 : (current >= 5 ? 1 : current + 1)
+    else if (back)
+      next = current === 0 ? 5 : (current <= 1 ? 5 : current - 1)
+    else
+      return
+
+    event.preventDefault()
+    setRating(next as StarRating)
+    // The tabindex has to rebind onto the new star before focus can land on
+    // it, so this waits a tick rather than focusing synchronously.
+    setTimeout(() => {
+      const el = document.getElementById(`rating-star-${next}`)
+      if (el)
+        el.focus()
+    }, 0)
+  }
+
   const ratingText = derived<string>(() => {
     return getRatingText((hoverRating() || rating()) as StarRating)
   })
@@ -520,16 +614,20 @@
                 screen reader announces "Rate 4 of 5, radio button, selected"
                 instead of five identical unnamed buttons. --}}
             <button
-              :for="star in stars"
+              :for="star in starViews()"
+              :key="star.n"
               type="button"
               role="radio"
+              x-id="'rating-star-' + star.n"
               x-disabled="!judge"
-              x-aria-checked="rating === star ? 'true' : 'false'"
-              x-aria-label="'Rate ' + star + ' of 5'"
+              x-aria-checked="star.checked"
+              x-aria-label="star.label"
+              x-tabindex="star.tab"
               class="hover:text-amber-400 rounded focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 focus:outline-none disabled:opacity-50 transition-colors disabled:cursor-not-allowed"
-              x-class="(hoverRating || rating) >= star ? 'text-amber-400' : 'text-gray-300'"
-              @click="rating.set(star); ratingError.set(false)"
-              @mouseenter="hoverRating.set(star)"
+              x-class="star.filled ? 'text-amber-400' : 'text-gray-300'"
+              @click="setRating(star.n)"
+              @keydown="onStarKeydown($event)"
+              @mouseenter="hoverRating.set(star.n)"
               @mouseleave="hoverRating.set(0)"
             >
               {{-- Filled vs outlined, not amber vs grey. Colour was the only
@@ -537,8 +635,8 @@
                   1.4.1 for anyone who cannot distinguish the two. The outline
                   is the default so the pre-JS render shows an empty rating,
                   which is the correct starting state. --}}
-              <span :show="(hoverRating || rating) >= star" style="display:none"><Icon name="star-solid" size="32" /></span>
-              <span :show="(hoverRating || rating) < star"><Icon name="star" size="32" /></span>
+              <span :show="star.filled" style="display:none"><Icon name="star-solid" size="32" /></span>
+              <span :show="!star.filled"><Icon name="star" size="32" /></span>
             </button>
           </div>
           {{-- aria-live so the choice is announced after a click, which is the
@@ -593,15 +691,24 @@
         staff, junior attorneys) often genuinely needs this; for
         everyone else, leaving it off boosts the future verified-
         credentials badge (#37) on their review. --}}
+    {{-- The wrapping label stays, so clicking anywhere on the card still
+        toggles the box. But `aria-labelledby` overrides the name that label
+        would otherwise produce, which was the heading AND the explanation
+        concatenated — 258 characters announced as the control's NAME every
+        time it took focus, before a screen-reader user heard "checkbox".
+        The explanation is a description, which is what `aria-describedby` is
+        for: announced after the name, and skippable (bench-review#58). --}}
     <label class="flex gap-3 items-start mb-5 p-4 bg-blue-50/50 hover:bg-blue-50 border border-blue-200/60 rounded-md cursor-pointer">
       <input
         type="checkbox"
         x-model="anonymized"
+        aria-labelledby="anonymized-title"
+        aria-describedby="anonymized-help"
         class="mt-0.5 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-600 focus:ring-offset-0"
       >
       <div class="flex-1">
-        <p class="font-semibold text-gray-900 text-sm">Post this review anonymously</p>
-        <p class="mt-1 leading-relaxed text-gray-600 text-xs">Your name won't appear publicly — readers see "Anonymous reviewer" (or your role, if set in settings). A moderator still sees your identity for review. Useful for clerks, court staff, or attorneys reviewing under retaliation risk.</p>
+        <p id="anonymized-title" class="font-semibold text-gray-900 text-sm">Post this review anonymously</p>
+        <p id="anonymized-help" class="mt-1 leading-relaxed text-gray-600 text-xs">Your name won't appear publicly — readers see "Anonymous reviewer" (or your role, if set in settings). A moderator still sees your identity for review. Useful for clerks, court staff, or attorneys reviewing under retaliation risk.</p>
       </div>
     </label>
 
