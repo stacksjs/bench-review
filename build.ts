@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { buildApp } from '@stacksjs/stx'
+import { generateMobileAssociations } from './scripts/generate-mobile-associations'
 import { resolveApiEndpoint, tsAnalyticsTag } from './app/Helpers/analyticsTag'
 import { TS_ANALYTICS_APP_ID } from './config/ts-analytics'
 import { cspMetaTag, cspPolicyFor } from './app/Helpers/cspMeta'
@@ -260,6 +261,28 @@ try {
 }
 catch (err) {
   console.warn('[build] CSP meta injection skipped:', err instanceof Error ? err.message : err)
+}
+
+// Universal links (bench-review#80). `config/mobile.ts` entitles
+// `applinks:benchreview.org`, which is only half of one — iOS also fetches
+// `/.well-known/apple-app-site-association` from the domain and will not open
+// a link in the app unless that file names this exact team+bundle.
+//
+// Written into `public/` BEFORE the copy would be too late, so it goes
+// straight into `dist/` here. Regenerated every build so it cannot drift from
+// the app's identity.
+//
+// Skipped silently when APPLE_TEAM_ID is unset, because that is the ordinary
+// state of a checkout that is not building the app — the conformance gate is
+// what reports it when a release build should have had one.
+try {
+  // eslint-disable-next-line ts/no-top-level-await
+  const written = await generateMobileAssociations(process.env, 'dist')
+  if (written.length)
+    console.log(`[build] wrote ${written[0]}`)
+}
+catch (err) {
+  console.warn('[build] apple-app-site-association generation skipped:', err instanceof Error ? err.message : err)
 }
 
 // buildApp() emits a page-derived dist/sitemap.xml hardcoded to localhost
