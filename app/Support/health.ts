@@ -1,5 +1,7 @@
 import type { ApplicationHealthResult } from '@stacksjs/router'
+import process from 'node:process'
 import { checkApplicationHealth } from '@stacksjs/router'
+import filesystems from '../../config/filesystems'
 
 /**
  * The name this app answers to in its own health body.
@@ -20,6 +22,37 @@ export interface HealthOptions {
   check?: () => Promise<ApplicationHealthResult>
   /** App-specific facts merged into the body. */
   extra?: Record<string, unknown>
+}
+
+/**
+ * Is this deployment configured to keep the files people upload?
+ *
+ * The `local` disk writes under `storage/` and hands back `/storage/...` URLs
+ * that nothing serves, on a filesystem that a redeploy replaces. In production
+ * that means every review photo and avatar 404s and then evaporates — and
+ * because uploads are the highest-risk content this site accepts, losing them
+ * silently is also losing the evidence attached to a report.
+ *
+ * It is a configuration mistake, not a code one, and configuration mistakes
+ * are invisible until someone goes looking. So the health endpoint — the thing
+ * already being watched — answers for it (bench-review#55).
+ *
+ * Deliberately only in production. `local` is the right default everywhere
+ * else and a red light in development would train people to ignore this one.
+ */
+export function uploadsDiskCheck(): { ok: boolean, disk: string, message?: string } {
+  const disk = String((filesystems as any)?.default ?? 'local')
+  const env = String(process.env.APP_ENV ?? '').toLowerCase()
+  const isProduction = env === 'production' || env === 'prod'
+
+  if (!isProduction || disk !== 'local')
+    return { ok: true, disk }
+
+  return {
+    ok: false,
+    disk,
+    message: 'FILESYSTEM_DISK=local in production: uploaded photos are served from a path nothing routes and are destroyed on redeploy. Set FILESYSTEM_DISK=s3.',
+  }
 }
 
 /**
@@ -78,8 +111,14 @@ export async function healthResponse(options: HealthOptions = {}): Promise<Respo
     }
   }
 
-  return new Response(JSON.stringify({ app: APP, ...health, ...(options.extra ?? {}) }), {
-    status: health.status === 'healthy' ? 200 : 503,
+  // Merged in rather than left to the framework's probe set, which only knows
+  // about the database and the cache.
+  const uploads = uploadsDiskCheck()
+  const checks = { ...health.checks, uploads: { ok: uploads.ok, ms: 0, message: uploads.message ?? `disk=${uploads.disk}` } }
+  const status = health.status === 'healthy' && !uploads.ok ? 'degraded' : health.status
+
+  return new Response(JSON.stringify({ app: APP, ...health, checks, status, ...(options.extra ?? {}) }), {
+    status: status === 'healthy' ? 200 : 503,
     headers: {
       'Content-Type': 'application/json',
       // A cached health check reports the past. Nothing between us and the

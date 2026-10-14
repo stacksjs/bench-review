@@ -6,6 +6,13 @@ node_modules
 temp
 .temp
 .env*
+# ...but NOT the example. It is the one env file that is meant to be in the
+# repo — `.env*` swept it up too, so the file new contributors are supposed to
+# copy has never been tracked, which is exactly how it drifted into describing
+# a Postgres app on port 3000 that this has never been (bench-review#55).
+# Values in it are blanked; a real secret in here would be a mistake whatever
+# the ignore rules say.
+!.env.example
 *.local
 updates
 tests/unit/coverage
