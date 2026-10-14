@@ -14,7 +14,20 @@ export interface AdminReviewRow {
   created_at?: string | null
   updated_at?: string | null
   judge: { id: number | null, name: string }
-  user: { id: number, name: string, email: string } | null
+  /**
+   * The author, MASKED when they asked to be anonymous (bench-review#56).
+   * An anonymized row has `id`/`email` null and carries `author_ref` — a
+   * stable per-author pseudonym, so a moderator can tell that several
+   * anonymous reviews are the same person without learning who. The real
+   * identity comes from `revealAuthor`, which logs the request.
+   */
+  user: {
+    id: number | null
+    name: string
+    email: string | null
+    anonymized: boolean
+    author_ref?: string
+  } | null
   // Judge right-of-reply: the official response body, or null if none.
   response?: string | null
   /**
@@ -48,6 +61,13 @@ defineStore('adminReviews', () => {
    * longer looking at (bench-review#51).
    */
   const selectedIds = state<number[]>([])
+  /**
+   * Identities unmasked during this session, keyed by review id. Lives in the
+   * store rather than on the row so a refetch (which replaces `reviews`)
+   * drops it: a reveal is answered for the person who asked, at the moment
+   * they asked, and is not a property of the review.
+   */
+  const revealedAuthors = state<Record<number, { name: string, email: string }>>({})
   const bulkRunning = state<boolean>(false)
 
   const totalPages = derived<number>(() => Math.max(1, Math.ceil(total() / perPage())))
@@ -57,6 +77,8 @@ defineStore('adminReviews', () => {
   async function fetchReviews(): Promise<void> {
     loading.set(true)
     selectedIds.set([])
+    // An unmasked identity does not survive the rows it was asked about.
+    revealedAuthors.set({})
     try {
       const params = new URLSearchParams({
         status: statusFilter(),
@@ -228,6 +250,42 @@ defineStore('adminReviews', () => {
     }
   }
 
+  /**
+   * Ask for one anonymized author's identity (bench-review#56). A reason is
+   * required and is recorded in the moderation log along with who asked.
+   */
+  async function revealAuthor(id: number, note: string): Promise<boolean> {
+    try {
+      const res = await useStore('auth').authFetch(`/api/admin/reviews/${id}/author`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note }),
+      })
+      const data = await res.json().catch(() => ({})) as {
+        ok?: boolean
+        error?: string
+        author?: { id: number, name: string | null, email: string | null }
+      }
+      if (!res.ok || !data.ok || !data.author) {
+        actionError.set(data.error || 'Could not reveal this author')
+        return false
+      }
+      revealedAuthors.set({
+        ...revealedAuthors(),
+        [id]: {
+          name: data.author.name || 'Unnamed account',
+          email: data.author.email || '(no email on file)',
+        },
+      })
+      actionError.set('')
+      return true
+    }
+    catch (err) {
+      actionError.set(err instanceof Error ? err.message : 'Network error')
+      return false
+    }
+  }
+
   async function deleteReview(id: number): Promise<boolean> {
     try {
       const res = await useStore('auth').authFetch(`/api/admin/reviews/${id}`, { method: 'DELETE' })
@@ -308,6 +366,8 @@ defineStore('adminReviews', () => {
     setPage,
     setReviewStatus,
     redactReview,
+    revealAuthor,
+    revealedAuthors,
     toggleSelected,
     toggleSelectAll,
     clearSelection,

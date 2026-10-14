@@ -36,6 +36,11 @@
   const redactNote = state<string>('')
   const redacting = state<boolean>(false)
   const redactOpen = state<number>(0)
+  // Author reveal (bench-review#56): the queue masks anonymized authors, and
+  // this is the deliberate, reasoned, logged exception.
+  const revealNote = state<string>('')
+  const revealing = state<boolean>(false)
+  const revealOpen = state<number>(0)
   // In-flight guard for the per-row Approve/Reject/Delete mutations.
   // The buttons live inside the :for, where signal call-syntax in
   // x-disabled/:text is the forbidden footgun (silently breaks the
@@ -46,6 +51,33 @@
     redactOpen.set(redactOpen() === review.id ? 0 : review.id)
     redactDraft.set(review.content ?? '')
     redactNote.set('')
+  }
+
+  function openReveal(review: AdminReviewRow): void {
+    revealOpen.set(revealOpen() === review.id ? 0 : review.id)
+    revealNote.set('')
+  }
+
+  async function confirmReveal(review: AdminReviewRow): Promise<void> {
+    if (revealing())
+      return
+    if (revealNote().trim().length < 5) {
+      toast.error('Reason required', 'Say why this author needs to be identified — it goes in the moderation log.')
+      return
+    }
+    revealing.set(true)
+    try {
+      if (await store.revealAuthor(review.id, revealNote().trim())) {
+        revealOpen.set(0)
+        toast.success('Author revealed', 'Recorded in the moderation log against your account.')
+      }
+      else {
+        toast.error('Could not reveal', store.actionError() || 'Try again.')
+      }
+    }
+    finally {
+      revealing.set(false)
+    }
   }
 
   async function saveRedaction(review: AdminReviewRow): Promise<void> {
@@ -108,13 +140,37 @@
    * means bindFor reuses the existing node, so ticking a box does not
    * rebuild the list under the moderator's cursor.
    */
-  const rowsView = derived<Array<AdminReviewRow & { selected: boolean, selectLabel: string }>>(() => {
+  const rowsView = derived<Array<AdminReviewRow & {
+    selected: boolean
+    selectLabel: string
+    authorLine: string
+    revealLabel: string
+  }>>(() => {
     const picked = new Set(store.selectedIds())
-    return store.reviews().map(r => ({
-      ...r,
-      selected: picked.has(r.id),
-      selectLabel: `Select review: ${r.title}`,
-    }))
+    const revealed = store.revealedAuthors()
+    return store.reviews().map((r) => {
+      // The author line, resolved here rather than in the template: the row
+      // has three states (named, masked, unmasked-this-session) and branching
+      // on them in the `:for` would mean signal call-syntax inside the loop.
+      const shown = revealed[r.id]
+      let authorLine: string
+      if (shown)
+        authorLine = shown.email
+      else if (!r.user)
+        authorLine = '(no account)'
+      else if (r.user.anonymized)
+        authorLine = `Anonymous · ${r.user.author_ref ?? 'ref unavailable'}`
+      else
+        authorLine = r.user.email ?? '(no email)'
+
+      return {
+        ...r,
+        selected: picked.has(r.id),
+        selectLabel: `Select review: ${r.title}`,
+        authorLine,
+        revealLabel: shown ? `Revealed: ${shown.name}` : 'Reveal author',
+      }
+    })
   })
 
   const selectedCount = derived<number>(() => store.selectedIds().length)
@@ -395,8 +451,11 @@
             <p class="mt-1 text-gray-600 text-sm">
               <span>{{ review.judge.name }}</span>
               <span class="text-gray-400"> · </span>
-              <span :if="review.user">{{ review.user.email }}</span>
-              <span :if="!review.user" class="text-gray-400">(anonymous)</span>
+              {{-- The author, masked when they asked to be anonymous
+                  (bench-review#56). `Anonymous · A-…` is a stable per-author
+                  ref, so repeat abuse is still visible here without anyone
+                  being identified. Precomputed in `rowsView`. --}}
+              <span>{{ review.authorLine }}</span>
               <span class="text-gray-400"> · </span>
               <span>{{ '★ ' + review.rating }}</span>
             </p>
@@ -458,6 +517,41 @@
         </div>
         <div class="mt-3 space-y-3" x-class="expandedId() === review.id ? '' : 'hidden'">
           <div class="px-4 py-3 max-w-none bg-gray-50 rounded prose prose-sm" x-html="review.content"></div>
+
+          {{-- Author reveal (bench-review#56). The queue shows anonymized
+              authors as `Anonymous · A-…`, because a single compromised
+              moderator account used to be enough to de-anonymize every
+              anonymous reviewer on the site at once, silently. Revealing one
+              is still allowed — threats and subpoenas have to be actionable —
+              but it costs a reason and leaves a log entry with your name on
+              it. --}}
+          <div class="px-4 py-3 bg-gray-50 border border-gray-300 rounded">
+            <div class="flex items-center justify-between">
+              <label class="block font-semibold text-gray-700 text-xs tracking-wide uppercase">Author identity</label>
+              <button
+                type="button"
+                @click="openReveal(review)"
+                class="px-2 py-0.5 font-medium text-gray-800 text-xs bg-white hover:bg-gray-100 border border-gray-300 rounded"
+              >{{ review.revealLabel }}</button>
+            </div>
+            <p class="mt-0.5 text-gray-500 text-xs">Anonymous reviewers are masked here. The ref stays the same across everything one person writes, so you can spot a repeat without identifying anyone. Revealing is logged against your account.</p>
+
+            <div x-class="revealOpen() === review.id ? '' : 'hidden'">
+              <input
+                x-model="revealNote"
+                type="text"
+                placeholder="Why — e.g. threat assessment, subpoena 24-1193"
+                aria-label="Reason for revealing this author"
+                class="block mt-2 px-3 py-2 w-full text-gray-900 text-xs bg-white border border-gray-300 rounded-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              >
+              <button
+                type="button"
+                @click="confirmReveal(review)"
+                x-disabled="revealing"
+                class="mt-2 px-3 py-1.5 font-semibold text-white text-xs bg-gray-800 hover:bg-gray-900 rounded disabled:opacity-50"
+              >{{ revealing() ? 'Revealing…' : 'Reveal and log' }}</button>
+            </div>
+          </div>
 
           {{-- Redaction (bench-review#53). Separate from the status buttons
               because it is a different decision: the review stays published,
