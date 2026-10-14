@@ -31,6 +31,25 @@ import { processAndPersistReviewPhoto } from '../../Helpers/reviewPhotos'
  */
 const MAX_PHOTOS_PER_REVIEW = 4
 
+/**
+ * Photos one account may hold across every review it has written
+ * (bench-review#56).
+ *
+ * The per-review cap above bounds a single review and nothing else: an author
+ * with twenty reviews could hold eighty images, and the route had no quota at
+ * all behind its throttle. Each accepted photo is three WebP renditions kept
+ * indefinitely, so the unbounded quantity here is storage, paid for by us.
+ *
+ * Counted rather than measured in bytes. A byte quota is the more precise
+ * control, but it needs a size column the table does not have and a backfill
+ * for every existing row, and it would not bound the thing it sounds like it
+ * bounds — the CPU in a delete-and-reupload loop is capped by the route's
+ * throttle, not by how much is on disk. Twelve photos is three full reviews'
+ * worth, which is past any honest use of this feature and far short of
+ * anything expensive.
+ */
+const MAX_PHOTOS_PER_USER = 12
+
 export default new Action({
   name: 'Upload Review Photos',
   description: 'Attach one or more photos to an existing review',
@@ -81,6 +100,19 @@ export default new Action({
       return response.json({ error: 'No photos in the upload.' }, 422)
     if (incoming.length > slotsRemaining)
       return response.json({ error: `Can only add ${slotsRemaining} more ${slotsRemaining === 1 ? 'photo' : 'photos'} to this review.` }, 422)
+
+    // Per-ACCOUNT cap, on top of the per-review one. Counts the user's rows
+    // across every review, so the budget cannot be spread over many reviews.
+    const owned = await db.selectFrom('review_photos')
+      .select(['COUNT(*) as c'])
+      .where('user_id', '=', Number(userId))
+      .executeTakeFirst() as { c: number | string } | undefined
+    const ownedCount = Number(owned?.c ?? 0)
+    const userSlotsRemaining = MAX_PHOTOS_PER_USER - ownedCount
+    if (userSlotsRemaining <= 0)
+      return response.json({ error: `You have reached the ${MAX_PHOTOS_PER_USER}-photo limit across your reviews. Delete one to add another.` }, 422)
+    if (incoming.length > userSlotsRemaining)
+      return response.json({ error: `You can only add ${userSlotsRemaining} more ${userSlotsRemaining === 1 ? 'photo' : 'photos'} across your reviews.` }, 422)
 
     const reviewUuid = review.uuid || `review-${reviewId}`
     const persisted: any[] = []
