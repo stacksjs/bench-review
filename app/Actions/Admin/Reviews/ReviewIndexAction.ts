@@ -1,6 +1,7 @@
 import { Action } from '@stacksjs/actions'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
+import { maskAuthor } from '../../../Helpers/anonymityMask'
 
 /**
  * GET /api/admin/reviews — paginated review list with status filter.
@@ -15,9 +16,17 @@ import { request, response } from '@stacksjs/router'
  *   - q        : substring matched against `title` OR `content`
  *   - page, perPage : 1-indexed, 25 default, max 100
  *
- * Returns each row hydrated with `{ judge: { id, name }, user: { id, name, email } | null }`
+ * Returns each row hydrated with `{ judge: { id, name }, user: AdminAuthor | null }`
  * so the admin table can show "Review of <Judge> by <Author>" without
  * an extra client-side join.
+ *
+ * The author is MASKED when the review is anonymized (bench-review#56): this
+ * endpoint used to hand out `{ id, name, email }` for every row regardless,
+ * which made the moderation queue a bulk de-anonymization tool for anyone who
+ * got into one admin account. Masked rows carry `author_ref` instead, so a
+ * moderator can still tell that several anonymous reviews are the same person.
+ * The real identity is one explicit, logged request away —
+ * `RevealReviewAuthorAction`.
  */
 // 'removed' included so a moderator can still find a taken-down review
 // (bench-review#53). It is invisible to the public and to its author, but the
@@ -208,7 +217,7 @@ export default new Action({
         created_at: r.created_at,
         updated_at: r.updated_at,
         judge: j ? { id: j.id, name: j.name } : { id: r.judge_id, name: '(unknown judge)' },
-        user: u ? { id: u.id, name: u.name, email: u.email } : null,
+        user: maskAuthor(r as any, u),
         response: responseByReview.get(Number(r.id)) ?? null,
         photos: photosByReview.get(Number(r.id)) ?? [],
         open_flags: openFlagsByReview.get(Number(r.id)) ?? 0,

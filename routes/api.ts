@@ -594,6 +594,15 @@ route.patch('/admin/reviews/{id}/content', 'Actions/Admin/Reviews/RedactReviewAc
   .middleware('admin')
   .skipCsrf()
 
+// Reveal one anonymized author. The moderation queue masks them by default
+// (bench-review#56), so this is the deliberate, reasoned, logged exception —
+// not the ambient behaviour it used to be.
+route.post('/admin/reviews/{id}/author', 'Actions/Admin/Reviews/RevealReviewAuthorAction')
+  .name('bench.admin.reviews.revealAuthor')
+  .middleware('auth')
+  .middleware('admin')
+  .skipCsrf()
+
 route.delete('/admin/reviews/{id}', 'Actions/Admin/Reviews/DeleteReviewAction')
   .name('bench.admin.reviews.destroy')
   .middleware('auth')
