@@ -5,9 +5,16 @@ import type { MobileConfig } from '@stacksjs/types/mobile'
  *
  * ## What the native app actually is
  *
- * Not a rewrite. Stacks' mobile build produces a native shell that loads this
- * same STX site, so there is one codebase and one set of views. `./buddy
- * build:ios` generates the Xcode project from the values below.
+ * Not a rewrite. Stacks' mobile build produces a native shell around this same
+ * STX site, so there is one codebase. `./buddy build:ios` generates the Xcode
+ * project from the values below.
+ *
+ * Since bench-review#79 that shell is no longer only a web view: the paths in
+ * `nativeScreens` are drawn as real UIKit screens from `resources/native`,
+ * with the system's own tab bar and push navigation, while every other path
+ * still loads the site. The two halves share the API and nothing else, which
+ * is why a native screen reads `resources/functions/native-api.ts` rather than
+ * a web store.
  *
  * Which server the app talks to is fixed AT BUILD TIME, not at runtime:
  *
@@ -59,6 +66,35 @@ const mobileContent = envVars.MOBILE_E2E === '1'
       fallbackWebAssets: 'dist-offline',
     }
 
+/**
+ * The screens Craft draws NATIVELY, by path (bench-review#79).
+ *
+ * A path listed here is a real UIKit screen from `resources/native`, not the
+ * site in a web view: a cold start is native views, taps between them push
+ * native screens, and the bar below is the system's own tab bar. Any path NOT
+ * listed still opens the web site, so this converts the app screen by screen
+ * rather than in one jump.
+ *
+ * Craft matches fixed segments before a parameter, so `/judges` is never
+ * taken for a judge's id.
+ *
+ * This is the first slice: the two directories that have real data behind them
+ * and the judge screen they push to. The rest of the app — the feed, an
+ * article, writing a review, the account screens — is still the web view, and
+ * the e2e suite (bench-review#81) covers both halves.
+ */
+const nativeScreens: Record<string, string> = {
+  '/judges': 'Judges',
+  '/judges/:id': 'Judge',
+  '/court-houses': 'CourtHouses',
+}
+
+/** The tab bar, an SF Symbol each. */
+const tabs = [
+  { id: '/judges', title: 'Judges', symbol: 'person.text.rectangle' },
+  { id: '/court-houses', title: 'Courthouses', symbol: 'building.columns' },
+]
+
 export default {
   ios: {
     appName: 'Bench Review',
@@ -96,6 +132,30 @@ export default {
 
     orientations: ['portrait'],
     deviceFamilies: ['iphone'],
+
+    // ⚠️ INERT ON THIS FRAMEWORK VERSION — read before trusting it.
+    //
+    // These three keys are what makes Craft draw `nativeScreens` as real UIKit
+    // screens instead of loading the site in a web view (bench-review#79), and
+    // they are correct. They currently do NOTHING, and the generated
+    // `storage/framework/mobile/ios/craft.config.json` still says
+    // `"renderer": "web"`.
+    //
+    // Two things have to be true and only one is. craft-native is now 0.0.187,
+    // which does ship iOS native-screen support (0.0.118 had it in its Android
+    // template only). But `./buddy build:ios` goes through @stacksjs/build
+    // 0.70.380, which contains zero occurrences of `nativeScreens` and never
+    // forwards `renderer` — so the config never reaches Craft. HQ.training,
+    // which does run native, is on the stacks 0.75 line.
+    //
+    // Left in place deliberately rather than removed: the screens in
+    // resources/native are written and the wiring is right, so this becomes
+    // live the moment the framework can carry it. Proven inert rather than
+    // assumed — the generated craft.config.json was read after a build, and
+    // the iOS e2e suite still passes on the web renderer.
+    renderer: 'native',
+    nativeScreens,
+    tabs,
 
     capabilities: {
       camera: true,
