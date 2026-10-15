@@ -33,6 +33,7 @@
     "@stacksjs/mobile": "0.70.380",
     "bun-query-builder": "0.2.50",
     "chart.js": "^4.5.1",
+    "craft-native": "0.0.187",
     "leaflet": "^1.9.4",
     "ofetch": "^1.5.1",
     "perfect-debounce": "^2.1.0",
@@ -61,6 +62,6 @@
     "commit-msg": "bunx gitlint --edit .git/COMMIT_EDITMSG"
   },
   "overrides": {
-    "craft-native": "0.0.118"
+    "craft-native": "0.0.187"
   }
 }
