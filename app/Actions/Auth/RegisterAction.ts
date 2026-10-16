@@ -158,12 +158,19 @@ export default new Action({
       // Fire `user:registered` so app/Events.ts listeners (welcome email, CRM
       // sync, etc.) run. Fire-and-forget — listener errors are caught by the
       // wildcard handler so a flaky welcome email doesn't fail registration.
-      dispatch('user:registered', {
-        id: user?.id,
-        email: user?.email,
-        name: user?.name,
-        to: user?.email,
-      })
+      // Guarded, because stacks 0.75 types the event payload: `user?.id` is
+      // `string | undefined` and no longer assignable. Guarding is the right
+      // fix rather than a cast — a listener handed an undefined id and email
+      // cannot send the welcome or verification mail it exists to send, so
+      // firing in that case was always a no-op dressed as an event.
+      if (user?.id && user.email) {
+        dispatch('user:registered', {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          to: user.email,
+        })
+      }
 
       return withSessionCookie({
         token: result.token,

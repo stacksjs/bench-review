@@ -1,6 +1,42 @@
 import { config } from '@stacksjs/config'
-import { db, sql } from '@stacksjs/database'
-import { Controller } from '@stacksjs/server'
+import { db, mutationCount, sql, sqlDateTime } from '@stacksjs/database/runtime'
+import { Controller } from '@stacksjs/server/controllers/base'
+
+const DAY_MS = 86_400_000
+/** `2026-09-10T11` - the stored timestamp truncated to its hour. */
+const HOUR_PREFIX = 13
+/** `2026-09-10` - truncated to its day. */
+const DAY_PREFIX = 10
+
+/**
+ * The hour bucket as the dashboard reads it: `2026-09-10 11:00:00`.
+ *
+ * Buckets are prefixes of the stored timestamp rather than the output of a
+ * date function, because `strftime` and `datetime` exist only on SQLite. The
+ * stored format is fixed (see `sqlDateTime`), so a prefix is exact, and the
+ * label is restored here rather than in SQL.
+ */
+function hourLabel(bucket: string): string {
+  return `${String(bucket).replace('T', ' ')}:00:00`
+}
+
+/**
+ * The query type is the first element of the JSON array in `tags`, written by
+ * the query logger. Read here rather than in SQL: the JSON functions differ
+ * per dialect and PostgreSQL has none by these names.
+ */
+function queryTypeFromTags(tags: string | null | undefined): string {
+  if (!tags)
+    return 'unknown'
+  try {
+    const parsed = JSON.parse(tags) as unknown
+    const first = Array.isArray(parsed) ? parsed[0] : undefined
+    return typeof first === 'string' && first ? first : 'unknown'
+  }
+  catch {
+    return 'unknown'
+  }
+}
 
 export default class QueryController extends Controller {
   /**
@@ -14,15 +50,30 @@ export default class QueryController extends Controller {
         .select(db.fn.count('id').as('count'))
         .executeTakeFirstOrThrow()
 
-      // Get counts by query type
-      const queryTypeStats = await db
+      // `tags` is a string column holding a JSON array whose first element is
+      // the query type. Grouping by the whole column keeps this portable:
+      // `json_extract` is SQLite and MySQL only, and PostgreSQL has no such
+      // function, so the previous projection made this endpoint fail there.
+      // The distinct tag sets are few, so folding them by type here is cheap.
+      const tagStats = await db
         .selectFrom('query_logs')
         .select([
-          sql`json_extract(tags, "$[0]")`.as('type'),
+          'tags',
           db.fn.count('id').as('count'),
+          db.fn.avg('duration').as('avg_duration'),
         ])
-        .groupBy(sql`json_extract(tags, "$[0]")`)
-        .execute()
+        .groupBy('tags')
+        .execute() as Array<{ tags: string | null, count: number | string, avg_duration: number | string | null }>
+
+      const byType = new Map<string, { count: number, durationTotal: number }>()
+      for (const row of tagStats) {
+        const type = queryTypeFromTags(row.tags)
+        const count = Number(row.count) || 0
+        const entry = byType.get(type) ?? { count: 0, durationTotal: 0 }
+        entry.count += count
+        entry.durationTotal += Number(row.avg_duration ?? 0) * count
+        byType.set(type, entry)
+      }
 
       // Get counts by status
       const statusStats = await db
@@ -31,35 +82,31 @@ export default class QueryController extends Controller {
         .groupBy('status')
         .execute()
 
-      // Get average duration by query type
-      const durationStats = await db
-        .selectFrom('query_logs')
-        .select([
-          sql`json_extract(tags, "$[0]")`.as('type'),
-          db.fn.avg('duration').as('avg_duration'),
-        ])
-        .groupBy(sql`json_extract(tags, "$[0]")`)
-        .execute()
-
       // Get count of slow queries over time (last 24 hours)
       const slowQueriesTimeline = await db
         .selectFrom('query_logs')
         .select([
-          sql`strftime("%Y-%m-%d %H:00:00", executed_at)`.as('hour'),
+          sql`substr(executed_at, 1, 13)`.as('hour'),
           db.fn.count('id').as('count'),
         ])
         .where('status', '=', 'slow')
-        .whereRaw(sql`executed_at >= datetime("now", "-1 day")`)
-        .groupBy(sql`strftime("%Y-%m-%d %H:00:00", executed_at)`)
+        .where('executed_at', '>=', sqlDateTime(new Date(Date.now() - 86_400_000)))
+        .groupBy('hour')
         .orderBy('hour')
-        .execute()
+        .execute() as Array<{ hour: string, count: number | string }>
 
       return {
         totalQueries: totalQueries.count,
-        byType: queryTypeStats,
+        byType: [...byType].map(([type, entry]) => ({ type, count: entry.count })),
         byStatus: statusStats,
-        avgDuration: durationStats,
-        slowQueriesTimeline,
+        avgDuration: [...byType].map(([type, entry]) => ({
+          type,
+          avg_duration: entry.count === 0 ? 0 : entry.durationTotal / entry.count,
+        })),
+        slowQueriesTimeline: slowQueriesTimeline.map(row => ({
+          hour: hourLabel(row.hour),
+          count: Number(row.count) || 0,
+        })),
         // Include system settings for reference
         settings: {
           slowThreshold: config.database?.queryLogging?.slowThreshold || 100,
@@ -242,8 +289,15 @@ export default class QueryController extends Controller {
         throw new Error('Query not found')
 
       // Parse JSON fields (safely — data may be corrupted)
-      const safeParse = (val: string | null | undefined, fallback: any = []) => {
-        if (!val) return fallback
+      /*
+       * The row's fields arrive `unknown` - the query builder has no schema for
+       * this table - so this takes what it is given and decides. Reading a JSON
+       * column is exactly the place a value has to be checked rather than
+       * trusted: it is text somebody else wrote.
+       */
+      const safeParse = (val: unknown, fallback: unknown = []): unknown => {
+        if (typeof val !== 'string' || !val)
+          return fallback
         try { return JSON.parse(val) }
         catch { return fallback }
       }
@@ -271,38 +325,43 @@ export default class QueryController extends Controller {
     type = 'all',
   }) {
     try {
-      let interval: string
-      let timeConstraint: string
+      let bucketWidth: number
+      let windowMs: number
 
-      // Set time grouping format and constraint based on timeframe
+      // Set the bucket width and how far back to look, per timeframe.
       switch (timeframe) {
         case 'week':
-          interval = '%Y-%m-%d'
-          timeConstraint = '-7 day'
+          bucketWidth = DAY_PREFIX
+          windowMs = 7 * DAY_MS
           break
         case 'month':
-          interval = '%Y-%m-%d'
-          timeConstraint = '-30 day'
+          bucketWidth = DAY_PREFIX
+          windowMs = 30 * DAY_MS
           break
         case 'day':
         default:
-          interval = '%Y-%m-%d %H:00:00'
-          timeConstraint = '-24 hour'
+          bucketWidth = HOUR_PREFIX
+          windowMs = DAY_MS
           break
       }
 
       let query = db
         .selectFrom('query_logs')
         .select([
-          // `interval` and `timeConstraint` are chosen from the fixed set a
-          // few lines above, never from the request, so interpolating them
-          // into the fragment is safe. `sql.literal` does not exist on this
-          // tag, which is what made this a type error.
-          sql`strftime('${interval}', executed_at)`.as('time_interval'),
+          // Timestamps are stored in one canonical format, so the bucket is a
+          // prefix of the stored text: 13 characters for an hour, 10 for a
+          // day. `strftime` and `datetime` are SQLite-only, and the value in
+          // `sql`...`` was interpolated as a quoted `'${interval}'`, which the
+          // tag rendered as a literal `'?'`, so this returned nothing at all,
+          // on every dialect.
+          // Two fixed fragments rather than one interpolated width: a value
+          // inside the tag is bound as a parameter, and a parameter here
+          // throws the builder's own count off.
+          (bucketWidth === HOUR_PREFIX ? sql`substr(executed_at, 1, 13)` : sql`substr(executed_at, 1, 10)`).as('time_interval'),
           db.fn.count('id').as('count'),
           db.fn.avg('duration').as('avg_duration'),
         ])
-        .whereRaw(sql`executed_at >= datetime("now", '${timeConstraint}')`)
+        .where('executed_at', '>=', sqlDateTime(new Date(Date.now() - windowMs)))
         .groupBy('time_interval')
         .orderBy('time_interval')
 
@@ -310,10 +369,13 @@ export default class QueryController extends Controller {
       if (type !== 'all')
         query = query.where('tags', 'like', `%"${type}"%`)
 
-      const results = await query.execute()
+      const results = await query.execute() as Array<{ time_interval: string, count: number | string, avg_duration: number | string | null }>
 
       return {
-        data: results,
+        data: results.map(row => ({
+          ...row,
+          time_interval: bucketWidth === HOUR_PREFIX ? hourLabel(row.time_interval) : row.time_interval,
+        })),
         meta: {
           timeframe,
           type,
@@ -349,7 +411,33 @@ export default class QueryController extends Controller {
         .limit(10)
         .execute()
 
-      return results
+      /*
+       * An aggregate select's rows are named by its aliases rather than by the
+       * table, so they arrive unknown-valued. Read out here, once, rather than
+       * asserted: `count` really can be a string, a number or a bigint
+       * depending on the driver, which is why the return type says so.
+       */
+      /*
+       * Annotated rather than inferred.
+       *
+       * `results` comes back from an aggregate select, whose rows are named by
+       * their aliases rather than by the table, so each row is
+       * `Record<string, unknown>` - and the mapped literal collapses to the
+       * same thing rather than to the shape this method promises. Naming the
+       * element type is what makes the compiler check the mapping against the
+       * signature instead of widening past it.
+       */
+      return results.map((row): {
+        normalized_query: string
+        count: string | number | bigint
+        avg_duration: string | number
+        max_duration: number | undefined
+      } => ({
+        normalized_query: String(row.normalized_query ?? ''),
+        count: (typeof row.count === 'number' || typeof row.count === 'bigint' ? row.count : String(row.count ?? '0')),
+        avg_duration: (typeof row.avg_duration === 'number' ? row.avg_duration : String(row.avg_duration ?? '0')),
+        max_duration: typeof row.max_duration === 'number' ? row.max_duration : undefined,
+      }))
     }
     catch (error: unknown) {
       const err = error as Error
@@ -364,16 +452,23 @@ export default class QueryController extends Controller {
     try {
       const retentionDays = config.database?.queryLogging?.retention || 7
 
-      // Parameterized via db.unsafe: the delete builder can neither
-      // bind a datetime() expression nor render raw WHERE fragments.
-      const statement = await (db as any).unsafe(
-        `DELETE FROM query_logs WHERE executed_at < datetime("now", ?)`,
-        [`-${retentionDays} day`],
-      )
-      const result = typeof statement?.execute === 'function' ? await statement.execute() : statement
+      // The cutoff is computed here rather than in SQL. `datetime("now", ?)`
+      // is SQLite syntax, so this statement was a syntax error on PostgreSQL
+      // and MySQL and pruned nothing there. It was not right on SQLite either:
+      // `datetime()` renders `2026-09-10 11:00:00` while the logger writes
+      // `sqlDateTime()`'s `2026-09-10T11:00:00.000`, and comparing those as
+      // text keeps rows up to a day past their retention, because 'T' > ' '.
+      // A bound cutoff in the stored format compares correctly everywhere.
+      const cutoff = sqlDateTime(new Date(Date.now() - retentionDays * 86_400_000))
+      const result = await db
+        .deleteFrom('query_logs')
+        .where('executed_at', '<', cutoff)
+        .executeTakeFirst()
 
       return {
-        pruned: Number(result?.changes ?? result?.numDeletedRows ?? 0),
+        // Each driver names the affected-row count differently, and the pair
+        // read here covered only SQLite.
+        pruned: mutationCount(result),
         retentionDays,
       }
     }

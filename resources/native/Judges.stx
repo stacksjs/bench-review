@@ -118,7 +118,11 @@ function clear(): void {
 }
 
 function open(judge: Judge): void {
-  craft?.navigation?.push('/judges/' + judge.id, { judge })
+  // `open(path)` and nothing else: Craft's navigation takes a path string and
+  // throws on anything else, so a screen cannot be handed the row the list
+  // already holds. The detail screen fetches by id, which is why
+  // GET /api/judges/{id} exists.
+  craft?.navigation?.open(`/judges/${judge.id}`)
 }
 
 async function refresh(): Promise<void> {
@@ -149,9 +153,9 @@ onMount(() => {
           accessibilityLabel="Search judges"
           testID="judges-search"
         />
-        <View :if="term().length > 0" @click="clear()" accessibilityRole="button" accessibilityLabel="Clear search" testID="judges-clear">
+        <Pressable :if="term().length > 0" @press="clear()" accessibilityRole="button" accessibilityLabel="Clear search" testID="judges-clear">
           <Icon name="circle-x" class="h-4 w-4 text-[#8e8e93]" />
-        </View>
+        </Pressable>
       </View>
 
       <Text :if="summary()" :class="ui.header" :text="summary()" testID="judges-summary" />
@@ -159,8 +163,11 @@ onMount(() => {
       <View :if="rows().length > 0" :class="ui.group" testID="judges-list">
         <View :for="(row, index) in rows()" :key="row.key">
           <View :if="index" :class="ui.separatorAvatar" />
-          <View
-            @click="open(row.judge)"
+          {{-- Pressable, not a View with @click. A View is not a tap target in
+              the native renderer — the row rendered correctly and simply did
+              nothing when tapped. --}}
+          <Pressable
+            @press="open(row.judge)"
             class="flex-row gap-3 items-center px-4 py-2.5"
             accessibilityRole="button"
             :accessibilityLabel="row.name"
@@ -175,7 +182,7 @@ onMount(() => {
               <Text :if="row.where" :numberOfLines="1" :class="ui.subtitle" :text="row.where" />
             </View>
             <Icon name="chevron-right" :class="ui.chevron" />
-          </View>
+          </Pressable>
         </View>
       </View>
 
@@ -193,9 +200,9 @@ onMount(() => {
       <View :if="nothing()" class="items-center mt-7 py-6" :class="ui.card" accessibilityRole="alert" testID="judges-empty">
         <Icon :name="offline() ? 'wifi-off' : 'search'" class="h-7 w-7 text-[#c7c7cc] dark:text-[#48484a]" />
         <Text class="mt-3 text-center" :class="ui.subtitle" :text="reason()" />
-        <View :if="failed()" @click="refresh()" class="justify-center mt-2 min-h-[44px]" accessibilityRole="button" testID="judges-retry">
+        <Pressable :if="failed()" @press="refresh()" class="justify-center mt-2 min-h-[44px]" accessibilityRole="button" testID="judges-retry">
           <Text class="text-[17px]" :class="ui.tint" text="Try again" />
-        </View>
+        </Pressable>
       </View>
 
       <View class="h-12" />

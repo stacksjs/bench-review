@@ -182,7 +182,11 @@ export default new Action({
     if (recipient && emailAllowed && (inserted as any)?.id) {
       const judgeName = (judge as any)?.name ?? 'this judge'
       const reviewerName = (authUser as any)?.name || 'there'
-      const articleUrl = `${process.env.APP_URL || 'http://localhost:4000'}/article/${inserted.id}`
+      // Read through the same cast the enclosing guard uses: that guard tests
+      // `(inserted as any)?.id`, which does not narrow `inserted` itself, so
+      // stacks 0.75's stricter row typing flags the direct access.
+      const insertedId = (inserted as any)?.id
+      const articleUrl = `${process.env.APP_URL || 'http://localhost:4000'}/article/${insertedId}`
       const safeJudge = escapeHtml(judgeName)
       sendMailDetached('mail.review-submitted', {
         to: recipient,

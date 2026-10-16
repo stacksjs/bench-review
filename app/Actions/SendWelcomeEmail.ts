@@ -11,8 +11,9 @@ export default new Action({
   name: 'SendWelcomeEmail',
   description: 'Sends a welcome email to newly registered users',
 
-  // @ts-expect-error — event-listener handle receives the payload, not a request
-  // (Action only models request handlers; see SendEmailVerification for the note).
+  // No `@ts-expect-error` here any more: stacks 0.75 types a listener's
+  // handle as receiving the event payload rather than a request, so the
+  // directive became unused and tsc flagged IT instead.
   async handle({ to, name }: WelcomeEmailParams) {
     const appName = config.app.name || 'our app'
     const url = config.app.url || 'https://localhost:5173'

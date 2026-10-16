@@ -39,7 +39,7 @@
     "perfect-debounce": "^2.1.0",
     "pretty-bytes": "^7.1.0",
     "sharp": "^0.35.0",
-    "stacks": "0.70.380",
+    "stacks": "0.75.187",
     "ts-broadcasting": "^0.0.4",
     "ts-medium-editor": "^0.1.6"
   },

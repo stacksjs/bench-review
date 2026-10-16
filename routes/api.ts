@@ -147,6 +147,14 @@ route.get('/judges/search', 'Actions/Judges/JudgeSearchAction')
   .name('bench.judges.search')
   .middleware('throttle:60,1m')
 
+// One judge. Declared AFTER `/judges/search` so bun-router never takes
+// `search` for an id, and bounded by the same throttle as the directory.
+// Added for the native app's detail screen, which is reached by path and so
+// cannot be handed a row (bench-review#79).
+route.get('/judges/{id}', 'Actions/Judges/JudgeShowAction')
+  .name('bench.judges.show')
+  .middleware('throttle:60,1m')
+
 route.get('/court-houses', 'Actions/CourtHouses/CourtHouseIndexAction')
   .name('bench.courtHouses.index')
   .middleware('throttle:60,1m')

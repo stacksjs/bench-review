@@ -57,14 +57,39 @@ const envVars = typeof Bun !== 'undefined' ? Bun.env : process.env
 // personal-team sideload therefore ships without universal links.
 const personalTeam = envVars.IOS_PERSONAL_TEAM === '1'
 
-// End-to-end runs load the bundled site so they never depend on the network;
-// every other build prefers the live site and keeps `dist/` as the fallback.
-const mobileContent = envVars.MOBILE_E2E === '1'
-  ? { webAssets: 'dist-offline' }
-  : {
-      url: envVars.MOBILE_URL ?? 'https://benchreview.org',
-      fallbackWebAssets: 'dist-offline',
-    }
+// Always `url` plus a bundled fallback, including under MOBILE_E2E.
+//
+// This used to swap to `webAssets: 'dist-offline'` with no `url` for e2e runs,
+// so they never touched the network. A native renderer has no web view for
+// `webAssets` to be shown in, and the framework now says so outright:
+//
+//   ios.renderer 'native' has no web view to show ios.webAssets in:
+//   set ios.url to the app's site instead
+//
+// `fallbackWebAssets` is gone for the same reason — it is the web view's
+// offline page, and there is no web view. The framework refuses both.
+//
+// ⚠️ This CHANGES the offline story, and not entirely for the better yet. The
+// native screens are compiled into the app, so they cold-start with no network
+// and show their own offline state. But every path still served by the web —
+// everything outside `nativeScreens` — now needs the server, where it used to
+// fall back to `dist-offline`. That gap closes as more screens become native;
+// until then the bundled fallback only returns if the renderer goes back to
+// 'web'. The e2e suite's offline flow is written against the old behaviour and
+// is updated with this.
+// The path in `url` is where the app STARTS, and under a native renderer it
+// has to be one of the `nativeScreens` — the framework refuses otherwise:
+//
+//   The start path "/" is not a nativeScreens path; with renderer: "native"
+//   the app must start on a native screen.
+//
+// `/judges` rather than `/`, which is also the better landing: `/` still
+// serves the marketing coming-soon page (bench-review#62), so the web build
+// opens the app on a "Coming soon" banner. The native app opens on the
+// directory, which is what someone who installed it came for.
+const mobileContent = {
+  url: envVars.MOBILE_URL ?? 'https://benchreview.org/judges',
+}
 
 /**
  * The screens Craft draws NATIVELY, by path (bench-review#79).

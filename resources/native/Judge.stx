@@ -22,9 +22,11 @@ interface Review {
 
 const craft = (globalThis as any).craft
 const route = craft?.navigation?.route ?? {}
-const judge = (route.params?.judge ?? route.props?.judge ?? {}) as Record<string, any>
-const judgeId = Number(judge.id ?? route.params?.id ?? 0)
+// Only the PATH reaches a native screen — `navigation.open` carries no props —
+// so the id is all there is and the judge itself is fetched.
+const judgeId = Number(route.params?.id ?? 0)
 
+const judge = state<Record<string, any> | null>(null)
 const reviews = state<Review[]>([])
 const loading = state(true)
 const failed = state(false)
@@ -32,11 +34,11 @@ const offline = state(false)
 
 let alive = true
 
-const name = judge.name || 'Judge'
-const mark = initials(judge.name)
-const photo = judge.photo || ''
-const court = judge.court?.name || ''
-const where = judge.location || ''
+const name = derived<string>(() => judge()?.name || 'Judge')
+const mark = derived<string>(() => initials(judge()?.name))
+const photo = derived<string>(() => judge()?.photo || '')
+const court = derived<string>(() => judge()?.court?.name || '')
+const where = derived<string>(() => judge()?.location || '')
 
 const rows = derived(() => reviews().map(r => ({
   key: r.id,
@@ -65,7 +67,7 @@ const reason = derived<string>(() => {
 
 const nothing = derived<boolean>(() => !loading() && (failed() || !reviews().length))
 
-effect(() => craft?.navigation?.setOptions({ title: name }))
+effect(() => craft?.navigation?.setOptions({ title: name() }))
 
 async function load(): Promise<void> {
   if (!judgeId) {
@@ -76,9 +78,15 @@ async function load(): Promise<void> {
   failed.set(false)
   offline.set(false)
   try {
-    const data = await getJson<{ data?: Review[] } | Review[]>(`/api/judges/${judgeId}/reviews?page=1&per_page=20`)
+    // Both in flight together: the header and the reviews are independent, so
+    // serialising them would show an empty screen for two round trips.
+    const [who, data] = await Promise.all([
+      getJson<Record<string, any>>(`/api/judges/${judgeId}`),
+      getJson<{ data?: Review[] } | Review[]>(`/api/judges/${judgeId}/reviews?page=1&per_page=20`),
+    ])
     if (!alive)
       return
+    judge.set(who)
     const list = Array.isArray(data) ? data : (data?.data ?? [])
     reviews.set(list)
   }
@@ -111,13 +119,13 @@ onMount(() => {
       {{-- Who this is. Drawn from the row handed over by the directory, so it
           is on screen in the first frame with no request. --}}
       <View class="items-center mt-6" testID="judge-header">
-        <Image :if="photo" :source="{ uri: photo }" resizeMode="cover" class="h-20 w-20 rounded-full" :accessibilityLabel="name" />
-        <View :if="!photo" class="items-center justify-center h-20 w-20 bg-[#2563eb] dark:bg-[#1d4ed8] rounded-full">
-          <Text class="font-semibold text-[28px] text-white" :text="mark" />
+        <Image :if="photo()" :source="{ uri: photo() }" resizeMode="cover" class="h-20 w-20 rounded-full" :accessibilityLabel="name()" />
+        <View :if="!photo()" class="items-center justify-center h-20 w-20 bg-[#2563eb] dark:bg-[#1d4ed8] rounded-full">
+          <Text class="font-semibold text-[28px] text-white" :text="mark()" />
         </View>
-        <Text class="mt-3 font-semibold text-[22px] text-black text-center dark:text-white" :text="name" />
-        <Text :if="court" class="mt-1 text-center" :class="ui.subtitle" :text="court" />
-        <Text :if="where" class="mt-0.5 text-center" :class="ui.caption" :text="where" />
+        <Text class="mt-3 font-semibold text-[22px] text-black text-center dark:text-white" :text="name()" />
+        <Text :if="court()" class="mt-1 text-center" :class="ui.subtitle" :text="court()" />
+        <Text :if="where()" class="mt-0.5 text-center" :class="ui.caption" :text="where()" />
       </View>
 
       <Text :if="summary()" :class="ui.header" :text="summary()" testID="judge-reviews-summary" />
@@ -146,9 +154,9 @@ onMount(() => {
       <View :if="nothing()" class="items-center mt-7 py-6" :class="ui.card" accessibilityRole="alert" testID="judge-empty">
         <Icon :name="offline() ? 'wifi-off' : 'message-square'" class="h-7 w-7 text-[#c7c7cc] dark:text-[#48484a]" />
         <Text class="mt-3 text-center" :class="ui.subtitle" :text="reason()" />
-        <View :if="failed()" @click="refresh()" class="justify-center mt-2 min-h-[44px]" accessibilityRole="button" testID="judge-retry">
+        <Pressable :if="failed()" @press="refresh()" class="justify-center mt-2 min-h-[44px]" accessibilityRole="button" testID="judge-retry">
           <Text class="text-[17px]" :class="ui.tint" text="Try again" />
-        </View>
+        </Pressable>
       </View>
 
       <View class="h-12" />
