@@ -13,6 +13,7 @@
 // opening one is instant and needs no second request — there is no
 // /api/judges/{id} endpoint to call anyway.
 import { getJson, keepSnapshot, readSnapshot } from '../functions/native-api'
+import { buildPages, lastPageOf, pageSlice } from '../functions/native-paging'
 import { initials, ui } from '../functions/native-ui'
 
 interface Judge {
@@ -51,7 +52,7 @@ const filtered = derived<Judge[]>(() => {
 
 // Rows carry their own display strings, so the template never calls a signal
 // inside its `:for` — the same rule the web components follow.
-const rows = derived(() => filtered().slice(0, 200).map(j => ({
+const rows = derived(() => pageSlice(filtered(), currentPage()).map(j => ({
   judge: j,
   key: j.id,
   name: j.name || 'Unnamed judge',
@@ -59,6 +60,27 @@ const rows = derived(() => filtered().slice(0, 200).map(j => ({
   mark: initials(j.name),
   photo: j.photo || '',
 })))
+
+// Numbered pagination (Prev / 1 2 … N / Next), matching the web directory.
+// The endpoint returns the whole directory in one bounded query, so paging is
+// over the list already held: a page change costs nothing and works offline.
+const currentPage = state<number>(1)
+const lastPage = derived<number>(() => lastPageOf(filtered().length))
+const pages = derived(() => buildPages(currentPage(), lastPage()))
+
+function goToPage(n: number): void {
+  if (!n || n === currentPage())
+    return
+  currentPage.set(Math.max(1, Math.min(n, lastPage())))
+}
+
+function prevPage(): void {
+  goToPage(currentPage() - 1)
+}
+
+function nextPage(): void {
+  goToPage(currentPage() + 1)
+}
 
 const summary = derived<string>(() => {
   if (loading() && !judges().length)
@@ -111,10 +133,14 @@ async function load(): Promise<void> {
 
 function typed(value: string): void {
   term.set(value)
+  // Back to page 1: a narrower result has fewer pages, and staying on page 9
+  // of a two-page answer shows nothing at all.
+  currentPage.set(1)
 }
 
 function clear(): void {
   term.set('')
+  currentPage.set(1)
 }
 
 function open(judge: Judge): void {
@@ -202,6 +228,30 @@ onMount(() => {
         <Text class="mt-3 text-center" :class="ui.subtitle" :text="reason()" />
         <Pressable :if="failed()" @press="refresh()" class="justify-center mt-2 min-h-[44px]" accessibilityRole="button" testID="judges-retry">
           <Text class="text-[17px]" :class="ui.tint" text="Try again" />
+        </Pressable>
+      </View>
+
+
+      {{-- Prev / 1 2 … N / Next, the same pager the web directory draws. The
+          page pills sit in a `:for`, and a tap handler that references the
+          loop variable is the one thing not yet firing in the native runtime
+          (see the note in resources/native/Judges.stx), so Prev and Next —
+          which reference nothing from a loop — are the controls that are
+          known to work today. --}}
+      <View :if="lastPage() > 1" class="flex-row gap-2 items-center justify-center mb-10 mt-6" testID="judges-pager">
+        <Pressable @press="prevPage()" class="justify-center px-3 min-h-[44px]" accessibilityRole="button" accessibilityLabel="Previous page" testID="judges-prev">
+          <Text class="text-[17px]" :class="currentPage() > 1 ? ui.tint : ui.caption" text="Prev" />
+        </Pressable>
+
+        <View :for="item in pages()" :key="item.label + '-' + item.n">
+          <Text :if="item.gap" :class="ui.caption" text="…" />
+          <Pressable :if="!item.gap" @press="goToPage(item.n)" class="items-center justify-center px-3 min-h-[44px] rounded-[8px]" :class="item.active ? 'bg-[#2563eb]' : ''" accessibilityRole="button" :accessibilityLabel="'Page ' + item.label" :testID="'judges-page-' + item.label">
+            <Text class="text-[17px]" :class="item.active ? 'font-semibold text-white' : ui.tint" :text="item.label" />
+          </Pressable>
+        </View>
+
+        <Pressable @press="nextPage()" class="justify-center px-3 min-h-[44px]" accessibilityRole="button" accessibilityLabel="Next page" testID="judges-next">
+          <Text class="text-[17px]" :class="currentPage() < lastPage() ? ui.tint : ui.caption" text="Next" />
         </Pressable>
       </View>
 
