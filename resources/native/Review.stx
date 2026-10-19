@@ -526,12 +526,13 @@ onMount(() => {
         <Text class="mt-1.5 mx-8 text-right" :class="ui.caption" :text="countLine()" />
 
         {{-- A pressable row with a checkmark, not a Switch.
-             `<Switch>` renders as a real UISwitch here but its change event
-             never reaches the script: wiring `@change` to a handler that
-             demonstrably fires from a Pressable on this same screen still did
-             nothing, so the thumb moved and the state did not. A control that
-             looks settable and is not is worse than no control, and a
-             checkmark row is a shape iOS already uses for exactly this. --}}
+             `<Switch>` renders as a real UISwitch here and is then completely
+             inert: the thumb does not move on tap and `@change` never reaches
+             the script, while Checkbox and Slider with the same
+             `@change` -> `onValueChange` both fire on this screen. Filed as
+             craft-native/craft#371; drop this for a real Switch once that is
+             fixed. A control that looks settable and is not is worse than no
+             control, and a checkmark row is a shape iOS already uses here. --}}
         <View class="mt-4" :class="ui.group">
           <Pressable
             id="review-anonymous"
