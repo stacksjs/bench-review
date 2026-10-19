@@ -9,6 +9,7 @@
 // already listed. Only the reviews are fetched, from the same public endpoint
 // the website uses.
 import { ApiError, getJson } from '../functions/native-api'
+import { plainTextFromHtml, shortDate, starsFor } from '../functions/native-review'
 import { initials, ui } from '../functions/native-ui'
 
 interface Review {
@@ -65,10 +66,15 @@ const rows = derived(() => reviews().map(r => ({
   key: r.id,
   title: r.title || 'Untitled review',
   // The API returns sanitized HTML; a native Text draws characters, not
-  // markup, so the tags are stripped rather than shown.
-  body: String(r.content || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim(),
-  stars: '★'.repeat(Math.max(0, Math.min(5, Number(r.rating) || 0))),
-  who: r.reviewer?.name || 'Reviewer',
+  // markup. This used to strip tags with a local regex, which left the
+  // ENTITIES behind — a review mentioning "Smith & Co" rendered as
+  // "Smith &amp; Co". `plainTextFromHtml` decodes them, and sharing it with
+  // the feed stops the two screens drifting again.
+  body: plainTextFromHtml(r.content || ''),
+  // Hollow stars for the remainder, as in the feed: a bare "★★" does not say
+  // out of how many.
+  stars: starsFor(r.rating),
+  who: [r.reviewer?.name || 'Reviewer', shortDate(r.created_at)].filter(Boolean).join(' · '),
 })))
 
 const summary = derived<string>(() => {
