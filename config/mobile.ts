@@ -112,12 +112,20 @@ const nativeScreens: Record<string, string> = {
   '/judges': 'Judges',
   '/judges/:id': 'Judge',
   '/court-houses': 'CourtHouses',
+  '/profile': 'Profile',
+  // Not a tab: reached from whatever needed a session. The app does not open
+  // on a sign-in wall — the directory and the published reviews are public on
+  // the web and are public here, and App Review guideline 5.1.1(v) says an app
+  // without significant account-based features must let people in without a
+  // login.
+  '/login': 'Login',
 }
 
 /** The tab bar, an SF Symbol each. */
 const tabs = [
   { id: '/judges', title: 'Judges', symbol: 'person.text.rectangle' },
   { id: '/court-houses', title: 'Courthouses', symbol: 'building.columns' },
+  { id: '/profile', title: 'Profile', symbol: 'person.crop.circle' },
 ]
 
 export default {
@@ -187,6 +195,13 @@ export default {
       filePicker: true,
       share: true,
       deepLinks: true,
+      // The session token, in the Keychain rather than anywhere this app can
+      // read casually (resources/functions/native-session.ts). Without this
+      // the capability gate refuses `craft.secureStorage` and the native sign
+      // -in has nowhere to put what it earns. On a site built around reviewer
+      // anonymity, the credential that links a person to an anonymous review
+      // is exactly the thing that belongs behind the device's own lock.
+      secureStorage: true,
     },
 
     /**

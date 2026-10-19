@@ -1,0 +1,146 @@
+<script client lang="ts">
+// The account tab, drawn natively (config/mobile.ts `nativeScreens`,
+// /profile).
+//
+// Two states in one screen rather than two screens: signed out it explains
+// what an account is for and offers the way in; signed in it shows who you
+// are and the way out. A tab that disappears when signed out would be worse —
+// the bar would change shape under the person.
+import { authFetch, currentUser, signedIn, signOut } from '../functions/native-session'
+import { initials, ui } from '../functions/native-ui'
+
+const craft = (globalThis as any).craft
+
+// Read synchronously so the first frame is already correct. An async read
+// flashes the signed-out state at someone who is signed in.
+const authed = state<boolean>(signedIn())
+const user = state(currentUser())
+const busy = state(false)
+const reviewCount = state<number | null>(null)
+
+let alive = true
+
+const name = derived<string>(() => user()?.name || 'Your account')
+const emailLine = derived<string>(() => user()?.email || '')
+const mark = derived<string>(() => initials(user()?.name || user()?.email))
+const countLine = derived<string>(() => {
+  const n = reviewCount()
+  if (n === null)
+    return ''
+  return n === 1 ? '1 review written' : `${n} reviews written`
+})
+
+effect(() => craft?.navigation?.setOptions({ title: 'Profile', largeTitle: true }))
+
+/** Confirms the stored token is still good, and gives the tab something true to show. */
+async function loadMine(): Promise<void> {
+  if (!authed())
+    return
+  try {
+    const response = await authFetch('/api/me/reviews?page=1&per_page=1')
+    if (!alive)
+      return
+    if (response.status === 401) {
+      // authFetch has already cleared the Keychain; reflect it here.
+      authed.set(false)
+      user.set(null)
+      return
+    }
+    if (!response.ok)
+      return
+    const body = await response.json().catch(() => ({})) as Record<string, any>
+    reviewCount.set(Number(body?.total ?? (Array.isArray(body?.data) ? body.data.length : 0)) || 0)
+  }
+  catch {
+    // Offline: the identity below still shows, it just has no count beside it.
+  }
+}
+
+function openSignIn(): void {
+  craft?.navigation?.open?.('/login')
+}
+
+async function leave(): Promise<void> {
+  if (busy())
+    return
+  busy.set(true)
+  try {
+    await signOut()
+    authed.set(false)
+    user.set(null)
+    reviewCount.set(null)
+  }
+  finally {
+    busy.set(false)
+  }
+}
+
+onMount(() => {
+  alive = true
+  // Re-read on every appearance: the person may have signed in on the Login
+  // screen and come back, and this tab is what they come back to.
+  const refresh = (): void => {
+    authed.set(signedIn())
+    user.set(currentUser())
+    void loadMine()
+  }
+  refresh()
+  try {
+    craft?.navigation?.onAppear?.(refresh)
+  }
+  catch {
+    // No appearance hook on this runtime; the mount read stands.
+  }
+  return () => { alive = false }
+})
+</script>
+
+<template>
+  <View :class="ui.screen">
+    <ScrollView class="flex-1">
+      {{-- Signed in --}}
+      <View :if="authed()" testID="profile-signed-in">
+        <View class="items-center mt-6">
+          <View class="items-center justify-center h-20 w-20 bg-[#2563eb] dark:bg-[#1d4ed8] rounded-full">
+            <Text class="font-semibold text-[28px] text-white" :text="mark()" />
+          </View>
+          <Text class="mt-3 font-semibold text-[22px] text-black text-center dark:text-white" :text="name()" />
+          <Text :if="emailLine()" class="mt-1 text-center" :class="ui.subtitle" :text="emailLine()" />
+          <Text :if="countLine()" class="mt-0.5 text-center" :class="ui.caption" :text="countLine()" />
+        </View>
+
+        <Pressable
+          id="profile-signout"
+          @press="leave()"
+          class="items-center justify-center mt-8 mx-4 h-[50px] bg-white dark:bg-[#1c1c1e] rounded-[12px]"
+          accessibilityRole="button"
+          accessibilityLabel="Sign out"
+          testID="profile-signout"
+        >
+          <Text class="text-[17px]" :class="ui.destructive" :text="busy() ? 'Signing out…' : 'Sign out'" />
+        </Pressable>
+
+        <Text class="mb-12 mt-3 mx-8 text-center" :class="ui.caption" text="Signing out removes this phone's session. Your reviews stay where they are." />
+      </View>
+
+      {{-- Signed out --}}
+      <View :if="!authed()" testID="profile-signed-out">
+        <Text class="mb-2 mt-10 mx-6 font-semibold text-[22px] text-black dark:text-white" text="You are browsing as a guest" />
+        <Text class="mb-6 mx-6" :class="ui.subtitle" text="Judges, courthouses and published reviews are open to everyone. An account is only needed to write a review, follow a judge, or manage what you have written." />
+
+        <Pressable
+          id="profile-signin"
+          @press="openSignIn()"
+          class="items-center justify-center mx-4 h-[50px] bg-[#2563eb] dark:bg-[#1d4ed8] rounded-[12px]"
+          accessibilityRole="button"
+          accessibilityLabel="Sign in"
+          testID="profile-signin"
+        >
+          <Text class="font-semibold text-[17px] text-white" text="Sign in" />
+        </Pressable>
+
+        <Text class="mb-12 mt-6 mx-8 text-center" :class="ui.caption" text="Reviews can be published under your name or anonymously — you choose per review." />
+      </View>
+    </ScrollView>
+  </View>
+</template>

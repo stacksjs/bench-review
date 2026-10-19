@@ -43,6 +43,13 @@ export const ui = {
   subtitle: 'text-[15px] text-[#6e6e73] dark:text-[#98989d]',
   /** Small print: a caption, a count, a jurisdiction. */
   caption: 'text-[13px] text-[#6e6e73] dark:text-[#98989d]',
+  /**
+   * Something went wrong. systemRed, in the shade Apple uses for text rather
+   * than for a tap target, so it clears contrast on white. Colour alone never
+   * carries the meaning — every use sits in an `accessibilityRole="alert"`
+   * and says in words what failed.
+   */
+  danger: 'text-[15px] text-[#d70015] dark:text-[#ff453a]',
   /** A value at a row's end. */
   value: 'text-[17px] text-[#6e6e73] dark:text-[#98989d]',
   /** A big number in a stat. */

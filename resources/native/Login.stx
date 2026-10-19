@@ -1,0 +1,128 @@
+<script client lang="ts">
+// Signing in, drawn natively (config/mobile.ts `nativeScreens`, /login).
+//
+// Reached from whatever needed a session — Profile, and in time Write a
+// Review — rather than shown at launch. The directory, the courthouses and
+// the published reviews are public on the web and are public here; asking for
+// a password before any of that is visible would be worse product, and App
+// Review guideline 5.1.1(v) says an app without significant account-based
+// features must let people in without a login.
+//
+// The token goes straight to the Keychain (native-session.ts). Nothing about
+// the session is kept in a snapshot.
+import { signIn, signedIn } from '../functions/native-session'
+import { ui } from '../functions/native-ui'
+
+const craft = (globalThis as any).craft
+
+const email = state('')
+const password = state('')
+const busy = state(false)
+const failure = state('')
+
+const canSubmit = derived<boolean>(() => email().trim().length > 0 && password().length > 0 && !busy())
+const already = derived<boolean>(() => signedIn())
+
+effect(() => craft?.navigation?.setOptions({ title: 'Sign in' }))
+
+function typedEmail(value: string): void {
+  email.set(value)
+  failure.set('')
+}
+
+function typedPassword(value: string): void {
+  password.set(value)
+  failure.set('')
+}
+
+async function submit(): Promise<void> {
+  if (busy() || !email().trim() || !password())
+    return
+  busy.set(true)
+  failure.set('')
+  try {
+    const result = await signIn(email().trim(), password())
+    if (!result.ok) {
+      failure.set(result.error || 'Could not sign you in.')
+      return
+    }
+    // The password is spent; it has no further use on this screen.
+    password.set('')
+    craft?.navigation?.back?.()
+  }
+  finally {
+    busy.set(false)
+  }
+}
+</script>
+
+<template>
+  <View :class="ui.screen">
+    <ScrollView class="flex-1" keyboardDismissMode="on-drag">
+      <Text class="mb-2 mt-8 mx-6 font-semibold text-[22px] text-black dark:text-white" text="Sign in to Bench Review" />
+      <Text class="mb-4 mx-6" :class="ui.subtitle" text="You only need an account to write a review, follow a judge, or manage your profile. Browsing is open to everyone." />
+
+      <View :class="ui.group">
+        <View class="px-4 py-2.5">
+          <Text :class="ui.caption" text="Email" />
+          <TextInput
+            id="login-email"
+            class="mt-1 text-[17px] text-black dark:text-white border-0"
+            :value="email()"
+            @input="typedEmail($event.text)"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            textContentType="username"
+            :autoCorrect="false"
+            placeholder="you@example.com"
+            placeholderTextColor="#8e8e93"
+            accessibilityLabel="Email address"
+            testID="login-email"
+          />
+        </View>
+        <View :class="ui.separator" />
+        <View class="px-4 py-2.5">
+          <Text :class="ui.caption" text="Password" />
+          <TextInput
+            id="login-password"
+            class="mt-1 text-[17px] text-black dark:text-white border-0"
+            :value="password()"
+            @input="typedPassword($event.text)"
+            :secureTextEntry="true"
+            autoCapitalize="none"
+            textContentType="password"
+            :autoCorrect="false"
+            placeholder="Your password"
+            placeholderTextColor="#8e8e93"
+            accessibilityLabel="Password"
+            testID="login-password"
+          />
+        </View>
+      </View>
+
+      {{-- The server's own wording, verbatim: /api/auth/login answers the same
+          thing for an unknown address and a wrong password, and splitting
+          them here would hand back the enumeration oracle the web login
+          deliberately does not have. --}}
+      <View :if="failure()" class="mt-4" :class="ui.card" accessibilityRole="alert" testID="login-error">
+        <Text :class="ui.danger" :text="failure()" />
+      </View>
+
+      <Pressable
+        id="login-submit"
+        @press="submit()"
+        class="items-center justify-center mt-6 mx-4 h-[50px] rounded-[12px]"
+        :class="canSubmit() ? 'bg-[#2563eb]' : 'bg-[#c7c7cc]'"
+        accessibilityRole="button"
+        accessibilityLabel="Sign in"
+        testID="login-submit"
+      >
+        <Text class="font-semibold text-[17px] text-white" :text="busy() ? 'Signing in…' : 'Sign in'" />
+      </Pressable>
+
+      <Text :if="already()" class="mt-4 mx-6 text-center" :class="ui.caption" text="You are already signed in on this phone." />
+
+      <Text class="mb-12 mt-6 mx-8 text-center" :class="ui.caption" text="No account yet? You can create one on benchreview.org." />
+    </ScrollView>
+  </View>
+</template>
