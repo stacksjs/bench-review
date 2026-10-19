@@ -162,6 +162,27 @@ describe('plainTextFromHtml', () => {
     expect(plainTextFromHtml('')).toBe('')
     expect(plainTextFromHtml(null as any)).toBe('')
   })
+
+  it('decodes typographic entities, which opinion summaries are full of', () => {
+    // `statute&rsquo;s` printed literally on the opinions screen until this.
+    expect(plainTextFromHtml('<p>the statute&rsquo;s plain text</p>')).toBe('the statute\u2019s plain text')
+    expect(plainTextFromHtml('a &mdash; b &hellip;')).toBe('a \u2014 b \u2026')
+  })
+
+  it('decodes numeric escapes, decimal and hex', () => {
+    expect(plainTextFromHtml('don&#8217;t')).toBe('don\u2019t')
+    expect(plainTextFromHtml('don&#x2019;t')).toBe('don\u2019t')
+  })
+
+  it('leaves an entity it does not know as written', () => {
+    // Losing the word would be worse than showing its escape.
+    expect(plainTextFromHtml('100 &notareal; done')).toBe('100 &notareal; done')
+  })
+
+  it('does not unwind a double escape into markup', () => {
+    // `&amp;lt;` is the TEXT "&lt;", not a tag waiting to be rebuilt.
+    expect(plainTextFromHtml('&amp;lt;script&amp;gt;')).toBe('&lt;script&gt;')
+  })
 })
 
 describe('starsFor', () => {

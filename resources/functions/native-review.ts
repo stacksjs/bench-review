@@ -123,22 +123,64 @@ export function submitFailureMessage(status: number, body: Record<string, any>):
  * this because it renders the same field as markup.
  *
  * Block tags become a space rather than nothing, so "…bench.</p><p>Clear…"
- * does not read as "bench.Clear". Entities are decoded last, and only the
- * five `toReviewHtml` produces plus `&nbsp;` — decoding arbitrary entities
- * would mean un-escaping things the sanitiser deliberately escaped.
+ * does not read as "bench.Clear".
+ *
+ * Entities are decoded broadly — named typographic ones and numeric escapes,
+ * not just the five `toReviewHtml` writes. This used to be deliberately
+ * narrow, on the reasoning that un-escaping what a sanitiser escaped is how
+ * markup gets reconstructed. That reasoning does not apply at this sink: the
+ * result goes to a native `Text`, which draws characters and never parses
+ * them, so there is nothing for a `<` to become. Narrowness only showed up
+ * as `statute&rsquo;s` printed literally on the opinions screen, whose
+ * summaries come from CourtListener rather than the review composer.
+ *
+ * `&amp;` is decoded LAST, so an escaped-twice `&amp;lt;` ends as the text
+ * `&lt;` rather than being unwound into a tag.
  */
+const ENTITIES: Record<string, string> = {
+  nbsp: ' ',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  rsquo: '\u2019',
+  lsquo: '\u2018',
+  rdquo: '\u201D',
+  ldquo: '\u201C',
+  mdash: '\u2014',
+  ndash: '\u2013',
+  hellip: '\u2026',
+  middot: '\u00B7',
+}
+
 export function plainTextFromHtml(html: string): string {
   return String(html ?? '')
     .replace(/<(?:br|\/p|\/h[1-6]|\/li|\/blockquote|hr)\s*\/?>/gi, ' ')
     .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
+    // Numeric escapes, decimal and hex, which is how most apostrophes arrive.
+    .replace(/&#(\d+);/g, (_, code) => safeChar(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => safeChar(Number.parseInt(code, 16)))
+    .replace(/&([a-z]+);/gi, (whole, name) => {
+      const found = ENTITIES[String(name).toLowerCase()]
+      // An entity this does not know stays as written rather than being
+      // dropped — losing a word is worse than showing its escape.
+      return found === undefined ? whole : found
+    })
     .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+/** A code point, or the escape left alone when it is not one worth printing. */
+function safeChar(code: number): string {
+  if (!Number.isFinite(code) || code <= 0 || code > 0x10FFFF)
+    return ''
+  try {
+    return String.fromCodePoint(code)
+  }
+  catch {
+    return ''
+  }
 }
 
 /** `★★★★☆`, clamped. The site reserves gold for ratings and nothing else. */
