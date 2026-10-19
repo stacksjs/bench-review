@@ -9,7 +9,7 @@
 // already listed. Only the reviews are fetched, from the same public endpoint
 // the website uses.
 import { ApiError, getJson } from '../functions/native-api'
-import { handoffFromParams, JUDGE_FIELDS, judgeFromHandoff } from '../functions/native-handoff'
+import { handoffFromParams, handoffQuery, JUDGE_FIELDS, judgeFromHandoff } from '../functions/native-handoff'
 import { plainTextFromHtml, shortDate, starsFor } from '../functions/native-review'
 import { initials, ui } from '../functions/native-ui'
 
@@ -166,6 +166,19 @@ async function refresh(): Promise<void> {
 }
 
 /**
+ * The judge's opinions and education, each its own screen.
+ *
+ * The name rides along so the pushed screen's title is right in the first
+ * frame rather than reading "Opinions" until something loads.
+ */
+function openSection(section: string): void {
+  const id = judgeId()
+  if (!id)
+    return
+  craft?.navigation?.open?.(`/judges/${id}/${section}${handoffQuery({ name: name() })}`)
+}
+
+/**
  * Write a review of this judge.
  *
  * `/review/:id` rather than the Write tab, so the judge is already chosen —
@@ -226,6 +239,24 @@ onMount(() => {
       >
         <Text class="font-semibold text-[17px] text-white" text="Write a review" />
       </Pressable>
+
+      {{-- Two more surfaces for this judge. Shown unconditionally rather than
+           gated on a count: learning whether either has rows costs two more
+           requests on a screen that already makes two, and each screen says
+           plainly when it has nothing. --}}
+      <View class="mt-6" :class="ui.group" testID="judge-sections">
+        <Pressable id="judge-opinions" @press="openSection('opinions')" :class="ui.row" accessibilityRole="button" accessibilityLabel="Opinions" testID="judge-opinions">
+          <Icon name="scale" class="h-5 w-5" :class="ui.tint" />
+          <Text class="flex-1" :class="ui.title" text="Opinions" />
+          <Icon name="chevron-right" :class="ui.chevron" />
+        </Pressable>
+        <View :class="ui.separator" />
+        <Pressable id="judge-education" @press="openSection('education')" :class="ui.row" accessibilityRole="button" accessibilityLabel="Education" testID="judge-education">
+          <Icon name="graduation-cap" class="h-5 w-5" :class="ui.tint" />
+          <Text class="flex-1" :class="ui.title" text="Education" />
+          <Icon name="chevron-right" :class="ui.chevron" />
+        </Pressable>
+      </View>
 
       <Text :if="summary()" :class="ui.header" :text="summary()" testID="judge-reviews-summary" />
 

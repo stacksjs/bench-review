@@ -111,6 +111,10 @@ const mobileContent = {
 const nativeScreens: Record<string, string> = {
   '/judges': 'Judges',
   '/judges/:id': 'Judge',
+  // More fixed segments win over fewer, so these are never taken for
+  // `/judges/:id` however they are ordered here.
+  '/judges/:id/opinions': 'JudgeOpinions',
+  '/judges/:id/education': 'JudgeEducation',
   '/court-houses': 'CourtHouses',
   '/court-houses/:id': 'CourtHouse',
   // Both reach the same screen. `/review` starts by asking which judge;

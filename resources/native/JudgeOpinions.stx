@@ -1,0 +1,205 @@
+<script client lang="ts">
+// One judge's opinions, drawn natively (config/mobile.ts `nativeScreens`,
+// /judges/:id/opinions): the phone's half of Bench/Judge/RecentRulings.stx.
+//
+// Reads GET /api/judges/{id}/opinions, which is already paginated
+// server-side and returns the canonical paginator shape, so this screen pages
+// over the wire the way the review feed does rather than holding a whole
+// history in memory.
+import { ApiError, getJson } from '../functions/native-api'
+import { JUDGE_FIELDS, handoffFromParams } from '../functions/native-handoff'
+import { buildPages } from '../functions/native-paging'
+import { plainTextFromHtml, shortDate } from '../functions/native-review'
+import { ui } from '../functions/native-ui'
+
+interface Opinion {
+  id: number
+  case_name?: string | null
+  citation?: string | null
+  decision_date?: string | null
+  summary?: string | null
+  outcome_label?: string | null
+  source_provider?: string | null
+}
+
+interface OpinionPage {
+  data?: Opinion[]
+  current_page?: number
+  last_page?: number
+  total?: number
+}
+
+const craft = (globalThis as any).craft
+const PER_PAGE = 25
+
+function readJudgeId(): number {
+  const route = craft?.route ?? {}
+  const fromParams = Number(route.params?.id ?? 0)
+  if (Number.isInteger(fromParams) && fromParams > 0)
+    return fromParams
+  const fromPath = String(route.path ?? '').match(/\/judges\/(\d+)/)
+  return fromPath ? Number(fromPath[1]) : 0
+}
+
+const judgeId = state<number>(readJudgeId())
+// The judge's name travels in the URL, so the title is right immediately
+// rather than saying "Opinions" until something loads.
+const judgeName = state<string>(handoffFromParams<any>(craft?.route?.params, JUDGE_FIELDS)?.name ?? '')
+
+const opinions = state<Opinion[]>([])
+const currentPage = state<number>(1)
+const lastPage = state<number>(1)
+const total = state<number>(0)
+const loading = state(true)
+const failed = state(false)
+const offline = state(false)
+
+let alive = true
+// An older page must not land on top of a newer one: two taps on Next are
+// enough to need this.
+let request = 0
+
+const rows = derived(() => opinions().map(o => ({
+  key: o.id,
+  title: o.case_name || 'Untitled opinion',
+  // Date and citation on one line, each dropped when absent rather than
+  // rendered as a stray separator.
+  meta: [shortDate(o.decision_date), o.citation].filter(Boolean).join(' · '),
+  outcome: o.outcome_label || '',
+  // The column can hold markup; a native label draws characters.
+  summary: plainTextFromHtml(o.summary || ''),
+})))
+
+const pages = derived(() => buildPages(currentPage(), lastPage()))
+const nothing = derived<boolean>(() => !loading() && (failed() || !opinions().length))
+const showSkeleton = derived<boolean>(() => loading() && !opinions().length)
+
+const countLine = derived<string>(() => {
+  const n = total()
+  if (!n)
+    return ''
+  return n === 1 ? '1 OPINION' : `${n} OPINIONS`
+})
+
+const reason = derived<string>(() => {
+  if (offline())
+    return 'Opinions need a connection. Reconnect and try again.'
+  if (failed())
+    return 'The opinions could not be loaded. This is a problem on our side.'
+  // Not an error: most judges have no opinions recorded yet, and saying so
+  // plainly is better than an empty box that looks broken.
+  return 'No opinions have been recorded for this judge yet.'
+})
+
+const title = derived<string>(() => judgeName() ? `${judgeName()} · Opinions` : 'Opinions')
+
+effect(() => craft?.navigation?.setOptions({ title: title() }))
+
+async function load(page: number): Promise<void> {
+  const id = judgeId()
+  if (!id) {
+    loading.set(false)
+    failed.set(true)
+    return
+  }
+  const ticket = ++request
+  loading.set(true)
+  failed.set(false)
+  offline.set(false)
+  try {
+    const body = await getJson<OpinionPage>(`/api/judges/${id}/opinions?page=${page}&per_page=${PER_PAGE}`)
+    if (!alive || ticket !== request)
+      return
+    const data = Array.isArray(body?.data) ? body.data : []
+    opinions.set(data)
+    currentPage.set(Number(body?.current_page ?? page) || 1)
+    lastPage.set(Math.max(1, Number(body?.last_page ?? 1)))
+    total.set(Number(body?.total ?? data.length) || 0)
+  }
+  catch (err) {
+    if (!alive || ticket !== request)
+      return
+    failed.set(true)
+    offline.set(err instanceof ApiError && err.status === 0)
+  }
+  finally {
+    if (alive && ticket === request)
+      loading.set(false)
+  }
+}
+
+function goToPage(n: number): void {
+  if (n >= 1 && n <= lastPage() && n !== currentPage())
+    void load(n)
+}
+
+function prevPage(): void {
+  goToPage(currentPage() - 1)
+}
+
+function nextPage(): void {
+  goToPage(currentPage() + 1)
+}
+
+async function refresh(): Promise<void> {
+  await load(currentPage())
+}
+
+onMount(() => {
+  alive = true
+  void load(1)
+  return () => { alive = false }
+})
+</script>
+
+<template>
+  <View :class="ui.screen">
+    <ScrollView class="flex-1" @refresh="refresh()" :refreshing="loading() && opinions().length > 0">
+      <Text :if="countLine()" :class="ui.header" :text="countLine()" testID="opinions-count" />
+
+      <View :if="rows().length > 0" :class="ui.group" testID="opinions-list">
+        <View :for="(row, index) in rows()" :key="row.key">
+          <View :if="index" :class="ui.separator" />
+          <View class="gap-1 px-4 py-3">
+            <Text :numberOfLines="2" :class="ui.titleStrong" :text="row.title" />
+            <Text :if="row.meta" :class="ui.caption" :text="row.meta" />
+            <Text :if="row.outcome" class="self-start mt-0.5 px-2 py-0.5 bg-[#e5e5ea] dark:bg-[#2c2c2e] rounded-[6px]" :class="ui.caption" :text="row.outcome" />
+            <Text :if="row.summary" :numberOfLines="3" class="mt-0.5" :class="ui.subtitle" :text="row.summary" />
+          </View>
+        </View>
+      </View>
+
+      <View :if="showSkeleton()" class="mt-7" :class="ui.group" testID="opinions-loading">
+        <View :for="n in [1, 2, 3]" :key="n" class="gap-2 px-4 py-4">
+          <View class="h-3.5 w-2/3" :class="ui.skeleton" />
+          <View class="h-3 w-1/3" :class="ui.skeleton" />
+        </View>
+      </View>
+
+      <View :if="nothing()" class="items-center mt-7 py-6" :class="ui.card" accessibilityRole="alert" testID="opinions-empty">
+        <Icon :name="offline() ? 'wifi-off' : 'scale'" class="h-7 w-7 text-[#c7c7cc] dark:text-[#48484a]" />
+        <Text class="mt-3 text-center" :class="ui.subtitle" :text="reason()" />
+        <Pressable :if="failed()" id="opinions-retry" @press="refresh()" class="justify-center mt-2 min-h-[44px]" accessibilityRole="button" testID="opinions-retry">
+          <Text class="text-[17px]" :class="ui.tint" text="Try again" />
+        </Pressable>
+      </View>
+
+      <View :if="pages().length" class="flex-row items-center justify-center mb-10 mt-4">
+        <Pressable id="opinions-prev" @press="prevPage()" class="justify-center px-3 min-h-[44px]" accessibilityRole="button" accessibilityLabel="Previous page" testID="opinions-prev">
+          <Text :class="currentPage() > 1 ? ui.tint : ui.caption" text="Prev" />
+        </Pressable>
+        <View :for="item in pages()" :key="item.label + '-' + item.n">
+          <Text :if="item.gap" class="px-2" :class="ui.caption" text="…" />
+          <Pressable :if="!item.gap" :id="'opinions-page-' + item.label" @press="goToPage(item.n)" class="items-center justify-center px-3 min-h-[44px] rounded-[8px]" :class="item.active ? 'bg-[#2563eb]' : ''" accessibilityRole="button" :accessibilityLabel="'Page ' + item.label" :testID="'opinions-page-' + item.label">
+            <Text :class="item.active ? 'text-white text-[15px]' : ui.tint" :text="item.label" />
+          </Pressable>
+        </View>
+        <Pressable id="opinions-next" @press="nextPage()" class="justify-center px-3 min-h-[44px]" accessibilityRole="button" accessibilityLabel="Next page" testID="opinions-next">
+          <Text :class="currentPage() < lastPage() ? ui.tint : ui.caption" text="Next" />
+        </Pressable>
+      </View>
+
+      <View class="h-10" />
+    </ScrollView>
+  </View>
+</template>
