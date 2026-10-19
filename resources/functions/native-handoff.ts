@@ -44,25 +44,29 @@ export interface JudgeHandoff {
   where?: string
 }
 
-const KEYS: Array<[keyof JudgeHandoff, string]> = [
-  ['name', 'hname'],
-  ['photo', 'hphoto'],
-  ['court', 'hcourt'],
-  ['where', 'hwhere'],
-]
+export interface CourtHandoff {
+  name?: string
+  /** "City, State", already joined by the opener. */
+  where?: string
+  /** Counts travel as strings, like every other query value. */
+  judges?: string
+  reviews?: string
+  rating?: string
+}
 
 /**
  * `?hname=…&hphoto=…` for the fields that have a value, or '' for none.
  *
  * Empty fields are left out rather than sent empty, so the path stays as
- * short as what is actually known.
+ * short as what is actually known. Every key is prefixed, which is what keeps
+ * a handoff out of the route's own namespace.
  */
-export function handoffQuery(handoff: JudgeHandoff): string {
+export function handoffQuery(handoff: Record<string, string | number | null | undefined>): string {
   const parts: string[] = []
-  for (const [field, key] of KEYS) {
-    const value = String(handoff[field] ?? '').trim()
+  for (const [field, raw] of Object.entries(handoff)) {
+    const value = String(raw ?? '').trim()
     if (value)
-      parts.push(`${key}=${encodeURIComponent(value)}`)
+      parts.push(`h${field}=${encodeURIComponent(value)}`)
   }
   return parts.length ? `?${parts.join('&')}` : ''
 }
@@ -70,16 +74,22 @@ export function handoffQuery(handoff: JudgeHandoff): string {
 /**
  * The handoff carried by a route, or null when it carries none.
  *
+ * `fields` names what to look for, so a screen reads only its own keys and an
+ * unrelated query parameter cannot become part of a handoff.
+ *
  * Null rather than an empty object, so a screen can tell "nothing was handed
  * over, fetch it" from "a name was handed over and it is empty".
  */
-export function handoffFromParams(params: Record<string, any> | null | undefined): JudgeHandoff | null {
+export function handoffFromParams<T extends Record<string, string>>(
+  params: Record<string, any> | null | undefined,
+  fields: readonly string[],
+): T | null {
   if (!params || typeof params !== 'object')
     return null
-  const out: JudgeHandoff = {}
+  const out: Record<string, string> = {}
   let any = false
-  for (const [field, key] of KEYS) {
-    const raw = params[key]
+  for (const field of fields) {
+    const raw = params[`h${field}`]
     if (raw == null)
       continue
     const value = String(raw).trim()
@@ -88,12 +98,15 @@ export function handoffFromParams(params: Record<string, any> | null | undefined
     out[field] = value
     any = true
   }
-  return any ? out : null
+  return any ? (out as T) : null
 }
 
+export const JUDGE_FIELDS = ['name', 'photo', 'court', 'where'] as const
+export const COURT_FIELDS = ['name', 'where', 'judges', 'reviews', 'rating'] as const
+
 /**
- * A handoff as the shape the judge endpoint returns, so the detail screen
- * reads one shape whether the header came from a tap or from the server.
+ * A judge handoff as the shape the judge endpoint returns, so the detail
+ * screen reads one shape whether the header came from a tap or the server.
  */
 export function judgeFromHandoff(handoff: JudgeHandoff | null): Record<string, any> | null {
   if (!handoff)
@@ -103,5 +116,28 @@ export function judgeFromHandoff(handoff: JudgeHandoff | null): Record<string, a
     photo: handoff.photo ?? '',
     court: handoff.court ? { name: handoff.court } : null,
     location: handoff.where ?? '',
+  }
+}
+
+/**
+ * The same for a courthouse, against `CourtHouseIndexAction`'s row.
+ *
+ * The counts come back as strings and are parsed here rather than at the
+ * binding, so the screen never has to care which half of the paint it is
+ * looking at. A rating that was never sent stays null — "no published reviews
+ * yet" is a real state the screen shows differently from zero.
+ */
+export function courtFromHandoff(handoff: CourtHandoff | null): Record<string, any> | null {
+  if (!handoff)
+    return null
+  const city = String(handoff.where ?? '')
+  const rating = handoff.rating == null ? null : Number(handoff.rating)
+  return {
+    name: handoff.name ?? '',
+    city,
+    state: '',
+    active_judges: handoff.judges == null ? null : Number(handoff.judges),
+    total_reviews: handoff.reviews == null ? null : Number(handoff.reviews),
+    avg_rating: rating != null && Number.isFinite(rating) ? rating : null,
   }
 }

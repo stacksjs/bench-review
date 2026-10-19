@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { handoffFromParams, handoffQuery, judgeFromHandoff } from '../../resources/functions/native-handoff'
+import { COURT_FIELDS, courtFromHandoff, handoffFromParams, handoffQuery, JUDGE_FIELDS, judgeFromHandoff } from '../../resources/functions/native-handoff'
 
 /**
  * The handoff rides the URL because the two store-shaped alternatives both
@@ -45,31 +45,31 @@ describe('handoffQuery', () => {
 describe('handoffFromParams', () => {
   it('reads back what was written, decoded by the router', () => {
     // The runtime decodes, so params arrive as the original strings.
-    expect(handoffFromParams({ id: '1', hname: 'Ann L. Aiken', hcourt: 'District Court' }))
+    expect(handoffFromParams({ id: '1', hname: 'Ann L. Aiken', hcourt: 'District Court' }, JUDGE_FIELDS))
       .toEqual({ name: 'Ann L. Aiken', court: 'District Court' })
   })
 
   it('round-trips a photo URL unchanged', () => {
     const photo = 'https://ui-avatars.com/api/?name=Ann%20L.&background=1f2937&bold=true'
     const key = handoffQuery({ photo }).slice('?hphoto='.length)
-    expect(handoffFromParams({ hphoto: decodeURIComponent(key) })?.photo).toBe(photo)
+    expect(handoffFromParams<any>({ hphoto: decodeURIComponent(key) }, JUDGE_FIELDS)?.photo).toBe(photo)
   })
 
   it('is null when the route carries no handoff', () => {
     // "Nothing was handed over, fetch it" has to be distinguishable from
     // "a name was handed over and it is empty".
-    expect(handoffFromParams({ id: '1' })).toBeNull()
-    expect(handoffFromParams({})).toBeNull()
-    expect(handoffFromParams(null)).toBeNull()
-    expect(handoffFromParams(undefined)).toBeNull()
+    expect(handoffFromParams({ id: '1' }, JUDGE_FIELDS)).toBeNull()
+    expect(handoffFromParams({}, JUDGE_FIELDS)).toBeNull()
+    expect(handoffFromParams(null, JUDGE_FIELDS)).toBeNull()
+    expect(handoffFromParams(undefined, JUDGE_FIELDS)).toBeNull()
   })
 
   it('ignores blank values rather than painting an empty name', () => {
-    expect(handoffFromParams({ hname: '   ' })).toBeNull()
+    expect(handoffFromParams({ hname: '   ' }, JUDGE_FIELDS)).toBeNull()
   })
 
   it('does not pick up the route params it sits beside', () => {
-    expect(handoffFromParams({ id: '7', name: 'not a handoff', path: '/judges/7' })).toBeNull()
+    expect(handoffFromParams({ id: '7', name: 'not a handoff', path: '/judges/7' }, JUDGE_FIELDS)).toBeNull()
   })
 })
 
@@ -85,5 +85,40 @@ describe('judgeFromHandoff', () => {
 
   it('is null for no handoff', () => {
     expect(judgeFromHandoff(null)).toBeNull()
+  })
+})
+
+describe('a courthouse handoff', () => {
+  it('round-trips the row the directory already has', () => {
+    const query = handoffQuery({ name: 'District Court, D. Oregon', where: 'Portland, OR', judges: 12, reviews: 48, rating: 4.2 })
+    const params: Record<string, string> = { id: '1' }
+    for (const pair of query.slice(1).split('&')) {
+      const [k, v] = pair.split('=')
+      params[k] = decodeURIComponent(v)
+    }
+    expect(courtFromHandoff(handoffFromParams(params, COURT_FIELDS))).toEqual({
+      name: 'District Court, D. Oregon',
+      city: 'Portland, OR',
+      state: '',
+      active_judges: 12,
+      total_reviews: 48,
+      avg_rating: 4.2,
+    })
+  })
+
+  it('keeps a missing rating null, not zero', () => {
+    // "No published reviews yet" is a state the screen shows differently from
+    // an average of zero, which no review can produce.
+    const court = courtFromHandoff(handoffFromParams({ hname: 'A court' }, COURT_FIELDS))
+    expect(court?.avg_rating).toBeNull()
+    expect(court?.total_reviews).toBeNull()
+  })
+
+  it('reads only its own fields, not the judge handoff\'s', () => {
+    expect(handoffFromParams({ hphoto: 'p.png' }, COURT_FIELDS)).toBeNull()
+  })
+
+  it('is null for no handoff', () => {
+    expect(courtFromHandoff(null)).toBeNull()
   })
 })

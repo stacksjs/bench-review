@@ -9,7 +9,7 @@
 // already listed. Only the reviews are fetched, from the same public endpoint
 // the website uses.
 import { ApiError, getJson } from '../functions/native-api'
-import { handoffFromParams, judgeFromHandoff } from '../functions/native-handoff'
+import { handoffFromParams, JUDGE_FIELDS, judgeFromHandoff } from '../functions/native-handoff'
 import { plainTextFromHtml, shortDate, starsFor } from '../functions/native-review'
 import { initials, ui } from '../functions/native-ui'
 
@@ -62,7 +62,7 @@ const judgeId = state<number>(readJudgeId())
  * designs that could be both. A cold deep link carries no handoff and falls
  * back to the fetch, which is why GET /api/judges/{id} still exists.
  */
-const judge = state<Record<string, any> | null>(judgeFromHandoff(handoffFromParams(craft?.route?.params)))
+const judge = state<Record<string, any> | null>(judgeFromHandoff(handoffFromParams(craft?.route?.params, JUDGE_FIELDS)))
 const reviews = state<Review[]>([])
 const loading = state(true)
 const failed = state(false)
