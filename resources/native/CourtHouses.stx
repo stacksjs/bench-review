@@ -156,7 +156,7 @@ onMount(() => {
           accessibilityLabel="Search courthouses"
           testID="courts-search"
         />
-        <Pressable :if="term().length > 0" @press="clear()" accessibilityRole="button" accessibilityLabel="Clear search" testID="courts-clear">
+        <Pressable :if="term().length > 0" id="courts-clear" @press="clear()" accessibilityRole="button" accessibilityLabel="Clear search" testID="courts-clear">
           <Icon name="circle-x" class="h-4 w-4 text-[#8e8e93]" />
         </Pressable>
       </View>
@@ -186,7 +186,7 @@ onMount(() => {
       <View :if="nothing()" class="items-center mt-7 py-6" :class="ui.card" accessibilityRole="alert" testID="courts-empty">
         <Icon :name="offline() ? 'wifi-off' : 'building'" class="h-7 w-7 text-[#c7c7cc] dark:text-[#48484a]" />
         <Text class="mt-3 text-center" :class="ui.subtitle" :text="reason()" />
-        <Pressable :if="failed()" @press="refresh()" class="justify-center mt-2 min-h-[44px]" accessibilityRole="button" testID="courts-retry">
+        <Pressable :if="failed()" id="courts-retry" @press="refresh()" class="justify-center mt-2 min-h-[44px]" accessibilityRole="button" testID="courts-retry">
           <Text class="text-[17px]" :class="ui.tint" text="Try again" />
         </Pressable>
       </View>
@@ -199,18 +199,18 @@ onMount(() => {
           which reference nothing from a loop — are the controls that are
           known to work today. --}}
       <View :if="lastPage() > 1" class="flex-row gap-2 items-center justify-center mb-10 mt-6" testID="courts-pager">
-        <Pressable @press="prevPage()" class="justify-center px-3 min-h-[44px]" accessibilityRole="button" accessibilityLabel="Previous page" testID="courts-prev">
+        <Pressable id="courts-prev" @press="prevPage()" class="justify-center px-3 min-h-[44px]" accessibilityRole="button" accessibilityLabel="Previous page" testID="courts-prev">
           <Text class="text-[17px]" :class="currentPage() > 1 ? ui.tint : ui.caption" text="Prev" />
         </Pressable>
 
         <View :for="item in pages()" :key="item.label + '-' + item.n">
           <Text :if="item.gap" :class="ui.caption" text="…" />
-          <Pressable :if="!item.gap" @press="goToPage(item.n)" class="items-center justify-center px-3 min-h-[44px] rounded-[8px]" :class="item.active ? 'bg-[#2563eb]' : ''" accessibilityRole="button" :accessibilityLabel="'Page ' + item.label" :testID="'courts-page-' + item.label">
+          <Pressable :if="!item.gap" :id="'courts-page-' + item.label" @press="goToPage(item.n)" class="items-center justify-center px-3 min-h-[44px] rounded-[8px]" :class="item.active ? 'bg-[#2563eb]' : ''" accessibilityRole="button" :accessibilityLabel="'Page ' + item.label" :testID="'courts-page-' + item.label">
             <Text class="text-[17px]" :class="item.active ? 'font-semibold text-white' : ui.tint" :text="item.label" />
           </Pressable>
         </View>
 
-        <Pressable @press="nextPage()" class="justify-center px-3 min-h-[44px]" accessibilityRole="button" accessibilityLabel="Next page" testID="courts-next">
+        <Pressable id="courts-next" @press="nextPage()" class="justify-center px-3 min-h-[44px]" accessibilityRole="button" accessibilityLabel="Next page" testID="courts-next">
           <Text class="text-[17px]" :class="currentPage() < lastPage() ? ui.tint : ui.caption" text="Next" />
         </Pressable>
       </View>
