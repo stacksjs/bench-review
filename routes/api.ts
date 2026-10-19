@@ -159,6 +159,13 @@ route.get('/court-houses', 'Actions/CourtHouses/CourtHouseIndexAction')
   .name('bench.courtHouses.index')
   .middleware('throttle:60,1m')
 
+// One courthouse's bench. Added for the native courthouse screen, which
+// would otherwise have to pull the whole 2,000-row judge directory to list
+// about ten (bench-review#79). Same throttle as the directory it belongs to.
+route.get('/court-houses/{id}/judges', 'Actions/CourtHouses/CourtHouseJudgesAction')
+  .name('bench.courtHouses.judges')
+  .middleware('throttle:60,1m')
+
 // Public contact form. Two of its topics - "Report a review" and "Legal
 // request" - are the channels this site designates for takedown demands, and
 // this route did not exist at all until #54. Throttled like the other public
