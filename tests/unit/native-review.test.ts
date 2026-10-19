@@ -2,7 +2,10 @@ import { describe, expect, it } from 'bun:test'
 import { sanitizeReviewHtml } from '../../app/Helpers/sanitizeReviewHtml'
 import {
   CONTENT_MIN,
+  plainTextFromHtml,
   reviewProblem,
+  shortDate,
+  starsFor,
   submitFailureMessage,
   toReviewHtml,
   visibleLength,
@@ -128,5 +131,62 @@ describe('submitFailureMessage', () => {
 
   it('still says something actionable for an unexpected status', () => {
     expect(submitFailureMessage(500, {})).toBe('The review could not be posted. Please try again.')
+  })
+})
+
+describe('plainTextFromHtml', () => {
+  it('drops tags so a native label does not print them', () => {
+    expect(plainTextFromHtml('<p>Ran a tight calendar.</p>')).toBe('Ran a tight calendar.')
+  })
+
+  it('keeps a word boundary where a block tag was', () => {
+    // Without this, two paragraphs read as "bench.Clear".
+    expect(plainTextFromHtml('<p>bench.</p><p>Clear with parties.</p>')).toBe('bench. Clear with parties.')
+  })
+
+  it('treats a line break as a space', () => {
+    expect(plainTextFromHtml('<p>one<br>two</p>')).toBe('one two')
+  })
+
+  it('decodes the entities toReviewHtml produces, and no others', () => {
+    expect(plainTextFromHtml(toReviewHtml('Smith & Co said <b> was "fine"')))
+      .toBe('Smith & Co said <b> was "fine"')
+  })
+
+  it('round-trips a composed body back to what was typed', () => {
+    const typed = 'First point.\n\nSecond point.'
+    expect(plainTextFromHtml(toReviewHtml(typed))).toBe('First point. Second point.')
+  })
+
+  it('is empty for empty input rather than throwing', () => {
+    expect(plainTextFromHtml('')).toBe('')
+    expect(plainTextFromHtml(null as any)).toBe('')
+  })
+})
+
+describe('starsFor', () => {
+  it('fills to the rating and leaves the rest hollow', () => {
+    expect(starsFor(4)).toBe('★★★★☆')
+    expect(starsFor(0)).toBe('☆☆☆☆☆')
+    expect(starsFor(5)).toBe('★★★★★')
+  })
+
+  it('clamps rather than drawing a row of the wrong length', () => {
+    expect(starsFor(9)).toHaveLength(5)
+    expect(starsFor(-2)).toBe('☆☆☆☆☆')
+    expect(starsFor(null)).toBe('☆☆☆☆☆')
+  })
+})
+
+describe('shortDate', () => {
+  it('formats an ISO timestamp', () => {
+    expect(shortDate('2026-10-19T08:30:00.000Z')).toBe('19 Oct 2026')
+  })
+
+  it('says nothing when there is nothing to say', () => {
+    // A row drops the line rather than printing "Invalid Date".
+    expect(shortDate(null)).toBe('')
+    expect(shortDate('')).toBe('')
+    expect(shortDate('not a date')).toBe('')
   })
 })

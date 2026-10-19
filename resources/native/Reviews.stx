@@ -1,0 +1,238 @@
+<script client lang="ts">
+// The review feed, drawn natively (config/mobile.ts `nativeScreens`,
+// /reviews): the phone's half of Bench/ReviewsFeed.stx.
+//
+// Published reviews across every judge, newest first, with the same
+// recent/helpful sort the web feed offers. Public — no session needed, same
+// as the directories, because reading reviews is the point of the site.
+//
+// A row opens the JUDGE, not a review page. That is what the web feed does
+// (`/judges/:id/profile`), there is no standalone review screen on either
+// surface, and the judge screen already lists their reviews.
+import { ApiError, getJson, keepSnapshot, readSnapshot } from '../functions/native-api'
+import { buildPages } from '../functions/native-paging'
+import { plainTextFromHtml, shortDate, starsFor } from '../functions/native-review'
+import { ui } from '../functions/native-ui'
+
+interface FeedReview {
+  id: number
+  title?: string | null
+  content?: string | null
+  rating?: number | null
+  created_at?: string | null
+  judge_id?: number | null
+  judge?: { id?: number, name?: string | null, context_line?: string | null } | null
+  reviewer?: { name?: string | null } | null
+}
+
+interface FeedPage {
+  data?: FeedReview[]
+  current_page?: number
+  last_page?: number
+  total?: number
+}
+
+const craft = (globalThis as any).craft
+const SNAPSHOT = 'reviews-feed'
+const PER_PAGE = 20
+
+const reviews = state<FeedReview[]>(readSnapshot<FeedReview[]>(SNAPSHOT) ?? [])
+const currentPage = state<number>(1)
+const lastPage = state<number>(1)
+const total = state<number>(0)
+const sort = state<string>('recent')
+const loading = state(true)
+const failed = state(false)
+const offline = state(false)
+
+let alive = true
+// Guards against an older page landing after a newer one and overwriting it
+// — two taps on Next in quick succession are enough.
+let request = 0
+
+const rows = derived(() => reviews().map(r => ({
+  review: r,
+  key: r.id,
+  judgeId: Number(r.judge?.id ?? r.judge_id ?? 0),
+  stars: starsFor(r.rating),
+  title: r.title || 'Untitled review',
+  snippet: plainTextFromHtml(r.content || ''),
+  judgeName: r.judge?.name || 'Unknown judge',
+  where: r.judge?.context_line || '',
+  byline: [r.reviewer?.name || 'Anonymous reviewer', shortDate(r.created_at)].filter(Boolean).join(' · '),
+})))
+
+const pages = derived(() => buildPages(currentPage(), lastPage()))
+const nothing = derived<boolean>(() => !loading() && !reviews().length)
+const showSkeleton = derived<boolean>(() => loading() && !reviews().length)
+
+const countLine = derived<string>(() => {
+  const n = total()
+  if (!n)
+    return ''
+  return n === 1 ? '1 REVIEW' : `${n} REVIEWS`
+})
+
+const reason = derived<string>(() => {
+  if (offline())
+    return 'The feed needs a connection. Reconnect and try again.'
+  if (failed())
+    return 'The feed could not be loaded. This is a problem on our side.'
+  return 'No reviews have been published yet. The first one could be yours.'
+})
+
+effect(() => craft?.navigation?.setOptions({ title: 'Reviews', largeTitle: true }))
+
+/**
+ * One page of the feed.
+ *
+ * Paged on the SERVER, unlike the directories: the feed is unbounded and
+ * grows, so pulling it whole to page in memory would get slower every week.
+ * That makes a page change a request, which is why the stale-response guard
+ * above exists.
+ */
+async function load(page: number): Promise<void> {
+  const ticket = ++request
+  loading.set(true)
+  failed.set(false)
+  offline.set(false)
+  try {
+    const body = await getJson<FeedPage>(`/api/reviews?page=${page}&per_page=${PER_PAGE}&sort=${sort()}`)
+    if (!alive || ticket !== request)
+      return
+    const data = Array.isArray(body?.data) ? body.data : []
+    reviews.set(data)
+    currentPage.set(Number(body?.current_page ?? page) || 1)
+    lastPage.set(Math.max(1, Number(body?.last_page ?? 1)))
+    total.set(Number(body?.total ?? data.length) || 0)
+    // Only page one is worth keeping: it is what a cold start shows.
+    if (page === 1)
+      keepSnapshot(SNAPSHOT, data.slice(0, PER_PAGE))
+  }
+  catch (err) {
+    if (!alive || ticket !== request)
+      return
+    failed.set(true)
+    offline.set((err as any)?.status === 0)
+  }
+  finally {
+    if (alive && ticket === request)
+      loading.set(false)
+  }
+}
+
+function goToPage(n: number): void {
+  if (n >= 1 && n <= lastPage() && n !== currentPage())
+    void load(n)
+}
+
+function prevPage(): void {
+  goToPage(currentPage() - 1)
+}
+
+function nextPage(): void {
+  goToPage(currentPage() + 1)
+}
+
+/**
+ * Change the order.
+ *
+ * Back to page one, because page 4 of "recent" and page 4 of "helpful" have
+ * nothing to do with each other — the same reason the web feed resets.
+ */
+function sortBy(next: string): void {
+  const value = next === 'helpful' ? 'helpful' : 'recent'
+  if (sort() === value)
+    return
+  sort.set(value)
+  void load(1)
+}
+
+function openJudge(judgeId: number): void {
+  if (judgeId)
+    craft?.navigation?.open?.(`/judges/${judgeId}`)
+}
+
+async function refresh(): Promise<void> {
+  await load(currentPage())
+}
+
+onMount(() => {
+  alive = true
+  void load(1)
+  return () => { alive = false }
+})
+</script>
+
+<template>
+  <View :class="ui.screen">
+    <ScrollView class="flex-1" @refresh="refresh()" :refreshing="loading() && reviews().length > 0">
+      <View class="flex-row gap-2 items-center mt-2 mx-4">
+        <Pressable id="reviews-sort-recent" @press="sortBy('recent')" class="items-center justify-center px-3 min-h-[44px] rounded-[8px]" :class="sort() === 'recent' ? 'bg-[#2563eb]' : ''" accessibilityRole="button" accessibilityLabel="Sort by most recent" testID="reviews-sort-recent">
+          <Text :class="sort() === 'recent' ? 'text-white text-[15px]' : ui.tint" text="Recent" />
+        </Pressable>
+        <Pressable id="reviews-sort-helpful" @press="sortBy('helpful')" class="items-center justify-center px-3 min-h-[44px] rounded-[8px]" :class="sort() === 'helpful' ? 'bg-[#2563eb]' : ''" accessibilityRole="button" accessibilityLabel="Sort by most helpful" testID="reviews-sort-helpful">
+          <Text :class="sort() === 'helpful' ? 'text-white text-[15px]' : ui.tint" text="Helpful" />
+        </Pressable>
+      </View>
+
+      <Text :if="countLine()" :class="ui.header" :text="countLine()" testID="reviews-count" />
+
+      <View :if="rows().length > 0" :class="ui.group" testID="reviews-list">
+        <View :for="(row, index) in rows()" :key="row.key">
+          <View :if="index" :class="ui.separator" />
+          <Pressable
+            :id="'review-row-' + row.key"
+            @press="openJudge(row.judgeId)"
+            class="gap-1 px-4 py-3"
+            accessibilityRole="button"
+            :accessibilityLabel="'Review of ' + row.judgeName + ', ' + row.title"
+            :testID="'review-row-' + row.key"
+          >
+            <View class="flex-row gap-2 items-center">
+              <Text class="text-[#f59e0b] text-[15px]" :text="row.stars" />
+              <Text :numberOfLines="1" class="flex-1" :class="ui.caption" :text="row.byline" />
+            </View>
+            <Text :numberOfLines="2" :class="ui.titleStrong" :text="row.title" />
+            <Text :if="row.snippet" :numberOfLines="3" :class="ui.subtitle" :text="row.snippet" />
+            <View class="flex-row gap-1 items-center mt-0.5">
+              <Text :numberOfLines="1" :class="ui.tint" :text="row.judgeName" />
+              <Text :if="row.where" :numberOfLines="1" class="flex-1" :class="ui.caption" :text="'· ' + row.where" />
+            </View>
+          </Pressable>
+        </View>
+      </View>
+
+      <View :if="showSkeleton()" class="mt-7" :class="ui.group" testID="reviews-loading">
+        <View :for="n in [1, 2, 3]" :key="n" class="gap-2 px-4 py-4">
+          <View class="h-3 w-1/4" :class="ui.skeleton" />
+          <View class="h-3.5 w-2/3" :class="ui.skeleton" />
+          <View class="h-3 w-full" :class="ui.skeleton" />
+        </View>
+      </View>
+
+      <View :if="nothing()" class="items-center mt-7 py-6" :class="ui.card" accessibilityRole="alert" testID="reviews-empty">
+        <Icon :name="offline() ? 'wifi-off' : 'message-square'" class="h-7 w-7 text-[#c7c7cc] dark:text-[#48484a]" />
+        <Text class="mt-3 text-center" :class="ui.subtitle" :text="reason()" />
+        <Pressable :if="failed()" id="reviews-retry" @press="refresh()" class="justify-center mt-2 min-h-[44px]" accessibilityRole="button" testID="reviews-retry">
+          <Text class="text-[17px]" :class="ui.tint" text="Try again" />
+        </Pressable>
+      </View>
+
+      <View :if="pages().length" class="flex-row items-center justify-center mb-10 mt-4">
+        <Pressable id="reviews-prev" @press="prevPage()" class="justify-center px-3 min-h-[44px]" accessibilityRole="button" accessibilityLabel="Previous page" testID="reviews-prev">
+          <Text :class="currentPage() > 1 ? ui.tint : ui.caption" text="Prev" />
+        </Pressable>
+        <View :for="item in pages()" :key="item.label + '-' + item.n">
+          <Text :if="item.gap" class="px-2" :class="ui.caption" text="…" />
+          <Pressable :if="!item.gap" :id="'reviews-page-' + item.label" @press="goToPage(item.n)" class="items-center justify-center px-3 min-h-[44px] rounded-[8px]" :class="item.active ? 'bg-[#2563eb]' : ''" accessibilityRole="button" :accessibilityLabel="'Page ' + item.label" :testID="'reviews-page-' + item.label">
+            <Text :class="item.active ? 'text-white text-[15px]' : ui.tint" :text="item.label" />
+          </Pressable>
+        </View>
+        <Pressable id="reviews-next" @press="nextPage()" class="justify-center px-3 min-h-[44px]" accessibilityRole="button" accessibilityLabel="Next page" testID="reviews-next">
+          <Text :class="currentPage() < lastPage() ? ui.tint : ui.caption" text="Next" />
+        </Pressable>
+      </View>
+    </ScrollView>
+  </View>
+</template>

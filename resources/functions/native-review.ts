@@ -114,3 +114,51 @@ export function submitFailureMessage(status: number, body: Record<string, any>):
     return 'Some of this review needs changing before it can be posted.'
   return 'The review could not be posted. Please try again.'
 }
+
+/**
+ * A review body as plain text, for a native `Text` that cannot render markup.
+ *
+ * The feed returns the stored HTML. A native label draws a string, so handing
+ * it `<p>Ran a tight…</p>` prints the tags; the web gets away with ignoring
+ * this because it renders the same field as markup.
+ *
+ * Block tags become a space rather than nothing, so "…bench.</p><p>Clear…"
+ * does not read as "bench.Clear". Entities are decoded last, and only the
+ * five `toReviewHtml` produces plus `&nbsp;` — decoding arbitrary entities
+ * would mean un-escaping things the sanitiser deliberately escaped.
+ */
+export function plainTextFromHtml(html: string): string {
+  return String(html ?? '')
+    .replace(/<(?:br|\/p|\/h[1-6]|\/li|\/blockquote|hr)\s*\/?>/gi, ' ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** `★★★★☆`, clamped. The site reserves gold for ratings and nothing else. */
+export function starsFor(rating: number | null | undefined): string {
+  const n = Math.max(0, Math.min(5, Math.round(Number(rating) || 0)))
+  return '★'.repeat(n) + '☆'.repeat(5 - n)
+}
+
+/**
+ * `2026-10-19T…` as `19 Oct 2026`.
+ *
+ * Absent or unparseable dates return an empty string, so a row drops the line
+ * instead of printing "Invalid Date" — a review with no timestamp is still a
+ * review worth reading.
+ */
+export function shortDate(value: string | null | undefined): string {
+  if (!value)
+    return ''
+  const at = new Date(String(value))
+  if (Number.isNaN(at.getTime()))
+    return ''
+  return at.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}

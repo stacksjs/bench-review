@@ -104,9 +104,9 @@ const mobileContent = {
  * taken for a judge's id.
  *
  * Native so far: the two directories, the judge screen they push to, the
- * account screens, and writing a review. The rest — the feed, an article,
- * following a judge, editing a review already posted — is still the web view,
- * and the e2e suite (bench-review#81) covers both halves.
+ * account screens, writing a review and the review feed. The rest — an
+ * article, following a judge, editing a review already posted — is still the
+ * web view, and the e2e suite (bench-review#81) covers both halves.
  */
 const nativeScreens: Record<string, string> = {
   '/judges': 'Judges',
@@ -117,6 +117,7 @@ const nativeScreens: Record<string, string> = {
   // sends someone here without the picker.
   '/review': 'Review',
   '/review/:id': 'Review',
+  '/reviews': 'Reviews',
   '/profile': 'Profile',
   // Not a tab: reached from whatever needed a session. The app does not open
   // on a sign-in wall — the directory and the published reviews are public on
@@ -129,18 +130,19 @@ const nativeScreens: Record<string, string> = {
 /**
  * The tab bar, an SF Symbol each.
  *
- * Browse, browse, write, account. Writing a review is the one thing the app
- * asks of someone rather than offers them, so it sits between the directories
- * it is about and the account it needs — not at the end, where it reads as a
- * settings screen.
+ * Writing a review is the one thing the app asks of someone rather than
+ * offers them, so it sits in the middle — with the things it is about on one
+ * side and the account it needs on the other. At five tabs that is the actual
+ * centre of the bar, which it was not at four.
  *
- * A standard UITabBar spaces its items evenly and has no raised centre button;
- * the centre of four is the gap between Courthouses and Write.
+ * Five is also the ceiling: iOS collapses anything past the fifth into a
+ * "More" list, so a sixth tab would hide two of these behind a menu.
  */
 const tabs = [
   { id: '/judges', title: 'Judges', symbol: 'person.text.rectangle' },
   { id: '/court-houses', title: 'Courthouses', symbol: 'building.columns' },
   { id: '/review', title: 'Write', symbol: 'square.and.pencil' },
+  { id: '/reviews', title: 'Reviews', symbol: 'text.bubble' },
   { id: '/profile', title: 'Profile', symbol: 'person.crop.circle' },
 ]
 
