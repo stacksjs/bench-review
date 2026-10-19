@@ -10,7 +10,7 @@
 // (`/judges/:id/profile`), there is no standalone review screen on either
 // surface, and the judge screen already lists their reviews.
 import { ApiError, getJson, keepSnapshot, readSnapshot } from '../functions/native-api'
-import { stashHandoff } from '../functions/native-handoff'
+import { handoffQuery } from '../functions/native-handoff'
 import { buildPages } from '../functions/native-paging'
 import { plainTextFromHtml, shortDate, starsFor } from '../functions/native-review'
 import { ui } from '../functions/native-ui'
@@ -22,7 +22,7 @@ interface FeedReview {
   rating?: number | null
   created_at?: string | null
   judge_id?: number | null
-  judge?: { id?: number, name?: string | null, context_line?: string | null } | null
+  judge?: { id?: number, name?: string | null, context_line?: string | null, image_url?: string | null } | null
   reviewer?: { name?: string | null } | null
 }
 
@@ -60,6 +60,10 @@ const rows = derived(() => reviews().map(r => ({
   snippet: plainTextFromHtml(r.content || ''),
   judgeName: r.judge?.name || 'Unknown judge',
   where: r.judge?.context_line || '',
+  // `image_url` here, `photo` on the judge endpoint — the feed composes its
+  // judge from `attachJudgeContext`, which keeps the column's own name. The
+  // handoff translates, so the detail screen only ever reads `photo`.
+  judgePhoto: r.judge?.image_url || '',
   byline: [r.reviewer?.name || 'Anonymous reviewer', shortDate(r.created_at)].filter(Boolean).join(' · '),
 })))
 
@@ -152,21 +156,24 @@ function sortBy(next: string): void {
 /**
  * Open the judge, painting what this row already knows.
  *
- * A feed row carries less than a directory row — a name and the one-line
- * context, no photo — so the handoff is deliberately partial and shaped like
- * the API's judge so the detail screen has one shape to read. `context_line`
- * is already "court · city · state" composed server-side, which is what the
- * detail screen's court line shows anyway.
+ * Shaped like the API's judge, so the detail screen has one shape to read:
+ * `context_line` is already "court · city · state" composed server-side,
+ * which is what that screen's court line shows anyway, and `image_url` is
+ * renamed to the `photo` the judge endpoint uses.
+ *
+ * Still partial — no jurisdiction or slug — but it carries everything the
+ * header draws, so the first frame is the finished header rather than a
+ * placeholder that is replaced a moment later.
  */
-function openJudge(row: { judgeId: number, judgeName: string, where: string }): void {
+function openJudge(row: { judgeId: number, judgeName: string, where: string, judgePhoto: string }): void {
   if (!row.judgeId)
     return
-  stashHandoff('judge', row.judgeId, {
-    id: row.judgeId,
+  const handoff = handoffQuery({
     name: row.judgeName,
-    court: { name: row.where },
+    photo: row.judgePhoto,
+    court: row.where,
   })
-  craft?.navigation?.open?.(`/judges/${row.judgeId}`)
+  craft?.navigation?.open?.(`/judges/${row.judgeId}${handoff}`)
 }
 
 async function refresh(): Promise<void> {

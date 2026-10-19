@@ -1,87 +1,89 @@
-import { beforeEach, describe, expect, it } from 'bun:test'
-import { stashHandoff, takeHandoff } from '../../resources/functions/native-handoff'
+import { describe, expect, it } from 'bun:test'
+import { handoffFromParams, handoffQuery, judgeFromHandoff } from '../../resources/functions/native-handoff'
 
 /**
- * The handoff rides a SHARED key, so these tests are mostly about the id
- * guard: the thing standing between "paints instantly" and "paints the wrong
- * judge's name".
+ * The handoff rides the URL because the two store-shaped alternatives both
+ * fail quietly on device — see the module header. These tests pin the
+ * encoding, and in particular that a value survives the round trip intact:
+ * the one field that matters most is a photo URL, which is itself full of
+ * `&` and `=`.
  */
 
-function fakeStore(): Map<string, unknown> {
-  const kv = new Map<string, unknown>()
-  ;(globalThis as any).craft = {
-    snapshots: {
-      get: (k: string) => kv.get(k),
-      set: (k: string, v: unknown) => void kv.set(k, v),
-    },
-  }
-  return kv
-}
-
-describe('handoff', () => {
-  beforeEach(() => {
-    delete (globalThis as any).craft
+describe('handoffQuery', () => {
+  it('encodes the fields that have a value', () => {
+    expect(handoffQuery({ name: 'Ann L. Aiken', court: 'District Court' }))
+      .toBe('?hname=Ann%20L.%20Aiken&hcourt=District%20Court')
   })
 
-  it('hands the row to the screen opened for that id', () => {
-    fakeStore()
-    stashHandoff('judge', 7, { id: 7, name: 'Ann L. Aiken' })
-    expect(takeHandoff('judge', 7)).toEqual({ id: 7, name: 'Ann L. Aiken' })
+  it('leaves out what is empty rather than sending blanks', () => {
+    expect(handoffQuery({ name: 'Ann', photo: '', court: '   ' })).toBe('?hname=Ann')
   })
 
-  it('refuses a handoff meant for a different id', () => {
-    // Two opens in flight: the loser must not paint the winner's judge.
-    fakeStore()
-    stashHandoff('judge', 7, { id: 7, name: 'Ann L. Aiken' })
-    expect(takeHandoff('judge', 8)).toBeNull()
+  it('is empty when nothing is known, so the path stays clean', () => {
+    expect(handoffQuery({})).toBe('')
+    expect(handoffQuery({ name: '', photo: '' })).toBe('')
   })
 
-  it('keeps only the latest, so browsing cannot grow the store', () => {
-    const kv = fakeStore()
-    stashHandoff('judge', 1, { name: 'One' })
-    stashHandoff('judge', 2, { name: 'Two' })
-    stashHandoff('judge', 3, { name: 'Three' })
-    expect(kv.size).toBe(1)
-    expect(takeHandoff('judge', 3)).toEqual({ name: 'Three' })
-    expect(takeHandoff('judge', 1)).toBeNull()
+  it('escapes a URL value so its own query does not leak into the path', () => {
+    // The photo is a URL with `&` and `=` in it. Unescaped, `&background=...`
+    // would arrive as a separate route param.
+    const photo = 'https://ui-avatars.com/api/?name=Ann&size=256&background=1f2937'
+    const query = handoffQuery({ photo })
+    expect(query).not.toContain('&background=')
+    expect(query).toBe(`?hphoto=${encodeURIComponent(photo)}`)
   })
 
-  it('keeps kinds apart', () => {
-    fakeStore()
-    stashHandoff('judge', 5, { name: 'Judge' })
-    expect(takeHandoff('court', 5)).toBeNull()
+  it('prefixes every key, so none can collide with a route param', () => {
+    // `route.params` is one flat object: an unprefixed `name` or `id` would
+    // sit beside the path's own `:id`.
+    const query = handoffQuery({ name: 'x', photo: 'y', court: 'z', where: 'w' })
+    for (const key of query.slice(1).split('&').map(p => p.split('=')[0]))
+      expect(key.startsWith('h')).toBe(true)
+  })
+})
+
+describe('handoffFromParams', () => {
+  it('reads back what was written, decoded by the router', () => {
+    // The runtime decodes, so params arrive as the original strings.
+    expect(handoffFromParams({ id: '1', hname: 'Ann L. Aiken', hcourt: 'District Court' }))
+      .toEqual({ name: 'Ann L. Aiken', court: 'District Court' })
   })
 
-  it('is null when nothing was stashed', () => {
-    fakeStore()
-    expect(takeHandoff('judge', 5)).toBeNull()
+  it('round-trips a photo URL unchanged', () => {
+    const photo = 'https://ui-avatars.com/api/?name=Ann%20L.&background=1f2937&bold=true'
+    const key = handoffQuery({ photo }).slice('?hphoto='.length)
+    expect(handoffFromParams({ hphoto: decodeURIComponent(key) })?.photo).toBe(photo)
   })
 
-  it('is null for id 0, which is "the route gave us nothing"', () => {
-    fakeStore()
-    stashHandoff('judge', 0, { name: 'Nobody' })
-    expect(takeHandoff('judge', 0)).toBeNull()
+  it('is null when the route carries no handoff', () => {
+    // "Nothing was handed over, fetch it" has to be distinguishable from
+    // "a name was handed over and it is empty".
+    expect(handoffFromParams({ id: '1' })).toBeNull()
+    expect(handoffFromParams({})).toBeNull()
+    expect(handoffFromParams(null)).toBeNull()
+    expect(handoffFromParams(undefined)).toBeNull()
   })
 
-  it('survives a malformed envelope rather than throwing', () => {
-    const kv = fakeStore()
-    kv.set('handoff.judge', 'not an envelope')
-    expect(takeHandoff('judge', 7)).toBeNull()
+  it('ignores blank values rather than painting an empty name', () => {
+    expect(handoffFromParams({ hname: '   ' })).toBeNull()
   })
 
-  it('survives a store that throws', () => {
-    ;(globalThis as any).craft = {
-      snapshots: {
-        get: () => { throw new Error('no store') },
-        set: () => { throw new Error('no store') },
-      },
-    }
-    expect(() => stashHandoff('judge', 1, { name: 'x' })).not.toThrow()
-    expect(takeHandoff('judge', 1)).toBeNull()
+  it('does not pick up the route params it sits beside', () => {
+    expect(handoffFromParams({ id: '7', name: 'not a handoff', path: '/judges/7' })).toBeNull()
+  })
+})
+
+describe('judgeFromHandoff', () => {
+  it('shapes it like the judge endpoint, so the screen reads one shape', () => {
+    expect(judgeFromHandoff({ name: 'Ann', photo: 'p.png', court: 'District Court', where: 'OR' }))
+      .toEqual({ name: 'Ann', photo: 'p.png', court: { name: 'District Court' }, location: 'OR' })
   })
 
-  it('no-ops outside the native runtime, where there is no craft global', () => {
-    expect(() => stashHandoff('judge', 1, { name: 'x' })).not.toThrow()
-    expect(takeHandoff('judge', 1)).toBeNull()
+  it('leaves court null when there is none, which is what the screen branches on', () => {
+    expect(judgeFromHandoff({ name: 'Ann' })?.court).toBeNull()
+  })
+
+  it('is null for no handoff', () => {
+    expect(judgeFromHandoff(null)).toBeNull()
   })
 })

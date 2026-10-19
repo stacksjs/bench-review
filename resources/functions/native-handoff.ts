@@ -7,62 +7,101 @@
  * was on screen a moment earlier, and it fails offline even though the data
  * was in memory.
  *
- * `craft.snapshots` is shared between screens, so it can carry the row across
- * the push. It is the offline-snapshot store doing a job it was not designed
- * for, and the danger is exactly that: a single shared key with no tie to the
- * navigation. Two opens in flight both write it, and the screen that lands
- * could read the other one's row and paint the WRONG judge's name.
+ * ## Why this rides the URL and not a store
  *
- * The id guard is what makes that safe. A handoff is only used when its id
- * matches the id the screen resolved from its own route, so a mismatched or
- * leftover handoff is ignored rather than trusted. One key per kind, not one
- * per row, so the store cannot grow without bound as people browse.
+ * The obvious channel is `craft.snapshots`, which both screens can reach. It
+ * does not work, and the way it fails is quiet:
  *
- * No expiry, deliberately. A stale name for the moment before the refresh
- * lands is better than a blank header, and when the phone is offline a stale
- * handoff is the only thing the screen has.
+ *   - `snapshots.set` answers whether the value was "handed to the shell",
+ *     which then persists it to a file. The push can beat that write, so the
+ *     next screen's `get` reads the PREVIOUS value. Measured on a simulator:
+ *     a judge opened from the feed painted the photo an earlier visit from
+ *     the directory had stashed, not the one the feed had just written.
+ *   - An in-memory map beside it does not help either. Native screens do not
+ *     share a JS context — a map written on the feed screen reads back EMPTY
+ *     on the judge screen in the same process (`size=0`).
+ *
+ * Query parameters have neither problem. They travel as part of the
+ * navigation itself, so the value that arrives is always the one this tap
+ * sent: it cannot be stale, cannot belong to another row, and needs no guard.
+ *
+ * The cost is a longer path and string-only values, which is fine for the
+ * four short fields a header draws.
+ *
+ * ## The `h` prefix
+ *
+ * Path params and query params land in ONE flat `route.params` object, so a
+ * handoff key named `id` would fight the `:id` in the route. Prefixing keeps
+ * them in their own corner and says at a glance where a value came from.
  */
 
-function store(): any {
-  return (globalThis as any).craft?.snapshots
+export interface JudgeHandoff {
+  name?: string
+  photo?: string
+  /** Courthouse, or the feed's composed "court · city · state" line. */
+  court?: string
+  /** Jurisdiction and state, when the opener has them apart from the court. */
+  where?: string
 }
 
-interface Envelope<T> {
-  id: number
-  value: T
-}
+const KEYS: Array<[keyof JudgeHandoff, string]> = [
+  ['name', 'hname'],
+  ['photo', 'hphoto'],
+  ['court', 'hcourt'],
+  ['where', 'hwhere'],
+]
 
-/** Put `value` where the screen opened for `id` can find it. */
-export function stashHandoff<T>(kind: string, id: number, value: T): void {
-  if (!id || !value)
-    return
-  try {
-    store()?.set?.(`handoff.${kind}`, { id: Number(id), value } satisfies Envelope<T>)
+/**
+ * `?hname=…&hphoto=…` for the fields that have a value, or '' for none.
+ *
+ * Empty fields are left out rather than sent empty, so the path stays as
+ * short as what is actually known.
+ */
+export function handoffQuery(handoff: JudgeHandoff): string {
+  const parts: string[] = []
+  for (const [field, key] of KEYS) {
+    const value = String(handoff[field] ?? '').trim()
+    if (value)
+      parts.push(`${key}=${encodeURIComponent(value)}`)
   }
-  catch {
-    // A handoff is an optimisation. Losing one costs a round trip, nothing more.
-  }
+  return parts.length ? `?${parts.join('&')}` : ''
 }
 
 /**
- * The handoff left for `id`, or null.
+ * The handoff carried by a route, or null when it carries none.
  *
- * Returns null on any mismatch — a different id, a malformed envelope, a store
- * that is not there — because every one of those means "paint from the server
- * instead", which is the behaviour this replaces and is always correct.
+ * Null rather than an empty object, so a screen can tell "nothing was handed
+ * over, fetch it" from "a name was handed over and it is empty".
  */
-export function takeHandoff<T>(kind: string, id: number): T | null {
-  if (!id)
+export function handoffFromParams(params: Record<string, any> | null | undefined): JudgeHandoff | null {
+  if (!params || typeof params !== 'object')
     return null
-  try {
-    const held = store()?.get?.(`handoff.${kind}`) as Envelope<T> | undefined
-    if (!held || typeof held !== 'object')
-      return null
-    if (Number(held.id) !== Number(id))
-      return null
-    return (held.value ?? null) as T | null
+  const out: JudgeHandoff = {}
+  let any = false
+  for (const [field, key] of KEYS) {
+    const raw = params[key]
+    if (raw == null)
+      continue
+    const value = String(raw).trim()
+    if (!value)
+      continue
+    out[field] = value
+    any = true
   }
-  catch {
+  return any ? out : null
+}
+
+/**
+ * A handoff as the shape the judge endpoint returns, so the detail screen
+ * reads one shape whether the header came from a tap or from the server.
+ */
+export function judgeFromHandoff(handoff: JudgeHandoff | null): Record<string, any> | null {
+  if (!handoff)
     return null
+  return {
+    name: handoff.name ?? '',
+    photo: handoff.photo ?? '',
+    court: handoff.court ? { name: handoff.court } : null,
+    location: handoff.where ?? '',
   }
 }

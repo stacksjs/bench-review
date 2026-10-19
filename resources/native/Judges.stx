@@ -13,7 +13,7 @@
 // opening one is instant and needs no second request — there is no
 // /api/judges/{id} endpoint to call anyway.
 import { getJson, keepSnapshot, readSnapshot } from '../functions/native-api'
-import { stashHandoff } from '../functions/native-handoff'
+import { handoffQuery } from '../functions/native-handoff'
 import { buildPages, lastPageOf, pageSlice } from '../functions/native-paging'
 import { initials, ui } from '../functions/native-ui'
 
@@ -146,14 +146,18 @@ function clear(): void {
 
 function open(judge: Judge): void {
   // `open(path)` takes a path string and nothing else — no props argument
-  // (craft-native/craft#375) — so the row this list already holds cannot ride
-  // the push. It goes through the shared snapshot store instead, keyed by the
-  // judge's id so the detail screen can tell it apart from a leftover one.
+  // (craft-native/craft#375) — so the row this list already holds rides the
+  // URL. A store cannot do it: see native-handoff.ts.
   //
   // GET /api/judges/{id} is still what fills the screen: this only decides
   // whether the header is drawn now or after a round trip.
-  stashHandoff('judge', Number(judge.id), judge)
-  craft?.navigation?.open(`/judges/${judge.id}`)
+  const handoff = handoffQuery({
+    name: judge.name ?? '',
+    photo: judge.photo ?? '',
+    court: judge.court?.name ?? '',
+    where: judge.location ?? '',
+  })
+  craft?.navigation?.open(`/judges/${judge.id}${handoff}`)
 }
 
 async function refresh(): Promise<void> {

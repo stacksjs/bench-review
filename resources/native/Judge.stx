@@ -9,7 +9,7 @@
 // already listed. Only the reviews are fetched, from the same public endpoint
 // the website uses.
 import { ApiError, getJson } from '../functions/native-api'
-import { takeHandoff } from '../functions/native-handoff'
+import { handoffFromParams, judgeFromHandoff } from '../functions/native-handoff'
 import { plainTextFromHtml, shortDate, starsFor } from '../functions/native-review'
 import { initials, ui } from '../functions/native-ui'
 
@@ -50,18 +50,19 @@ function readJudgeId(): number {
 const judgeId = state<number>(readJudgeId())
 
 /**
- * The judge, painted from the opener's handoff when there is one.
+ * The judge, painted from whatever the opener put in the URL.
  *
  * Read synchronously as the initial state rather than in `onMount`, so the
  * header is right in the FIRST frame — an effect that fills it a tick later
  * still shows a blank name and a "?" avatar for that tick, which is the
  * flicker this exists to remove.
  *
- * `takeHandoff` only answers when the stashed id matches this screen's own,
- * so a leftover handoff from a different judge is ignored rather than
- * painted. A cold deep link has no handoff and falls back to the fetch.
+ * The handoff travels with this navigation, so it cannot be stale and cannot
+ * belong to another judge; see native-handoff.ts for the two store-shaped
+ * designs that could be both. A cold deep link carries no handoff and falls
+ * back to the fetch, which is why GET /api/judges/{id} still exists.
  */
-const judge = state<Record<string, any> | null>(takeHandoff<Record<string, any>>('judge', readJudgeId()))
+const judge = state<Record<string, any> | null>(judgeFromHandoff(handoffFromParams(craft?.route?.params)))
 const reviews = state<Review[]>([])
 const loading = state(true)
 const failed = state(false)
