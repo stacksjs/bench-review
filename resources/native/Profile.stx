@@ -117,7 +117,7 @@ onMount(() => {
           accessibilityLabel="Sign out"
           testID="profile-signout"
         >
-          <Text class="text-[17px]" :class="ui.destructive" :text="busy() ? 'Signing out…' : 'Sign out'" />
+          <Text class="text-[17px]" :class="ui.danger" :text="busy() ? 'Signing out…' : 'Sign out'" />
         </Pressable>
 
         <Text class="mb-12 mt-3 mx-8 text-center" :class="ui.caption" text="Signing out removes this phone's session. Your reviews stay where they are." />
