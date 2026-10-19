@@ -10,6 +10,7 @@
 // (`/judges/:id/profile`), there is no standalone review screen on either
 // surface, and the judge screen already lists their reviews.
 import { ApiError, getJson, keepSnapshot, readSnapshot } from '../functions/native-api'
+import { stashHandoff } from '../functions/native-handoff'
 import { buildPages } from '../functions/native-paging'
 import { plainTextFromHtml, shortDate, starsFor } from '../functions/native-review'
 import { ui } from '../functions/native-ui'
@@ -148,9 +149,24 @@ function sortBy(next: string): void {
   void load(1)
 }
 
-function openJudge(judgeId: number): void {
-  if (judgeId)
-    craft?.navigation?.open?.(`/judges/${judgeId}`)
+/**
+ * Open the judge, painting what this row already knows.
+ *
+ * A feed row carries less than a directory row — a name and the one-line
+ * context, no photo — so the handoff is deliberately partial and shaped like
+ * the API's judge so the detail screen has one shape to read. `context_line`
+ * is already "court · city · state" composed server-side, which is what the
+ * detail screen's court line shows anyway.
+ */
+function openJudge(row: { judgeId: number, judgeName: string, where: string }): void {
+  if (!row.judgeId)
+    return
+  stashHandoff('judge', row.judgeId, {
+    id: row.judgeId,
+    name: row.judgeName,
+    court: { name: row.where },
+  })
+  craft?.navigation?.open?.(`/judges/${row.judgeId}`)
 }
 
 async function refresh(): Promise<void> {
@@ -183,7 +199,7 @@ onMount(() => {
           <View :if="index" :class="ui.separator" />
           <Pressable
             :id="'review-row-' + row.key"
-            @press="openJudge(row.judgeId)"
+            @press="openJudge(row)"
             class="gap-1 px-4 py-3"
             accessibilityRole="button"
             :accessibilityLabel="'Review of ' + row.judgeName + ', ' + row.title"

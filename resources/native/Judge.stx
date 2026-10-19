@@ -9,6 +9,7 @@
 // already listed. Only the reviews are fetched, from the same public endpoint
 // the website uses.
 import { ApiError, getJson } from '../functions/native-api'
+import { takeHandoff } from '../functions/native-handoff'
 import { plainTextFromHtml, shortDate, starsFor } from '../functions/native-review'
 import { initials, ui } from '../functions/native-ui'
 
@@ -48,7 +49,19 @@ function readJudgeId(): number {
 
 const judgeId = state<number>(readJudgeId())
 
-const judge = state<Record<string, any> | null>(null)
+/**
+ * The judge, painted from the opener's handoff when there is one.
+ *
+ * Read synchronously as the initial state rather than in `onMount`, so the
+ * header is right in the FIRST frame — an effect that fills it a tick later
+ * still shows a blank name and a "?" avatar for that tick, which is the
+ * flicker this exists to remove.
+ *
+ * `takeHandoff` only answers when the stashed id matches this screen's own,
+ * so a leftover handoff from a different judge is ignored rather than
+ * painted. A cold deep link has no handoff and falls back to the fetch.
+ */
+const judge = state<Record<string, any> | null>(takeHandoff<Record<string, any>>('judge', readJudgeId()))
 const reviews = state<Review[]>([])
 const loading = state(true)
 const failed = state(false)
@@ -108,15 +121,32 @@ async function load(): Promise<void> {
   try {
     // Both in flight together: the header and the reviews are independent, so
     // serialising them would show an empty screen for two round trips.
-    const [who, data] = await Promise.all([
+    //
+    // `allSettled`, not `all`: with `all` a failing REVIEWS request threw away
+    // a perfectly good judge, so a judge whose reviews endpoint was down had
+    // no name and a "?" avatar. They fail independently because they are
+    // independent.
+    const [who, data] = await Promise.allSettled([
       getJson<Record<string, any>>(`/api/judges/${id}`),
       getJson<{ data?: Review[] } | Review[]>(`/api/judges/${id}/reviews?page=1&per_page=20`),
     ])
     if (!alive)
       return
-    judge.set(who)
-    const list = Array.isArray(data) ? data : (data?.data ?? [])
-    reviews.set(list)
+
+    if (who.status === 'fulfilled')
+      judge.set(who.value)
+
+    if (data.status === 'fulfilled') {
+      const body = data.value
+      reviews.set(Array.isArray(body) ? body : (body?.data ?? []))
+    }
+
+    // Only the reviews decide the failed state: this screen's empty card is
+    // about reviews, and the header speaks for itself once it is painted.
+    if (data.status === 'rejected') {
+      failed.set(true)
+      offline.set(data.reason instanceof ApiError && data.reason.status === 0)
+    }
   }
   catch (err) {
     if (!alive)
