@@ -103,8 +103,8 @@ const mobileContent = {
  * Craft matches fixed segments before a parameter, so `/judges` is never
  * taken for a judge's id.
  *
- * Native so far: the two directories, the judge screen they push to, the
- * account screens, writing a review and the review feed. The rest — an
+ * Native so far: the two directories and the detail screen each pushes to,
+ * the account screens, writing a review and the review feed. The rest — an
  * article, following a judge, editing a review already posted — is still the
  * web view, and the e2e suite (bench-review#81) covers both halves.
  */
@@ -112,6 +112,7 @@ const nativeScreens: Record<string, string> = {
   '/judges': 'Judges',
   '/judges/:id': 'Judge',
   '/court-houses': 'CourtHouses',
+  '/court-houses/:id': 'CourtHouse',
   // Both reach the same screen. `/review` starts by asking which judge;
   // `/review/:id` arrives already knowing, which is how a judge's own screen
   // sends someone here without the picker.

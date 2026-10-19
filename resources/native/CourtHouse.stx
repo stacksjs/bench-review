@@ -1,0 +1,335 @@
+<script client lang="ts">
+// One courthouse, drawn natively (config/mobile.ts `nativeScreens`,
+// /court-houses/:id): the phone's half of Bench/Court/CourtHeader.stx and
+// its bench tab.
+//
+// The header paints from the row the directory handed over in the URL, so it
+// is finished in the first frame; the bench is fetched. Tapping a judge
+// hands THEIR row on in the same way, so the chain stays instant all the way
+// down.
+import { ApiError, getJson } from '../functions/native-api'
+import { COURT_FIELDS, courtFromHandoff, handoffFromParams, handoffQuery } from '../functions/native-handoff'
+import { buildPages, lastPageOf, pageSlice } from '../functions/native-paging'
+import { initials, ui } from '../functions/native-ui'
+
+interface CourtHouse {
+  id?: number
+  name?: string | null
+  city?: string | null
+  state?: string | null
+  address?: string | null
+  zip_code?: string | null
+  active_judges?: number | null
+  total_reviews?: number | null
+  avg_rating?: number | null
+}
+
+interface BenchJudge {
+  id: number
+  name?: string | null
+  photo?: string | null
+  practice_area?: string | null
+  jurisdiction?: string | null
+}
+
+const craft = (globalThis as any).craft
+
+/**
+ * Which courthouse this is.
+ *
+ * `craft.route`, not `craft.navigation.route`, which is undefined. Params can
+ * land after construction, so the path is read as well rather than trusting a
+ * single early read.
+ */
+function readCourtId(): number {
+  const route = craft?.route ?? {}
+  const fromParams = Number(route.params?.id ?? 0)
+  if (Number.isInteger(fromParams) && fromParams > 0)
+    return fromParams
+  const fromPath = String(route.path ?? '').match(/\/court-houses\/(\d+)/)
+  return fromPath ? Number(fromPath[1]) : 0
+}
+
+const courtId = state<number>(readCourtId())
+
+// Painted from the URL the directory built, so the first frame is the
+// finished header rather than a placeholder replaced a moment later.
+const court = state<CourtHouse | null>(courtFromHandoff(handoffFromParams(craft?.route?.params, COURT_FIELDS)))
+const judges = state<BenchJudge[]>([])
+const loading = state(true)
+const failed = state(false)
+const offline = state(false)
+const currentPage = state<number>(1)
+
+let alive = true
+
+const name = derived<string>(() => court()?.name || 'Courthouse')
+const where = derived<string>(() => {
+  const c = court()
+  // `city` already holds the joined "City, State" on a handoff; a fetched row
+  // keeps them apart.
+  return [c?.city, c?.state].filter(Boolean).join(', ')
+})
+const street = derived<string>(() => {
+  const c = court()
+  return [c?.address, c?.zip_code].filter(Boolean).join(' · ')
+})
+
+const judgeCount = derived<number | null>(() => {
+  const n = court()?.active_judges
+  return n == null ? null : Number(n)
+})
+const reviewCount = derived<number | null>(() => {
+  const n = court()?.total_reviews
+  return n == null ? null : Number(n)
+})
+const ratingLine = derived<string>(() => {
+  const r = court()?.avg_rating
+  // No published reviews averages to nothing, which is not the same as 0.0 —
+  // a courthouse nobody has reviewed should say so rather than look badly
+  // rated.
+  return r == null ? 'No ratings yet' : `${Number(r).toFixed(1)} average`
+})
+const judgeCountLine = derived<string>(() => {
+  const n = judgeCount()
+  if (n == null)
+    return ''
+  return n === 1 ? '1 judge' : `${n} judges`
+})
+const reviewCountLine = derived<string>(() => {
+  const n = reviewCount()
+  if (n == null)
+    return ''
+  return n === 1 ? '1 review' : `${n} reviews`
+})
+
+const rows = derived(() => pageSlice(judges(), currentPage()).map(j => ({
+  judge: j,
+  key: j.id,
+  name: j.name || 'Unnamed judge',
+  detail: [j.practice_area, j.jurisdiction].filter(Boolean).join(' · '),
+  mark: initials(j.name),
+  photo: j.photo || '',
+})))
+
+const lastPage = derived<number>(() => lastPageOf(judges().length))
+const pages = derived(() => buildPages(currentPage(), lastPage()))
+const nothing = derived<boolean>(() => !loading() && (failed() || !judges().length))
+const showSkeleton = derived<boolean>(() => loading() && !judges().length)
+
+const reason = derived<string>(() => {
+  if (offline())
+    return 'The bench needs a connection. Reconnect and try again.'
+  if (failed())
+    return 'The bench could not be loaded. This is a problem on our side.'
+  return 'No judges are listed at this courthouse yet.'
+})
+
+effect(() => craft?.navigation?.setOptions({ title: name() }))
+
+/**
+ * The courthouse and its bench.
+ *
+ * There is no `GET /api/court-houses/{id}`: the directory endpoint returns
+ * all 202 rows with every field already hydrated, so a deep link finds its
+ * own row in that one bounded response rather than earning a second
+ * endpoint. The bench DOES have its own, because the alternative is pulling
+ * the 2,000-row judge directory to list about ten.
+ *
+ * `allSettled`, not `all`: these fail independently and the header must not
+ * be thrown away because the bench request failed.
+ */
+async function load(): Promise<void> {
+  const id = courtId()
+  if (!id) {
+    loading.set(false)
+    failed.set(true)
+    return
+  }
+  failed.set(false)
+  offline.set(false)
+  try {
+    const [all, bench] = await Promise.allSettled([
+      getJson<CourtHouse[]>('/api/court-houses'),
+      getJson<{ data?: BenchJudge[] } | BenchJudge[]>(`/api/court-houses/${id}/judges`),
+    ])
+    if (!alive)
+      return
+
+    if (all.status === 'fulfilled' && Array.isArray(all.value)) {
+      const found = all.value.find(c => Number(c.id) === id)
+      if (found)
+        court.set(found)
+    }
+
+    if (bench.status === 'fulfilled') {
+      const body = bench.value
+      judges.set(Array.isArray(body) ? body : (body?.data ?? []))
+    }
+    else {
+      failed.set(true)
+      offline.set(bench.reason instanceof ApiError && bench.reason.status === 0)
+    }
+  }
+  catch (err) {
+    if (!alive)
+      return
+    failed.set(true)
+    offline.set(err instanceof ApiError && err.status === 0)
+  }
+  finally {
+    if (alive)
+      loading.set(false)
+  }
+}
+
+function goToPage(n: number): void {
+  if (n >= 1 && n <= lastPage())
+    currentPage.set(n)
+}
+
+function prevPage(): void {
+  goToPage(currentPage() - 1)
+}
+
+function nextPage(): void {
+  goToPage(currentPage() + 1)
+}
+
+/** Open a judge, handing on the row this screen already has. */
+function openJudge(row: { judge: BenchJudge, name: string, photo: string }): void {
+  const id = Number(row.judge?.id ?? 0)
+  if (!id)
+    return
+  const handoff = handoffQuery({
+    name: row.name,
+    photo: row.photo,
+    court: name(),
+    where: where(),
+  })
+  craft?.navigation?.open?.(`/judges/${id}${handoff}`)
+}
+
+async function refresh(): Promise<void> {
+  await load()
+}
+
+onMount(() => {
+  alive = true
+  void load()
+
+  // Params that resolve after construction: re-read and fetch again, but only
+  // when the id actually changed, so this cannot loop.
+  try {
+    craft?.route?.onParams?.(() => {
+      const next = readCourtId()
+      if (next && next !== courtId()) {
+        courtId.set(next)
+        void load()
+      }
+    })
+  }
+  catch {
+    // No subscription on this runtime; the initial read stands.
+  }
+
+  return () => { alive = false }
+})
+</script>
+
+<template>
+  <View :class="ui.screen">
+    <ScrollView class="flex-1" @refresh="refresh()" :refreshing="loading() && judges().length > 0">
+      <View class="items-center mt-6" testID="court-header">
+        <View class="items-center justify-center h-20 w-20 bg-[#2563eb] dark:bg-[#1d4ed8] rounded-full">
+          <Icon name="building" class="h-9 w-9 text-white" />
+        </View>
+        <Text class="mt-3 mx-6 font-semibold text-[22px] text-black text-center dark:text-white" :text="name()" />
+        <Text :if="where()" class="mt-1 text-center" :class="ui.subtitle" :text="where()" />
+        <Text :if="street()" class="mt-0.5 mx-8 text-center" :class="ui.caption" :text="street()" />
+      </View>
+
+      {{-- Three numbers, the same ones the web's "By the numbers" panel shows. --}}
+      <View class="flex-row mt-6" :class="ui.group" testID="court-stats">
+        <View class="flex-1 items-center py-3">
+          <Text :class="ui.figure" :text="judgeCount() == null ? '—' : String(judgeCount())" />
+          <Text :class="ui.caption" text="Judges" />
+        </View>
+        <View class="w-[0.5px] bg-[#c6c6c8] dark:bg-[#38383a]" />
+        <View class="flex-1 items-center py-3">
+          <Text :class="ui.figure" :text="reviewCount() == null ? '—' : String(reviewCount())" />
+          <Text :class="ui.caption" text="Reviews" />
+        </View>
+        <View class="w-[0.5px] bg-[#c6c6c8] dark:bg-[#38383a]" />
+        <View class="flex-1 items-center py-3">
+          {{-- Not gold: the design reserves it for rating STARS, and a static
+               colour here would lose to `ui.figure`'s `text-black` anyway. --}}
+          <Text :class="ui.figure" :text="court()?.avg_rating == null ? '—' : Number(court()?.avg_rating).toFixed(1)" />
+          <Text :class="ui.caption" text="Rating" />
+        </View>
+      </View>
+      <Text class="mt-1.5 mx-8 text-center" :class="ui.caption" :text="ratingLine()" />
+
+      <Text :class="ui.header" text="THE BENCH" />
+
+      <View :if="rows().length > 0" :class="ui.group" testID="court-bench">
+        <View :for="(row, index) in rows()" :key="row.key">
+          <View :if="index" :class="ui.separatorAvatar" />
+          <Pressable
+            :id="'court-judge-' + row.key"
+            @press="openJudge(row)"
+            class="flex-row gap-3 items-center px-4 py-2.5"
+            accessibilityRole="button"
+            :accessibilityLabel="row.name"
+            :testID="'court-judge-' + row.key"
+          >
+            <Image :if="row.photo" :source="{ uri: row.photo }" class="h-11 w-11 rounded-full" resizeMode="cover" :accessibilityLabel="row.name" />
+            <View :if="!row.photo" :class="ui.avatar">
+              <Text :class="ui.avatarText" :text="row.mark" />
+            </View>
+            <View class="flex-1">
+              <Text :class="ui.title" :text="row.name" />
+              <Text :if="row.detail" :numberOfLines="1" :class="ui.subtitle" :text="row.detail" />
+            </View>
+            <Icon name="chevron-right" :class="ui.chevron" />
+          </Pressable>
+        </View>
+      </View>
+
+      <View :if="showSkeleton()" :class="ui.group" testID="court-loading">
+        <View :for="n in [1, 2, 3]" :key="n" class="flex-row gap-3 items-center px-4 py-3">
+          <View class="h-11 w-11 rounded-full" :class="ui.skeleton" />
+          <View class="flex-1 gap-2">
+            <View class="h-3.5 w-1/2" :class="ui.skeleton" />
+            <View class="h-3 w-1/3" :class="ui.skeleton" />
+          </View>
+        </View>
+      </View>
+
+      <View :if="nothing()" class="items-center py-6" :class="ui.card" accessibilityRole="alert" testID="court-empty">
+        <Icon :name="offline() ? 'wifi-off' : 'person-standing'" class="h-7 w-7 text-[#c7c7cc] dark:text-[#48484a]" />
+        <Text class="mt-3 text-center" :class="ui.subtitle" :text="reason()" />
+        <Pressable :if="failed()" id="court-retry" @press="refresh()" class="justify-center mt-2 min-h-[44px]" accessibilityRole="button" testID="court-retry">
+          <Text class="text-[17px]" :class="ui.tint" text="Try again" />
+        </Pressable>
+      </View>
+
+      <View :if="pages().length" class="flex-row items-center justify-center mb-10 mt-4">
+        <Pressable id="court-prev" @press="prevPage()" class="justify-center px-3 min-h-[44px]" accessibilityRole="button" accessibilityLabel="Previous page" testID="court-prev">
+          <Text :class="currentPage() > 1 ? ui.tint : ui.caption" text="Prev" />
+        </Pressable>
+        <View :for="item in pages()" :key="item.label + '-' + item.n">
+          <Text :if="item.gap" class="px-2" :class="ui.caption" text="…" />
+          <Pressable :if="!item.gap" :id="'court-page-' + item.label" @press="goToPage(item.n)" class="items-center justify-center px-3 min-h-[44px] rounded-[8px]" :class="item.active ? 'bg-[#2563eb]' : ''" accessibilityRole="button" :accessibilityLabel="'Page ' + item.label" :testID="'court-page-' + item.label">
+            <Text :class="item.active ? 'text-white text-[15px]' : ui.tint" :text="item.label" />
+          </Pressable>
+        </View>
+        <Pressable id="court-next" @press="nextPage()" class="justify-center px-3 min-h-[44px]" accessibilityRole="button" accessibilityLabel="Next page" testID="court-next">
+          <Text :class="currentPage() < lastPage() ? ui.tint : ui.caption" text="Next" />
+        </Pressable>
+      </View>
+
+      <View class="h-10" />
+    </ScrollView>
+  </View>
+</template>
