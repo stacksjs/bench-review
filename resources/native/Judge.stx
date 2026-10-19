@@ -128,6 +128,19 @@ async function refresh(): Promise<void> {
   await load()
 }
 
+/**
+ * Write a review of this judge.
+ *
+ * `/review/:id` rather than the Write tab, so the judge is already chosen —
+ * someone who got here by reading about a judge should not have to find them
+ * again in a picker. `open(path)` is the only shape Craft's navigation takes.
+ */
+function review(): void {
+  const id = judgeId()
+  if (id)
+    craft?.navigation?.open?.(`/review/${id}`)
+}
+
 onMount(() => {
   alive = true
   void load()
@@ -165,6 +178,17 @@ onMount(() => {
         <Text :if="court()" class="mt-1 text-center" :class="ui.subtitle" :text="court()" />
         <Text :if="where()" class="mt-0.5 text-center" :class="ui.caption" :text="where()" />
       </View>
+
+      <Pressable
+        id="judge-write-review"
+        @press="review()"
+        class="items-center justify-center mt-6 mx-4 h-[50px] bg-[#2563eb] dark:bg-[#1d4ed8] rounded-[12px]"
+        accessibilityRole="button"
+        accessibilityLabel="Write a review of this judge"
+        testID="judge-write-review"
+      >
+        <Text class="font-semibold text-[17px] text-white" text="Write a review" />
+      </Pressable>
 
       <Text :if="summary()" :class="ui.header" :text="summary()" testID="judge-reviews-summary" />
 

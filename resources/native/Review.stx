@@ -1,0 +1,575 @@
+<script client lang="ts">
+// Writing a review, drawn natively (config/mobile.ts `nativeScreens`,
+// /review and /review/:id): the phone's half of Bench/ReviewForm.stx.
+//
+// Four states in one screen, because they are one task and splitting them
+// across pushed screens would make going back lose what was typed:
+//
+//   signed out  -> what an account is for, and the way in
+//   no judge    -> which judge is this about
+//   composing   -> rating, title, body, and whether to publish anonymously
+//   submitted   -> it is in the moderation queue, not on the site yet
+//
+// `/review/:id` arrives already past the second state, which is how the judge
+// screen's own "Write a review" button gets here.
+import { getJson } from '../functions/native-api'
+import { CONTENT_MAX, reviewProblem, submitFailureMessage, TITLE_MAX, toReviewHtml, visibleLength } from '../functions/native-review'
+import { buildPages, lastPageOf, pageSlice } from '../functions/native-paging'
+import { authFetch, signedIn } from '../functions/native-session'
+import { initials, ui } from '../functions/native-ui'
+
+interface Judge {
+  id: number
+  name?: string | null
+  photo?: string | null
+  location?: string | null
+  court?: { name?: string | null } | null
+}
+
+const craft = (globalThis as any).craft
+
+// Read the session synchronously, so someone who is signed in never sees the
+// guest panel flash first (the same reason Profile.stx does it).
+const authed = state<boolean>(signedIn())
+
+/**
+ * The judge this review is about, when the route already names one.
+ *
+ * `craft.route`, not `craft.navigation.route` — the latter is undefined. Params
+ * can land after construction, so `route.path` is read as well rather than
+ * trusting a single early read.
+ */
+function readJudgeId(): number {
+  const route = craft?.route ?? {}
+  const fromParams = Number(route.params?.id ?? 0)
+  if (Number.isInteger(fromParams) && fromParams > 0)
+    return fromParams
+  const fromPath = String(route.path ?? '').match(/\/review\/(\d+)/)
+  return fromPath ? Number(fromPath[1]) : 0
+}
+
+const judge = state<Judge | null>(null)
+const judgeId = derived<number>(() => Number(judge()?.id ?? 0))
+
+// The picker's directory. Only loaded when the route did not name a judge —
+// a review started from a judge's own screen never pays for it.
+const judges = state<Judge[]>([])
+const listLoading = state(false)
+const listFailed = state(false)
+const listOffline = state(false)
+const term = state<string>('')
+const currentPage = state<number>(1)
+
+const rating = state<number>(0)
+const title = state<string>('')
+const body = state<string>('')
+const anonymous = state<boolean>(false)
+
+const busy = state(false)
+const failure = state<string | null>(null)
+const submittedName = state<string | null>(null)
+
+let alive = true
+
+const judgeName = derived<string>(() => judge()?.name || 'this judge')
+const judgeWhere = derived<string>(() => {
+  const j = judge()
+  return [j?.court?.name, j?.location].filter(Boolean).join(' · ')
+})
+const judgeMark = derived<string>(() => initials(judge()?.name))
+const judgePhoto = derived<string>(() => judge()?.photo || '')
+
+const filtered = derived<Judge[]>(() => {
+  const needle = term().trim().toLowerCase()
+  const all = judges()
+  if (!needle)
+    return all
+  return all.filter(j =>
+    String(j.name || '').toLowerCase().includes(needle)
+    || String(j.court?.name || '').toLowerCase().includes(needle)
+    || String(j.location || '').toLowerCase().includes(needle),
+  )
+})
+
+// Rows carry their own display strings, so the template never calls a signal
+// inside its `:for`.
+const rows = derived(() => pageSlice(filtered(), currentPage()).map(j => ({
+  judge: j,
+  key: j.id,
+  name: j.name || 'Unnamed judge',
+  where: [j.court?.name, j.location].filter(Boolean).join(' · '),
+  mark: initials(j.name),
+  photo: j.photo || '',
+})))
+
+const lastPage = derived<number>(() => lastPageOf(filtered().length))
+const pages = derived(() => buildPages(currentPage(), lastPage()))
+
+const pickerEmpty = derived<boolean>(() => !listLoading() && !filtered().length)
+const pickerEmptyLine = derived<string>(() => {
+  if (listOffline())
+    return 'The directory needs a connection. Reconnect and try again.'
+  if (listFailed())
+    return 'The directory could not be loaded. This is a problem on our side.'
+  if (term().trim())
+    return 'No judges match that search.'
+  return 'No judges yet.'
+})
+
+// Gold, and only for ratings — the same reservation the site makes.
+const starMarks = derived(() => [1, 2, 3, 4, 5].map(n => ({ n, on: rating() >= n })))
+const ratingLine = derived<string>(() => {
+  const n = rating()
+  if (!n)
+    return 'Tap a star'
+  return n === 1 ? '1 star' : `${n} stars`
+})
+
+// Says which way the switch is set, in words. A switch whose only feedback is
+// the thumb tells a VoiceOver user nothing about what it will do to their
+// name, which on a site built around reviewer anonymity is the one setting
+// that has to be unambiguous.
+const anonymityLine = derived<string>(() => anonymous()
+  ? 'Your name is replaced with your role. Moderators still see who wrote it.'
+  : 'This review will be published under your name.')
+
+const bodyCount = derived<number>(() => visibleLength(body()))
+const countLine = derived<string>(() => `${bodyCount()} of ${CONTENT_MAX}`)
+
+// The first thing that still needs doing, or null. Shown as the reason the
+// button is inert rather than leaving someone tapping a dead control.
+const problem = derived<string | null>(() => reviewProblem({
+  judgeId: judgeId(),
+  rating: rating(),
+  title: title(),
+  body: body(),
+}))
+const canSubmit = derived<boolean>(() => !busy() && !problem())
+
+const composing = derived<boolean>(() => authed() && !submittedName() && !!judgeId())
+const picking = derived<boolean>(() => authed() && !submittedName() && !judgeId())
+
+effect(() => craft?.navigation?.setOptions({ title: 'Write a review', largeTitle: true }))
+
+async function loadJudges(): Promise<void> {
+  if (judges().length || listLoading())
+    return
+  listLoading.set(true)
+  listFailed.set(false)
+  listOffline.set(false)
+  try {
+    const data = await getJson<Judge[]>('/api/judges')
+    if (!alive)
+      return
+    judges.set(Array.isArray(data) ? data : [])
+  }
+  catch (err) {
+    if (!alive)
+      return
+    listFailed.set(true)
+    listOffline.set((err as any)?.status === 0)
+  }
+  finally {
+    if (alive)
+      listLoading.set(false)
+  }
+}
+
+/** Fill in the judge named by `/review/:id`, so the screen can say who it is about. */
+async function loadRoutedJudge(id: number): Promise<void> {
+  try {
+    const data = await getJson<Judge>(`/api/judges/${id}`)
+    if (alive && data && Number(data.id) === id)
+      judge.set(data)
+  }
+  catch {
+    // The review can still be written: fall back to the picker rather than
+    // stranding the screen on a judge it cannot name.
+    if (alive)
+      void loadJudges()
+  }
+}
+
+function typedSearch(value: string): void {
+  term.set(value)
+  currentPage.set(1)
+}
+
+function clearSearch(): void {
+  term.set('')
+  currentPage.set(1)
+}
+
+function choose(picked: Judge): void {
+  judge.set(picked)
+  failure.set(null)
+}
+
+function changeJudge(): void {
+  judge.set(null)
+  failure.set(null)
+  void loadJudges()
+}
+
+function goToPage(n: number): void {
+  if (n >= 1 && n <= lastPage())
+    currentPage.set(n)
+}
+
+function prevPage(): void {
+  goToPage(currentPage() - 1)
+}
+
+function nextPage(): void {
+  goToPage(currentPage() + 1)
+}
+
+function setRating(n: number): void {
+  rating.set(n)
+  failure.set(null)
+}
+
+function typedTitle(value: string): void {
+  title.set(value)
+  failure.set(null)
+}
+
+function typedBody(value: string): void {
+  body.set(value)
+  failure.set(null)
+}
+
+/**
+ * Flip it from our own state rather than from the event payload.
+ *
+ * `value` IS on the payload the runtime sends (`nativeEvent.value`), but
+ * `:value` makes this a controlled switch — the renderer re-applies the prop
+ * on the next tree update — so a payload read that comes back undefined
+ * writes `false`, snaps the thumb back, and looks like a dead control. Owning
+ * the state is the only read that cannot disagree with what is drawn.
+ */
+function toggleAnonymous(): void {
+  anonymous.set(!anonymous())
+}
+
+function openSignIn(): void {
+  craft?.navigation?.open?.('/login')
+}
+
+/**
+ * Post it.
+ *
+ * The body goes as HTML because that is what the endpoint stores and the site
+ * renders; `toReviewHtml` is what keeps the author's paragraphs and escapes
+ * anything that looks like markup.
+ */
+async function submit(): Promise<void> {
+  if (busy())
+    return
+  const blocker = problem()
+  if (blocker) {
+    failure.set(blocker)
+    return
+  }
+
+  busy.set(true)
+  failure.set(null)
+  const name = judgeName()
+  try {
+    const response = await authFetch('/api/reviews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        judge_id: judgeId(),
+        title: title().trim(),
+        content: toReviewHtml(body()),
+        rating: rating(),
+        anonymized: anonymous(),
+      }),
+    })
+    if (!alive)
+      return
+    const payload = await response.json().catch(() => ({})) as Record<string, any>
+    if (!response.ok) {
+      if (response.status === 401)
+        authed.set(false)
+      failure.set(submitFailureMessage(response.status, payload))
+      return
+    }
+    submittedName.set(name)
+  }
+  catch {
+    if (alive)
+      failure.set('Could not reach Bench Review. Your review has not been posted.')
+  }
+  finally {
+    if (alive)
+      busy.set(false)
+  }
+}
+
+/** Start a fresh one, rather than leaving the thanks panel as a dead end. */
+function writeAnother(): void {
+  submittedName.set(null)
+  judge.set(null)
+  rating.set(0)
+  title.set('')
+  body.set('')
+  anonymous.set(false)
+  failure.set(null)
+  void loadJudges()
+}
+
+onMount(() => {
+  alive = true
+  const refresh = (): void => {
+    authed.set(signedIn())
+    if (!signedIn())
+      return
+    const routed = readJudgeId()
+    if (routed && !judge())
+      void loadRoutedJudge(routed)
+    else if (!routed && !judge())
+      void loadJudges()
+  }
+  refresh()
+  try {
+    // Someone can leave for the sign-in screen and come back; this tab is
+    // what they come back to.
+    craft?.navigation?.onAppear?.(refresh)
+  }
+  catch {
+    // No appearance hook on this runtime; the mount read stands.
+  }
+  return () => { alive = false }
+})
+</script>
+
+<template>
+  <View :class="ui.screen">
+    <ScrollView class="flex-1" keyboardDismissMode="on-drag">
+      {{-- Signed out --}}
+      <View :if="!authed()" testID="review-signed-out">
+        <Text class="mb-2 mt-10 mx-6 font-semibold text-[22px] text-black dark:text-white" text="Sign in to write a review" />
+        <Text class="mb-6 mx-6" :class="ui.subtitle" text="Reviews name real judges, so they are tied to an account. Reading them is open to everyone." />
+        <Pressable
+          id="review-signin"
+          @press="openSignIn()"
+          class="items-center justify-center mx-4 h-[50px] bg-[#2563eb] dark:bg-[#1d4ed8] rounded-[12px]"
+          accessibilityRole="button"
+          accessibilityLabel="Sign in"
+          testID="review-signin"
+        >
+          <Text class="font-semibold text-[17px] text-white" text="Sign in" />
+        </Pressable>
+        <Text class="mb-12 mt-6 mx-8 text-center" :class="ui.caption" text="You can publish under your name or anonymously — you choose on each review." />
+      </View>
+
+      {{-- Posted --}}
+      <View :if="submittedName()" testID="review-submitted">
+        <Text class="mb-2 mt-10 mx-6 font-semibold text-[22px] text-black dark:text-white" text="Thanks — it is with our moderators" />
+        <Text class="mb-6 mx-6" :class="ui.subtitle" :text="'Your review of ' + submittedName() + ' is in the queue. Reviews are read by a moderator before they appear, so it is not on the site yet.'" />
+        <Pressable
+          id="review-another"
+          @press="writeAnother()"
+          class="items-center justify-center mx-4 h-[50px] bg-white dark:bg-[#1c1c1e] rounded-[12px]"
+          accessibilityRole="button"
+          accessibilityLabel="Write another review"
+          testID="review-another"
+        >
+          <Text class="text-[17px]" :class="ui.tint" text="Write another review" />
+        </Pressable>
+      </View>
+
+      {{-- Which judge --}}
+      <View :if="picking()" testID="review-picker">
+        <Text class="mb-3 mt-6 mx-6" :class="ui.subtitle" text="Which judge is this review about?" />
+
+        <View :class="ui.search">
+          <Icon name="search" class="h-4 w-4 text-[#8e8e93]" />
+          <TextInput
+            id="review-search"
+            class="flex-1 text-[17px] text-black dark:text-white border-0"
+            :value="term()"
+            @input="typedSearch($event.text)"
+            placeholder="Search by name, court, or location"
+            placeholderTextColor="#8e8e93"
+            autoCapitalize="none"
+            :autoCorrect="false"
+            accessibilityLabel="Search judges"
+            testID="review-search"
+          />
+          <Pressable :if="term().length > 0" id="review-search-clear" @press="clearSearch()" accessibilityRole="button" accessibilityLabel="Clear search" testID="review-search-clear">
+            <Icon name="x-circle" class="h-4 w-4 text-[#8e8e93]" />
+          </Pressable>
+        </View>
+
+        <View :if="!pickerEmpty()" class="mt-4" :class="ui.group">
+          <View :for="(row, index) in rows()" :key="row.key">
+            <View :if="index" :class="ui.separatorAvatar" />
+            <Pressable
+              :id="'review-judge-' + row.key"
+              @press="choose(row.judge)"
+              class="flex-row gap-3 items-center px-4 py-2.5"
+              accessibilityRole="button"
+              :accessibilityLabel="'Review ' + row.name"
+              :testID="'review-judge-' + row.key"
+            >
+              <Image :if="row.photo" :source="row.photo" class="h-11 w-11 rounded-full" resizeMode="cover" :accessibilityLabel="row.name" />
+              <View :if="!row.photo" :class="ui.avatar">
+                <Text :class="ui.avatarText" :text="row.mark" />
+              </View>
+              <View class="flex-1">
+                <Text :class="ui.title" :text="row.name" />
+                <Text :if="row.where" :class="ui.subtitle" :text="row.where" />
+              </View>
+              <Icon name="chevron-right" :class="ui.chevron" />
+            </Pressable>
+          </View>
+        </View>
+
+        <View :if="pickerEmpty()" class="items-center mt-16 px-8">
+          <Text class="text-center" :class="ui.subtitle" :text="pickerEmptyLine()" />
+        </View>
+
+        {{-- Prev / 1 2 … N / Next, the same pager as the directories. --}}
+        <View :if="pages().length" class="flex-row items-center justify-center mb-10 mt-4">
+          <Pressable id="review-prev" @press="prevPage()" class="justify-center px-3 min-h-[44px]" accessibilityRole="button" accessibilityLabel="Previous page" testID="review-prev">
+            <Text :class="currentPage() > 1 ? ui.tint : ui.caption" text="Prev" />
+          </Pressable>
+          <View :for="item in pages()" :key="item.label + '-' + item.n">
+            <Text :if="item.gap" class="px-2" :class="ui.caption" text="…" />
+            <Pressable :if="!item.gap" :id="'review-page-' + item.label" @press="goToPage(item.n)" class="items-center justify-center px-3 min-h-[44px] rounded-[8px]" :class="item.active ? 'bg-[#2563eb]' : ''" accessibilityRole="button" :accessibilityLabel="'Page ' + item.label" :testID="'review-page-' + item.label">
+              <Text :class="item.active ? 'text-white text-[15px]' : ui.tint" :text="item.label" />
+            </Pressable>
+          </View>
+          <Pressable id="review-next" @press="nextPage()" class="justify-center px-3 min-h-[44px]" accessibilityRole="button" accessibilityLabel="Next page" testID="review-next">
+            <Text :class="currentPage() < lastPage() ? ui.tint : ui.caption" text="Next" />
+          </Pressable>
+        </View>
+      </View>
+
+      {{-- The review itself --}}
+      <View :if="composing()" testID="review-form">
+        <View class="mt-4" :class="ui.group">
+          <View class="flex-row gap-3 items-center px-4 py-2.5">
+            <Image :if="judgePhoto()" :source="judgePhoto()" class="h-11 w-11 rounded-full" resizeMode="cover" :accessibilityLabel="judgeName()" />
+            <View :if="!judgePhoto()" :class="ui.avatar">
+              <Text :class="ui.avatarText" :text="judgeMark()" />
+            </View>
+            <View class="flex-1">
+              <Text :class="ui.titleStrong" :text="judgeName()" />
+              <Text :if="judgeWhere()" :class="ui.subtitle" :text="judgeWhere()" />
+            </View>
+            <Pressable id="review-change-judge" @press="changeJudge()" class="justify-center min-h-[44px]" accessibilityRole="button" accessibilityLabel="Choose a different judge" testID="review-change-judge">
+              <Text :class="ui.tint" text="Change" />
+            </Pressable>
+          </View>
+        </View>
+
+        {{-- Five fixed stars rather than a loop: each one is its own tap
+             target with its own label, which a loop cannot give them. --}}
+        <Text :class="ui.header" text="YOUR RATING" />
+        <View class="flex-row items-center mx-4 px-4 py-1.5 bg-white dark:bg-[#1c1c1e] rounded-[10px]">
+          <Pressable id="review-star-1" @press="setRating(1)" class="items-center justify-center pr-2 min-h-[44px] min-w-[40px]" accessibilityRole="button" accessibilityLabel="1 star" testID="review-star-1">
+            <Text class="text-[28px]" :class="rating() >= 1 ? 'text-[#f59e0b]' : 'text-[#d1d1d6]'" text="★" />
+          </Pressable>
+          <Pressable id="review-star-2" @press="setRating(2)" class="items-center justify-center px-2 min-h-[44px] min-w-[40px]" accessibilityRole="button" accessibilityLabel="2 stars" testID="review-star-2">
+            <Text class="text-[28px]" :class="rating() >= 2 ? 'text-[#f59e0b]' : 'text-[#d1d1d6]'" text="★" />
+          </Pressable>
+          <Pressable id="review-star-3" @press="setRating(3)" class="items-center justify-center px-2 min-h-[44px] min-w-[40px]" accessibilityRole="button" accessibilityLabel="3 stars" testID="review-star-3">
+            <Text class="text-[28px]" :class="rating() >= 3 ? 'text-[#f59e0b]' : 'text-[#d1d1d6]'" text="★" />
+          </Pressable>
+          <Pressable id="review-star-4" @press="setRating(4)" class="items-center justify-center px-2 min-h-[44px] min-w-[40px]" accessibilityRole="button" accessibilityLabel="4 stars" testID="review-star-4">
+            <Text class="text-[28px]" :class="rating() >= 4 ? 'text-[#f59e0b]' : 'text-[#d1d1d6]'" text="★" />
+          </Pressable>
+          <Pressable id="review-star-5" @press="setRating(5)" class="items-center justify-center px-2 min-h-[44px] min-w-[40px]" accessibilityRole="button" accessibilityLabel="5 stars" testID="review-star-5">
+            <Text class="text-[28px]" :class="rating() >= 5 ? 'text-[#f59e0b]' : 'text-[#d1d1d6]'" text="★" />
+          </Pressable>
+          <Text class="flex-1 ml-2" :class="ui.subtitle" :text="ratingLine()" />
+        </View>
+
+        <Text :class="ui.header" text="YOUR REVIEW" />
+        <View :class="ui.group">
+          <View class="px-4 py-2.5">
+            <Text :class="ui.caption" text="Title" />
+            <TextInput
+              id="review-title"
+              class="mt-1 text-[17px] text-black dark:text-white border-0"
+              :value="title()"
+              @input="typedTitle($event.text)"
+              :maxLength="TITLE_MAX"
+              placeholder="A line that sums it up"
+              placeholderTextColor="#8e8e93"
+              accessibilityLabel="Review title"
+              testID="review-title"
+            />
+          </View>
+          <View :class="ui.separator" />
+          <View class="px-4 py-2.5">
+            <Text :class="ui.caption" text="What happened" />
+            <TextInput
+              id="review-body"
+              class="mt-1 min-h-[140px] text-[17px] text-black dark:text-white border-0"
+              :value="body()"
+              @input="typedBody($event.text)"
+              :multiline="true"
+              :maxLength="CONTENT_MAX"
+              textAlignVertical="top"
+              placeholder="What was your experience in this courtroom? Leave a blank line between paragraphs."
+              placeholderTextColor="#8e8e93"
+              accessibilityLabel="Review body"
+              testID="review-body"
+            />
+          </View>
+        </View>
+        <Text class="mt-1.5 mx-8 text-right" :class="ui.caption" :text="countLine()" />
+
+        {{-- A pressable row with a checkmark, not a Switch.
+             `<Switch>` renders as a real UISwitch here but its change event
+             never reaches the script: wiring `@change` to a handler that
+             demonstrably fires from a Pressable on this same screen still did
+             nothing, so the thumb moved and the state did not. A control that
+             looks settable and is not is worse than no control, and a
+             checkmark row is a shape iOS already uses for exactly this. --}}
+        <View class="mt-4" :class="ui.group">
+          <Pressable
+            id="review-anonymous"
+            @press="toggleAnonymous()"
+            class="flex-row gap-3 items-center px-4 py-2.5 min-h-[44px]"
+            accessibilityRole="switch"
+            accessibilityLabel="Publish anonymously"
+            :accessibilityValue="anonymous() ? 'On' : 'Off'"
+            testID="review-anonymous"
+          >
+            <View class="flex-1">
+              <Text :class="ui.title" text="Publish anonymously" />
+              <Text :class="ui.caption" :text="anonymityLine()" />
+            </View>
+            <Icon :if="anonymous()" name="check" class="h-5 w-5 text-[#2563eb]" />
+          </Pressable>
+        </View>
+
+        <View :if="failure()" class="mt-4" :class="ui.card" accessibilityRole="alert" testID="review-error">
+          <Text :class="ui.danger" :text="failure()" />
+        </View>
+
+        <Pressable
+          id="review-submit"
+          @press="submit()"
+          class="items-center justify-center mt-6 mx-4 h-[50px] rounded-[12px]"
+          :class="canSubmit() ? 'bg-[#2563eb]' : 'bg-[#c7c7cc]'"
+          accessibilityRole="button"
+          accessibilityLabel="Post review"
+          testID="review-submit"
+        >
+          <Text class="font-semibold text-[17px] text-white" :text="busy() ? 'Posting…' : 'Post review'" />
+        </Pressable>
+
+        {{-- Why the button is inert, so nobody taps a dead control guessing. --}}
+        <Text :if="problem()" class="mt-2 mx-8 text-center" :class="ui.caption" :text="problem()" />
+        <Text class="mb-12 mt-6 mx-8 text-center" :class="ui.caption" text="Reviews are read by a moderator before they appear on the site." />
+      </View>
+    </ScrollView>
+  </View>
+</template>

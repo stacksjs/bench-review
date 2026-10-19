@@ -103,15 +103,20 @@ const mobileContent = {
  * Craft matches fixed segments before a parameter, so `/judges` is never
  * taken for a judge's id.
  *
- * This is the first slice: the two directories that have real data behind them
- * and the judge screen they push to. The rest of the app — the feed, an
- * article, writing a review, the account screens — is still the web view, and
- * the e2e suite (bench-review#81) covers both halves.
+ * Native so far: the two directories, the judge screen they push to, the
+ * account screens, and writing a review. The rest — the feed, an article,
+ * following a judge, editing a review already posted — is still the web view,
+ * and the e2e suite (bench-review#81) covers both halves.
  */
 const nativeScreens: Record<string, string> = {
   '/judges': 'Judges',
   '/judges/:id': 'Judge',
   '/court-houses': 'CourtHouses',
+  // Both reach the same screen. `/review` starts by asking which judge;
+  // `/review/:id` arrives already knowing, which is how a judge's own screen
+  // sends someone here without the picker.
+  '/review': 'Review',
+  '/review/:id': 'Review',
   '/profile': 'Profile',
   // Not a tab: reached from whatever needed a session. The app does not open
   // on a sign-in wall — the directory and the published reviews are public on
@@ -121,10 +126,21 @@ const nativeScreens: Record<string, string> = {
   '/login': 'Login',
 }
 
-/** The tab bar, an SF Symbol each. */
+/**
+ * The tab bar, an SF Symbol each.
+ *
+ * Browse, browse, write, account. Writing a review is the one thing the app
+ * asks of someone rather than offers them, so it sits between the directories
+ * it is about and the account it needs — not at the end, where it reads as a
+ * settings screen.
+ *
+ * A standard UITabBar spaces its items evenly and has no raised centre button;
+ * the centre of four is the gap between Courthouses and Write.
+ */
 const tabs = [
   { id: '/judges', title: 'Judges', symbol: 'person.text.rectangle' },
   { id: '/court-houses', title: 'Courthouses', symbol: 'building.columns' },
+  { id: '/review', title: 'Write', symbol: 'square.and.pencil' },
   { id: '/profile', title: 'Profile', symbol: 'person.crop.circle' },
 ]
 
@@ -166,26 +182,20 @@ export default {
     orientations: ['portrait'],
     deviceFamilies: ['iphone'],
 
-    // ⚠️ INERT ON THIS FRAMEWORK VERSION — read before trusting it.
+    // What makes Craft draw `nativeScreens` as real UIKit screens instead of
+    // loading the site in a web view (bench-review#79).
     //
-    // These three keys are what makes Craft draw `nativeScreens` as real UIKit
-    // screens instead of loading the site in a web view (bench-review#79), and
-    // they are correct. They currently do NOTHING, and the generated
-    // `storage/framework/mobile/ios/craft.config.json` still says
-    // `"renderer": "web"`.
+    // This block carried an "INERT ON THIS FRAMEWORK VERSION" warning for a
+    // while, and it was right at the time: `./buddy build:ios` went through
+    // @stacksjs/build 0.70.380, which contains zero occurrences of
+    // `nativeScreens` and never forwarded `renderer`, so the generated
+    // craft.config.json still said `"renderer": "web"`.
     //
-    // Two things have to be true and only one is. craft-native is now 0.0.187,
-    // which does ship iOS native-screen support (0.0.118 had it in its Android
-    // template only). But `./buddy build:ios` goes through @stacksjs/build
-    // 0.70.380, which contains zero occurrences of `nativeScreens` and never
-    // forwards `renderer` — so the config never reaches Craft. HQ.training,
-    // which does run native, is on the stacks 0.75 line.
-    //
-    // Left in place deliberately rather than removed: the screens in
-    // resources/native are written and the wiring is right, so this becomes
-    // live the moment the framework can carry it. Proven inert rather than
-    // assumed — the generated craft.config.json was read after a build, and
-    // the iOS e2e suite still passes on the web renderer.
+    // That is fixed. Native screen support lives in @stacksjs/actions, not
+    // @stacksjs/build — checking the wrong package is what made the gap look
+    // like a missing feature — and bench is on the stacks 0.75 line now. The
+    // generated craft.config.json says `"renderer": "native"`, and the screens
+    // have been exercised on a simulator.
     renderer: 'native',
     nativeScreens,
     tabs,
