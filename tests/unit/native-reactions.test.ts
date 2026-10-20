@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, test } from 'bun:test'
 import {
   COMMENT_MAX,
   commentByline,
@@ -8,6 +8,7 @@ import {
   helpfulLabel,
   likeFailureMessage,
   nextLikeState,
+  sendLike,
 } from '../../resources/functions/native-reactions'
 
 /**
@@ -128,5 +129,55 @@ describe('a comment byline', () => {
 
   test('a missing date does not leave a dangling separator', () => {
     expect(commentByline({ name: 'Dana Clerk' }, '')).toBe('Dana Clerk')
+  })
+})
+
+describe('sending a like', () => {
+  const asHost = (token: string | null): void => {
+    ;(globalThis as any).craft = {
+      app: { url: 'http://fixture.test/' },
+      secureStorage: { getSync: () => token, remove: () => {} },
+    }
+  }
+  const answer = (status: number, body: unknown): void => {
+    ;(globalThis as any).fetch = async () =>
+      new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+  }
+
+  const realFetch = globalThis.fetch
+  afterEach(() => {
+    globalThis.fetch = realFetch
+    delete (globalThis as any).craft
+  })
+
+  test("the server's count wins over the guess", async () => {
+    // Another device may have changed it since this page was fetched.
+    asHost('t')
+    answer(200, { liked: true, likes: 99 })
+    expect(await sendLike(1, { liked: false, likes: 4 })).toEqual({ value: { liked: true, likes: 99 } })
+  })
+
+  test('a server that omits the count falls back to the GUESS, not the old value', async () => {
+    // Falling back to `before` would show 4 beside a filled button — the one
+    // state that says the tap did nothing when it did.
+    asHost('t')
+    answer(200, { liked: true })
+    expect(await sendLike(1, { liked: false, likes: 4 })).toEqual({ value: { liked: true, likes: 5 } })
+  })
+
+  test('a refusal hands back the value from before, so applying it IS the rollback', async () => {
+    asHost('t')
+    answer(422, { error: 'You cannot mark your own review as helpful.' })
+    const outcome = await sendLike(1, { liked: false, likes: 4 })
+    expect(outcome.value).toEqual({ liked: false, likes: 4 })
+    expect(outcome.error).toBe('You cannot mark your own review as helpful.')
+  })
+
+  test('an unreachable server is a rollback with the connection worded', async () => {
+    asHost('t')
+    ;(globalThis as any).fetch = async () => { throw new Error('offline') }
+    const outcome = await sendLike(1, { liked: true, likes: 7 })
+    expect(outcome.value).toEqual({ liked: true, likes: 7 })
+    expect(outcome.error).toMatch(/could not reach/i)
   })
 })

@@ -293,6 +293,11 @@ export function handle(request: Request): Response {
   const byJudge = path.match(/^\/api\/judges\/(\d+)\/reviews$/)
   if (byJudge) {
     const id = Number(byJudge[1])
+    // The SAME rows the feed serves, reaction fields and all. The judge
+    // screen draws the same chips, so a fixture that dropped `likes` or
+    // `comments` here would make them read zero on one screen and a number
+    // on the other — which is the inconsistency this endpoint's change was
+    // made to remove.
     const rows = feedRows().filter(r => r.judge_id === id).slice(0, 2)
     return json({ data: rows, total: rows.length })
   }

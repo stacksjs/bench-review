@@ -2,6 +2,7 @@ import { Action } from '@stacksjs/actions'
 import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
+import { hydrateCommentCounts } from '../../Helpers/reviewComments'
 import { hydrateLikeData } from '../../Helpers/reviewLikes'
 import { buildPaginatorMeta, resolvePaginatorArgs } from '../../Helpers/paginate'
 import { toPublicReviewRow } from '../../Helpers/reviewerLabel'
@@ -120,7 +121,7 @@ export default new Action({
         .execute() as Array<Record<string, any>>
     }
 
-    const hydrated = await hydrateLikeData(rows ?? [])
+    const hydrated = await hydrateCommentCounts(await hydrateLikeData(rows ?? []))
     // Strip raw user_id (de-anonymization guard); is_mine carries the
     // "my review" signal the client needs. See toPublicReviewRow.
     const me = await Auth.user().catch(() => null)

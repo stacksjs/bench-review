@@ -10,7 +10,9 @@
 // the website uses.
 import { ApiError, getJson } from '../functions/native-api'
 import { handoffFromParams, handoffQuery, JUDGE_FIELDS, judgeFromHandoff } from '../functions/native-handoff'
+import { commentLabel, helpfulLabel, nextLikeState, sendLike } from '../functions/native-reactions'
 import { plainTextFromHtml, shortDate, starsFor } from '../functions/native-review'
+import { signedIn } from '../functions/native-session'
 import { initials, ui } from '../functions/native-ui'
 
 interface Review {
@@ -20,6 +22,11 @@ interface Review {
   rating?: number | null
   created_at?: string | null
   reviewer?: { name?: string | null, role_label?: string | null } | null
+  likes?: number | null
+  liked_by_me?: boolean | null
+  comments?: number | null
+  /** The endpoint strips `user_id` and states ownership instead. */
+  is_mine?: boolean | null
 }
 
 const craft = (globalThis as any).craft
@@ -67,6 +74,10 @@ const reviews = state<Review[]>([])
 const loading = state(true)
 const failed = state(false)
 const offline = state(false)
+/** Optimistic likes, keyed by review — see Reviews.stx for why beside. */
+const reactions = state<Record<number, { liked: boolean, likes: number }>>({})
+/** A refusal to report, cleared by the next thing the person does. */
+const notice = state('')
 
 let alive = true
 
@@ -76,8 +87,19 @@ const photo = derived<string>(() => judge()?.photo || '')
 const court = derived<string>(() => judge()?.court?.name || '')
 const where = derived<string>(() => judge()?.location || '')
 
-const rows = derived(() => reviews().map(r => ({
+const rows = derived(() => reviews().map((r) => {
+  const pending = reactions()[r.id]
+  const liked = pending ? pending.liked : Boolean(r.liked_by_me)
+  const likes = pending ? pending.likes : Number(r.likes ?? 0)
+  const comments = Number(r.comments ?? 0)
+  return {
   key: r.id,
+  liked,
+  likes,
+  comments,
+  helpfulText: helpfulLabel(likes),
+  commentText: commentLabel(comments),
+  mine: Boolean(r.is_mine),
   title: r.title || 'Untitled review',
   // The API returns sanitized HTML; a native Text draws characters, not
   // markup. This used to strip tags with a local regex, which left the
@@ -89,7 +111,8 @@ const rows = derived(() => reviews().map(r => ({
   // out of how many.
   stars: starsFor(r.rating),
   who: [r.reviewer?.name || 'Reviewer', shortDate(r.created_at)].filter(Boolean).join(' · '),
-})))
+  }
+}))
 
 const summary = derived<string>(() => {
   if (loading())
@@ -140,6 +163,9 @@ async function load(): Promise<void> {
     if (data.status === 'fulfilled') {
       const body = data.value
       reviews.set(Array.isArray(body) ? body : (body?.data ?? []))
+      // The new rows carry the server's own counts, so a guess still being
+      // held is both stale and redundant.
+      reactions.set({})
     }
 
     // Only the reviews decide the failed state: this screen's empty card is
@@ -171,6 +197,47 @@ async function refresh(): Promise<void> {
  * The name rides along so the pushed screen's title is right in the first
  * frame rather than reading "Opinions" until something loads.
  */
+/**
+ * Mark a review helpful, or take it back.
+ *
+ * The same rows as the feed, so the same behaviour: optimistic, with the
+ * server's answer replacing the guess and a refusal putting the old value
+ * back. `sendLike` owns the request and the wording for both screens — these
+ * two have drifted once already, when this one stripped tags with its own
+ * regex and printed `Smith &amp; Co` for it.
+ */
+async function toggleLike(row: { key: number, liked: boolean, likes: number }): Promise<void> {
+  if (!signedIn()) {
+    craft?.navigation?.open?.('/login')
+    return
+  }
+
+  const before = { liked: row.liked, likes: row.likes }
+  reactions.set({ ...reactions(), [row.key]: nextLikeState(before) })
+  notice.set('')
+
+  const outcome = await sendLike(row.key, before)
+  if (!alive)
+    return
+  // The value is the server's on success and the previous one on failure, so
+  // applying it unconditionally IS the rollback.
+  reactions.set({ ...reactions(), [row.key]: outcome.value })
+  if (outcome.error)
+    notice.set(outcome.error)
+}
+
+/** Open the thread, handing over what this row already knows. */
+function openComments(row: { key: number, title: string, comments: number }): void {
+  if (!row.key)
+    return
+  notice.set('')
+  craft?.navigation?.open?.(`/reviews/${row.key}/comments${handoffQuery({
+    title: row.title,
+    judge: name(),
+    comments: row.comments,
+  })}`)
+}
+
 function openSection(section: string): void {
   const id = judgeId()
   if (!id)
@@ -260,16 +327,58 @@ onMount(() => {
 
       <Text :if="summary()" :class="ui.header" :text="summary()" testID="judge-reviews-summary" />
 
+      <View :if="notice()" class="mb-2 mx-4 px-3 py-2 bg-[#fff0f0] dark:bg-[#2c1618] rounded-[10px]" testID="judge-notice">
+        <Text :class="ui.danger" :text="notice()" />
+      </View>
+
       <View :if="rows().length > 0" :class="ui.group" testID="judge-reviews">
         <View :for="(row, index) in rows()" :key="row.key">
           <View :if="index" :class="ui.separator" />
-          <View class="gap-1 px-4 py-3">
+          <View class="gap-1 pb-2 pt-3 px-4">
             <View class="flex-row gap-2 items-center">
               <Text class="text-[#f59e0b] text-[15px]" :text="row.stars" />
               <Text :numberOfLines="1" class="flex-1" :class="ui.caption" :text="row.who" />
             </View>
             <Text :numberOfLines="2" :class="ui.titleStrong" :text="row.title" />
             <Text :if="row.body" :numberOfLines="3" :class="ui.subtitle" :text="row.body" />
+          </View>
+
+          <!--
+            The same chips as the feed, because these are the same rows. A
+            review that can be marked helpful in one place and not the other
+            is the kind of difference people notice and cannot explain.
+
+            Nothing here is nested inside a Pressable: this row has none, and
+            adding one later would make these a coin toss over which handler
+            runs — see Reviews.stx.
+          -->
+          <View class="flex-row gap-2 items-center pb-3 px-4" :testID="'judge-review-actions-' + row.key">
+            <Pressable
+              :if="!row.mine"
+              :id="'judge-review-like-' + row.key"
+              @press="toggleLike(row)"
+              class="flex-row gap-1.5 items-center px-4 min-h-[44px] rounded-full"
+              :class="row.liked ? 'bg-[#2563eb]' : 'bg-[#f2f2f7] dark:bg-[#2c2c2e]'"
+              accessibilityRole="button"
+              :accessibilityState="{ selected: row.liked }"
+              :accessibilityLabel="row.liked ? 'Marked helpful. Tap to undo' : 'Mark this review helpful'"
+              :testID="'judge-review-like-' + row.key"
+            >
+              <Icon name="thumbs-up" class="h-[17px] w-[17px]" :class="row.liked ? 'text-white' : 'text-[#6e6e73] dark:text-[#98989d]'" />
+              <Text :class="row.liked ? 'font-semibold text-[15px] text-white' : 'text-[15px] text-[#3c3c43] dark:text-[#d1d1d6]'" :text="row.helpfulText" />
+            </Pressable>
+
+            <Pressable
+              :id="'judge-review-comments-' + row.key"
+              @press="openComments(row)"
+              class="flex-row gap-1.5 items-center px-4 min-h-[44px] bg-[#f2f2f7] dark:bg-[#2c2c2e] rounded-full"
+              accessibilityRole="button"
+              :accessibilityLabel="'Comments on ' + row.title"
+              :testID="'judge-review-comments-' + row.key"
+            >
+              <Icon name="message-square" class="h-[17px] w-[17px] text-[#6e6e73] dark:text-[#98989d]" />
+              <Text class="text-[#3c3c43] text-[15px] dark:text-[#d1d1d6]" :text="row.commentText" />
+            </Pressable>
           </View>
         </View>
       </View>

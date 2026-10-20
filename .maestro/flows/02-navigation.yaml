@@ -101,6 +101,15 @@ tags:
 - assertVisible: "Fixture County Courthouse"
 - assertVisible: "Opinions"
 - assertVisible: "Education"
+
+# THE JUDGE'S REVIEWS CARRY THE SAME CHIPS AS THE FEED. They are the same
+# rows; a review markable helpful in one place and not the other is a
+# difference people notice and cannot explain. The fixture's judge 1 has two
+# reviews, the first with 4 likes and 2 comments.
+- assertVisible:
+    id: "judge-review-like-1000"
+- assertVisible:
+    id: "judge-review-comments-1000"
 - takeScreenshot: judge-detail
 
 # BACK RETURNS TO THE DIRECTORY, with the list still there.

@@ -1,3 +1,6 @@
+import { ApiError } from './native-api'
+import { authFetch } from './native-session'
+
 /**
  * Liking a review and commenting on one, from the phone (bench-review#44,
  * bench-review#79).
@@ -53,6 +56,51 @@ export function commentLabel(comments: number): string {
   if (n <= 0)
     return 'Comment'
   return String(n)
+}
+
+/** What a row should show after a toggle, and why if it did not take. */
+export interface LikeOutcome {
+  /** The server's answer, or the value from before when it refused. */
+  value: LikeResult
+  /** Set only on failure; already worded for the person who tapped. */
+  error?: string
+}
+
+/**
+ * Send the toggle and say what the row should show.
+ *
+ * Shared by the feed and the judge screen rather than written twice. They
+ * show the same rows and have already drifted once — the judge screen
+ * stripped tags with its own regex and printed `Smith &amp; Co` for it — and
+ * an optimistic update with a rollback is more than enough logic to drift in
+ * a direction nobody notices.
+ *
+ * The caller owns the optimistic guess and the state; this owns the request
+ * and the wording. On failure it hands BACK the value from before, so a
+ * caller that always applies `value` rolls back by construction rather than
+ * by remembering to.
+ */
+export async function sendLike(reviewId: number, before: LikeResult): Promise<LikeOutcome> {
+  try {
+    const response = await authFetch(`/api/reviews/${reviewId}/like`, { method: 'POST' })
+    const body = await response.json().catch(() => ({})) as Record<string, any>
+    if (!response.ok)
+      return { value: before, error: likeFailureMessage(response.status, body) }
+
+    // The server is the authority on both — another device may have changed
+    // the count since this page was fetched. Its absence falls back to the
+    // guess, not to the old value, or a successful like would show the count
+    // it had before it.
+    return {
+      value: {
+        liked: Boolean(body?.liked),
+        likes: Number(body?.likes ?? nextLikeState(before).likes),
+      },
+    }
+  }
+  catch (err) {
+    return { value: before, error: likeFailureMessage(err instanceof ApiError ? err.status : 0, {}) }
+  }
 }
 
 /**

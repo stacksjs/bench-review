@@ -12,9 +12,9 @@
 import { ApiError, getJson, keepSnapshot, readSnapshot } from '../functions/native-api'
 import { handoffQuery } from '../functions/native-handoff'
 import { buildPages } from '../functions/native-paging'
-import { commentLabel, helpfulLabel, likeFailureMessage, nextLikeState } from '../functions/native-reactions'
+import { commentLabel, helpfulLabel, nextLikeState, sendLike } from '../functions/native-reactions'
 import { plainTextFromHtml, shortDate, starsFor } from '../functions/native-review'
-import { authFetch, signedIn } from '../functions/native-session'
+import { signedIn } from '../functions/native-session'
 import { ui } from '../functions/native-ui'
 
 interface FeedReview {
@@ -31,11 +31,6 @@ interface FeedReview {
   comments?: number | null
   /** The endpoint strips `user_id` and states ownership instead. */
   is_mine?: boolean | null
-}
-
-interface Reaction {
-  liked: boolean
-  likes: number
 }
 
 interface FeedPage {
@@ -65,7 +60,7 @@ const offline = state(false)
  * — which is the behaviour wanted, since the fresh rows carry the server's
  * own count by then.
  */
-const reactions = state<Record<number, Reaction>>({})
+const reactions = state<Record<number, { liked: boolean, likes: number }>>({})
 /** A refusal to report, cleared by the next thing the person does. */
 const notice = state('')
 
@@ -214,33 +209,20 @@ async function toggleLike(row: { key: number, liked: boolean, likes: number }): 
   }
 
   const before = { liked: row.liked, likes: row.likes }
-  const guess = nextLikeState(before)
-  setReaction(row.key, guess)
+  setReaction(row.key, nextLikeState(before))
   notice.set('')
 
-  try {
-    const response = await authFetch(`/api/reviews/${row.key}/like`, { method: 'POST' })
-    const body = await response.json().catch(() => ({})) as Record<string, any>
-    if (!alive)
-      return
-    if (!response.ok) {
-      setReaction(row.key, before)
-      notice.set(likeFailureMessage(response.status, body))
-      return
-    }
-    // The server is the authority on both: a second device may have changed
-    // the count since this page was fetched.
-    setReaction(row.key, { liked: Boolean(body?.liked), likes: Number(body?.likes ?? guess.likes) })
-  }
-  catch (err) {
-    if (!alive)
-      return
-    setReaction(row.key, before)
-    notice.set(likeFailureMessage(err instanceof ApiError ? err.status : 0, {}))
-  }
+  const outcome = await sendLike(row.key, before)
+  if (!alive)
+    return
+  // `outcome.value` is the server's answer on success and the previous value
+  // on failure, so applying it unconditionally IS the rollback.
+  setReaction(row.key, outcome.value)
+  if (outcome.error)
+    notice.set(outcome.error)
 }
 
-function setReaction(id: number, value: Reaction): void {
+function setReaction(id: number, value: { liked: boolean, likes: number }): void {
   reactions.set({ ...reactions(), [id]: value })
 }
 
