@@ -159,7 +159,8 @@ function feedRows() {
       title: REVIEW_TITLES[i % REVIEW_TITLES.length],
       content: '<p>Started on time and explained every ruling. Alder &amp; Co were held to the same line.</p><p>Clear with self-represented parties, and said why.</p>',
       rating: 1 + (i % 5),
-      likes: (i * 7) % 23,
+      likes: likesFor(1000 + i),
+      liked_by_me: liked.has(1000 + i),
       judge_id: judge.id,
       judge: {
         id: judge.id,
@@ -171,9 +172,61 @@ function feedRows() {
       },
       reviewer: { id: null, name: REVIEWER_NAMES[i % REVIEWER_NAMES.length], role_label: null },
       created_at: new Date(Date.UTC(2026, 9, 1 + (i % 19), 9, 0, 0)).toISOString(),
+      // `toPublicReviewRow` strips `user_id` and states ownership instead, so
+      // the feed can hide the like button on a row the viewer wrote. Nothing
+      // in the fixture is the viewer's, which is the state a fresh install is
+      // in and the one the flows assert.
+      is_mine: false,
+      // Reviews 1000 and 1001 start with comments so a populated thread and
+      // an empty one are both reachable without posting anything.
+      comments: COMMENTS[1000 + i]?.length ?? 0,
     }
   })
 }
+
+/**
+ * Likes, as a toggle the run can actually flip.
+ *
+ * In memory, so a flow that likes something and relaunches sees it persist
+ * within the run and reset between runs — which is what a fixture should do.
+ * `LIKE_BASE` is the count before anyone touches it.
+ */
+const LIKE_BASE: Record<number, number> = { 1000: 4, 1001: 1 }
+const liked = new Set<number>()
+
+function likesFor(id: number): number {
+  return (LIKE_BASE[id] ?? 0) + (liked.has(id) ? 1 : 0)
+}
+
+/** The one account the fixture knows, and the token it answers with. */
+const FIXTURE_EMAIL = 'clerk@example.test'
+const FIXTURE_PASSWORD = 'correct-horse'
+const FIXTURE_TOKEN = 'fixture-session-token'
+
+function authed(request: Request): boolean {
+  return (request.headers.get('authorization') || '') === `Bearer ${FIXTURE_TOKEN}`
+}
+
+/** Seeded threads, plus whatever the run posts. Oldest first, like the API. */
+const COMMENTS: Record<number, Array<Record<string, any>>> = {
+  1000: [
+    {
+      id: 5001,
+      body: 'Appeared before them twice this year and this matches both times.',
+      created_at: '2026-10-02T10:00:00.000Z',
+      author: { id: null, name: 'Anonymous attorney' },
+      is_mine: false,
+    },
+    {
+      id: 5002,
+      body: 'The timekeeping is the part nobody warns you about.',
+      created_at: '2026-10-03T11:30:00.000Z',
+      author: { id: 7, name: 'Dana Clerk' },
+      is_mine: false,
+    },
+  ],
+}
+let nextCommentId = 6000
 
 function paged(rows: any[], page: number, perPage: number) {
   const start = (page - 1) * perPage
@@ -259,16 +312,114 @@ export function handle(request: Request): Response {
     return json(paged(ordered, page, perPage))
   }
 
-  // No session in the suite, so the profile screen's signed-out state is what
-  // gets tested. That is the state a fresh install is in.
-  if (path === '/api/me/reviews')
-    return json({ error: 'Unauthenticated' }, 401)
+  // Toggling a like, with the same refusals the real action has: auth-gated
+  // (a single person could otherwise spam the counter by reloading), 404 for
+  // a review that is not published, and 422 for your own work.
+  const like = path.match(/^\/api\/reviews\/(\d+)\/like$/)
+  if (like && request.method === 'POST') {
+    const id = Number(like[1])
+    if (!authed(request))
+      return json({ error: 'Not authenticated' }, 401)
+    if (id < 1000 || id >= 1000 + FEED_SIZE)
+      return json({ error: 'Review not found' }, 404)
+    if (liked.has(id))
+      liked.delete(id)
+    else
+      liked.add(id)
+    return json({ liked: liked.has(id), likes: likesFor(id) })
+  }
+
+  const thread = path.match(/^\/api\/reviews\/(\d+)\/comments$/)
+  if (thread) {
+    const id = Number(thread[1])
+    if (id < 1000 || id >= 1000 + FEED_SIZE)
+      return json({ error: 'Review not found' }, 404)
+
+    // Reading is public: the endpoint only ever leaks published comments.
+    if (request.method === 'GET')
+      return json(paged(COMMENTS[id] ?? [], page, perPage))
+
+    if (request.method === 'POST') {
+      if (!authed(request))
+        return json({ error: 'Not authenticated' }, 401)
+      return json({ error: 'A comment arrived without a body.' }, 422)
+    }
+  }
+
+  // The signed-in app asks for this the moment the Profile screen appears.
+  //
+  // It answered 401 unconditionally at first, on the reasoning that the suite
+  // has no session — and that quietly broke every signed-in flow. `authFetch`
+  // treats a 401 as a SPENT TOKEN and clears the Keychain, which is correct:
+  // that is what a revoked session should do. So a sign-in succeeded, wrote
+  // its token, and was signed back out within a second by this line. The app
+  // was behaving properly the whole time.
+  //
+  // A fixture that answers a status the real server would not is not a
+  // simplification, it is a different server.
+  if (path === '/api/me/reviews') {
+    if (!authed(request))
+      return json({ error: 'Unauthenticated' }, 401)
+    return json({ data: [], total: 0 })
+  }
 
   return json({ error: 'Not found.' }, 404)
 }
 
+/**
+ * The POST paths that need a parsed body, which `handle` cannot do because it
+ * is synchronous — and it is synchronous so that every read is one function
+ * call away from a test.
+ */
+export async function handleAsync(request: Request): Promise<Response> {
+  const url = new URL(request.url)
+  const json = (value: unknown, status = 200): Response =>
+    Response.json(value, { status, headers: { 'Access-Control-Allow-Origin': '*' } })
+
+  if (url.pathname === '/api/auth/login' && request.method === 'POST') {
+    const body = await request.json().catch(() => ({})) as Record<string, any>
+    if (body?.email === FIXTURE_EMAIL && body?.password === FIXTURE_PASSWORD)
+      return json({ access_token: FIXTURE_TOKEN, user: { id: 7, name: 'Dana Clerk', email: FIXTURE_EMAIL } })
+    // The real endpoint answers the same for an unknown address and a wrong
+    // password, so the fixture does too — a friendlier split here would be a
+    // fixture teaching a flow to expect an enumeration oracle.
+    return json({ error: 'Incorrect email or password' }, 401)
+  }
+
+  if (url.pathname === '/api/auth/logout')
+    return json({ ok: true })
+
+  const thread = url.pathname.match(/^\/api\/reviews\/(\d+)\/comments$/)
+  if (thread && request.method === 'POST') {
+    const id = Number(thread[1])
+    if (!authed(request))
+      return json({ error: 'Not authenticated' }, 401)
+    if (id < 1000 || id >= 1000 + FEED_SIZE)
+      return json({ error: 'Review not found' }, 404)
+
+    const body = await request.json().catch(() => ({})) as Record<string, any>
+    const text = String(body?.body ?? '').trim()
+    if (text.length < 5)
+      return json({ error: 'Comment must be at least 5 characters.' }, 422)
+    if (text.length > 2000)
+      return json({ error: 'Comment must be at most 2000 characters.' }, 422)
+
+    const comment = {
+      id: nextCommentId++,
+      body: text,
+      created_at: new Date().toISOString(),
+      author: { id: 7, name: 'Dana Clerk' },
+      is_mine: true,
+    }
+    COMMENTS[id] = [...(COMMENTS[id] ?? []), comment]
+    return json({ ok: true, comment }, 201)
+  }
+
+  return handle(request)
+}
+
 export function serve(port: number = DEFAULT_PORT): { stop: () => void, port: number } {
-  const server = Bun.serve({ port, fetch: handle })
+  const server = Bun.serve({ port, fetch: handleAsync })
   return { stop: () => server.stop(true), port: server.port }
 }
 

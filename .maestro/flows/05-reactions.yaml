@@ -1,0 +1,105 @@
+appId: ${APP_ID}
+name: Liking and commenting from the feed
+tags:
+  - mobile
+  - smoke
+---
+# The feed's action row (bench-review#44, bench-review#79).
+#
+# `POST /api/reviews/{id}/like` and the comment endpoints both shipped long
+# before anything on the phone reached them — the feed carried the `likes`
+# count in its row data and rendered it nowhere. This covers the row that
+# closed that, and the screen behind it.
+#
+# Signed OUT throughout, deliberately. That is the state a fresh install is
+# in, and it is the state where both buttons have something to prove: reading
+# a thread is public and must work, while reacting is auth-gated and must
+# lead somewhere rather than fail.
+#
+# Tabs are tapped by position, not by their word: see 02-navigation for why.
+# Feed 14%, Judges 32%, Courthouses 50%, Write 68%, Profile 86%, at 92% down.
+
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: "Ran a tight, fair calendar"
+    timeout: 90000
+
+# ⚠️ START FROM SIGNED OUT, and do not assume it.
+#
+# `clearState: true` wipes the app's own data but NOT the Keychain, which is
+# where the session token lives — it survives a reinstall and an erase of app
+# storage both. So any earlier run that signed in (or anyone signing in by
+# hand) leaves the next run signed in, and a flow asserting the guest state
+# fails for a reason that has nothing to do with the change under test.
+#
+# Measured: this flow went red that way after a sign-in probe, with the app
+# behaving perfectly.
+- tapOn:
+    point: "86%,92%"
+- waitForAnimationToEnd:
+    timeout: 6000
+- runFlow:
+    when:
+      visible: "Sign out"
+    commands:
+      - tapOn:
+          id: "profile-signout"
+      - extendedWaitUntil:
+          visible: "You are browsing as a guest"
+          timeout: 30000
+
+# Back to the feed to begin.
+- tapOn:
+    point: "14%,92%"
+- extendedWaitUntil:
+    visible: "Ran a tight, fair calendar"
+    timeout: 30000
+
+# THE COUNTS ARE THE POINT. A row with reactions shows its numbers; a row with
+# none shows the verb instead, because a bare "0" counts a thing that has not
+# happened. The fixture seeds the first review with 4 likes and 2 comments.
+- assertVisible: "4"
+- assertVisible: "2"
+- assertVisible: "Helpful"
+- assertVisible: "Comment"
+- takeScreenshot: feed-actions
+
+# READING A THREAD IS PUBLIC. No session, and the comments are still there.
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "review-comments-1000"
+- extendedWaitUntil:
+    visible: "Appeared before them twice this year and this matches both times."
+    timeout: 30000
+- assertVisible: "The timekeeping is the part nobody warns you about."
+- assertVisible:
+    text: "(?i)2 comments"
+
+# WRITING IS NOT. Signed out, the composer is an invitation rather than a box
+# that cannot be typed in — a disabled field explains nothing.
+- assertVisible: "Sign in to join this conversation."
+- assertNotVisible: "Add a comment"
+- takeScreenshot: comments-signed-out
+
+# BACK TO THE FEED.
+- tapOn:
+    point: "6%,10%"
+- extendedWaitUntil:
+    visible: "Ran a tight, fair calendar"
+    timeout: 30000
+
+# A LIKE WHILE SIGNED OUT LEADS SOMEWHERE. The endpoint is auth-gated for
+# good reason, so the honest answer to the tap is the sign-in screen, not an
+# error about a refusal the person can do nothing with from here.
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "review-like-1000"
+- extendedWaitUntil:
+    visible: "Sign in to Bench Review"
+    timeout: 30000
+- takeScreenshot: like-signed-out

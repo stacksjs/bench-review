@@ -43,6 +43,37 @@ tags:
     visible: "Ran a tight, fair calendar"
     timeout: 90000
 
+# ⚠️ START FROM SIGNED OUT, and do not assume it.
+#
+# `clearState: true` wipes the app's own data but NOT the Keychain, which is
+# where the session token lives — it survives a reinstall and an erase of app
+# storage both. So any earlier run that signed in (or anyone signing in by
+# hand) leaves the next run signed in, and a flow asserting the guest state
+# fails for a reason that has nothing to do with the change under test.
+#
+# Measured: this flow went red that way after a sign-in probe, with the app
+# behaving perfectly.
+- tapOn:
+    point: "86%,92%"
+- waitForAnimationToEnd:
+    timeout: 6000
+- runFlow:
+    when:
+      visible: "Sign out"
+    commands:
+      - tapOn:
+          id: "profile-signout"
+      - extendedWaitUntil:
+          visible: "You are browsing as a guest"
+          timeout: 30000
+
+# Back to the feed to begin.
+- tapOn:
+    point: "14%,92%"
+- extendedWaitUntil:
+    visible: "Ran a tight, fair calendar"
+    timeout: 30000
+
 # The feed's rows carry sanitiser-escaped HTML. A row that forgot to strip
 # tags or decode entities would print the escape rather than the ampersand.
 - assertVisible:

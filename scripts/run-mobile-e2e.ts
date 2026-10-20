@@ -327,6 +327,14 @@ if (import.meta.main) {
   const startFixture = (): void => {
     if (!ownServer || fixture)
       return
+    // Somebody else is already on the port. Carrying on would be worse than
+    // stopping: the readiness check below would pass against THEIR server,
+    // the run would test data this suite does not control, and the offline
+    // flow would stop a child that was never serving while the real one kept
+    // answering — a green offline test asserting nothing. Hit exactly that.
+    if (reachable())
+      throw new Error(`Something is already serving port ${DEFAULT_PORT}. Stop it, or pass --server to use it deliberately.`)
+
     fixture = Bun.spawn(['bun', join(projectRoot, 'scripts/mobile-e2e-api.ts')], {
       cwd: projectRoot,
       env: { ...process.env, MOBILE_E2E_PORT: String(DEFAULT_PORT) } as Record<string, string>,
@@ -338,9 +346,11 @@ if (import.meta.main) {
     for (let attempt = 0; attempt < 50; attempt++) {
       if (reachable())
         return
+      if (fixture.exitCode !== null)
+        throw new Error(`The fixture API exited immediately (code ${fixture.exitCode}). Its error is above.`)
       Bun.sleepSync(100)
     }
-    throw new Error(`The fixture API did not come up on port ${DEFAULT_PORT}. Is something else using it?`)
+    throw new Error(`The fixture API did not come up on port ${DEFAULT_PORT}.`)
   }
 
   const stopFixture = (): void => {
