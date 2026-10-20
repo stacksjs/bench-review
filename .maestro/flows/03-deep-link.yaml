@@ -1,0 +1,81 @@
+appId: ${APP_ID}
+name: Deep link routing
+tags:
+  - mobile
+  - smoke
+---
+# `benchreview://<path>` has to open the NATIVE screen that path names
+# (bench-review#94, bench-review#79).
+#
+# This flow replaced `pending-03-deep-link.yaml`, which documented the gap
+# while the app was a web view: the scheme was registered, iOS handed the URL
+# over, and the shell did nothing with it. The native conversion closed it —
+# `DeepLinkManager.handleURL` asks `CraftHybrid.handleDeepLink`, which matches
+# the path against `nativeScreens` and pushes the screen itself.
+#
+# The assertions are about SHAPE, not about which judge: that a detail screen
+# is on top rather than the directory, and that a two-segment path reaches its
+# own screen rather than being swallowed by `/judges/:id`. Which row an id maps
+# to is the API's job and is covered by the unit and feature suites, so naming
+# a judge here would only make the flow break when the data changes.
+#
+# A universal link (https://benchreview.org/...) cannot be exercised on a
+# simulator: it needs a signed non-personal team AND the domain serving
+# /.well-known/apple-app-site-association (bench-review#80, blocked on the
+# deploy in bench-review#85). The custom scheme needs neither, so it is what
+# this can honestly assert — and it takes the same road through the shell.
+
+# COLD: no launchApp. The link alone has to start the app and decide the
+# screen, which is what a tap from Messages or Mail actually does. Verified to
+# be the link's doing and not iOS state restoration, by cold-opening a judge
+# the app had never shown.
+- stopApp
+- openLink: benchreview://judges/7
+# iOS asks before handing a scheme link to an app from the home screen. It
+# does not ask when the app is already frontmost, so this is conditional.
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- extendedWaitUntil:
+    visible: "Write a review"
+    timeout: 90000
+- assertVisible: "Opinions"
+- assertVisible: "Education"
+- takeScreenshot: deep-link-cold-judge
+
+# TWO SEGMENTS. `CraftHybridRoutes` sorts more fixed segments first, so
+# `/judges/:id/education` must never be taken for `/judges/:id`. If it were,
+# the judge screen would be on top and "Write a review" with it.
+#
+# From cold again, deliberately. A pushed screen leaves the one below it in
+# the accessibility tree, so `assertNotVisible` means nothing with a judge
+# screen already on the stack — it would pass or fail on what the PREVIOUS
+# step pushed rather than on this link.
+- stopApp
+- openLink: benchreview://judges/1/education
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- extendedWaitUntil:
+    visible: "Education"
+    timeout: 30000
+- assertNotVisible: "Write a review"
+- takeScreenshot: deep-link-education
+
+# ANOTHER TAB'S STACK. A link is not bound to the tab the app happens to be
+# showing.
+- stopApp
+- openLink: benchreview://court-houses/1
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- extendedWaitUntil:
+    visible: "THE BENCH"
+    timeout: 30000
+- takeScreenshot: deep-link-courthouse
