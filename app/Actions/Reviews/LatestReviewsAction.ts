@@ -3,6 +3,7 @@ import { Auth } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { request, response } from '@stacksjs/router'
 import { attachJudgeContext } from '../../Helpers/judgeContext'
+import { hydrateCommentCounts } from '../../Helpers/reviewComments'
 import { hydrateLikeData } from '../../Helpers/reviewLikes'
 import { buildPaginatorMeta, resolvePaginatorArgs } from '../../Helpers/paginate'
 import { attachReviewers, toPublicReviewRow } from '../../Helpers/reviewerLabel'
@@ -138,7 +139,7 @@ export default new Action({
           .execute() as Array<Record<string, any>>
       }
 
-      const hydrated = await hydrateLikeData(rows ?? [])
+      const hydrated = await hydrateCommentCounts(await hydrateLikeData(rows ?? []))
       const withReviewer = await attachReviewers(hydrated, loadUsers)
       // Courthouse + jurisdiction alongside the name: the feed is where two
       // same-name judges are least distinguishable (bench-review#50).
@@ -172,7 +173,7 @@ export default new Action({
         .get()
     }
 
-    const hydrated = await hydrateLikeData(rows ?? [])
+    const hydrated = await hydrateCommentCounts(await hydrateLikeData(rows ?? []))
     const withReviewer = await attachReviewers(hydrated, loadUsers)
     const withJudge = await attachJudgeContext(withReviewer)
     const publicRows = withJudge.map(r => toPublicReviewRow(r, viewerId))
