@@ -1,37 +1,54 @@
 appId: ${APP_ID}
-name: Bundled cold start
+name: Native cold start
 tags:
   - mobile
   - smoke
 ---
-# The single most valuable flow: it is the one that catches a broken or stale
-# offline bundle, and the offline bundle only runs when something else has
-# already gone wrong.
+# The app opens on real native screens with real content.
+#
+# This flow used to assert the marketing coming-soon page, because the app was
+# a web view over a bundled copy of the site. Under `renderer: 'native'` there
+# is no web view and no bundle: the start path is a UIKit screen that fetches,
+# so what "it started" means is now three separate claims, and the old flow
+# could not make any of them.
+#
+# It starts on the FEED, which is both the first tab and the app's start path
+# in `config/mobile.ts`. Those two have to agree — an app that opens on a path
+# belonging to some other tab selects that tab instead, and the bar's first
+# item is then not where you are.
+
 - launchApp:
     clearState: true
     permissions:
       all: allow
 
 # 90s rather than 30s. A cold simulator spends a long time in launchApp before
-# the WebView paints, and this returns as soon as the text appears, so a
-# generous timeout costs nothing on a healthy run and prevents a flaky failure
-# on a slow one.
-#
-# This asserts the COMING SOON page, not the marketing homepage, because that
-# is genuinely what `/` serves today — see bench-review#62. When that is fixed
-# this assertion has to change with it, which is the point: the flow should
-# fail loudly rather than quietly keep passing against the wrong page.
+# the first frame, and this returns as soon as the text appears, so a generous
+# timeout costs nothing on a healthy run and prevents a flaky failure on a
+# slow one.
 - extendedWaitUntil:
-    visible: Transparency in the US Chambers of Secrets
+    visible: "Ran a tight, fair calendar"
     timeout: 90000
 - takeScreenshot: cold-start
 
-# The site chrome reached the WebView. Without this a blank page under a
-# correct <title> would pass.
-#
-# NOT the nav links: below `lg` the header's three regions are hidden and
-# navigation lives behind the hamburger (bench-review#90), so "Find Judges" is
-# not on screen on an iPhone. Asserting it failed here on the first run — the
-# flow was written from the desktop rendering, and the app was right.
-- assertVisible: "Coming soon"
-- assertVisible: "Open main menu"
+# 1. THE SCREEN DREW, and it is the feed rather than a directory.
+- assertVisible: "Feed"
+
+# 2. THE API ANSWERED AND THE WHOLE PAGE ARRIVED. A single visible row could
+#    be one lucky record; the count is the feed's own summary of what it
+#    received, and the fixture serves 32.
+- assertVisible:
+    text: "(?i)32 reviews"
+
+# 3. THE SHELL IS NATIVE. The tab bar is UIKit's, drawn by the shell rather
+#    than by the page — its absence is how a silent fall back to a web view
+#    would show up. The feed leads it.
+- assertVisible: "Judges"
+- assertVisible: "Courthouses"
+- assertVisible: "Write"
+- assertVisible: "Profile"
+
+# What the feed must NOT say when it has rows. The empty state is a claim
+# about the content, and a screen showing both is one whose state machine is
+# wrong.
+- assertNotVisible: "No reviews have been published yet. The first one could be yours."

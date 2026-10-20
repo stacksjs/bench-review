@@ -1,45 +1,76 @@
 appId: ${APP_ID}
-name: Offline fallback serves the bundle
+name: Offline states, with no server
 tags:
   - mobile
   - offline
-onFlowComplete:
-  - setAirplaneMode: disabled
 ---
-# The reason this suite exists. The offline path only runs when the network or
-# the server has already failed, so it is the least likely thing to be
-# exercised by hand and the most likely to rot unnoticed.
-- setAirplaneMode: enabled
+# The reason this suite exists. An outage only happens once something else has
+# already failed, so it is the least likely thing to be exercised by hand and
+# the most likely to rot unnoticed.
+#
+# `tags: offline` is load-bearing: the runner reads it and runs this flow with
+# the fixture API STOPPED. The tag is the flow's own declaration of what it
+# needs, so renaming the file cannot quietly turn this into an online test
+# that passes while asserting nothing.
+#
+# It does NOT use airplane mode, which is what the old version did. The
+# simulator shares the Mac's network stack and loopback is not the radio, so
+# the app would go on reaching a localhost server with the plane switch on.
+# That flow passed because the app it tested needed no server at all.
+#
+# What is asserted is the DISTINCTION the screens draw. `getJson` reports a
+# request that never reached a server as status 0, separately from a server
+# that answered badly, because the two deserve different sentences: one is the
+# phone's connection, the other is ours. Collapsing them is how an outage gets
+# reported to someone as an empty directory — a claim about the content, and a
+# false one.
+#
+# Tabs are tapped by position, not by their word: see 02-navigation for why.
+# Feed 14%, Judges 32%, Courthouses 50%, Write 68%, Profile 86%, at 92% down.
+
 - launchApp:
     clearState: true
     permissions:
       all: allow
 
+# The screen still draws: the native screens are compiled into the app, so a
+# cold start with no server reaches its own offline state rather than nothing.
+# The feed is the start path, so this is the first thing anyone would see.
 - extendedWaitUntil:
-    visible: Transparency in the US Chambers of Secrets
+    visible: "The feed needs a connection. Reconnect and try again."
     timeout: 90000
-- takeScreenshot: offline-cold-start
+- takeScreenshot: offline-feed
 
-# A SECOND bundled page, reached with the network off. One page could be a
-# cached shell; two proves the bundle is being served.
-#
-# Reached through the menu rather than `benchreview://judges`, which is what
-# this originally did: the custom scheme is declared in config/mobile.ts but
-# does not route the WebView (see 03-deep-link, and the issue it is parked
-# against). Depending on it here would have made the offline test fail for a
-# reason that has nothing to do with being offline.
-- tapOn: "Open main menu"
-- extendedWaitUntil:
-    visible: "Find Judges"
-    timeout: 30000
-- tapOn: "Find Judges"
-- extendedWaitUntil:
-    visible: Judicial Directory
-    timeout: 30000
+# The false claim this state exists to prevent.
+- assertNotVisible: "No reviews have been published yet. The first one could be yours."
+# And not the server-side wording either — nothing answered at all.
+- assertNotVisible: "The feed could not be loaded. This is a problem on our side."
 
-# What the directory must NOT say with the API unreachable. "No judges yet" is
-# a claim about the content and it is false during an outage; the store carries
-# a loadError for exactly this, and the offline bundle shipped a week-stale
-# copy that predated it (found writing this suite, bench-review#81).
-- assertNotVisible: "No judges yet"
+# A retry is offered rather than a dead end.
+- assertVisible: "Try again"
+
+# EVERY TAB, not just the one it lands on. Each screen owns its own copy and
+# its own offline flag, so one of them getting this wrong is invisible from
+# here.
+- tapOn:
+    point: "32%,92%"
+- extendedWaitUntil:
+    visible: "Could not reach Bench Review. The directory will load when you are back online."
+    timeout: 30000
+- assertNotVisible: "No judges yet."
 - takeScreenshot: offline-directory
+
+- tapOn:
+    point: "50%,92%"
+- extendedWaitUntil:
+    visible: "Could not reach Bench Review. Courthouses will load when you are back online."
+    timeout: 30000
+- assertNotVisible: "No courthouses yet."
+
+# The tab bar is the shell's and does not need the network, so the app stays
+# navigable through an outage rather than stranding someone on one screen.
+- tapOn:
+    point: "14%,92%"
+- extendedWaitUntil:
+    visible: "The feed needs a connection. Reconnect and try again."
+    timeout: 30000

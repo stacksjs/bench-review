@@ -1,16 +1,32 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
+import { DEFAULT_PORT } from './mobile-e2e-api'
+import { resolveMobileServer, serverArgument } from './mobile-target'
 
 /**
  * End-to-end run of the iOS app against a simulator (bench-review#81).
  *
- * The web conformance gate validates the built `dist/`, which the app loads —
- * but nothing exercised the native shell: that it launches, that the WebView
- * reaches its content, that a deep link routes, or that the offline fallback
- * engages when the server is gone. The offline path is the one most worth
- * covering, because it only runs when something else has already broken and so
- * is never exercised by hand.
+ * The web conformance gate validates the built `dist/`, which the SITE serves.
+ * Nothing exercises the app: that it launches, that its screens reach the API,
+ * that a link routes to the right one, or that an outage is reported as an
+ * outage rather than as an empty directory. The last is the one most worth
+ * covering, because it only happens once something else has already broken.
+ *
+ * ## This suite tests a NATIVE app, and that changed what it needs
+ *
+ * It used to test a web view over a bundled copy of the site, so it needed no
+ * server at all: `MOBILE_E2E=1` selected `dist-offline` and every flow ran
+ * against the bundle. Under `renderer: 'native'` the framework refuses both
+ * `webAssets` and `fallbackWebAssets` — there is no web view to show them in —
+ * so the app's content comes over HTTP from whatever `MOBILE_URL` named at
+ * BUILD time, and `MOBILE_E2E` no longer selects anything.
+ *
+ * So the run owns a server instead: `scripts/mobile-e2e-api.ts`, on its own
+ * port, with fixed data. Flows tagged `offline` are run with it STOPPED, which
+ * is what being offline means for an app whose every screen is a fetch.
+ * `./buddy dev` is left alone — it belongs to whoever is running it, and a
+ * suite that killed it would be taking their work away mid-run.
  *
  * iOS only, deliberately. `config/mobile.ts` declares `deviceFamilies:
  * ['iphone']` and there is no Android configuration in this project, so an
@@ -20,15 +36,15 @@ import process from 'node:process'
 const projectRoot = resolve(import.meta.dir, '..')
 const flowRoot = join(projectRoot, '.maestro/flows')
 const resultsRoot = join(projectRoot, 'storage/framework/runtime/e2e/ios')
-const offlineBundle = join(projectRoot, 'dist-offline')
-const builtSite = join(projectRoot, 'dist')
+const nativeScreens = join(projectRoot, 'resources/native')
+const nativeBundle = join(projectRoot, 'storage/framework/mobile/ios/native-screens.js')
 
 /**
- * Pages the flows actually visit. A bundle that is merely PRESENT is not a
- * bundle that works — the first version of this checked only that the
- * directory existed, and the bundle it blessed was a week stale.
+ * Where the app opens, which under `renderer: 'native'` must BE one of the
+ * `nativeScreens` — the framework refuses the build otherwise. Kept in step
+ * with `config/mobile.ts`, whose own default is the same path.
  */
-const REQUIRED_PAGES = ['index.html', 'judges.html']
+const START_PATH = '/reviews'
 
 /**
  * Maestro is a JVM program, and Homebrew's openjdk is keg-only — it is not
@@ -81,51 +97,70 @@ function requireCommand(name: string, hint: string): void {
 }
 
 /**
- * Refuse to run against a bundle that is missing, empty, or older than the
- * site it is supposed to mirror.
+ * Refuse to run against a native bundle that is missing, empty, or older than
+ * the screens it was compiled from.
  *
- * The staleness half is not theoretical. `bun run build` refreshes `dist/` and
- * does NOT refresh `dist-offline/` — only `build:ios` chains the two — so a
- * normal build leaves the app shipping whatever the bundle happened to contain.
- * Found exactly that while writing this: the bundle was a week old and
- * predated the judge directory's load-failure state, so the offline app
- * claimed "No judges yet" during an outage, which is the false claim that
- * state exists to prevent.
+ * This replaced a `dist-offline/` check that no longer means anything: the
+ * native app ships no web pages. What it does ship is every screen in
+ * `resources/native`, compiled — and that CAN go stale the same way, because
+ * only `build:ios` recompiles them.
+ *
+ * Checked at `storage/framework/mobile/ios/native-screens.js`, which is what
+ * `./buddy build:ios` writes and what gets copied into the app bundle as
+ * `dist/native-screen.js`. NOT at `dist/native-screen.js` in the project: that
+ * copy only appears when the full `bun run build:ios` has also built the site,
+ * so a guard on it fails a perfectly good iOS-only build.
+ *
+ * It matters most under `--no-build`, which is the flag someone reaches for
+ * while iterating on flows, and therefore exactly when they are most likely
+ * to be testing yesterday's screens and reading the result as today's.
  */
-export function assertUsableOfflineBundle(): void {
-  if (!existsSync(offlineBundle))
-    throw new Error(`dist-offline/ does not exist. Run \`bun run build:offline-bundle\` first.`)
+export function assertUsableNativeBundle(): void {
+  if (!existsSync(nativeBundle))
+    throw new Error(`${nativeBundle} does not exist — the app has no screens to draw. Run \`./buddy build:ios\`.`)
 
-  const entries = readdirSync(offlineBundle)
-  if (entries.length === 0)
-    throw new Error(`dist-offline/ is empty. Run \`bun run build:offline-bundle\` first.`)
+  if (statSync(nativeBundle).size === 0)
+    throw new Error(`${nativeBundle} is empty. Run \`./buddy build:ios\`.`)
 
-  for (const page of REQUIRED_PAGES) {
-    const path = join(offlineBundle, page)
-    if (!existsSync(path))
-      throw new Error(`dist-offline/${page} is missing — the flows navigate to it. Run \`bun run build:offline-bundle\`.`)
-    if (statSync(path).size === 0)
-      throw new Error(`dist-offline/${page} is empty.`)
-  }
-
-  if (!existsSync(builtSite))
+  if (!existsSync(nativeScreens))
     return
 
-  // Compare against the site it mirrors. A bundle older than dist/ is a bundle
-  // that will test last week's app.
-  for (const page of REQUIRED_PAGES) {
-    const fresh = join(builtSite, page)
-    if (!existsSync(fresh))
-      continue
-    const bundledAt = statSync(join(offlineBundle, page)).mtimeMs
-    const builtAt = statSync(fresh).mtimeMs
-    if (bundledAt < builtAt - 1000) {
-      throw new Error(
-        `dist-offline/${page} is older than dist/${page} — the app would be tested against a stale bundle. `
-        + `\`bun run build\` does not refresh dist-offline; run \`bun run build:offline-bundle\`.`,
-      )
-    }
+  const builtAt = statSync(nativeBundle).mtimeMs
+  const newest = readdirSync(nativeScreens)
+    .filter(f => f.endsWith('.stx'))
+    .map(f => ({ file: f, at: statSync(join(nativeScreens, f)).mtimeMs }))
+    .sort((a, b) => b.at - a.at)[0]
+
+  if (newest && newest.at > builtAt + 1000) {
+    throw new Error(
+      `resources/native/${newest.file} is newer than the compiled screens — the run would test the previous build of them. `
+      + `\`bun run build\` does not recompile them; run \`./buddy build:ios\`.`,
+    )
   }
+}
+
+/**
+ * Whether a flow asks to be run with the server stopped.
+ *
+ * Read from the flow's own `tags:` rather than from a list of filenames here,
+ * so a flow carries its own requirement and renaming one cannot quietly turn
+ * the offline test into an online one that passes.
+ */
+export function wantsOfflineServer(flowSource: string): boolean {
+  // Front matter only — everything before the `---` that opens the steps.
+  const frontMatter = flowSource.split(/^---\s*$/m)[0] ?? ''
+  const lines = frontMatter.split('\n')
+  const start = lines.findIndex(line => /^tags:\s*$/.test(line))
+  if (start === -1)
+    return false
+  for (const line of lines.slice(start + 1)) {
+    // The list ends at the first line that is not one of its items.
+    if (!/^\s+-\s*\S/.test(line))
+      return false
+    if (/^\s+-\s*offline\s*$/.test(line))
+      return true
+  }
+  return false
 }
 
 function bootedSimulator(preferred?: string): string {
@@ -151,17 +186,23 @@ function bootedSimulator(preferred?: string): string {
 /**
  * Generate the Xcode project, compile it for the simulator, and install it.
  *
- * `MOBILE_E2E=1` makes `config/mobile.ts` choose `webAssets: 'dist-offline'`
- * with no server at all, so every flow runs against the bundle and none of
- * them depend on the network. That is the point: a suite that needs a server
- * cannot test what happens without one.
+ * `server` is baked in: `config/mobile.ts` reads `MOBILE_URL` and the
+ * generated `craft.config.json` carries it as `devServerURL`, which is what
+ * `apiBase()` calls at runtime. It cannot be changed afterwards, so a build
+ * pointed at the wrong place has to be rebuilt — which is why
+ * `resolveMobileServer` refuses the bad values up front rather than letting
+ * the app open on a dead host and look merely empty.
+ *
+ * The path matters as well as the origin: under `renderer: 'native'` the start
+ * path has to BE one of the `nativeScreens`, and the framework refuses the
+ * build otherwise.
  */
-function buildAndInstall(deviceId: string): string {
+function buildAndInstall(deviceId: string, server: string): string {
   const generated = join(projectRoot, 'storage/framework/mobile/ios')
   const project = join(generated, 'BenchReview.xcodeproj')
 
   // Regenerate so the project matches config/mobile.ts and the current bundle.
-  run(['./buddy', 'build:ios'], { env: { MOBILE_E2E: '1' } })
+  run(['./buddy', 'build:ios'], { env: { MOBILE_URL: `${server}${START_PATH}` } })
   if (!existsSync(project))
     throw new Error(`${project} was not generated.`)
 
@@ -254,31 +295,106 @@ if (import.meta.main) {
     throw new Error('Maestro needs a JDK and none was found. Install one (brew install openjdk@17) or set JAVA_HOME.')
   requireCommand('xcrun', 'Install Xcode and its command line tools.')
 
-  assertUsableOfflineBundle()
+  // `--server` points the build somewhere else — `./buddy dev`, or a deployed
+  // host — which is useful for looking at the app by hand. The FLOWS assert
+  // the fixture's own data, so they will fail against anything else, loudly
+  // and on the first assertion rather than by passing against whoever happens
+  // to sort first.
+  const chosen = serverArgument(args) ?? process.env.MOBILE_URL
+  const ownServer = !chosen
+  const server = resolveMobileServer(chosen ?? `http://localhost:${DEFAULT_PORT}`, 'simulator')
+  if (!ownServer)
+    console.log(`\n  ⚠️  --server given: flows that assert fixture data will fail against ${server}`)
 
   const deviceId = bootedSimulator(device)
-  console.log(`\n  iOS e2e — simulator ${deviceId}, app ${appId()}\n`)
+  console.log(`\n  iOS e2e — simulator ${deviceId}, app ${appId()}, server ${server}\n`)
 
-  if (!args.includes('--no-build')) {
-    console.log('  building and installing…')
-    buildAndInstall(deviceId)
+  // A SEPARATE PROCESS, not `Bun.serve` in this one.
+  //
+  // Everything this script runs — xcodebuild, simctl, maestro — goes through
+  // `Bun.spawnSync`, which blocks the event loop until the child exits. An
+  // in-process server shares that loop, so it would accept nothing for the
+  // whole of a maestro run: the app would find the port dead and every flow
+  // would assert against an offline screen. Measured, not guessed — the first
+  // version did exactly this and flow 01 waited out its 90 seconds.
+  let fixture: ReturnType<typeof Bun.spawn> | undefined
+
+  const reachable = (): boolean => Bun.spawnSync([
+    'curl', '--silent', '--fail', '--max-time', '1', '--output', '/dev/null',
+    `http://localhost:${DEFAULT_PORT}/api/judges`,
+  ]).success
+
+  const startFixture = (): void => {
+    if (!ownServer || fixture)
+      return
+    fixture = Bun.spawn(['bun', join(projectRoot, 'scripts/mobile-e2e-api.ts')], {
+      cwd: projectRoot,
+      env: { ...process.env, MOBILE_E2E_PORT: String(DEFAULT_PORT) } as Record<string, string>,
+      stdout: 'ignore',
+      stderr: 'inherit',
+    })
+    // Ready before anything depends on it. A flow starts within seconds of the
+    // install and the app fetches on its first frame.
+    for (let attempt = 0; attempt < 50; attempt++) {
+      if (reachable())
+        return
+      Bun.sleepSync(100)
+    }
+    throw new Error(`The fixture API did not come up on port ${DEFAULT_PORT}. Is something else using it?`)
   }
 
-  // `pending-*` flows document a gap that is real and not yet fixed. They are
-  // kept in the repo — deleting them loses the evidence — but skipped by
-  // default so the suite stays green on what works, and a red suite always
-  // means a regression rather than a known bug.
-  const includePending = args.includes('--include-pending')
-  const flows = readdirSync(flowRoot)
-    .filter(f => f.endsWith('.yaml'))
-    .filter(f => includePending || !f.startsWith('pending-'))
-    .sort()
-  const selected = only ? flows.filter(f => f.includes(only)) : flows
-  if (!selected.length)
-    throw new Error(`No flow matched "${only}". Available: ${flows.join(', ')}`)
+  const stopFixture = (): void => {
+    if (!fixture)
+      return
+    fixture.kill()
+    fixture = undefined
+    // Gone before the flow starts, or the first screen of an "offline" run
+    // gets a real answer and the flow asserts the wrong state.
+    for (let attempt = 0; attempt < 50 && reachable(); attempt++)
+      Bun.sleepSync(100)
+  }
 
-  for (const flow of selected)
-    runFlow(deviceId, flow)
+  startFixture()
 
-  console.log(`\n  all ${selected.length} flow(s) passed — reports in ${resultsRoot}\n`)
+  try {
+    if (!args.includes('--no-build')) {
+      console.log('  building and installing…')
+      buildAndInstall(deviceId, server)
+    }
+
+    assertUsableNativeBundle()
+
+    // `pending-*` flows document a gap that is real and not yet fixed. They are
+    // kept in the repo — deleting them loses the evidence — but skipped by
+    // default so the suite stays green on what works, and a red suite always
+    // means a regression rather than a known bug.
+    const includePending = args.includes('--include-pending')
+    const flows = readdirSync(flowRoot)
+      .filter(f => f.endsWith('.yaml'))
+      .filter(f => includePending || !f.startsWith('pending-'))
+      .sort()
+    const selected = only ? flows.filter(f => f.includes(only)) : flows
+    if (!selected.length)
+      throw new Error(`No flow matched "${only}". Available: ${flows.join(', ')}`)
+
+    for (const flow of selected) {
+      const offline = wantsOfflineServer(readFileSync(join(flowRoot, flow), 'utf8'))
+      if (offline && !ownServer) {
+        // Someone else's server. Stopping it is not ours to do, and running
+        // the flow with it up would assert an offline state that never comes.
+        console.log(`  – ${flow} skipped: it needs the server stopped, and --server is not ours to stop`)
+        continue
+      }
+      if (offline)
+        stopFixture()
+      else
+        startFixture()
+      runFlow(deviceId, flow)
+    }
+
+    console.log(`\n  all ${selected.length} flow(s) passed — reports in ${resultsRoot}\n`)
+  }
+  finally {
+    stopFixture()
+  }
 }

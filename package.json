@@ -24,7 +24,8 @@
     "release:validate": "bun scripts/validate-release.ts",
     "deployment:smoke": "bun scripts/smoke-deployment.ts",
     "test:e2e:ios": "bun scripts/run-mobile-e2e.ts",
-    "preview:ios": "MOBILE_E2E=1 bun run build:offline-bundle && MOBILE_E2E=1 ./buddy build:ios",
+    "mobile:fixture-api": "bun scripts/mobile-e2e-api.ts",
+    "preview:ios": "MOBILE_URL=http://localhost:4399 ./buddy build:ios",
     "preview:ios:local": "MOBILE_URL=http://localhost:4000 ./buddy build:ios",
     "preview:ios:production": "MOBILE_URL=https://benchreview.org ./buddy build:ios"
   },

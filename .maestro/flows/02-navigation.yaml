@@ -1,30 +1,113 @@
 appId: ${APP_ID}
-name: Native shell navigation
+name: Tabs and push navigation
 tags:
   - mobile
   - smoke
 ---
+# Moving around the app: the tab bar switches stacks, a row pushes a detail
+# screen, and back returns.
+#
+# This flow used to tap the web header's hamburger and wait for a page
+# heading. There is no header and no page now — navigation is the system's,
+# and what is worth testing is that the app drives it correctly.
+#
+# Press handlers are the specific risk. The native runtime registers one ONLY
+# when the element carries an `id`, and nothing reports it when one is
+# missing: the tap lands, no handler runs, no error is raised, and the screen
+# simply stays put. Every tap below is therefore an assertion that an id
+# survived the last edit.
+#
+# ⚠️ `waitForAnimationToEnd` before each push, and it is not decoration. A row
+# tapped the instant its text appears can be tapped while the list is still
+# settling, and that tap is silently lost — the same symptom as a missing id.
+# This flow failed that way in a full run and passed on its own, which is the
+# worst kind of test: one that reports a real bug's signature at random.
+#
+# TAPPING A TAB IS BY POSITION, NOT BY ITS WORD.
+#
+# The tab bar's labels are not unique on screen: a courthouse's stats row says
+# "Judges" and "Reviews" too, and the back button inherits the previous
+# screen's title. `tapOn: "Reviews"` matched the stats caption, and the flow
+# went on asserting against the screen it was already on.
+#
+# The five tabs are evenly spaced across the bar, so their centres are stable
+# proportions of any screen: Feed 14%, Judges 32%, Courthouses 50%, Write 68%,
+# Profile 86%, all at 92% down. Measured from the accessibility tree on an
+# iPhone 17 Pro (402x874pt), where the buttons span y 778-832.
+
 - launchApp:
     clearState: true
     permissions:
       all: allow
 - extendedWaitUntil:
-    visible: Transparency in the US Chambers of Secrets
+    visible: "Ran a tight, fair calendar"
     timeout: 90000
 
-# Below `lg` the header's three regions are hidden and navigation lives behind
-# the hamburger (bench-review#90). The app is iPhone-only, so this is the only
-# path a user has — and it is therefore the one worth testing.
-- tapOn: "Open main menu"
-- extendedWaitUntil:
-    visible: "Find Judges"
-    timeout: 30000
-- takeScreenshot: mobile-menu
+# The feed's rows carry sanitiser-escaped HTML. A row that forgot to strip
+# tags or decode entities would print the escape rather than the ampersand.
+- assertVisible:
+    text: ".*Alder & Co.*"
+- assertNotVisible: "&amp;"
+- takeScreenshot: feed
 
-- tapOn: "Find Judges"
-# The directory renders its own heading from the bundled page; the rows need
-# the API, which the bundle deliberately does not have.
+# ANOTHER TAB IS ANOTHER STACK — the Judges tab.
+- tapOn:
+    point: "32%,92%"
 - extendedWaitUntil:
-    visible: Judicial Directory
+    visible: "(?i)25 judges"
     timeout: 30000
 - takeScreenshot: judges
+
+# A ROW PUSHES ITS JUDGE. The name is the fixture's first row, so this also
+# checks the row opened the judge it was showing rather than some other one.
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn: "Fixture A. Alder"
+- extendedWaitUntil:
+    visible: "Write a review"
+    timeout: 30000
+- assertVisible: "Fixture A. Alder"
+- assertVisible: "Fixture County Courthouse"
+- assertVisible: "Opinions"
+- assertVisible: "Education"
+- takeScreenshot: judge-detail
+
+# BACK RETURNS TO THE DIRECTORY, with the list still there.
+- tapOn:
+    point: "6%,10%"
+- extendedWaitUntil:
+    visible: "(?i)25 judges"
+    timeout: 30000
+- assertNotVisible: "Write a review"
+
+# THE COURTHOUSES TAB.
+- tapOn:
+    point: "50%,92%"
+- extendedWaitUntil:
+    visible: "Fixture County Courthouse"
+    timeout: 30000
+- assertVisible:
+    text: "(?i)3 courthouses"
+- takeScreenshot: courthouses
+
+# A COURTHOUSE PUSHES ITS BENCH. Only its own judges are on it, so this
+# asserts the bench endpoint filtered rather than returning everyone.
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn: "Fixture County Courthouse"
+- extendedWaitUntil:
+    visible: "THE BENCH"
+    timeout: 30000
+- assertVisible: "Fixture A. Alder"
+- assertNotVisible: "Fixture C. Cedar"
+- takeScreenshot: courthouse-bench
+
+# PROFILE IS THE SIGNED-OUT STATE on a fresh install, which is what the
+# fixture's 401 produces.
+- tapOn:
+    point: "86%,92%"
+- extendedWaitUntil:
+    visible: "You are browsing as a guest"
+    timeout: 30000
+- assertVisible: "Sign in"
+- takeScreenshot: profile-guest
