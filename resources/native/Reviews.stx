@@ -12,7 +12,9 @@
 import { ApiError, getJson, keepSnapshot, readSnapshot } from '../functions/native-api'
 import { handoffQuery } from '../functions/native-handoff'
 import { buildPages } from '../functions/native-paging'
+import { commentLabel, helpfulLabel, likeFailureMessage, nextLikeState } from '../functions/native-reactions'
 import { plainTextFromHtml, shortDate, starsFor } from '../functions/native-review'
+import { authFetch, signedIn } from '../functions/native-session'
 import { ui } from '../functions/native-ui'
 
 interface FeedReview {
@@ -24,6 +26,16 @@ interface FeedReview {
   judge_id?: number | null
   judge?: { id?: number, name?: string | null, context_line?: string | null, image_url?: string | null } | null
   reviewer?: { name?: string | null } | null
+  likes?: number | null
+  liked_by_me?: boolean | null
+  comments?: number | null
+  /** The endpoint strips `user_id` and states ownership instead. */
+  is_mine?: boolean | null
+}
+
+interface Reaction {
+  liked: boolean
+  likes: number
 }
 
 interface FeedPage {
@@ -45,15 +57,39 @@ const sort = state<string>('recent')
 const loading = state(true)
 const failed = state(false)
 const offline = state(false)
+/**
+ * Where an optimistic like lives until the server answers, keyed by review.
+ *
+ * Kept BESIDE the feed rather than written into them: a page reload replaces
+ * `reviews` wholesale, and an override map keyed by id simply stops matching
+ * — which is the behaviour wanted, since the fresh rows carry the server's
+ * own count by then.
+ */
+const reactions = state<Record<number, Reaction>>({})
+/** A refusal to report, cleared by the next thing the person does. */
+const notice = state('')
 
 let alive = true
 // Guards against an older page landing after a newer one and overwriting it
 // — two taps on Next in quick succession are enough.
 let request = 0
 
-const rows = derived(() => reviews().map(r => ({
+const rows = derived(() => reviews().map((r) => {
+  const pending = reactions()[r.id]
+  const liked = pending ? pending.liked : Boolean(r.liked_by_me)
+  const likes = pending ? pending.likes : Number(r.likes ?? 0)
+  const comments = Number(r.comments ?? 0)
+  return {
   review: r,
   key: r.id,
+  liked,
+  likes,
+  comments,
+  helpfulText: helpfulLabel(likes),
+  commentText: commentLabel(comments),
+  // Authors cannot react to their own work — the server answers 422 — so the
+  // button is not offered rather than offered and refused.
+  mine: Boolean(r.is_mine),
   judgeId: Number(r.judge?.id ?? r.judge_id ?? 0),
   stars: starsFor(r.rating),
   title: r.title || 'Untitled review',
@@ -65,7 +101,8 @@ const rows = derived(() => reviews().map(r => ({
   // handoff translates, so the detail screen only ever reads `photo`.
   judgePhoto: r.judge?.image_url || '',
   byline: [r.reviewer?.name || 'Anonymous reviewer', shortDate(r.created_at)].filter(Boolean).join(' · '),
-})))
+  }
+}))
 
 const pages = derived(() => buildPages(currentPage(), lastPage()))
 const nothing = derived<boolean>(() => !loading() && !reviews().length)
@@ -107,6 +144,9 @@ async function load(page: number): Promise<void> {
       return
     const data = Array.isArray(body?.data) ? body.data : []
     reviews.set(data)
+    // The new rows carry the server's own counts, so any guess still being
+    // held is now both stale and redundant.
+    reactions.set({})
     currentPage.set(Number(body?.current_page ?? page) || 1)
     lastPage.set(Math.max(1, Number(body?.last_page ?? 1)))
     total.set(Number(body?.total ?? data.length) || 0)
@@ -151,6 +191,74 @@ function sortBy(next: string): void {
     return
   sort.set(value)
   void load(1)
+}
+
+/**
+ * Mark a review helpful, or take it back.
+ *
+ * OPTIMISTIC, and it has to be: the alternative is a button that sits still
+ * for a round trip, which reads as a broken button and gets tapped again.
+ * The server's own answer replaces the guess, and a refusal puts the old
+ * state back — a count that stayed wrong would be worse than one that never
+ * moved, because nothing on screen would say so.
+ *
+ * Signed out, this is not an error. The endpoint is auth-gated for good
+ * reason (a single person could otherwise spam the counter by reloading), so
+ * the honest response to a tap is to offer the sign-in rather than to explain
+ * a refusal.
+ */
+async function toggleLike(row: { key: number, liked: boolean, likes: number }): Promise<void> {
+  if (!signedIn()) {
+    craft?.navigation?.open?.('/login')
+    return
+  }
+
+  const before = { liked: row.liked, likes: row.likes }
+  const guess = nextLikeState(before)
+  setReaction(row.key, guess)
+  notice.set('')
+
+  try {
+    const response = await authFetch(`/api/reviews/${row.key}/like`, { method: 'POST' })
+    const body = await response.json().catch(() => ({})) as Record<string, any>
+    if (!alive)
+      return
+    if (!response.ok) {
+      setReaction(row.key, before)
+      notice.set(likeFailureMessage(response.status, body))
+      return
+    }
+    // The server is the authority on both: a second device may have changed
+    // the count since this page was fetched.
+    setReaction(row.key, { liked: Boolean(body?.liked), likes: Number(body?.likes ?? guess.likes) })
+  }
+  catch (err) {
+    if (!alive)
+      return
+    setReaction(row.key, before)
+    notice.set(likeFailureMessage(err instanceof ApiError ? err.status : 0, {}))
+  }
+}
+
+function setReaction(id: number, value: Reaction): void {
+  reactions.set({ ...reactions(), [id]: value })
+}
+
+/**
+ * Open the thread under a review.
+ *
+ * The count rides along so the screen's header is finished in frame one,
+ * the same way a judge row hands its judge over.
+ */
+function openComments(row: { key: number, title: string, judgeName: string, comments: number }): void {
+  if (!row.key)
+    return
+  notice.set('')
+  craft?.navigation?.open?.(`/reviews/${row.key}/comments${handoffQuery({
+    title: row.title,
+    judge: row.judgeName,
+    comments: row.comments,
+  })}`)
 }
 
 /**
@@ -201,13 +309,17 @@ onMount(() => {
 
       <Text :if="countLine()" :class="ui.header" :text="countLine()" testID="reviews-count" />
 
+      <View :if="notice()" class="mb-2 mx-4 px-3 py-2 bg-[#fff0f0] dark:bg-[#2c1618] rounded-[10px]" testID="reviews-notice">
+        <Text :class="ui.danger" :text="notice()" />
+      </View>
+
       <View :if="rows().length > 0" :class="ui.group" testID="reviews-list">
         <View :for="(row, index) in rows()" :key="row.key">
           <View :if="index" :class="ui.separator" />
           <Pressable
             :id="'review-row-' + row.key"
             @press="openJudge(row)"
-            class="gap-1 px-4 py-3"
+            class="gap-1 pb-2 pt-3 px-4"
             accessibilityRole="button"
             :accessibilityLabel="'Review of ' + row.judgeName + ', ' + row.title"
             :testID="'review-row-' + row.key"
@@ -223,6 +335,59 @@ onMount(() => {
               <Text :if="row.where" :numberOfLines="1" class="flex-1" :class="ui.caption" :text="'· ' + row.where" />
             </View>
           </Pressable>
+
+          <!--
+            The action row is a SIBLING of the row's own Pressable, never a
+            child of it. A Pressable inside a Pressable is a coin toss over
+            which handler runs, and the losing side fails the way every missed
+            press on this platform fails: silently, with the screen simply
+            staying put.
+
+            They are CHIPS rather than bare icons: a filled pill reads as
+            something you press, where a glyph and a number sitting under a
+            paragraph read as part of the paragraph. Pressed fills with the
+            tint and the glyph goes white — the same vocabulary as the
+            Recent/Helpful sort at the top of this screen.
+
+            Pressed state is not carried by colour alone: the label changes
+            with it, `accessibilityState` marks it selected, and the
+            `accessibilityLabel` says which action a tap performs. Colour-only
+            state is what the review form was pulled up on (bench-review#58).
+
+            There is no "not helpful". `judge_reviews_likes` holds one row per
+            like with no direction, so a second button could only clear the
+            first — a control that lies about what it does. Yelp's votes are
+            all positive for the same reason, and Amazon dropped its downvote
+            years ago.
+          -->
+          <View class="flex-row gap-2 items-center pb-3 px-4" :testID="'review-actions-' + row.key">
+            <Pressable
+              :if="!row.mine"
+              :id="'review-like-' + row.key"
+              @press="toggleLike(row)"
+              class="flex-row gap-1.5 items-center px-4 min-h-[44px] rounded-full"
+              :class="row.liked ? 'bg-[#2563eb]' : 'bg-[#f2f2f7] dark:bg-[#2c2c2e]'"
+              accessibilityRole="button"
+              :accessibilityState="{ selected: row.liked }"
+              :accessibilityLabel="row.liked ? 'Marked helpful. Tap to undo' : 'Mark this review helpful'"
+              :testID="'review-like-' + row.key"
+            >
+              <Icon name="thumbs-up" class="h-[17px] w-[17px]" :class="row.liked ? 'text-white' : 'text-[#6e6e73] dark:text-[#98989d]'" />
+              <Text :class="row.liked ? 'font-semibold text-[15px] text-white' : 'text-[15px] text-[#3c3c43] dark:text-[#d1d1d6]'" :text="row.helpfulText" />
+            </Pressable>
+
+            <Pressable
+              :id="'review-comments-' + row.key"
+              @press="openComments(row)"
+              class="flex-row gap-1.5 items-center px-4 min-h-[44px] bg-[#f2f2f7] dark:bg-[#2c2c2e] rounded-full"
+              accessibilityRole="button"
+              :accessibilityLabel="'Comments on ' + row.title"
+              :testID="'review-comments-' + row.key"
+            >
+              <Icon name="message-square" class="h-[17px] w-[17px] text-[#6e6e73] dark:text-[#98989d]" />
+              <Text class="text-[#3c3c43] text-[15px] dark:text-[#d1d1d6]" :text="row.commentText" />
+            </Pressable>
+          </View>
         </View>
       </View>
 

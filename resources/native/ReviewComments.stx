@@ -1,0 +1,350 @@
+<script client lang="ts">
+// The thread under one review, drawn natively (config/mobile.ts
+// `nativeScreens`, /reviews/:id/comments): the phone's half of
+// Bench/ReviewComments.stx.
+//
+// Reads GET /api/reviews/{id}/comments, which is already paginated
+// server-side, so this pages over the wire like the feed rather than holding
+// a whole thread in memory.
+//
+// Reading is PUBLIC — the endpoint only leaks published comments, and the
+// same `viewable-review` gate the review itself has. Writing needs a session,
+// which is why the composer is the one part of this screen that changes shape
+// depending on who is holding the phone.
+import { ApiError, getJson } from '../functions/native-api'
+import { handoffFromParams } from '../functions/native-handoff'
+import { buildPages } from '../functions/native-paging'
+import {
+  COMMENT_MAX,
+  commentByline,
+  commentFailureMessage,
+  commentProblem,
+} from '../functions/native-reactions'
+import { plainTextFromHtml, shortDate } from '../functions/native-review'
+import { authFetch, signedIn } from '../functions/native-session'
+import { ui } from '../functions/native-ui'
+
+interface CommentAuthor {
+  /** Null by construction for an anonymous comment — never reconstruct one. */
+  id?: number | null
+  name?: string | null
+}
+
+interface ReviewComment {
+  id: number
+  body?: string | null
+  created_at?: string | null
+  author?: CommentAuthor | null
+  is_mine?: boolean | null
+}
+
+interface CommentPage {
+  data?: ReviewComment[]
+  current_page?: number
+  last_page?: number
+  total?: number
+}
+
+const craft = (globalThis as any).craft
+const PER_PAGE = 25
+const COMMENT_FIELDS = ['title', 'judge', 'comments'] as const
+
+function readReviewId(): number {
+  const route = craft?.route ?? {}
+  const fromParams = Number(route.params?.id ?? 0)
+  if (Number.isInteger(fromParams) && fromParams > 0)
+    return fromParams
+  const fromPath = String(route.path ?? '').match(/\/reviews\/(\d+)/)
+  return fromPath ? Number(fromPath[1]) : 0
+}
+
+const handoff = handoffFromParams<any>(craft?.route?.params, COMMENT_FIELDS)
+
+const reviewId = state<number>(readReviewId())
+// What the row that opened this already knew, so the header is finished in
+// the first frame instead of appearing a moment later.
+const reviewTitle = state<string>(handoff?.title ?? '')
+const judgeName = state<string>(handoff?.judge ?? '')
+
+const comments = state<ReviewComment[]>([])
+const currentPage = state<number>(1)
+const lastPage = state<number>(1)
+const total = state<number>(Number(handoff?.comments ?? 0) || 0)
+const loading = state(true)
+const failed = state(false)
+const offline = state(false)
+
+const draft = state('')
+const posting = state(false)
+const problem = state('')
+
+let alive = true
+// An older page must not land on top of a newer one.
+let request = 0
+
+const rows = derived(() => comments().map(c => ({
+  key: c.id,
+  // The column can hold markup; a native label draws characters.
+  body: plainTextFromHtml(c.body || ''),
+  byline: commentByline(c.author, shortDate(c.created_at)),
+  mine: Boolean(c.is_mine),
+})))
+
+const pages = derived(() => buildPages(currentPage(), lastPage()))
+const nothing = derived<boolean>(() => !loading() && (failed() || !comments().length))
+const showSkeleton = derived<boolean>(() => loading() && !comments().length)
+
+const countLine = derived<string>(() => {
+  const n = total()
+  if (!n)
+    return ''
+  return n === 1 ? '1 COMMENT' : `${n} COMMENTS`
+})
+
+const reason = derived<string>(() => {
+  if (offline())
+    return 'Comments need a connection. Reconnect and try again.'
+  if (failed())
+    return 'The comments could not be loaded. This is a problem on our side.'
+  return 'No comments on this review yet.'
+})
+
+// The subtitle, not the title: a review's own title can be long, and a nav
+// bar truncates rather than wraps.
+const subtitle = derived<string>(() => {
+  const parts = [reviewTitle(), judgeName()].filter(Boolean)
+  return parts.join(' · ')
+})
+
+const canPost = derived<boolean>(() => signedIn() && !posting() && draft().trim().length > 0)
+const remaining = derived<number>(() => COMMENT_MAX - draft().trim().length)
+// Only worth saying when it is close enough to matter.
+const counter = derived<string>(() => remaining() <= 200 ? `${remaining()} left` : '')
+
+effect(() => craft?.navigation?.setOptions({ title: 'Comments' }))
+
+async function load(page: number): Promise<void> {
+  const id = reviewId()
+  if (!id) {
+    loading.set(false)
+    failed.set(true)
+    return
+  }
+  const ticket = ++request
+  loading.set(true)
+  failed.set(false)
+  offline.set(false)
+  try {
+    const body = await getJson<CommentPage>(`/api/reviews/${id}/comments?page=${page}&per_page=${PER_PAGE}`)
+    if (!alive || ticket !== request)
+      return
+    const data = Array.isArray(body?.data) ? body.data : []
+    comments.set(data)
+    currentPage.set(Number(body?.current_page ?? page) || 1)
+    lastPage.set(Math.max(1, Number(body?.last_page ?? 1)))
+    total.set(Number(body?.total ?? data.length) || 0)
+  }
+  catch (err) {
+    if (!alive || ticket !== request)
+      return
+    failed.set(true)
+    offline.set(err instanceof ApiError && err.status === 0)
+  }
+  finally {
+    if (alive && ticket === request)
+      loading.set(false)
+  }
+}
+
+function goToPage(n: number): void {
+  if (n >= 1 && n <= lastPage() && n !== currentPage())
+    void load(n)
+}
+
+function prevPage(): void {
+  goToPage(currentPage() - 1)
+}
+
+function nextPage(): void {
+  goToPage(currentPage() + 1)
+}
+
+async function refresh(): Promise<void> {
+  await load(currentPage())
+}
+
+function signIn(): void {
+  craft?.navigation?.open?.('/login')
+}
+
+/**
+ * Post the draft.
+ *
+ * NOT optimistic, unlike a like. A comment is something a person wrote, and
+ * showing it in the thread before the server has taken it would mean removing
+ * their words again if it were refused — for an unverified email, say, which
+ * is a refusal they can actually do something about. A like is one bit and
+ * costs nothing to put back; a comment is not.
+ *
+ * The draft survives a refusal for the same reason. Clearing the box on a
+ * failed post throws away the thing they came here to write.
+ */
+async function post(): Promise<void> {
+  if (posting())
+    return
+  if (!signedIn()) {
+    signIn()
+    return
+  }
+
+  const body = draft().trim()
+  const wrong = commentProblem(body)
+  if (wrong) {
+    problem.set(wrong)
+    return
+  }
+
+  posting.set(true)
+  problem.set('')
+  try {
+    const response = await authFetch(`/api/reviews/${reviewId()}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body }),
+    })
+    const answer = await response.json().catch(() => ({})) as Record<string, any>
+    if (!alive)
+      return
+    if (!response.ok) {
+      problem.set(commentFailureMessage(response.status, answer))
+      return
+    }
+    draft.set('')
+    // Land on the page the new comment is on. The thread is oldest-first, so
+    // that is the last one — and after an insert the last page may be a page
+    // that did not exist a moment ago.
+    await load(Math.max(1, Math.ceil((total() + 1) / PER_PAGE)))
+  }
+  catch (err) {
+    if (!alive)
+      return
+    problem.set(commentFailureMessage(err instanceof ApiError ? err.status : 0, {}))
+  }
+  finally {
+    if (alive)
+      posting.set(false)
+  }
+}
+
+onMount(() => {
+  alive = true
+  void load(1)
+  return () => { alive = false }
+})
+</script>
+
+<template>
+  <View :class="ui.screen">
+    <ScrollView class="flex-1" @refresh="refresh()" :refreshing="loading() && comments().length > 0">
+      <Text :if="subtitle()" class="mb-1 mt-5 mx-4" :class="ui.subtitle" :numberOfLines="2" :text="subtitle()" testID="comments-subtitle" />
+
+      <Text :if="countLine()" :class="ui.header" :text="countLine()" testID="comments-count" />
+
+      <View :if="rows().length > 0" :class="ui.group" testID="comments-list">
+        <View :for="(row, index) in rows()" :key="row.key">
+          <View :if="index" :class="ui.separator" />
+          <View class="gap-1 px-4 py-3">
+            <Text :class="ui.caption" :text="row.byline" />
+            <Text :class="ui.title" :text="row.body" />
+          </View>
+        </View>
+      </View>
+
+      <View :if="showSkeleton()" class="mt-7" :class="ui.group" testID="comments-loading">
+        <View :for="n in [1, 2]" :key="n" class="gap-2 px-4 py-4">
+          <View class="h-3 w-1/3" :class="ui.skeleton" />
+          <View class="h-3.5 w-full" :class="ui.skeleton" />
+        </View>
+      </View>
+
+      <View :if="nothing()" class="items-center mt-7 py-6" :class="ui.card" accessibilityRole="alert" testID="comments-empty">
+        <Icon :name="offline() ? 'wifi-off' : 'message-square'" class="h-7 w-7 text-[#c7c7cc] dark:text-[#48484a]" />
+        <Text class="mt-3 text-center" :class="ui.subtitle" :text="reason()" />
+        <Pressable :if="failed()" id="comments-retry" @press="refresh()" class="justify-center mt-2 min-h-[44px]" accessibilityRole="button" testID="comments-retry">
+          <Text class="text-[17px]" :class="ui.tint" text="Try again" />
+        </Pressable>
+      </View>
+
+      <View :if="pages().length" class="flex-row items-center justify-center mb-2 mt-4">
+        <Pressable id="comments-prev" @press="prevPage()" class="justify-center px-3 min-h-[44px]" accessibilityRole="button" accessibilityLabel="Previous page" testID="comments-prev">
+          <Text :class="currentPage() > 1 ? ui.tint : ui.caption" text="Prev" />
+        </Pressable>
+        <View :for="item in pages()" :key="item.label + '-' + item.n">
+          <Text :if="item.gap" class="px-2" :class="ui.caption" text="…" />
+          <Pressable :if="!item.gap" :id="'comments-page-' + item.label" @press="goToPage(item.n)" class="items-center justify-center px-3 min-h-[44px] rounded-[8px]" :class="item.active ? 'bg-[#2563eb]' : ''" accessibilityRole="button" :accessibilityLabel="'Page ' + item.label" :testID="'comments-page-' + item.label">
+            <Text :class="item.active ? 'text-white text-[15px]' : ui.tint" :text="item.label" />
+          </Pressable>
+        </View>
+        <Pressable id="comments-next" @press="nextPage()" class="justify-center px-3 min-h-[44px]" accessibilityRole="button" accessibilityLabel="Next page" testID="comments-next">
+          <Text :class="currentPage() < lastPage() ? ui.tint : ui.caption" text="Next" />
+        </Pressable>
+      </View>
+
+      <!--
+        The composer. Signed out it is an invitation rather than a disabled
+        box: a field you cannot type in explains nothing, and the endpoint is
+        auth-gated for reasons that have nothing to do with this person.
+      -->
+      <View :if="!signedIn()" class="items-center mt-6 py-6" :class="ui.card" testID="comments-signed-out">
+        <Text class="text-center" :class="ui.subtitle" text="Sign in to join this conversation." />
+        <Pressable id="comments-sign-in" @press="signIn()" class="items-center justify-center mt-3 px-5 min-h-[44px] bg-[#2563eb] rounded-[10px]" accessibilityRole="button" testID="comments-sign-in">
+          <Text class="font-semibold text-[17px] text-white" text="Sign in" />
+        </Pressable>
+      </View>
+
+      <!--
+        POST SITS BESIDE THE FIELD, NOT UNDER IT.
+        
+        Under it, the keyboard covers it: typing a comment left the button
+        behind the keys with no way to reach it and no Done key to dismiss
+        them. Measured on a simulator — only a sliver of the button was left
+        on screen. Beside the field it stays visible for as long as the field
+        does, which is necessarily as long as someone is typing.
+        
+        A refusal goes ABOVE the field for the same reason. "Verify your email
+        address before commenting" is only useful if it can be read while the
+        keyboard is still up, which is exactly when it arrives.
+      -->
+      <View :if="signedIn()" class="gap-2 mt-6 p-4" :class="ui.card" testID="comments-composer">
+        <Text :if="problem()" :class="ui.danger" :text="problem()" testID="comment-problem" />
+        <View class="flex-row gap-2 items-end">
+          <TextInput
+            id="comment-body"
+            :value="draft()"
+            @input="draft.set($event.text)"
+            placeholder="Add a comment"
+            :multiline="true"
+            :editable="!posting()"
+            class="flex-1 px-3 py-2 min-h-[88px] text-[17px] text-black dark:text-white bg-[#f2f2f7] dark:bg-[#2c2c2e] rounded-[10px]"
+            accessibilityLabel="Your comment"
+            testID="comment-body"
+          />
+          <Pressable
+            id="comment-post"
+            @press="post()"
+            class="items-center justify-center px-4 min-h-[44px] rounded-[10px]"
+            :class="canPost() ? 'bg-[#2563eb]' : 'bg-[#c7c7cc] dark:bg-[#3a3a3c]'"
+            accessibilityRole="button"
+            accessibilityLabel="Post comment"
+            testID="comment-post"
+          >
+            <Text class="font-semibold text-[17px] text-white" :text="posting() ? '…' : 'Post'" />
+          </Pressable>
+        </View>
+        <Text :if="counter()" class="text-right" :class="ui.caption" :text="counter()" />
+      </View>
+
+      <View class="h-10" />
+    </ScrollView>
+  </View>
+</template>

@@ -125,6 +125,9 @@ const nativeScreens: Record<string, string> = {
   '/review': 'Review',
   '/review/:id': 'Review',
   '/reviews': 'Reviews',
+  // The thread under one review. More fixed segments than `/reviews`, so the
+  // matcher reaches it first whatever the order here.
+  '/reviews/:id/comments': 'ReviewComments',
   '/profile': 'Profile',
   // Not a tab: reached from whatever needed a session. The app does not open
   // on a sign-in wall — the directory and the published reviews are public on
