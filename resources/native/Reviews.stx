@@ -86,7 +86,7 @@ const reason = derived<string>(() => {
   return 'No reviews have been published yet. The first one could be yours.'
 })
 
-effect(() => craft?.navigation?.setOptions({ title: 'Reviews', largeTitle: true }))
+effect(() => craft?.navigation?.setOptions({ title: 'Feed', largeTitle: true }))
 
 /**
  * One page of the feed.

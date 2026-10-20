@@ -83,12 +83,14 @@ const personalTeam = envVars.IOS_PERSONAL_TEAM === '1'
 //   The start path "/" is not a nativeScreens path; with renderer: "native"
 //   the app must start on a native screen.
 //
-// `/judges` rather than `/`, which is also the better landing: `/` still
-// serves the marketing coming-soon page (bench-review#62), so the web build
-// opens the app on a "Coming soon" banner. The native app opens on the
-// directory, which is what someone who installed it came for.
+// `/reviews` rather than `/`: `/` still serves the marketing coming-soon page
+// (bench-review#62), so the web build opens the app on a "Coming soon"
+// banner. The native app opens on the FEED, which is both the first tab and
+// the only screen with something new on it between visits. It was `/judges`
+// while the directory led the bar; the two have to agree, or the app opens on
+// a tab that is not the one selected.
 const mobileContent = {
-  url: envVars.MOBILE_URL ?? 'https://benchreview.org/judges',
+  url: envVars.MOBILE_URL ?? 'https://benchreview.org/reviews',
 }
 
 /**
@@ -135,19 +137,27 @@ const nativeScreens: Record<string, string> = {
 /**
  * The tab bar, an SF Symbol each.
  *
+ * THE FEED LEADS. It is the only tab that has something new on it between one
+ * visit and the next, which makes it the one worth opening the app onto — the
+ * directories are a reference you go to when you already have a name in mind.
+ * It is `/reviews` under a different word: the PATH stays as it is, because
+ * the website serves `/reviews` and a universal link has to mean the same
+ * thing on both. Only the label changed.
+ *
  * Writing a review is the one thing the app asks of someone rather than
- * offers them, so it sits in the middle — with the things it is about on one
- * side and the account it needs on the other. At five tabs that is the actual
- * centre of the bar, which it was not at four.
+ * offers them, and it used to sit in the middle for that reason. The feed
+ * taking first place pushes it off centre; left as it is rather than
+ * reshuffled around it, because separating the two directories to keep Write
+ * centred would be a stranger bar than an off-centre compose button.
  *
  * Five is also the ceiling: iOS collapses anything past the fifth into a
  * "More" list, so a sixth tab would hide two of these behind a menu.
  */
 const tabs = [
+  { id: '/reviews', title: 'Feed', symbol: 'text.bubble' },
   { id: '/judges', title: 'Judges', symbol: 'person.text.rectangle' },
   { id: '/court-houses', title: 'Courthouses', symbol: 'building.columns' },
   { id: '/review', title: 'Write', symbol: 'square.and.pencil' },
-  { id: '/reviews', title: 'Reviews', symbol: 'text.bubble' },
   { id: '/profile', title: 'Profile', symbol: 'person.crop.circle' },
 ]
 
