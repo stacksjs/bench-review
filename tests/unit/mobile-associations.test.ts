@@ -57,6 +57,25 @@ describe('apple-app-site-association', () => {
     expect(claimed).toContain('/article/*')
   })
 
+  test('the feed is claimed exactly, not only by prefix', () => {
+    // `/reviews/*` does NOT match `/reviews` — a prefix component needs
+    // something after the slash. Claiming only the prefix would leave a link
+    // to the app's own start path opening in Safari, which is the one link
+    // most likely to be shared.
+    const claimed = applinkComponents().filter(c => !c.exclude).map(c => String(c['/']))
+    expect(claimed).toContain('/reviews')
+    expect(claimed).toContain('/reviews/*')
+  })
+
+  test('claiming the feed did not claim the API with it', () => {
+    // `/api/reviews` is served from the same host. A component of `/*` or a
+    // careless `/reviews*` (no slash) would swallow it, and iOS would hand
+    // the app a link it cannot draw.
+    const claimed = applinkComponents().filter(c => !c.exclude).map(c => String(c['/']))
+    expect(claimed.some(p => p.startsWith('/api'))).toBe(false)
+    expect(claimed).not.toContain('/reviews*')
+  })
+
   test('nothing is written without a team id, and the absence is the signal', async () => {
     const written = await generateMobileAssociations({ APPLE_TEAM_ID: undefined }, STAGE)
     expect(written).toEqual([])

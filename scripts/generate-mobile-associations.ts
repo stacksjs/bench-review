@@ -37,9 +37,16 @@ import process from 'node:process'
  *     a confusing one. The link in that email is a one-time credential; it
  *     belongs in the browser that asked for it.
  *
- * Everything claimed is public, shareable content: judge profiles (which is
- * where `navigator.share` is actually called), courthouses, and published
- * review articles.
+ * Everything claimed is public, shareable content: the feed, judge profiles
+ * (which is where `navigator.share` is actually called), courthouses, and
+ * published review articles.
+ *
+ * `/reviews` is claimed as an exact path as well as a prefix, which the two
+ * directories are not. It is where the app STARTS — `config/mobile.ts` points
+ * `url` at it and it leads the tab bar — so a link to it is a link to the
+ * screen the app opens on. `/judges` and `/court-houses` are index pages
+ * nobody shares; their detail pages are the share targets, and those are
+ * covered by the prefix.
  */
 
 export interface MobileAssociationEnvironment {
@@ -67,6 +74,12 @@ export function applinkComponents(): Array<Record<string, unknown>> {
     { '/': '/verify-email/*', 'exclude': true, 'comment': 'one-time credential in an email' },
 
     // -- claimed --
+    // The feed, claimed EXACTLY as well as by prefix — unlike the two
+    // directories, whose index pages are not claimed. It is the app's start
+    // path and the first tab (config/mobile.ts), so a link to it is a link to
+    // where the app opens; an index nobody shares is a different case.
+    { '/': '/reviews', 'comment': 'the feed — the app opens here' },
+    { '/': '/reviews/*', 'comment': 'comment threads under a review' },
     { '/': '/judges/*', 'comment': 'judge profiles and their tabs — the main share target' },
     { '/': '/court-houses/*', 'comment': 'courthouse profiles' },
     { '/': '/article/*', 'comment': 'published reviews' },
