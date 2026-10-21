@@ -9,7 +9,7 @@
     "build": "bun build.ts",
     "build:stacks": "./buddy build",
     "build:offline-bundle": "bun scripts/build-offline-bundle.ts",
-    "build:ios": "bun run build && bun run build:offline-bundle && ./buddy build:ios",
+    "build:ios": "bun run build && bun run build:offline-bundle && ./buddy build:ios && bun scripts/patch-ios-tabbar.ts",
     "preview": "bun preview.ts",
     "start": "bun preview.ts",
     "lint": "bunx --bun pickier .",
