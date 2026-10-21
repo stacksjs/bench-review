@@ -395,10 +395,25 @@ if (import.meta.main) {
         console.log(`  – ${flow} skipped: it needs the server stopped, and --server is not ours to stop`)
         continue
       }
-      if (offline)
+      if (offline) {
         stopFixture()
-      else
+      }
+      else {
+        // A FRESH fixture for every flow, not just the first.
+        //
+        // Its state is in memory and mutable — likes, follows, posted
+        // comments, which judges have been reviewed — so without this the
+        // flows are coupled through it and the suite's result depends on the
+        // order it happens to run in. Measured: 08 posts a comment to review
+        // 1000, and 10 then found three comments on a review the fixture
+        // seeds with two. 10 was right and the isolation was missing.
+        //
+        // Cheap: a child process and a readiness poll, about a second each.
+        // `stopFixture` already waits for the port to go quiet, so this
+        // cannot race the new one onto a port the old one still holds.
+        stopFixture()
         startFixture()
+      }
       runFlow(deviceId, flow)
     }
 

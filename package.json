@@ -27,7 +27,8 @@
     "mobile:fixture-api": "bun scripts/mobile-e2e-api.ts",
     "preview:ios": "MOBILE_URL=http://localhost:4399 ./buddy build:ios",
     "preview:ios:local": "MOBILE_URL=http://localhost:4000 ./buddy build:ios",
-    "preview:ios:production": "MOBILE_URL=https://benchreview.org ./buddy build:ios"
+    "preview:ios:production": "MOBILE_URL=https://benchreview.org ./buddy build:ios",
+    "lint:flows": "bun scripts/lint-maestro-flows.ts"
   },
   "dependencies": {
     "@stacksjs/components": "^0.2.170",

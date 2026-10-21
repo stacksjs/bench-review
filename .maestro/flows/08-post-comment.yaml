@@ -71,12 +71,24 @@ tags:
 - extendedWaitUntil:
     visible: "Sign in to Bench Review"
     timeout: 30000
+# ⚠️ DISMISS THE KEYBOARD BETWEEN THE FIELDS.
+#
+# A tap meant to move focus from one text field to the next does not
+# reliably take while the keyboard is up, and the typing then lands in the
+# field that still HAS focus — silently, with every command reported as
+# completed. Measured: the email field came back holding
+# "clerk@example.testcorrect-horse" while the password field was empty, and
+# the flow failed three steps later on an assertion about something else.
+#
+# The same hazard sits under the submit button, which is below both fields.
 - tapOn:
     id: "login-email"
 - inputText: "clerk@example.test"
+- hideKeyboard
 - tapOn:
     id: "login-password"
 - inputText: "correct-horse"
+- hideKeyboard
 - tapOn:
     id: "login-submit"
 
@@ -131,7 +143,12 @@ tags:
 - extendedWaitUntil:
     visible: "The docket ran on time, which is worth saying."
     timeout: 30000
-- assertNotVisible: "[object Object]"
+# ⚠️ ESCAPED, because a maestro text selector is a REGEX. Unescaped,
+# `[object Object]` is a character CLASS matching one character out of
+# "objectO " — so it never looked for the string it names. It passed by
+# accident in one run and failed by accident in the next, which is how a
+# dead assertion announces itself if you are lucky.
+- assertNotVisible: '\[object Object\]'
 - takeScreenshot: comment-posted
 
 # THE REFUSAL CLEARED when the post succeeded, rather than sitting over a
