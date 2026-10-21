@@ -9,6 +9,7 @@
 // already listed. Only the reviews are fetched, from the same public endpoint
 // the website uses.
 import { ApiError, getJson } from '../functions/native-api'
+import { fetchFollowedIds, followAccessibilityLabel, followLabel, sendFollow } from '../functions/native-follow'
 import { handoffFromParams, handoffQuery, JUDGE_FIELDS, judgeFromHandoff } from '../functions/native-handoff'
 import { commentLabel, helpfulLabel, nextLikeState, sendLike } from '../functions/native-reactions'
 import { plainTextFromHtml, shortDate, starsFor } from '../functions/native-review'
@@ -78,6 +79,32 @@ const offline = state(false)
 const reactions = state<Record<number, { liked: boolean, likes: number }>>({})
 /** A refusal to report, cleared by the next thing the person does. */
 const notice = state('')
+/**
+ * Whether the signed-in person follows this judge.
+ *
+ * Starts false and is corrected by `load()`, which means a followed judge
+ * reads "Follow" for the length of one request. That is safe rather than
+ * merely tolerable: `POST /api/judges/{id}/follow` is idempotent and answers
+ * with the resulting state, so a tap inside that window produces the right
+ * end state and fixes the label on its way through.
+ */
+const following = state(false)
+/**
+ * A follow request in flight.
+ *
+ * The endpoints are idempotent, so a double-fire cannot corrupt anything at
+ * the storage layer — but two requests racing can land out of order and leave
+ * the button disagreeing with the server. One at a time.
+ */
+const followPending = state(false)
+/**
+ * A follow refusal, kept apart from `notice`.
+ *
+ * `notice` sits with the reviews, which is where a like failure belongs and
+ * is also several screens of scrolling away from this button. A message about
+ * the judge belongs beside the control for the judge.
+ */
+const followNotice = state('')
 
 let alive = true
 
@@ -86,6 +113,8 @@ const mark = derived<string>(() => initials(judge()?.name))
 const photo = derived<string>(() => judge()?.photo || '')
 const court = derived<string>(() => judge()?.court?.name || '')
 const where = derived<string>(() => judge()?.location || '')
+const followText = derived<string>(() => followLabel(following()))
+const followSpoken = derived<string>(() => followAccessibilityLabel(following(), name()))
 
 const rows = derived(() => reviews().map((r) => {
   const pending = reactions()[r.id]
@@ -150,15 +179,27 @@ async function load(): Promise<void> {
     // a perfectly good judge, so a judge whose reviews endpoint was down had
     // no name and a "?" avatar. They fail independently because they are
     // independent.
-    const [who, data] = await Promise.allSettled([
+    //
+    // The follow state joins them for the same reason, and ONLY with a
+    // session: without one `/api/me/follows` is a guaranteed 401, and
+    // `authFetch` reads a 401 as a spent token and clears the Keychain. An
+    // unconditional authed fetch on a public screen is how a sign-in got
+    // undone within a second once already (scripts/mobile-e2e-api.ts).
+    const [who, data, follows] = await Promise.allSettled([
       getJson<Record<string, any>>(`/api/judges/${id}`),
       getJson<{ data?: Review[] } | Review[]>(`/api/judges/${id}/reviews?page=1&per_page=20`),
+      signedIn() ? fetchFollowedIds() : Promise.resolve<number[]>([]),
     ])
     if (!alive)
       return
 
     if (who.status === 'fulfilled')
       judge.set(who.value)
+
+    // A follow in flight is not overwritten by a refresh that started before
+    // it: the person's own tap is newer than this answer.
+    if (follows.status === 'fulfilled' && !followPending())
+      following.set(follows.value.includes(id))
 
     if (data.status === 'fulfilled') {
       const body = data.value
@@ -189,6 +230,43 @@ async function load(): Promise<void> {
 
 async function refresh(): Promise<void> {
   await load()
+}
+
+/**
+ * Follow this judge, or stop.
+ *
+ * The native copy has promised this for as long as the app has existed —
+ * Login.stx and Profile.stx both say an account lets you "write a review,
+ * follow a judge, or manage your profile" — while the phone could only do the
+ * other two. The endpoints shipped with the website.
+ *
+ * Optimistic, like the helpful chips, and for the same reason: a button that
+ * does nothing for a round trip reads as broken and gets tapped again.
+ */
+async function toggleFollow(): Promise<void> {
+  const id = judgeId()
+  if (!id || followPending())
+    return
+
+  if (!signedIn()) {
+    craft?.navigation?.open?.('/login')
+    return
+  }
+
+  const before = following()
+  following.set(!before)
+  followPending.set(true)
+  followNotice.set('')
+
+  const outcome = await sendFollow(id, before)
+  if (!alive)
+    return
+  // The server's answer on success and the previous value on failure, so
+  // applying it unconditionally IS the rollback.
+  following.set(outcome.value)
+  followPending.set(false)
+  if (outcome.error)
+    followNotice.set(outcome.error)
 }
 
 /**
@@ -262,6 +340,20 @@ onMount(() => {
   alive = true
   void load()
 
+  // Someone can leave for the sign-in screen — the Follow button and the
+  // helpful chips both send them there — and come back to THIS screen,
+  // because Login pops rather than pushing anywhere. Without this the button
+  // they signed in to use still reads the signed-out state they left.
+  //
+  // A full reload rather than just the follow state: a review written from
+  // here comes back through the same door (Review.stx does the same).
+  try {
+    craft?.navigation?.onAppear?.(() => { void load() })
+  }
+  catch {
+    // No appearance hook on this runtime; the mount read stands.
+  }
+
   // Params that resolve after construction: re-read and fetch again, but only
   // when the id actually changed, so this cannot loop.
   try {
@@ -294,6 +386,51 @@ onMount(() => {
         <Text class="mt-3 font-semibold text-[22px] text-black text-center dark:text-white" :text="name()" />
         <Text :if="court()" class="mt-1 text-center" :class="ui.subtitle" :text="court()" />
         <Text :if="where()" class="mt-0.5 text-center" :class="ui.caption" :text="where()" />
+
+        <!--
+          Follow, in the header rather than beside "Write a review": that row
+          already holds the screen's one primary, and a second filled button
+          next to it reads as two primaries. The website puts it here too, up
+          with the judge's identity (Bench/Judge/ProfileHeader.stx).
+
+          44pt tall even though a header pill wants to be smaller — the
+          minimum touch target is not negotiable, and this screen is not
+          adding a new a11y finding while bench-review#58 is open.
+
+          WHITE, NOT BLUE, in both states. `bg-[#2563eb]` on a full-width
+          50pt button means "this screen's one primary action" everywhere
+          else in the app — Judge's own "Write a review", Profile's, Review's,
+          Login's submit. A filled blue pill here would be the first screen
+          with two, directly above the one it was competing with. Following a
+          judge is how someone comes back; writing a review is what the site
+          is for, and the hierarchy should say so.
+
+          The two states differ by what is INSIDE the pill: blue text with a
+          plus is the invitation, grey text with a check is the settled state.
+        -->
+        <Pressable
+          id="judge-follow"
+          @press="toggleFollow()"
+          class="flex-row gap-1.5 items-center justify-center self-center mt-4 px-5 min-h-[44px] bg-white dark:bg-[#1c1c1e] rounded-full"
+          accessibilityRole="button"
+          :accessibilityState="{ selected: following(), busy: followPending() }"
+          :accessibilityLabel="followSpoken()"
+          testID="judge-follow"
+        >
+          <Icon
+            :name="following() ? 'check' : 'plus'"
+            class="h-[17px] w-[17px]"
+            :class="following() ? 'text-[#6e6e73] dark:text-[#98989d]' : 'text-[#2563eb] dark:text-[#60a5fa]'"
+          />
+          <Text
+            :class="following() ? 'font-semibold text-[15px] text-[#6e6e73] dark:text-[#98989d]' : 'font-semibold text-[15px] text-[#2563eb] dark:text-[#60a5fa]'"
+            :text="followText()"
+          />
+        </Pressable>
+
+        <View :if="followNotice()" class="mt-2 mx-4 px-3 py-2 bg-[#fff0f0] dark:bg-[#2c1618] rounded-[10px]" testID="judge-follow-notice">
+          <Text class="text-center" :class="ui.danger" :text="followNotice()" />
+        </View>
       </View>
 
       <Pressable

@@ -1,0 +1,173 @@
+appId: ${APP_ID}
+name: Following a judge
+tags:
+  - mobile
+  - smoke
+---
+# The judge screen's Follow button (bench-review#79).
+#
+# `POST/DELETE /api/judges/{id}/follow` and `GET /api/me/follows` shipped with
+# the website, and the phone reached none of them — while the native copy
+# promised otherwise in two places: Login.stx and Profile.stx both say an
+# account is what you need "to write a review, follow a judge, or manage your
+# profile". Of those three the phone could do two.
+#
+# The order of this flow is load-bearing. It signs in from the screen of a
+# judge the fixture ALREADY FOLLOWS (Fixture B. Birch, id 2) and then asserts
+# the button flipped with nothing further tapped. That is the only way to
+# observe `navigation.onAppear` from a flow: Login pops back rather than
+# pushing on, so the screen behind it is already mounted and `onMount` will
+# not run again. Reversing these two judges makes every assertion here pass
+# while the screen silently never re-reads its state.
+#
+# Tabs are tapped by position, not by their word: see 02-navigation for why.
+# Feed 14%, Judges 32%, Courthouses 50%, Write 68%, Profile 86%, at 92% down.
+
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: "Ran a tight, fair calendar"
+    timeout: 90000
+
+# ⚠️ START FROM SIGNED OUT, and do not assume it. `clearState: true` does not
+# touch the Keychain, where the session token lives — see 02-navigation.
+- tapOn:
+    point: "86%,92%"
+- waitForAnimationToEnd:
+    timeout: 6000
+- runFlow:
+    when:
+      visible: "Sign out"
+    commands:
+      - tapOn:
+          id: "profile-signout"
+      - extendedWaitUntil:
+          visible: "You are browsing as a guest"
+          timeout: 30000
+
+# To the judge the fixture follows, by way of the directory.
+- tapOn:
+    point: "32%,92%"
+- extendedWaitUntil:
+    visible: "(?i)25 judges"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn: "Fixture B. Birch"
+- extendedWaitUntil:
+    visible: "Write a review"
+    timeout: 30000
+- assertVisible: "Fixture B. Birch"
+
+# SIGNED OUT, NO FOLLOW STATE IS INVENTED. This judge IS followed by the
+# fixture session, so a screen that asked for /me/follows without a session
+# would either show "Following" to a guest or sign them out trying.
+#
+# ⚠️ MAESTRO ANCHORS A TEXT REGEX TO THE WHOLE STRING. So "Follow" does NOT
+# also match "Following" — the two words are already unambiguous — while a
+# fragment like "Tap to stop following" matches NOTHING, because the label it
+# appears in is "Following <judge>. Tap to stop following.". An earlier
+# version of this flow asserted on that fragment and the assertions were dead:
+# the negatives passed vacuously and the positives could never come true.
+# Matching a fragment needs explicit wrappers, as in 02-navigation's
+# ".*Alder & Co.*".
+- assertVisible:
+    id: "judge-follow"
+- assertVisible: "Follow"
+- assertNotVisible: "Following"
+- takeScreenshot: judge-follow-signed-out
+
+# A FOLLOW WHILE SIGNED OUT LEADS SOMEWHERE. The endpoint is auth-gated, so
+# the honest answer to the tap is the sign-in screen — not an error about a
+# refusal the person can do nothing with from here.
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "judge-follow"
+- extendedWaitUntil:
+    visible: "Sign in to Bench Review"
+    timeout: 30000
+- tapOn:
+    id: "login-email"
+- inputText: "clerk@example.test"
+- tapOn:
+    id: "login-password"
+- inputText: "correct-horse"
+- tapOn:
+    id: "login-submit"
+
+# THE SCREEN BEHIND THE SIGN-IN CATCHES UP BY ITSELF.
+#
+# Login pops, so this judge's screen was never unmounted and nothing re-runs
+# on its own — without `navigation.onAppear` it would still show the
+# signed-out state the person left in order to fix it. Nothing is tapped
+# between the sign-in and this assertion, which is the whole point.
+- extendedWaitUntil:
+    visible: "Following"
+    timeout: 30000
+- assertNotVisible: "Follow"
+- assertNotVisible:
+    id: "judge-follow-notice"
+- takeScreenshot: judge-already-followed
+
+# AND IT COMES OFF. A follow you cannot undo from where you made it is a trap.
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "judge-follow"
+- extendedWaitUntil:
+    visible: "Follow"
+    timeout: 30000
+- assertNotVisible: "Following"
+
+# A JUDGE WHO IS GENUINELY NOT FOLLOWED STILL READS "Follow" WITH A SESSION.
+# Without this, a screen that showed "Following" for everyone once signed in
+# would pass every assertion above.
+- tapOn:
+    point: "6%,10%"
+- extendedWaitUntil:
+    visible: "(?i)25 judges"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn: "Fixture A. Alder"
+- extendedWaitUntil:
+    visible: "Write a review"
+    timeout: 30000
+- assertVisible: "Fixture A. Alder"
+- assertVisible: "Follow"
+- assertNotVisible: "Following"
+
+# AND FOLLOWING ONE TAKES. Optimistic, so the word changes before the request
+# finishes; what this proves is that it STAYS changed, which it only does if
+# the server agreed — a rollback would restore the old word AND show a reason,
+# so the absent notice is part of the claim.
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "judge-follow"
+- extendedWaitUntil:
+    visible: "Following"
+    timeout: 30000
+- assertNotVisible: "Follow"
+- assertNotVisible:
+    id: "judge-follow-notice"
+- takeScreenshot: judge-following
+
+# LEAVE THE DEVICE AS THIS FLOW FOUND IT. The Keychain outlives
+# `clearState: true`, so a flow that signs in and walks away leaves the next
+# run signed in — which is how 02 and 05 went red once for a reason that had
+# nothing to do with them. They establish the guest state themselves now, and
+# this flow still has no business making them do it.
+- tapOn:
+    point: "86%,92%"
+- extendedWaitUntil:
+    visible: "Sign out"
+    timeout: 30000
+- tapOn:
+    id: "profile-signout"
+- extendedWaitUntil:
+    visible: "You are browsing as a guest"
+    timeout: 30000

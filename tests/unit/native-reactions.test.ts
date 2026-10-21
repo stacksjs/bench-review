@@ -73,11 +73,19 @@ describe('why a like was refused', () => {
   })
 
   test('each status says a different thing', () => {
-    const messages = [401, 404, 422, 0, 500].map(s => likeFailureMessage(s, {}))
+    const messages = [401, 404, 422, 429, 0, 500].map(s => likeFailureMessage(s, {}))
     expect(new Set(messages).size).toBe(messages.length)
     expect(likeFailureMessage(401, {})).toMatch(/sign in/i)
     // Unreachable is about the connection, not about the review.
     expect(likeFailureMessage(0, {})).toMatch(/could not reach/i)
+  })
+
+  test('a throttle is not the generic "try again"', () => {
+    // The route allows 60 writes a minute and these are chips in a scrolling
+    // list, so hitting it takes no effort at all. Falling through to "Please
+    // try again" told people to do the one thing that could not work yet.
+    expect(likeFailureMessage(429, {})).toMatch(/wait a moment/i)
+    expect(likeFailureMessage(429, {})).not.toBe(likeFailureMessage(500, {}))
   })
 })
 
@@ -107,6 +115,14 @@ describe('why a comment was refused', () => {
     // sentence.
     expect(commentFailureMessage(403, {})).toMatch(/verify/i)
     expect(commentFailureMessage(401, {})).toMatch(/session/i)
+  })
+
+  test('a throttle says the draft is kept, because it is', () => {
+    // Twenty in five minutes is a long wait to be told "try again" about,
+    // and the composer does not clear on failure — so the message says so
+    // rather than leaving someone retyping it.
+    expect(commentFailureMessage(429, {})).toMatch(/draft is kept/i)
+    expect(commentFailureMessage(429, {})).not.toBe(commentFailureMessage(500, {}))
   })
 
   test('unreachable says the comment was not posted', () => {

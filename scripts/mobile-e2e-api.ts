@@ -198,6 +198,15 @@ function likesFor(id: number): number {
   return (LIKE_BASE[id] ?? 0) + (liked.has(id) ? 1 : 0)
 }
 
+/**
+ * Judges the fixture session follows, same in-memory toggle as the likes.
+ *
+ * Starts with one, so the run exercises BOTH states without having to tap its
+ * way into the second: a flow can check that the already-followed judge reads
+ * "Following" on arrival, which is the part a default-false state gets wrong.
+ */
+const followed = new Set<number>([2])
+
 /** The one account the fixture knows, and the token it answers with. */
 const FIXTURE_EMAIL = 'clerk@example.test'
 const FIXTURE_PASSWORD = 'correct-horse'
@@ -366,6 +375,33 @@ export function handle(request: Request): Response {
     if (!authed(request))
       return json({ error: 'Unauthenticated' }, 401)
     return json({ data: [], total: 0 })
+  }
+
+  // Which judges the session follows. A bare array of ids, as the real action
+  // answers — not an envelope, which is the shape mistake that would make the
+  // button read "Follow" on a judge already followed.
+  if (path === '/api/me/follows') {
+    if (!authed(request))
+      return json({ error: 'Unauthenticated' }, 401)
+    return json([...followed])
+  }
+
+  // Following a judge, with the refusals the real routes have: auth-gated and
+  // 404 for a judge who is not listed. Both verbs are idempotent, and both
+  // state the RESULTING state rather than just `ok` — the screens read
+  // `following` and fall back to their own intent without it.
+  const follow = path.match(/^\/api\/judges\/(\d+)\/follow$/)
+  if (follow && (request.method === 'POST' || request.method === 'DELETE')) {
+    const id = Number(follow[1])
+    if (!authed(request))
+      return json({ error: 'Not authenticated' }, 401)
+    if (!JUDGES.some(j => j.id === id))
+      return json({ error: 'Judge not found' }, 404)
+    if (request.method === 'POST')
+      followed.add(id)
+    else
+      followed.delete(id)
+    return json({ ok: true, following: followed.has(id) })
   }
 
   return json({ error: 'Not found.' }, 404)

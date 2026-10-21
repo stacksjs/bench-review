@@ -132,4 +132,47 @@ describe('the e2e fixture api', () => {
     expect((await get('/judges/1/education').body).education.length).toBeGreaterThan(0)
     expect((await get('/judges/2/education').body).education).toEqual([])
   })
+
+  test('/me/follows answers a bare array, and needs the session', async () => {
+    // An envelope here would make the button read "Follow" on a judge the
+    // session already follows — the screen does `.includes(id)` on the body.
+    const signedOut = handle(new Request('http://localhost/api/me/follows'))
+    expect(signedOut.status).toBe(401)
+
+    const response = handle(new Request('http://localhost/api/me/follows', {
+      headers: { Authorization: 'Bearer fixture-session-token' },
+    }))
+    expect(response.status).toBe(200)
+    expect(Array.isArray(await response.json())).toBe(true)
+  })
+
+  test('the fixture starts with a judge already followed', async () => {
+    // So a flow can check the "Following" state on arrival rather than only
+    // after tapping — which is the state a default-false screen gets wrong.
+    const ids = await handle(new Request('http://localhost/api/me/follows', {
+      headers: { Authorization: 'Bearer fixture-session-token' },
+    })).json() as number[]
+    expect(ids.length).toBeGreaterThan(0)
+  })
+
+  test('following is a toggle that states the resulting state', async () => {
+    const auth = { Authorization: 'Bearer fixture-session-token' }
+    const toggle = (id: number, method: string): Response =>
+      handle(new Request(`http://localhost/api/judges/${id}/follow`, { method, headers: auth }))
+
+    expect(await toggle(1, 'POST').json()).toEqual({ ok: true, following: true })
+    expect(await toggle(1, 'DELETE').json()).toEqual({ ok: true, following: false })
+    // Idempotent, as the real action is: a second follow is not a 409.
+    expect(await toggle(1, 'POST').json()).toEqual({ ok: true, following: true })
+    expect(await toggle(1, 'POST').json()).toEqual({ ok: true, following: true })
+    await toggle(1, 'DELETE')
+  })
+
+  test('following refuses what the real routes refuse', async () => {
+    const auth = { Authorization: 'Bearer fixture-session-token' }
+    // No session: a 401 the app reads as a spent token.
+    expect(handle(new Request('http://localhost/api/judges/1/follow', { method: 'POST' })).status).toBe(401)
+    // A judge who is not listed, distinct from a silent success.
+    expect(handle(new Request('http://localhost/api/judges/9999/follow', { method: 'POST', headers: auth })).status).toBe(404)
+  })
 })

@@ -120,6 +120,11 @@ export function likeFailureMessage(status: number, body: Record<string, any>): s
     return 'That review is no longer published.'
   if (status === 422)
     return 'You cannot mark your own review as helpful.'
+  // The route is throttled at 60 writes a minute. This used to fall through
+  // to "Please try again", which is wrong for the next few seconds in exactly
+  // the case that produces it — a row of chips being tapped quickly.
+  if (status === 429)
+    return 'That was a lot of taps. Wait a moment and try again.'
   if (status === 0)
     return 'Could not reach Bench Review. Your reaction was not saved.'
   return 'That did not save. Please try again.'
@@ -157,6 +162,11 @@ export function commentFailureMessage(status: number, body: Record<string, any>)
     return 'That review is no longer published.'
   if (status === 422)
     return 'This comment needs changing before it can be posted.'
+  // Twenty comments in five minutes, which is a far longer wait than the
+  // like throttle — so this says the draft is safe rather than inviting an
+  // immediate retry that would fail too.
+  if (status === 429)
+    return 'You have posted a lot of comments just now. Your draft is kept — try again in a few minutes.'
   if (status === 0)
     return 'Could not reach Bench Review. Your comment has not been posted.'
   return 'The comment could not be posted. Please try again.'
