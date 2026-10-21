@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, test } from 'bun:test'
-import { handle } from '../../scripts/mobile-e2e-api'
+import { handle, handleAsync } from '../../scripts/mobile-e2e-api'
 import { isLoopback, resolveMobileServer, serverArgument } from '../../scripts/mobile-target'
 import { junitSummary, wantsOfflineServer } from '../../scripts/run-mobile-e2e'
 
@@ -166,6 +166,75 @@ describe('the e2e fixture api', () => {
     expect(await toggle(1, 'POST').json()).toEqual({ ok: true, following: true })
     expect(await toggle(1, 'POST').json()).toEqual({ ok: true, following: true })
     await toggle(1, 'DELETE')
+  })
+
+  test('posting a review accepts what the NATIVE screen sends', async () => {
+    // The native screen omits `type`; the web sends it. The action's rule
+    // carries no `.required()`, so the router lets an absent value through
+    // and `handle()` defaults it. A fixture that demanded the field would
+    // fail a screen the real server accepts — which is the failure mode that
+    // makes a strict fixture worse than no fixture.
+    const response = await handleAsync(new Request('http://localhost/api/reviews', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer fixture-session-token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        judge_id: 3,
+        title: 'Ran a careful hearing',
+        content: '<p>Explained every ruling as it was made, and said why.</p>',
+        rating: 4,
+        anonymized: true,
+      }),
+    }))
+    expect(response.status).toBe(201)
+    const body = await response.json() as any
+    expect(body.review.type).toBe('neutral')
+    // The flag has to survive the trip, or the anonymity toggle is decorative.
+    expect(body.review.anonymized).toBe(1)
+    // Pending, as every real submission is — it does NOT join the feed.
+    expect(body.review.status).toBe('pending')
+  })
+
+  test('a body that is only markup is not a review', async () => {
+    // `<p></p>` is seven characters of HTML and none of review. Measuring the
+    // HTML string rather than the visible text is how a blank-body review got
+    // through once.
+    const response = await handleAsync(new Request('http://localhost/api/reviews', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer fixture-session-token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ judge_id: 1, title: 'Looks fine', content: '<p></p><p>&nbsp;</p>', rating: 5 }),
+    }))
+    expect(response.status).toBe(422)
+    expect((await response.json() as any).error).toMatch(/at least 10 characters of actual text/)
+  })
+
+  test('reviewing the same judge twice is a 409, not a second row', async () => {
+    const post = (judgeId: number): Promise<Response> => handleAsync(new Request('http://localhost/api/reviews', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer fixture-session-token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        judge_id: judgeId,
+        title: 'Clear and on time',
+        content: '<p>Started on time and explained the order of the day.</p>',
+        rating: 5,
+      }),
+    }))
+    expect((await post(12)).status).toBe(201)
+    const second = await post(12)
+    expect(second.status).toBe(409)
+    expect((await second.json() as any).error).toMatch(/already reviewed this judge/i)
+  })
+
+  test('posting a review refuses what the real route refuses', async () => {
+    const auth = { 'Authorization': 'Bearer fixture-session-token', 'Content-Type': 'application/json' }
+    const good = { title: 'Clear and on time', content: '<p>Started on time and explained every ruling.</p>', rating: 5 }
+    const post = (payload: unknown, headers: Record<string, string> = auth): Promise<Response> =>
+      handleAsync(new Request('http://localhost/api/reviews', { method: 'POST', headers, body: JSON.stringify(payload) }))
+
+    expect((await post({ judge_id: 1, ...good }, { 'Content-Type': 'application/json' })).status).toBe(401)
+    expect((await post({ judge_id: 9999, ...good })).status).toBe(404)
+    expect((await post({ ...good })).status).toBe(422)
+    expect((await post({ judge_id: 1, ...good, rating: 0 })).status).toBe(422)
+    expect((await post({ judge_id: 1, ...good, title: 'ab' })).status).toBe(422)
   })
 
   test('following refuses what the real routes refuse', async () => {

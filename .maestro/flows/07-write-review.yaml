@@ -1,0 +1,232 @@
+appId: ${APP_ID}
+name: Writing a review
+tags:
+  - mobile
+  - smoke
+---
+# The Write tab, end to end (bench-review#79).
+#
+# This screen is what the site exists for and had NO coverage at all: 17
+# interactive controls, none of them touched by a flow. It is also the screen
+# where a silent failure costs the most — reviews name real judges, and the
+# anonymity toggle decides whether the author's name goes on one.
+#
+# That toggle deserves the attention it gets below. It is a Pressable with a
+# checkmark rather than a <Switch> because <Switch> renders here and is then
+# completely inert — the thumb does not move and @change never fires
+# (craft-native/craft#371). A control that looks settable and is not is
+# exactly the bug this flow has to be able to see, so the assertions are on
+# the sentence underneath it, which says in words what the setting does.
+#
+# Tabs are tapped by position, not by their word: see 02-navigation for why.
+# Feed 14%, Judges 32%, Courthouses 50%, Write 68%, Profile 86%, at 92% down.
+
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: "Ran a tight, fair calendar"
+    timeout: 90000
+
+# ⚠️ START FROM SIGNED OUT, and do not assume it. `clearState: true` does not
+# touch the Keychain, where the session token lives — see 02-navigation.
+- tapOn:
+    point: "86%,92%"
+- waitForAnimationToEnd:
+    timeout: 6000
+- runFlow:
+    when:
+      visible: "Sign out"
+    commands:
+      - tapOn:
+          id: "profile-signout"
+      - extendedWaitUntil:
+          visible: "You are browsing as a guest"
+          timeout: 30000
+
+# WRITING IS GATED, AND SAYS WHY. Reading is open to everyone; a review names
+# a real judge, so it is tied to an account. The gate has to explain itself
+# rather than present an empty form that fails on submit.
+- tapOn:
+    point: "68%,92%"
+- extendedWaitUntil:
+    visible: "Reviews name real judges, so they are tied to an account. Reading them is open to everyone."
+    timeout: 30000
+- assertVisible:
+    id: "review-signin"
+- assertNotVisible:
+    id: "review-submit"
+- takeScreenshot: write-signed-out
+
+- tapOn:
+    id: "review-signin"
+- extendedWaitUntil:
+    visible: "Sign in to Bench Review"
+    timeout: 30000
+- tapOn:
+    id: "login-email"
+- inputText: "clerk@example.test"
+- tapOn:
+    id: "login-password"
+- inputText: "correct-horse"
+- tapOn:
+    id: "login-submit"
+
+# THE PICKER COMES BACK BY ITSELF. Login pops, so this tab is already
+# mounted; it re-reads on appearance rather than staying on the gate.
+- extendedWaitUntil:
+    visible: "Which judge is this review about?"
+    timeout: 30000
+- takeScreenshot: write-picker
+
+# SEARCH NARROWS THE DIRECTORY. 25 judges is already more than a list someone
+# scrolls, and the picker is the one place a wrong pick is unrecoverable.
+- tapOn:
+    id: "review-search"
+- inputText: "Cedar"
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible: "Fixture C. Cedar"
+- assertNotVisible: "Fixture A. Alder"
+- tapOn:
+    id: "review-judge-3"
+
+# THE FORM KNOWS WHO IT IS ABOUT, and says so rather than making someone
+# trust that the tap landed on the row they meant.
+- extendedWaitUntil:
+    visible: "YOUR RATING"
+    timeout: 30000
+- assertVisible: "Fixture C. Cedar"
+
+# THE BUTTON IS INERT UNTIL IT CAN WORK, AND SAYS WHAT IS MISSING. A dead
+# control with no explanation gets tapped repeatedly.
+- assertVisible: "Give a rating from 1 to 5 stars."
+
+- tapOn:
+    id: "review-star-4"
+- waitForAnimationToEnd:
+    timeout: 3000
+- assertVisible: "A title needs at least 3 characters."
+
+# ⚠️ DISMISS THE KEYBOARD BETWEEN FIELDS.
+#
+# Not a workaround for a broken screen — the screen is fine. With the title
+# focused the keyboard's top edge sits at about y=537pt, and the body field
+# (509-649), the anonymity row (697-754) and the submit button (778-828) are
+# all behind it. Craft insets the scroll view and keeps the FOCUSED field in
+# view, and `keyboardDismissMode="on-drag"` is how a person gets past it; but
+# `tapOn` by id taps wherever the element is reported, occluded or not. So a
+# tap meant for the body lands on the keyboard and the text appends to the
+# still-focused title.
+#
+# That is exactly what happened: the title came back holding "Ran a careful
+# hearing Explained every ruling as it was made…" while the body stayed
+# empty. The flow was wrong, not the app.
+- tapOn:
+    id: "review-title"
+- inputText: "Ran a careful hearing"
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 3000
+- assertVisible: "Write at least 10 characters about your experience."
+
+- tapOn:
+    id: "review-body"
+- inputText: "Explained every ruling as it was made, and said why."
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# THE TITLE HELD ONLY THE TITLE. If a keystroke had gone to the wrong field
+# this is where it shows: the title is a single line and the body text would
+# have landed on the end of it.
+- assertVisible: "Ran a careful hearing"
+
+# NOTHING LEFT TO FIX, so the reason disappears rather than lingering beside
+# a button that now works.
+- assertNotVisible: "Write at least 10 characters about your experience."
+
+# ⚠️ THE ANONYMITY TOGGLE IS LIVE, and says in words what it will do.
+#
+# This is the assertion that would catch the <Switch> bug if it came back:
+# an inert control leaves the sentence on "published under your name" however
+# many times it is tapped. On a site built around reviewer anonymity, a
+# toggle that looks set and is not is the worst failure on the screen.
+- assertVisible: "This review will be published under your name."
+- tapOn:
+    id: "review-anonymous"
+- extendedWaitUntil:
+    visible: "Your name is replaced with your role. Moderators still see who wrote it."
+    timeout: 10000
+- assertNotVisible: "This review will be published under your name."
+- takeScreenshot: write-anonymous-on
+
+# AND IT COMES BACK OFF. A one-way toggle is not a choice.
+- tapOn:
+    id: "review-anonymous"
+- extendedWaitUntil:
+    visible: "This review will be published under your name."
+    timeout: 10000
+- tapOn:
+    id: "review-anonymous"
+- extendedWaitUntil:
+    visible: "Your name is replaced with your role. Moderators still see who wrote it."
+    timeout: 10000
+
+- takeScreenshot: write-ready
+- tapOn:
+    id: "review-submit"
+
+# IT LANDS IN THE QUEUE, AND SAYS SO. Every submission is `status: pending`;
+# telling someone it is live when a moderator has not seen it is a promise
+# the site does not keep.
+- extendedWaitUntil:
+    visible: "Thanks — it is with our moderators"
+    timeout: 30000
+- assertVisible:
+    id: "review-another"
+- takeScreenshot: write-submitted
+
+# THE THANKS PANEL IS NOT A DEAD END. "Write another" has to return a BLANK
+# form — a second review carrying the first one's rating and text is how
+# someone posts the wrong thing about the wrong judge.
+- tapOn:
+    id: "review-another"
+- extendedWaitUntil:
+    visible: "Which judge is this review about?"
+    timeout: 30000
+
+# The SEARCH TERM survives "write another" — `writeAnother()` resets the
+# judge, rating, title and body but not the term, so the picker is still
+# narrowed to Cedar. Retyping it here would append and match nothing, which
+# is how this flow failed on paper before it ever ran.
+- assertVisible: "Fixture C. Cedar"
+- assertNotVisible: "Fixture A. Alder"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "review-judge-3"
+- extendedWaitUntil:
+    visible: "YOUR RATING"
+    timeout: 30000
+# The rating, title and body are all back to empty, which the screen says by
+# naming the FIRST thing still missing.
+- assertVisible: "Give a rating from 1 to 5 stars."
+- assertNotVisible: "Ran a careful hearing"
+# And the anonymity choice does not persist into a review that did not make
+# it — each review is its own decision.
+- assertVisible: "This review will be published under your name."
+
+# LEAVE THE DEVICE AS THIS FLOW FOUND IT — see 06-follow for why.
+- tapOn:
+    point: "86%,92%"
+- extendedWaitUntil:
+    visible: "Sign out"
+    timeout: 30000
+- tapOn:
+    id: "profile-signout"
+- extendedWaitUntil:
+    visible: "You are browsing as a guest"
+    timeout: 30000

@@ -1,0 +1,179 @@
+appId: ${APP_ID}
+name: Posting a comment
+tags:
+  - mobile
+  - smoke
+---
+# The comment composer (bench-review#44, bench-review#79).
+#
+# 05-reactions covers the signed-OUT half of this screen: the thread reads
+# publicly and the composer is an invitation rather than a dead box. The half
+# that actually writes had none, and it is the half where this screen's one
+# real bug lived — `@input="draft.set($event)"` stored the EVENT instead of
+# its text, which is non-empty, so it sailed past validation and would have
+# posted "[object Object]" to a public thread. Every other screen uses
+# `$event.text`; no unit test can see the difference, because the bug is in
+# the binding rather than in any function.
+#
+# So the assertions below are about the TEXT making the round trip, not about
+# the request succeeding.
+#
+# Tabs are tapped by position, not by their word: see 02-navigation for why.
+# Feed 14%, Judges 32%, Courthouses 50%, Write 68%, Profile 86%, at 92% down.
+
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: "Ran a tight, fair calendar"
+    timeout: 90000
+
+# ⚠️ START FROM SIGNED OUT, and do not assume it. `clearState: true` does not
+# touch the Keychain, where the session token lives — see 02-navigation.
+- tapOn:
+    point: "86%,92%"
+- waitForAnimationToEnd:
+    timeout: 6000
+- runFlow:
+    when:
+      visible: "Sign out"
+    commands:
+      - tapOn:
+          id: "profile-signout"
+      - extendedWaitUntil:
+          visible: "You are browsing as a guest"
+          timeout: 30000
+
+# Into the thread from the feed, signed out.
+- tapOn:
+    point: "14%,92%"
+- extendedWaitUntil:
+    visible: "Ran a tight, fair calendar"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "review-comments-1000"
+- extendedWaitUntil:
+    visible: "Appeared before them twice this year and this matches both times."
+    timeout: 30000
+
+# NO COMPOSER WITHOUT A SESSION — an invitation instead, because a disabled
+# box explains nothing.
+- assertVisible:
+    id: "comments-sign-in"
+- assertNotVisible:
+    id: "comment-body"
+
+- tapOn:
+    id: "comments-sign-in"
+- extendedWaitUntil:
+    visible: "Sign in to Bench Review"
+    timeout: 30000
+- tapOn:
+    id: "login-email"
+- inputText: "clerk@example.test"
+- tapOn:
+    id: "login-password"
+- inputText: "correct-horse"
+- tapOn:
+    id: "login-submit"
+
+# THE COMPOSER APPEARS ON RETURN, without the thread being re-opened.
+- extendedWaitUntil:
+    visible:
+      id: "comment-body"
+    timeout: 30000
+- assertNotVisible: "Sign in to join this conversation."
+- takeScreenshot: comments-composer
+
+# TOO SHORT IS REFUSED BEFORE IT COSTS A ROUND TRIP, and the reason names the
+# bound rather than saying "invalid".
+#
+# Posted EMPTY, which needs no typing at all. The refusal arrives on the post
+# ATTEMPT rather than while typing — `problem` is a state the handler sets,
+# not a derived off the draft — so the button is the trigger either way, and
+# an empty draft reaches the same guard as a two-character one.
+- tapOn:
+    id: "comment-post"
+- extendedWaitUntil:
+    visible: "A comment needs at least 5 characters."
+    timeout: 10000
+
+# ⚠️ THE TEXT ITSELF HAS TO SURVIVE THE TRIP.
+#
+# A binding that stored the event rather than its text passes every length
+# check — "[object Object]" is 15 characters — so the only assertion that can
+# see it is the posted comment's own words appearing in the thread.
+#
+# ⚠️ ONE typing interaction, and ASCII only.
+#
+#   - One, because a tap that re-focuses this field after a post does not
+#     reliably take: an earlier version typed twice around a post tap and the
+#     second string vanished, with the command still reported as completed.
+#     Driving the same screen by hand showed the app itself is fine — the
+#     text lands every time the field is genuinely focused — so this avoids
+#     the re-focus rather than papering over a defect that is not there.
+#   - ASCII, because `inputText` goes through XCUITest's typeText, which can
+#     only produce what the on-screen keyboard has. An em dash (U+2014) is
+#     not on it.
+#   - And it starts with a capital letter on purpose. The field takes iOS
+#     sentence capitalisation, which is right for a comment box and would
+#     otherwise turn a typed "the" into "The" and fail the assertion for a
+#     reason that has nothing to do with the app.
+- tapOn:
+    id: "comment-body"
+- inputText: "The docket ran on time, which is worth saying."
+- tapOn:
+    id: "comment-post"
+
+- extendedWaitUntil:
+    visible: "The docket ran on time, which is worth saying."
+    timeout: 30000
+- assertNotVisible: "[object Object]"
+- takeScreenshot: comment-posted
+
+# THE REFUSAL CLEARED when the post succeeded, rather than sitting over a
+# comment that did go up.
+- assertNotVisible: "A comment needs at least 5 characters."
+
+# AND THE BOX IS EMPTY AGAIN. A draft left behind after a successful post is
+# how the same comment goes up twice. An empty box cannot be asserted
+# directly — its text and the posted comment's are the same string — so this
+# asks the screen: posting now refuses for being EMPTY, which it can only do
+# if the draft was cleared. The refusal above was cleared by the successful
+# post, so this is the message arriving again rather than one that lingered.
+- tapOn:
+    id: "comment-post"
+- extendedWaitUntil:
+    visible: "A comment needs at least 5 characters."
+    timeout: 10000
+
+# THE THREAD GREW BY ONE, and the count says so. The seeded thread has two.
+#
+# ⚠️ The count is at the TOP of the thread (`comments-count`) and the
+# composer is at the bottom, so with the keyboard up this is off-screen. See
+# 07-write-review for the same hazard costing a run.
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 3000
+- scrollUntilVisible:
+    element:
+      id: "comments-count"
+    direction: UP
+    timeout: 20000
+- assertVisible:
+    text: "(?i)3 comments"
+
+# LEAVE THE DEVICE AS THIS FLOW FOUND IT — see 06-follow for why.
+- tapOn:
+    point: "86%,92%"
+- extendedWaitUntil:
+    visible: "Sign out"
+    timeout: 30000
+- tapOn:
+    id: "profile-signout"
+- extendedWaitUntil:
+    visible: "You are browsing as a guest"
+    timeout: 30000

@@ -77,6 +77,20 @@ const offline = state(false)
 const draft = state('')
 const posting = state(false)
 const problem = state('')
+/**
+ * Whether there is a session, as STATE rather than a call in the template.
+ *
+ * `signedIn()` reads the Keychain synchronously and is not a signal, so
+ * `:if="signedIn()"` is evaluated once at render and never again. This screen
+ * sends people to sign in — the invitation under the thread is its own
+ * button — and Login POPS rather than pushing on, so it comes back to a
+ * screen that was never unmounted. Reading the Keychain in the template meant
+ * someone who signed in specifically to comment returned to a thread still
+ * telling them to sign in, with no composer.
+ *
+ * Profile.stx and Review.stx already hold it this way for the same reason.
+ */
+const authed = state(signedIn())
 
 let alive = true
 // An older page must not land on top of a newer one.
@@ -116,7 +130,7 @@ const subtitle = derived<string>(() => {
   return parts.join(' · ')
 })
 
-const canPost = derived<boolean>(() => signedIn() && !posting() && draft().trim().length > 0)
+const canPost = derived<boolean>(() => authed() && !posting() && draft().trim().length > 0)
 const remaining = derived<number>(() => COMMENT_MAX - draft().trim().length)
 // Only worth saying when it is close enough to matter.
 const counter = derived<string>(() => remaining() <= 200 ? `${remaining()} left` : '')
@@ -193,6 +207,10 @@ async function post(): Promise<void> {
   if (posting())
     return
   if (!signedIn()) {
+    // The live read is the authority here: a token can be spent between the
+    // screen appearing and this tap. Bring the state back in step so the
+    // composer does not sit over a session that is gone.
+    authed.set(false)
     signIn()
     return
   }
@@ -239,6 +257,25 @@ async function post(): Promise<void> {
 onMount(() => {
   alive = true
   void load(1)
+
+  // Someone leaves for the sign-in screen from the invitation below the
+  // thread and comes back HERE — Login pops, so this screen is still
+  // mounted and nothing re-runs on its own. Without this they return to the
+  // same invitation they just acted on.
+  //
+  // The thread is reloaded too, not just the session: `is_mine` on each
+  // comment is a property of who is asking, so the rows a guest was served
+  // are the wrong rows once there is a session.
+  try {
+    craft?.navigation?.onAppear?.(() => {
+      authed.set(signedIn())
+      void load(currentPage())
+    })
+  }
+  catch {
+    // No appearance hook on this runtime; the mount read stands.
+  }
+
   return () => { alive = false }
 })
 </script>
@@ -295,7 +332,7 @@ onMount(() => {
         box: a field you cannot type in explains nothing, and the endpoint is
         auth-gated for reasons that have nothing to do with this person.
       -->
-      <View :if="!signedIn()" class="items-center mt-6 py-6" :class="ui.card" testID="comments-signed-out">
+      <View :if="!authed()" class="items-center mt-6 py-6" :class="ui.card" testID="comments-signed-out">
         <Text class="text-center" :class="ui.subtitle" text="Sign in to join this conversation." />
         <Pressable id="comments-sign-in" @press="signIn()" class="items-center justify-center mt-3 px-5 min-h-[44px] bg-[#2563eb] rounded-[10px]" accessibilityRole="button" testID="comments-sign-in">
           <Text class="font-semibold text-[17px] text-white" text="Sign in" />
@@ -315,7 +352,7 @@ onMount(() => {
         address before commenting" is only useful if it can be read while the
         keyboard is still up, which is exactly when it arrives.
       -->
-      <View :if="signedIn()" class="gap-2 mt-6 p-4" :class="ui.card" testID="comments-composer">
+      <View :if="authed()" class="gap-2 mt-6 p-4" :class="ui.card" testID="comments-composer">
         <Text :if="problem()" :class="ui.danger" :text="problem()" testID="comment-problem" />
         <View class="flex-row gap-2 items-end">
           <TextInput

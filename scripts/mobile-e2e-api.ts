@@ -207,6 +207,16 @@ function likesFor(id: number): number {
  */
 const followed = new Set<number>([2])
 
+/**
+ * Judges this session has already reviewed, so a second attempt gets the real
+ * 409 rather than silently stacking reviews.
+ *
+ * In memory, same as the likes and the follows: it persists within a run and
+ * resets between them.
+ */
+const reviewed = new Set<number>()
+let nextReviewId = 9000
+
 /** The one account the fixture knows, and the token it answers with. */
 const FIXTURE_EMAIL = 'clerk@example.test'
 const FIXTURE_PASSWORD = 'correct-horse'
@@ -429,6 +439,71 @@ export async function handleAsync(request: Request): Promise<Response> {
 
   if (url.pathname === '/api/auth/logout')
     return json({ ok: true })
+
+  // Posting a review (bench-review#79). The refusals are SubmitReviewAction's
+  // own, in its own order, because a permissive fixture here would be worse
+  // than none: the one thing an e2e run can prove about this screen is that
+  // what it sends is what the server will accept.
+  //
+  // Faithful in the details that cost something to get wrong:
+  //   - `type` is NOT required. The native screen omits it and the web sends
+  //     it; the action's rule carries no `.required()`, so the router's
+  //     `empty && rule.isRequired !== true` lets it through and `handle()`
+  //     defaults it to 'neutral'. A fixture that demanded it would fail a
+  //     screen the real server accepts.
+  //   - length is measured on the VISIBLE TEXT, after tags are stripped. A
+  //     body of `<p></p>` is 7 characters of HTML and none of review, which
+  //     is how a blank-body review got through once.
+  //   - a second review of the same judge is a 409, not a duplicate row.
+  if (url.pathname === '/api/reviews' && request.method === 'POST') {
+    if (!authed(request))
+      return json({ error: 'Not authenticated' }, 401)
+
+    const body = await request.json().catch(() => ({})) as Record<string, any>
+    const judgeId = Number(body?.judge_id)
+    const rating = Number(body?.rating)
+    const title = String(body?.title ?? '').trim()
+
+    if (!Number.isInteger(judgeId) || judgeId < 1)
+      return json({ error: 'Pick a judge before submitting.' }, 422)
+    if (!(rating >= 1 && rating <= 5))
+      return json({ error: 'Pick a rating between 1 and 5 stars.' }, 422)
+    if (title.length < 3 || title.length > 255)
+      return json({ error: 'Title must be between 3 and 255 characters.' }, 422)
+
+    const visible = String(body?.content ?? '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (visible.length < 10)
+      return json({ error: 'Review must be at least 10 characters of actual text.' }, 422)
+
+    if (!JUDGES.some(j => j.id === judgeId))
+      return json({ error: 'Judge not found' }, 404)
+    if (reviewed.has(judgeId))
+      return json({ error: 'You have already reviewed this judge. Edit your existing review instead of posting a new one.' }, 409)
+
+    reviewed.add(judgeId)
+    const anonRaw = body?.anonymized
+    return json({
+      ok: true,
+      review: {
+        id: nextReviewId++,
+        judge_id: judgeId,
+        title,
+        rating,
+        // Recorded the way the action records it, so a test can tell a
+        // screen that sent the flag from one that dropped it.
+        anonymized: anonRaw === true || anonRaw === 'true' || anonRaw === 1 || anonRaw === '1' ? 1 : 0,
+        type: body?.type ?? 'neutral',
+        // Pending, as every real submission is: the review does NOT appear
+        // in the feed afterwards, and a flow that expected it to would be
+        // asserting against a moderation queue that does not exist.
+        status: 'pending',
+      },
+    }, 201)
+  }
 
   const thread = url.pathname.match(/^\/api\/reviews\/(\d+)\/comments$/)
   if (thread && request.method === 'POST') {
