@@ -1,0 +1,371 @@
+<script client lang="ts">
+// One review, in full (config/mobile.ts `nativeScreens`, /reviews/:id).
+//
+// The feed's cards used to open the JUDGE. The card announced itself as
+// "Review of <judge>, <title>" and then pushed a screen about somebody's
+// whole record, which is why it read as a bug rather than a choice — there
+// was simply no screen for one review to open. This is it.
+//
+// It does NOT hold the thread. `/reviews/:id/comments` already owns that,
+// including the composer and its paging, and a second copy would be the
+// third place the same rows are drawn. This shows the review, a few comments
+// under it, and sends the rest there.
+import { ApiError, getJson } from '../functions/native-api'
+import { handoffFromParams, handoffQuery } from '../functions/native-handoff'
+import { commentByline, commentLabel, helpfulLabel, nextLikeState, sendLike } from '../functions/native-reactions'
+import { plainTextFromHtml, shortDate, starsFor } from '../functions/native-review'
+import { signedIn, viewerHeaders } from '../functions/native-session'
+import { initials, ui } from '../functions/native-ui'
+
+interface Comment {
+  id: number
+  body?: string | null
+  created_at?: string | null
+  author?: { name?: string | null } | null
+}
+
+const craft = (globalThis as any).craft
+
+/** How many comments are worth showing before "view all" does a better job. */
+const PREVIEW = 2
+
+function readReviewId(): number {
+  const route = craft?.route ?? {}
+  const fromParams = Number(route.params?.id ?? 0)
+  if (Number.isInteger(fromParams) && fromParams > 0)
+    return fromParams
+  // `/reviews/123` but NOT `/reviews/123/comments`, which is its own screen.
+  const fromPath = String(route.path ?? '').match(/\/reviews\/(\d+)(?:$|\?)/)
+  return fromPath ? Number(fromPath[1]) : 0
+}
+
+const reviewId = state<number>(readReviewId())
+
+/**
+ * What the opener already knew, painted in the first frame.
+ *
+ * The feed hands over the row it is already showing, so the title, stars and
+ * judge are on screen before any request — the same handoff the judge screen
+ * uses, and for the same reason: a detail screen that cannot name its subject
+ * until a round trip finishes shows a blank card for that round trip.
+ */
+const handoff = handoffFromParams(craft?.route?.params, ['title', 'judge', 'stars', 'likes', 'comments'] as const)
+
+const review = state<Record<string, any> | null>(null)
+const comments = state<Comment[]>([])
+const commentTotal = state<number>(Number(handoff?.comments ?? 0) || 0)
+const loading = state(true)
+const failed = state(false)
+const offline = state(false)
+/** Optimistic like, as on every other screen that shows this chip. */
+const pending = state<{ liked: boolean, likes: number } | null>(null)
+const notice = state('')
+
+let alive = true
+
+const title = derived<string>(() => review()?.title || handoff?.title || 'Review')
+const judgeName = derived<string>(() => review()?.judge?.name || handoff?.judge || '')
+const judgeWhere = derived<string>(() => review()?.judge?.context_line || '')
+const judgePhoto = derived<string>(() => review()?.judge?.image_url || '')
+const judgeMark = derived<string>(() => initials(judgeName()))
+const judgeId = derived<number>(() => Number(review()?.judge?.id ?? review()?.judge_id ?? 0))
+
+const stars = derived<string>(() => starsFor(Number(review()?.rating ?? handoff?.stars ?? 0)))
+const byline = derived<string>(() => [
+  review()?.author?.name || review()?.reviewer?.name || 'Anonymous reviewer',
+  shortDate(review()?.created_at),
+].filter(Boolean).join(' · '))
+
+// The API returns sanitized HTML; a native Text draws characters, not markup.
+const body = derived<string>(() => plainTextFromHtml(review()?.content || ''))
+
+const liked = derived<boolean>(() => pending() ? pending()!.liked : Boolean(review()?.liked_by_me))
+const likes = derived<number>(() => pending() ? pending()!.likes : Number(review()?.likes ?? handoff?.likes ?? 0))
+const helpfulText = derived<string>(() => helpfulLabel(likes()))
+const commentText = derived<string>(() => commentLabel(commentTotal()))
+const mine = derived<boolean>(() => Boolean(review()?.is_mine))
+
+const previewRows = derived(() => comments().slice(0, PREVIEW).map(c => ({
+  key: c.id,
+  body: plainTextFromHtml(c.body || ''),
+  byline: commentByline(c.author, shortDate(c.created_at)),
+})))
+
+const more = derived<number>(() => Math.max(0, commentTotal() - previewRows().length))
+const moreText = derived<string>(() => more() === 1 ? 'View 1 more comment' : 'View all ' + commentTotal() + ' comments')
+const noComments = derived<boolean>(() => !loading() && commentTotal() === 0)
+
+const reason = derived<string>(() => offline()
+  ? 'Could not reach Bench Review. This review will load when you are back online.'
+  : 'This review is no longer published.')
+
+effect(() => craft?.navigation?.setOptions({ title: 'Review' }))
+
+async function load(): Promise<void> {
+  const id = reviewId()
+  if (!id) {
+    loading.set(false)
+    failed.set(true)
+    return
+  }
+  failed.set(false)
+  offline.set(false)
+  try {
+    // Both together: the review and its comments are independent, and
+    // `allSettled` so a thread that fails does not throw away a perfectly
+    // good review — the mistake Judge.stx was built to avoid.
+    //
+    // `viewerHeaders()` on both, or `is_mine` and `liked_by_me` come back
+    // false for everyone and the chip is offered on the reader's own review.
+    const [one, thread] = await Promise.allSettled([
+      getJson<Record<string, any>>(`/api/reviews/${id}`, undefined, viewerHeaders()),
+      getJson<{ data?: Comment[], total?: number }>(`/api/reviews/${id}/comments?page=1&per_page=${PREVIEW}`, undefined, viewerHeaders()),
+    ])
+    if (!alive)
+      return
+
+    if (one.status === 'fulfilled') {
+      review.set(one.value)
+      // Fresh row, so a guess still being held is stale and redundant.
+      pending.set(null)
+    }
+    else {
+      failed.set(true)
+      offline.set(one.reason instanceof ApiError && one.reason.status === 0)
+    }
+
+    if (thread.status === 'fulfilled') {
+      comments.set(thread.value?.data ?? [])
+      commentTotal.set(Number(thread.value?.total ?? 0))
+    }
+  }
+  catch (err) {
+    if (!alive)
+      return
+    failed.set(true)
+    offline.set(err instanceof ApiError && err.status === 0)
+  }
+  finally {
+    if (alive)
+      loading.set(false)
+  }
+}
+
+async function refresh(): Promise<void> {
+  await load()
+}
+
+/** Mark it helpful, or take it back. Same contract as the feed's chips. */
+async function toggleLike(): Promise<void> {
+  if (!signedIn()) {
+    craft?.navigation?.open?.('/login')
+    return
+  }
+  const before = { liked: liked(), likes: likes() }
+  pending.set(nextLikeState(before))
+  notice.set('')
+
+  const outcome = await sendLike(reviewId(), before)
+  if (!alive)
+    return
+  // Server's answer on success, previous value on failure, so applying it
+  // unconditionally IS the rollback.
+  pending.set(outcome.value)
+  if (outcome.error)
+    notice.set(outcome.error)
+}
+
+/** The thread, which owns the composer and the paging. */
+function openComments(): void {
+  notice.set('')
+  craft?.navigation?.open?.(`/reviews/${reviewId()}/comments${handoffQuery({
+    title: title(),
+    judge: judgeName(),
+    comments: commentTotal(),
+  })}`)
+}
+
+/**
+ * The judge this review is about.
+ *
+ * Reachable from HERE rather than from the feed's card, which is what the
+ * card used to do. The name stays visible on the card as context; opening it
+ * is a different intent and belongs on a different tap.
+ */
+function openJudge(): void {
+  const id = judgeId()
+  if (!id)
+    return
+  craft?.navigation?.open?.(`/judges/${id}${handoffQuery({
+    name: judgeName(),
+    photo: judgePhoto(),
+    court: judgeWhere(),
+  })}`)
+}
+
+onMount(() => {
+  alive = true
+  void load()
+
+  // Someone leaves for the sign-in screen from the Helpful chip, or for the
+  // thread and back after posting. Login pops, so this screen is still
+  // mounted and nothing re-runs on its own — and `is_mine` and `liked_by_me`
+  // are computed from the session, so what comes back is a different review.
+  try {
+    craft?.navigation?.onAppear?.(() => { void load() })
+  }
+  catch {
+    // No appearance hook on this runtime; the mount read stands.
+  }
+
+  try {
+    craft?.route?.onParams?.(() => {
+      const next = readReviewId()
+      if (next && next !== reviewId()) {
+        reviewId.set(next)
+        void load()
+      }
+    })
+  }
+  catch {
+    // No subscription on this runtime; the initial read stands.
+  }
+
+  return () => { alive = false }
+})
+</script>
+
+<template>
+  <View :class="ui.screen">
+    <ScrollView class="flex-1" @refresh="refresh()" :refreshing="loading() && !!review()">
+      {{-- The review itself. Painted from the handoff in the first frame, so
+           the title and stars are right before anything is fetched. --}}
+      <View :if="!failed()" class="mt-4" :class="ui.card" testID="review-detail">
+        <View class="flex-row gap-2 items-center">
+          <Text class="text-[#f59e0b] text-[17px]" :text="stars()" />
+          <Text :numberOfLines="1" class="flex-1" :class="ui.caption" :text="byline()" />
+        </View>
+        <Text class="mt-2 font-semibold text-[22px] text-black dark:text-white" :text="title()" />
+        <Text :if="body()" class="mt-2 text-[#3c3c43] text-[17px] dark:text-[#d1d1d6]" :text="body()" testID="review-detail-body" />
+      </View>
+
+      {{-- Who it is about. Its own row, because opening the judge is a
+           different intent from reading the review. --}}
+      <Pressable
+        :if="judgeName()"
+        id="review-detail-judge"
+        @press="openJudge()"
+        class="flex-row gap-3 items-center mt-4 px-4 py-3"
+        :class="ui.group"
+        accessibilityRole="button"
+        :accessibilityLabel="'About ' + judgeName() + '. Opens their page.'"
+        testID="review-detail-judge"
+      >
+        <Image :if="judgePhoto()" :source="{ uri: judgePhoto() }" resizeMode="cover" class="h-11 w-11 rounded-full" />
+        <View :if="!judgePhoto()" :class="ui.avatar">
+          <Text :class="ui.avatarText" :text="judgeMark()" />
+        </View>
+        <View class="flex-1">
+          <Text :numberOfLines="1" :class="ui.title" :text="judgeName()" />
+          <Text :if="judgeWhere()" :numberOfLines="1" :class="ui.caption" :text="judgeWhere()" />
+        </View>
+        <Icon name="chevron-right" :class="ui.chevron" />
+      </Pressable>
+
+      <View :if="notice()" class="mt-3 mx-4 px-3 py-2 bg-[#fff0f0] dark:bg-[#2c1618] rounded-[10px]" testID="review-detail-notice">
+        <Text :class="ui.danger" :text="notice()" />
+      </View>
+
+      {{-- The same chips as the feed, because this is the same review. --}}
+      <View :if="!failed()" class="flex-row gap-2 items-center mt-4 px-4" testID="review-detail-actions">
+        <Pressable
+          :if="!mine()"
+          id="review-detail-like"
+          @press="toggleLike()"
+          class="flex-row gap-1.5 items-center px-4 min-h-[44px] rounded-full"
+          :class="liked() ? 'bg-[#2563eb]' : 'bg-white dark:bg-[#1c1c1e]'"
+          accessibilityRole="button"
+          :accessibilityState="{ selected: liked() }"
+          :accessibilityLabel="liked() ? 'Marked helpful. Tap to undo' : 'Mark this review helpful'"
+          testID="review-detail-like"
+        >
+          <Icon name="thumbs-up" class="h-[17px] w-[17px]" :class="liked() ? 'text-white' : 'text-[#6e6e73] dark:text-[#98989d]'" />
+          <Text :class="liked() ? 'font-semibold text-[15px] text-white' : 'text-[15px] text-[#3c3c43] dark:text-[#d1d1d6]'" :text="helpfulText()" />
+        </Pressable>
+
+        <Pressable
+          id="review-detail-comments"
+          @press="openComments()"
+          class="flex-row gap-1.5 items-center px-4 min-h-[44px] bg-white dark:bg-[#1c1c1e] rounded-full"
+          accessibilityRole="button"
+          accessibilityLabel="Comments on this review"
+          testID="review-detail-comments"
+        >
+          <Icon name="message-square" class="h-[17px] w-[17px] text-[#6e6e73] dark:text-[#98989d]" />
+          <Text class="text-[#3c3c43] text-[15px] dark:text-[#d1d1d6]" :text="commentText()" />
+        </Pressable>
+      </View>
+
+      {{-- A few comments, then the thread. The composer and the paging live
+           there; duplicating them here would be the third copy of the same
+           rows in this app. --}}
+      <Text :if="previewRows().length > 0" :class="ui.header" text="COMMENTS" />
+      <View :if="previewRows().length > 0" :class="ui.group" testID="review-detail-comments-preview">
+        <View :for="(row, index) in previewRows()" :key="row.key">
+          <View :if="index" :class="ui.separator" />
+          <View class="gap-1 px-4 py-3">
+            <Text :class="ui.caption" :text="row.byline" />
+            <Text :numberOfLines="4" :class="ui.title" :text="row.body" />
+          </View>
+        </View>
+      </View>
+
+      <Pressable
+        :if="more() > 0"
+        id="review-detail-more-comments"
+        @press="openComments()"
+        class="justify-center mt-2 mx-4 min-h-[44px]"
+        accessibilityRole="button"
+        :accessibilityLabel="moreText()"
+        testID="review-detail-more-comments"
+      >
+        <Text class="text-[17px]" :class="ui.tint" :text="moreText()" />
+      </Pressable>
+
+      {{-- No thread yet. An invitation rather than an empty box, and it opens
+           the same screen the chip does. --}}
+      <Pressable
+        :if="noComments() && !failed()"
+        id="review-detail-first-comment"
+        @press="openComments()"
+        class="items-center mt-4 py-5"
+        :class="ui.card"
+        accessibilityRole="button"
+        accessibilityLabel="Be the first to comment"
+        testID="review-detail-first-comment"
+      >
+        <Icon name="message-square" class="h-6 w-6 text-[#c7c7cc] dark:text-[#48484a]" />
+        <Text class="mt-2" :class="ui.subtitle" text="No comments yet." />
+        <Text class="mt-0.5 text-[15px]" :class="ui.tint" text="Be the first to comment" />
+      </Pressable>
+
+      <View :if="loading() && !review()" class="mt-4" :class="ui.card" testID="review-detail-loading">
+        <View class="gap-2">
+          <View class="h-3.5 w-1/3" :class="ui.skeleton" />
+          <View class="h-3 w-2/3" :class="ui.skeleton" />
+          <View class="h-3 w-1/2" :class="ui.skeleton" />
+        </View>
+      </View>
+
+      <View :if="failed()" class="items-center mt-7 py-6" :class="ui.card" accessibilityRole="alert" testID="review-detail-empty">
+        <Icon :name="offline() ? 'wifi-off' : 'message-square'" class="h-7 w-7 text-[#c7c7cc] dark:text-[#48484a]" />
+        <Text class="mt-3 text-center" :class="ui.subtitle" :text="reason()" />
+        <Pressable id="review-detail-retry" @press="refresh()" class="justify-center mt-2 min-h-[44px]" accessibilityRole="button" testID="review-detail-retry">
+          <Text class="text-[17px]" :class="ui.tint" text="Try again" />
+        </Pressable>
+      </View>
+
+      <View class="h-12" />
+    </ScrollView>
+  </View>
+</template>

@@ -14,7 +14,7 @@ import { handoffQuery } from '../functions/native-handoff'
 import { buildPages } from '../functions/native-paging'
 import { commentLabel, helpfulLabel, nextLikeState, sendLike } from '../functions/native-reactions'
 import { plainTextFromHtml, shortDate, starsFor } from '../functions/native-review'
-import { signedIn } from '../functions/native-session'
+import { signedIn, viewerHeaders } from '../functions/native-session'
 import { ui } from '../functions/native-ui'
 
 interface FeedReview {
@@ -134,7 +134,7 @@ async function load(page: number): Promise<void> {
   failed.set(false)
   offline.set(false)
   try {
-    const body = await getJson<FeedPage>(`/api/reviews?page=${page}&per_page=${PER_PAGE}&sort=${sort()}`)
+    const body = await getJson<FeedPage>(`/api/reviews?page=${page}&per_page=${PER_PAGE}&sort=${sort()}`, undefined, viewerHeaders())
     if (!alive || ticket !== request)
       return
     const data = Array.isArray(body?.data) ? body.data : []
@@ -255,15 +255,30 @@ function openComments(row: { key: number, title: string, judgeName: string, comm
  * header draws, so the first frame is the finished header rather than a
  * placeholder that is replaced a moment later.
  */
-function openJudge(row: { judgeId: number, judgeName: string, where: string, judgePhoto: string }): void {
-  if (!row.judgeId)
+/**
+ * Open the REVIEW, which is what the card is.
+ *
+ * It used to open the judge, while announcing itself as
+ * "Review of <judge>, <title>" — a card that says one thing and does
+ * another. There was no screen for a single review at the time, so the judge
+ * was the only detail screen a card could reach.
+ *
+ * The judge is still one tap away, from the review's own screen. The name
+ * stays on the card as context; it is not its own target, because a
+ * Pressable inside a Pressable is a coin toss over which handler runs (see
+ * the action row below).
+ */
+function openReview(row: { key: number, title: string, judgeName: string, stars: string, likes: number, comments: number }): void {
+  if (!row.key)
     return
-  const handoff = handoffQuery({
-    name: row.judgeName,
-    photo: row.judgePhoto,
-    court: row.where,
-  })
-  craft?.navigation?.open?.(`/judges/${row.judgeId}${handoff}`)
+  notice.set('')
+  craft?.navigation?.open?.(`/reviews/${row.key}${handoffQuery({
+    title: row.title,
+    judge: row.judgeName,
+    stars: row.stars,
+    likes: row.likes,
+    comments: row.comments,
+  })}`)
 }
 
 async function refresh(): Promise<void> {
@@ -273,6 +288,32 @@ async function refresh(): Promise<void> {
 onMount(() => {
   alive = true
   void load(1)
+
+  // Someone leaves for the sign-in screen from a Helpful chip and comes back
+  // HERE — Login pops rather than pushing on, so this tab is still mounted
+  // and nothing re-runs on its own.
+  //
+  // What goes stale is the ROWS, not a flag on this screen: `is_mine` and
+  // `liked_by_me` are computed per request from the caller's session
+  // (LatestReviewsAction resolves the viewer; reviewLikes.ts fills both),
+  // so a guest is served `false` for every row. Without this, after signing
+  // in:
+  //
+  //   - your own review still offers a Helpful chip, and tapping it is a
+  //     guaranteed 422 — the chip is hidden on `mine` precisely so that is
+  //     never offered;
+  //   - reviews you had already marked helpful read as unmarked, so the next
+  //     tap takes the mark OFF something you never put it back on.
+  //
+  // The page is kept rather than reset to 1: coming back from a sign-in is
+  // not a reason to lose someone's place in the feed.
+  try {
+    craft?.navigation?.onAppear?.(() => { void load(currentPage()) })
+  }
+  catch {
+    // No appearance hook on this runtime; the mount read stands.
+  }
+
   return () => { alive = false }
 })
 </script>
@@ -300,7 +341,7 @@ onMount(() => {
           <View :if="index" :class="ui.separator" />
           <Pressable
             :id="'review-row-' + row.key"
-            @press="openJudge(row)"
+            @press="openReview(row)"
             class="gap-1 pb-2 pt-3 px-4"
             accessibilityRole="button"
             :accessibilityLabel="'Review of ' + row.judgeName + ', ' + row.title"

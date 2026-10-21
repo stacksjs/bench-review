@@ -1,0 +1,139 @@
+appId: ${APP_ID}
+name: Opening one review
+tags:
+  - mobile
+  - smoke
+---
+# The review page (bench-review#79).
+#
+# The feed's cards used to open the JUDGE while announcing themselves as
+# "Review of <judge>, <title>" — a card that said one thing and did another.
+# There was no screen for a single review, so the judge was the only detail
+# screen a card could reach. This covers the screen that closes that, and the
+# two paths out of it.
+#
+# ⚠️ It also covers a route-matching risk this change introduced. There are
+# now THREE paths under /reviews:
+#
+#     /reviews              the feed
+#     /reviews/:id          this screen
+#     /reviews/:id/comments the thread
+#
+# `CraftHybridRoutes` sorts MORE FIXED SEGMENTS FIRST, so `comments` wins over
+# `:id`. That is a claim about the framework, not about this app, and the only
+# honest way to hold it is to open the thread FROM the review and check which
+# screen arrives.
+#
+# Tabs are tapped by position, not by their word: see 02-navigation for why.
+# Feed 14%, Judges 32%, Courthouses 50%, Write 68%, Profile 86%, at 92% down.
+
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: "Ran a tight, fair calendar"
+    timeout: 90000
+
+# ⚠️ START FROM SIGNED OUT, and do not assume it — see 02-navigation.
+- tapOn:
+    point: "86%,92%"
+- waitForAnimationToEnd:
+    timeout: 6000
+- runFlow:
+    when:
+      visible: "Sign out"
+    commands:
+      - tapOn:
+          id: "profile-signout"
+      - extendedWaitUntil:
+          visible: "You are browsing as a guest"
+          timeout: 30000
+
+- tapOn:
+    point: "14%,92%"
+- extendedWaitUntil:
+    visible: "Ran a tight, fair calendar"
+    timeout: 30000
+
+# THE CARD OPENS THE REVIEW. Tapped on the body of the card, which is the
+# part that reads as "this review" — the chips beside it are their own
+# targets and are not what this is about.
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "review-row-1000"
+- extendedWaitUntil:
+    visible:
+      id: "review-detail"
+    timeout: 30000
+
+# THE WHOLE REVIEW, not the three-line snippet the card shows. The fixture's
+# body runs to a second paragraph, and the card truncates at three lines, so
+# the closing sentence is only ever on this screen.
+- assertVisible: "Ran a tight, fair calendar"
+- assertVisible:
+    text: ".*Clear with self-represented parties, and said why.*"
+# And the sanitiser's entities are decoded, not printed — the bug this app
+# has hit twice. A native Text draws characters, not markup.
+- assertVisible:
+    text: ".*Alder & Co.*"
+- assertNotVisible: "&amp;"
+- takeScreenshot: review-page
+
+# ITS NUMBERS ARE THERE. The fixture seeds this review with 4 helpful marks
+# and 2 comments; a page that dropped them would read as a review nobody has
+# touched.
+- assertVisible:
+    id: "review-detail-like"
+- assertVisible: "4"
+- assertVisible:
+    id: "review-detail-comments"
+
+# AND THE COMMENTS UNDER IT, which is what the page was asked for.
+- assertVisible: "Appeared before them twice this year and this matches both times."
+- assertVisible: "The timekeeping is the part nobody warns you about."
+
+# ⚠️ THE THREAD IS A DIFFERENT SCREEN, and /reviews/:id/comments has to win
+# over /reviews/:id to reach it. If the matcher preferred fewer fixed
+# segments this would land back on the review page, which carries no
+# composer — so the sign-in invitation below is what tells the two apart.
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "review-detail-comments"
+- extendedWaitUntil:
+    visible: "Sign in to join this conversation."
+    timeout: 30000
+# ⚠️ TWO, which is what the fixture SEEDS this review with.
+#
+# This number is also the suite's canary for flow isolation. 08 posts a
+# comment to this same review, so if the runner ever stops handing each flow
+# a fresh fixture, this reads three and fails — which is exactly how the
+# coupling was found.
+- assertVisible:
+    text: "(?i)2 comments"
+- assertNotVisible:
+    id: "review-detail"
+
+# BACK TO THE REVIEW, which is where that came from.
+- tapOn:
+    point: "6%,10%"
+- extendedWaitUntil:
+    visible:
+      id: "review-detail"
+    timeout: 30000
+
+# THE JUDGE IS STILL ONE TAP AWAY. The card stopped opening them, so this
+# screen has to — otherwise the change traded one missing destination for
+# another.
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "review-detail-judge"
+- extendedWaitUntil:
+    visible: "Write a review"
+    timeout: 30000
+- assertVisible: "Fixture A. Alder"
+- assertVisible: "Opinions"
+- takeScreenshot: review-page-to-judge

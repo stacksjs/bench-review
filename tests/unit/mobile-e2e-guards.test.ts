@@ -133,6 +133,43 @@ describe('the e2e fixture api', () => {
     expect((await get('/judges/2/education').body).education).toEqual([])
   })
 
+  test('a GUEST owns nothing and has liked nothing', async () => {
+    // Both fields are computed per request from the caller's session on the
+    // real server, and answer false without one. A fixture that ignored auth
+    // here would serve a guest and a signed-in reader identical rows, which
+    // is precisely what hides the feed's staleness after a sign-in.
+    const feed = await get('/reviews').body
+    expect(feed.data.every((r: any) => r.is_mine === false)).toBe(true)
+    expect(feed.data.every((r: any) => r.liked_by_me === false)).toBe(true)
+  })
+
+  test('a SESSION owns its own review and sees what it liked', async () => {
+    const response = handle(new Request('http://localhost/api/reviews', {
+      headers: { Authorization: 'Bearer fixture-session-token' },
+    }))
+    const rows = (await response.json() as any).data as any[]
+    const mine = rows.filter(r => r.is_mine)
+    // Exactly one, so a flow asserting a chip disappeared cannot be fooled by
+    // the whole feed failing to render.
+    expect(mine).toHaveLength(1)
+    expect(mine[0].id).toBe(1000)
+    expect(rows.find(r => r.id === 1001)?.liked_by_me).toBe(true)
+  })
+
+  test('the judge screen agrees with the feed about ownership', async () => {
+    // They draw the same rows. A review markable helpful in one place and
+    // not the other is the kind of difference people notice and cannot
+    // explain — and the two screens have drifted once already.
+    const guest = await get('/judges/1/reviews').body
+    expect(guest.data.every((r: any) => r.is_mine === false)).toBe(true)
+
+    const authed = handle(new Request('http://localhost/api/judges/1/reviews', {
+      headers: { Authorization: 'Bearer fixture-session-token' },
+    }))
+    const rows = (await authed.json() as any).data as any[]
+    expect(rows.find(r => r.id === 1000)?.is_mine).toBe(true)
+  })
+
   test('/me/follows answers a bare array, and needs the session', async () => {
     // An envelope here would make the button read "Follow" on a judge the
     // session already follows — the screen does `.includes(id)` on the body.

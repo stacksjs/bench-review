@@ -125,6 +125,10 @@ const nativeScreens: Record<string, string> = {
   '/review': 'Review',
   '/review/:id': 'Review',
   '/reviews': 'Reviews',
+  // One review in full. More fixed segments than `/reviews` and fewer than
+  // `/reviews/:id/comments`, so the matcher reaches each of the three
+  // whatever the order here — it sorts more-fixed-segments first.
+  '/reviews/:id': 'ReviewDetail',
   // The thread under one review. More fixed segments than `/reviews`, so the
   // matcher reaches it first whatever the order here.
   '/reviews/:id/comments': 'ReviewComments',

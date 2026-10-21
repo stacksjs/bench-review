@@ -21,7 +21,7 @@ import {
   commentProblem,
 } from '../functions/native-reactions'
 import { plainTextFromHtml, shortDate } from '../functions/native-review'
-import { authFetch, signedIn } from '../functions/native-session'
+import { authFetch, signedIn, viewerHeaders } from '../functions/native-session'
 import { ui } from '../functions/native-ui'
 
 interface CommentAuthor {
@@ -149,7 +149,7 @@ async function load(page: number): Promise<void> {
   failed.set(false)
   offline.set(false)
   try {
-    const body = await getJson<CommentPage>(`/api/reviews/${id}/comments?page=${page}&per_page=${PER_PAGE}`)
+    const body = await getJson<CommentPage>(`/api/reviews/${id}/comments?page=${page}&per_page=${PER_PAGE}`, undefined, viewerHeaders())
     if (!alive || ticket !== request)
       return
     const data = Array.isArray(body?.data) ? body.data : []

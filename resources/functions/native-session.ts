@@ -74,6 +74,33 @@ async function forget(): Promise<void> {
 }
 
 /**
+ * The session as request headers, for a PUBLIC endpoint whose answer depends
+ * on who is asking.
+ *
+ * `/api/reviews`, a judge's reviews and a comment thread are all readable
+ * without a session, and all carry fields computed FROM one: `is_mine` says
+ * whether the reader wrote the row, `liked_by_me` whether they already marked
+ * it helpful. Fetched anonymously they are permanently false, which is not a
+ * stale value — it is a wrong one that never corrects:
+ *
+ *   - your own review keeps offering a Helpful chip, and the server answers
+ *     422 to every tap;
+ *   - a review you already marked reads as unmarked, so the next tap takes
+ *     the mark OFF.
+ *
+ * Deliberately NOT `authFetch`. That treats a 401 as a spent token and clears
+ * the Keychain, which is right for an endpoint that REQUIRES a session and
+ * wrong for one that does not: a public list answering 401 must not sign
+ * anybody out. Here the token is an optional hint — present, the server
+ * answers as the viewer; absent or stale, it answers as a guest, which is
+ * exactly what a public endpoint should do.
+ */
+export function viewerHeaders(): Record<string, string> {
+  const token = authToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+/**
  * A request carrying the session, when there is one.
  *
  * A 401 means the token is spent — revoked by a password change, a "sign out

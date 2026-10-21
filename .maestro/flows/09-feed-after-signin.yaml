@@ -1,0 +1,134 @@
+appId: ${APP_ID}
+name: The feed catches up after signing in
+tags:
+  - mobile
+  - smoke
+---
+# The feed's rows go stale across a sign-in (bench-review#79).
+#
+# `is_mine` and `liked_by_me` are computed per REQUEST from the caller's
+# session — LatestReviewsAction resolves the viewer, reviewLikes.ts fills both
+# — so a guest is served `false` for every row. The feed fetches once on
+# mount, and Login POPS rather than pushing on, so someone who taps a Helpful
+# chip, signs in, and comes back is looking at rows fetched as a guest.
+#
+# Two things are then wrong, and neither announces itself:
+#
+#   - your own review still offers a Helpful chip, and tapping it is a
+#     guaranteed 422 — the chip is hidden on `mine` precisely so that is
+#     never offered;
+#   - reviews you had already marked helpful read as unmarked, so the next
+#     tap takes the mark OFF something you never put back.
+#
+# This is the third screen with the same staleness; Judge and ReviewComments
+# were the other two. What makes it worth its own flow is that the stale
+# thing here is the ROWS rather than a flag on the screen, so the fix is a
+# reload and the proof has to be a row changing shape.
+#
+# Tabs are tapped by position, not by their word: see 02-navigation for why.
+# Feed 14%, Judges 32%, Courthouses 50%, Write 68%, Profile 86%, at 92% down.
+
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: "Ran a tight, fair calendar"
+    timeout: 90000
+
+# ⚠️ START FROM SIGNED OUT, and do not assume it. `clearState: true` does not
+# touch the Keychain, where the session token lives — see 02-navigation.
+- tapOn:
+    point: "86%,92%"
+- waitForAnimationToEnd:
+    timeout: 6000
+- runFlow:
+    when:
+      visible: "Sign out"
+    commands:
+      - tapOn:
+          id: "profile-signout"
+      - extendedWaitUntil:
+          visible: "You are browsing as a guest"
+          timeout: 30000
+
+- tapOn:
+    point: "14%,92%"
+- extendedWaitUntil:
+    visible: "Ran a tight, fair calendar"
+    timeout: 30000
+
+# A GUEST OWNS NOTHING, so every row offers the chip — including the one the
+# fixture session wrote. That is correct: the guest is not its author.
+- assertVisible:
+    id: "review-like-1000"
+- assertVisible:
+    id: "review-comments-1000"
+- takeScreenshot: feed-guest
+
+# Sign in from the chip itself, which is the journey that strands someone on
+# stale rows.
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "review-like-1000"
+- extendedWaitUntil:
+    visible: "Sign in to Bench Review"
+    timeout: 30000
+# ⚠️ DISMISS THE KEYBOARD BETWEEN THE FIELDS.
+#
+# A tap meant to move focus from one text field to the next does not
+# reliably take while the keyboard is up, and the typing then lands in the
+# field that still HAS focus — silently, with every command reported as
+# completed. Measured: the email field came back holding
+# "clerk@example.testcorrect-horse" while the password field was empty, and
+# the flow failed three steps later on an assertion about something else.
+#
+# The same hazard sits under the submit button, which is below both fields.
+- tapOn:
+    id: "login-email"
+- inputText: "clerk@example.test"
+- hideKeyboard
+- tapOn:
+    id: "login-password"
+- inputText: "correct-horse"
+- hideKeyboard
+- tapOn:
+    id: "login-submit"
+
+# ⚠️ THE ROWS ARE FETCHED AGAIN, with nothing tapped in between.
+#
+# Review 1000 is the fixture session's own, so its Helpful chip must be GONE
+# once the feed knows who is asking. Login pops, so this tab was never
+# unmounted and nothing re-runs without `navigation.onAppear`.
+- extendedWaitUntil:
+    notVisible:
+      id: "review-like-1000"
+    timeout: 30000
+
+# ⚠️ AND THE ROW IS STILL THERE. Without this the assertion above also passes
+# when the feed fails to load at all, which is the easiest way for this flow
+# to go green while proving nothing. The comment chip is not gated on
+# ownership, so it stays exactly where it was.
+- assertVisible: "Ran a tight, fair calendar"
+- assertVisible:
+    id: "review-comments-1000"
+- takeScreenshot: feed-signed-in
+
+# THE OTHER STALE FIELD. The fixture session had already marked review 1001
+# helpful, which a guest cannot see. After the reload the chip says so — and
+# says it in the spoken label, which is what tells someone a tap would UNDO
+# rather than repeat.
+- assertVisible: "Marked helpful. Tap to undo"
+
+# LEAVE THE DEVICE AS THIS FLOW FOUND IT — see 06-follow for why.
+- tapOn:
+    point: "86%,92%"
+- extendedWaitUntil:
+    visible: "Sign out"
+    timeout: 30000
+- tapOn:
+    id: "profile-signout"
+- extendedWaitUntil:
+    visible: "You are browsing as a guest"
+    timeout: 30000

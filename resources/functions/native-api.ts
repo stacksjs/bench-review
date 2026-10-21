@@ -56,14 +56,14 @@ export class ApiError extends Error {
  * the phone's connection, the other is ours. Collapsing them is how an outage
  * gets reported to a user as an empty directory.
  */
-export async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+export async function getJson<T>(path: string, signal?: AbortSignal, headers?: Record<string, string>): Promise<T> {
   const base = apiBase()
   if (!base)
     throw new ApiError('This build has no server configured.', 0)
 
   let response: Response
   try {
-    response = await fetch(base + path, { headers: { Accept: 'application/json' }, signal })
+    response = await fetch(base + path, { headers: { Accept: 'application/json', ...headers }, signal })
   }
   catch (err) {
     if ((err as any)?.name === 'AbortError')

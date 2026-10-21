@@ -150,7 +150,7 @@ function judgeRow(judge: FixtureJudge) {
   }
 }
 
-function feedRows() {
+function feedRows(viewer = false) {
   return Array.from({ length: FEED_SIZE }, (_, i) => {
     const judge = JUDGES[i % JUDGES.length]
     const c = court(judge.courtId)
@@ -160,7 +160,8 @@ function feedRows() {
       content: '<p>Started on time and explained every ruling. Alder &amp; Co were held to the same line.</p><p>Clear with self-represented parties, and said why.</p>',
       rating: 1 + (i % 5),
       likes: likesFor(1000 + i),
-      liked_by_me: liked.has(1000 + i),
+      // Per viewer, as the real endpoint answers it.
+      liked_by_me: viewer && liked.has(1000 + i),
       judge_id: judge.id,
       judge: {
         id: judge.id,
@@ -173,10 +174,11 @@ function feedRows() {
       reviewer: { id: null, name: REVIEWER_NAMES[i % REVIEWER_NAMES.length], role_label: null },
       created_at: new Date(Date.UTC(2026, 9, 1 + (i % 19), 9, 0, 0)).toISOString(),
       // `toPublicReviewRow` strips `user_id` and states ownership instead, so
-      // the feed can hide the like button on a row the viewer wrote. Nothing
-      // in the fixture is the viewer's, which is the state a fresh install is
-      // in and the one the flows assert.
-      is_mine: false,
+      // the feed can hide the like button on a row the viewer wrote. A GUEST
+      // owns nothing, which is why this is false until there is a session —
+      // and why a feed fetched signed out still offers Helpful on the
+      // reader's own review until it is fetched again.
+      is_mine: viewer && (1000 + i) === MY_REVIEW_ID,
       // Reviews 1000 and 1001 start with comments so a populated thread and
       // an empty one are both reachable without posting anything.
       comments: COMMENTS[1000 + i]?.length ?? 0,
@@ -192,7 +194,26 @@ function feedRows() {
  * `LIKE_BASE` is the count before anyone touches it.
  */
 const LIKE_BASE: Record<number, number> = { 1000: 4, 1001: 1 }
-const liked = new Set<number>()
+const liked = new Set<number>([1001])
+
+/**
+ * The review the fixture session WROTE.
+ *
+ * `is_mine` and `liked_by_me` are computed per request from the caller's
+ * session on the real server — LatestReviewsAction resolves the viewer and
+ * reviewLikes.ts fills both, answering `false` for a guest. The fixture said
+ * `is_mine: false` unconditionally and read `liked` without looking at auth,
+ * which made a guest and a signed-in reader see identical rows.
+ *
+ * That is not a simplification, it is the one difference that hides a real
+ * bug: the feed is fetched once on mount, and someone who signs in from a
+ * Helpful chip comes back to rows fetched as a guest. With the fixture
+ * answering the same either way, nothing could tell the two apart.
+ *
+ * 1000 so the row is the first in the feed and needs no scrolling, and 1001
+ * starts already liked so the other stale field is reachable too.
+ */
+const MY_REVIEW_ID = 1000
 
 function likesFor(id: number): number {
   return (LIKE_BASE[id] ?? 0) + (liked.has(id) ? 1 : 0)
@@ -317,7 +338,7 @@ export function handle(request: Request): Response {
     // `comments` here would make them read zero on one screen and a number
     // on the other — which is the inconsistency this endpoint's change was
     // made to remove.
-    const rows = feedRows().filter(r => r.judge_id === id).slice(0, 2)
+    const rows = feedRows(authed(request)).filter(r => r.judge_id === id).slice(0, 2)
     return json({ data: rows, total: rows.length })
   }
 
@@ -331,7 +352,7 @@ export function handle(request: Request): Response {
 
   if (path === '/api/reviews' && request.method === 'GET') {
     const sort = url.searchParams.get('sort') === 'helpful' ? 'helpful' : 'recent'
-    const rows = feedRows()
+    const rows = feedRows(authed(request))
     const ordered = sort === 'helpful' ? [...rows].sort((a, b) => b.likes - a.likes) : rows
     return json(paged(ordered, page, perPage))
   }
@@ -351,6 +372,28 @@ export function handle(request: Request): Response {
     else
       liked.add(id)
     return json({ liked: liked.has(id), likes: likesFor(id) })
+  }
+
+  // One review in full (bench-review#79). More fixed segments than
+  // `/api/reviews`, fewer than `/comments`, and matched before the thread
+  // below so neither can swallow the other.
+  const single = path.match(/^\/api\/reviews\/(\d+)$/)
+  if (single && request.method === 'GET') {
+    const id = Number(single[1])
+    const row = feedRows(authed(request)).find(r => r.id === id)
+    if (!row)
+      return json({ error: 'Not Found' }, 404)
+    // ShowReviewAction answers the row plus the pieces a detail screen needs
+    // in ONE request — judge, author, photos and any judge response — so the
+    // screen does not make four. `comments` is NOT among them: the count
+    // comes from the thread endpoint, which the screen fetches anyway.
+    return json({
+      ...row,
+      author: row.reviewer,
+      photos: [],
+      response: null,
+      can_respond_as_judge: false,
+    })
   }
 
   const thread = path.match(/^\/api\/reviews\/(\d+)\/comments$/)

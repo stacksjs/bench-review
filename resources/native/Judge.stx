@@ -13,7 +13,7 @@ import { fetchFollowedIds, followAccessibilityLabel, followLabel, sendFollow } f
 import { handoffFromParams, handoffQuery, JUDGE_FIELDS, judgeFromHandoff } from '../functions/native-handoff'
 import { commentLabel, helpfulLabel, nextLikeState, sendLike } from '../functions/native-reactions'
 import { plainTextFromHtml, shortDate, starsFor } from '../functions/native-review'
-import { signedIn } from '../functions/native-session'
+import { signedIn, viewerHeaders } from '../functions/native-session'
 import { initials, ui } from '../functions/native-ui'
 
 interface Review {
@@ -187,7 +187,7 @@ async function load(): Promise<void> {
     // undone within a second once already (scripts/mobile-e2e-api.ts).
     const [who, data, follows] = await Promise.allSettled([
       getJson<Record<string, any>>(`/api/judges/${id}`),
-      getJson<{ data?: Review[] } | Review[]>(`/api/judges/${id}/reviews?page=1&per_page=20`),
+      getJson<{ data?: Review[] } | Review[]>(`/api/judges/${id}/reviews?page=1&per_page=20`, undefined, viewerHeaders()),
       signedIn() ? fetchFollowedIds() : Promise.resolve<number[]>([]),
     ])
     if (!alive)
