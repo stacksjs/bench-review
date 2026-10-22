@@ -68,10 +68,22 @@ export const NAMED_JUDGES: FixtureJudge[] = [
   { id: 3, name: 'Fixture C. Cedar', courtId: 2 },
 ]
 
+/**
+ * Enough filler that the directory spills onto a SECOND page.
+ *
+ * The screens slice client-side at `PAGE_SIZE` 25 (resources/functions/
+ * native-paging.ts), and `buildPages` returns an empty list for a single
+ * page — correctly, since a pager that cannot go anywhere is noise. So a
+ * fixture with exactly 25 judges renders NO pager at all, and every paging
+ * control on the directory and the review picker was unreachable from a
+ * flow. 27 is the smallest count that is unambiguously two pages.
+ */
 const FILLER_SURNAMES = [
   'Dogwood', 'Elm', 'Fir', 'Gum', 'Hazel', 'Ironwood', 'Juniper', 'Katsura',
   'Linden', 'Maple', 'Nutmeg', 'Oak', 'Pine', 'Quince', 'Rowan', 'Spruce',
   'Teak', 'Umbrella', 'Vine', 'Walnut', 'Yew', 'Zelkova',
+  // Page two.
+  'Ash', 'Birchwood',
 ]
 
 export const JUDGES: FixtureJudge[] = [
@@ -156,7 +168,14 @@ function feedRows(viewer = false) {
     const c = court(judge.courtId)
     return {
       id: 1000 + i,
-      title: REVIEW_TITLES[i % REVIEW_TITLES.length],
+      // Unique per row from the second onward, so a flow can say WHICH page
+      // it is looking at. The five titles cycle, so row 20 — the first on
+      // page two — otherwise carries the same title as row 0, and "page one's
+      // first row is gone" is false while paging works perfectly.
+      //
+      // Row 0 keeps the bare title: 22 assertions across the suite name it,
+      // and anchored matching means `#20` does not collide with it.
+      title: i === 0 ? REVIEW_TITLES[0] : `${REVIEW_TITLES[i % REVIEW_TITLES.length]} #${i}`,
       content: '<p>Started on time and explained every ruling. Alder &amp; Co were held to the same line.</p><p>Clear with self-represented parties, and said why.</p>',
       rating: 1 + (i % 5),
       likes: likesFor(1000 + i),

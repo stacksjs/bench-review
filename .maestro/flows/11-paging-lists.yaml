@@ -1,0 +1,191 @@
+appId: ${APP_ID}
+name: Paging the feed and the directory
+tags:
+  - mobile
+  - smoke
+---
+# Numbered pagination, on the two screens that page DIFFERENTLY (#79).
+#
+# The feed is SERVER-paged: each page is a request, 20 rows at a time. The
+# directory is CLIENT-paged: one request, then `pageSlice` over the result at
+# 25 a page. They share the pager UI (`buildPages`) and nothing else, so
+# covering one proves nothing about the other.
+#
+# None of it was reachable before. `buildPages` returns an empty list for a
+# single page — correctly, a pager that cannot go anywhere is noise — and the
+# fixture had exactly 25 judges against a 25-per-page slice, which is the one
+# count that renders no pager at all. The fixture carries 27 now.
+#
+# Tabs are tapped by position, not by their word: see 02-navigation for why.
+# Feed 14%, Judges 32%, Courthouses 50%, Write 68%, Profile 86%, at 92% down.
+
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: "Ran a tight, fair calendar"
+    timeout: 90000
+
+# ⚠️ START FROM SIGNED OUT, and do not assume it — see 02-navigation.
+- tapOn:
+    point: "86%,92%"
+- waitForAnimationToEnd:
+    timeout: 6000
+- runFlow:
+    when:
+      visible: "Sign out"
+    commands:
+      - tapOn:
+          id: "profile-signout"
+      - extendedWaitUntil:
+          visible: "You are browsing as a guest"
+          timeout: 30000
+
+# ⚠️ LET THE TAB SETTLE before moving on. The conditional above is SKIPPED
+# when the app is already signed out, so the next tab tap would otherwise
+# fire with no gap at all — and a tap that lands mid-transition is simply
+# lost, leaving the flow asserting against the Profile tab it was on. Flow
+# 02 failed exactly that way in a full run while passing on its own.
+- waitForAnimationToEnd:
+    timeout: 5000
+
+- tapOn:
+    point: "14%,92%"
+- extendedWaitUntil:
+    visible: "Ran a tight, fair calendar"
+    timeout: 30000
+
+# ⚠️ THE PAGER IS BELOW TWENTY REVIEW CARDS, so it has to be scrolled to.
+# Asserting it without scrolling fails on a screen that is working — it is
+# simply not in the accessibility tree yet, which is how this flow failed
+# the first time it ran.
+#
+# Plain swipes rather than `scrollUntilVisible`: that command never reached
+# the pager here, even at a raised speed and a 60s timeout, and reported
+# "No visible element found" — which reads exactly like a pager that does
+# not exist. It does. Driving the same screen by hand shows
+# "Prev [1] 2 Next", and `maestro hierarchy` lists `reviews-page-1` at
+# [165,690][196,734] once it is on screen, so the ids are fine and the
+# scrolling was the problem.
+- repeat:
+    times: 9
+    commands:
+      - swipe:
+          start: "50%, 80%"
+          end: "50%, 18%"
+- assertVisible:
+    id: "reviews-page-2"
+- assertVisible:
+    id: "reviews-next"
+- takeScreenshot: feed-pager
+
+# ⚠️ NEXT FETCHES A DIFFERENT PAGE, and the proof is a row that exists ONLY
+# on page two. The five fixture titles cycle, so row 20 — the first row of
+# page two — would otherwise carry the same title as row 0, and "page one's
+# first row is gone" would be false while paging worked perfectly. Every row
+# after the first is suffixed with its index for exactly this.
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "reviews-next"
+- waitForAnimationToEnd:
+    timeout: 6000
+# Paging does not scroll back to the top, so the new page's first row is up
+# where the old one was.
+- repeat:
+    times: 9
+    commands:
+      - swipe:
+          start: "50%, 20%"
+          end: "50%, 82%"
+- assertVisible: "Ran a tight, fair calendar #20"
+- assertNotVisible: "Ran a tight, fair calendar"
+# The count is the WHOLE result, not the page.
+- assertVisible:
+    text: "(?i)32 reviews"
+- takeScreenshot: feed-page-2
+
+# A NUMBERED BUTTON JUMPS BACK, which is the point of numbering them rather
+# than shipping Prev and Next alone.
+- repeat:
+    times: 9
+    commands:
+      - swipe:
+          start: "50%, 80%"
+          end: "50%, 18%"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "reviews-page-1"
+- waitForAnimationToEnd:
+    timeout: 6000
+- repeat:
+    times: 9
+    commands:
+      - swipe:
+          start: "50%, 20%"
+          end: "50%, 82%"
+- assertVisible: "Ran a tight, fair calendar"
+- assertNotVisible: "Ran a tight, fair calendar #20"
+
+# ⚠️ THE DIRECTORY PAGES WITHOUT A REQUEST. Same pager, different machinery:
+# the feed asks the server for each page, while this has everything in memory
+# and `pageSlice` cuts it. Asserting one proves nothing about the other.
+- tapOn:
+    point: "32%,92%"
+- extendedWaitUntil:
+    visible: "(?i)27 judges"
+    timeout: 30000
+- assertVisible: "Fixture A. Alder"
+- repeat:
+    times: 9
+    commands:
+      - swipe:
+          start: "50%, 80%"
+          end: "50%, 18%"
+- takeScreenshot: judges-pager
+
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "judges-next"
+- waitForAnimationToEnd:
+    timeout: 6000
+- repeat:
+    times: 9
+    commands:
+      - swipe:
+          start: "50%, 20%"
+          end: "50%, 82%"
+# 27 judges at 25 a page leave exactly two on page two.
+- assertVisible: "Fixture D. Ash"
+- assertVisible: "Fixture E. Birchwood"
+- assertNotVisible: "Fixture A. Alder"
+- assertVisible: "(?i)27 judges"
+- takeScreenshot: judges-page-2
+
+# ⚠️ SEARCHING RESETS THE PAGE. Filtering to one match while sitting on page
+# two would otherwise show an empty list under a pager pointing at a page
+# that no longer exists — and it is invisible unless a flow goes to page two
+# FIRST, which is why the search is tested here rather than on its own.
+#
+# ⚠️ NO `hideKeyboard` HERE. On a simulator with a hardware keyboard attached
+# no software keyboard appears, and maestro's dismissal lands as a TAP on
+# whatever is underneath — which at screen centre-bottom is the Courthouses
+# tab. This flow ended up asserting against the wrong screen entirely, three
+# commands after the one that moved it.
+#
+# Nothing needs dismissing: the match appears directly under the search
+# field, above where a keyboard would be.
+- tapOn:
+    id: "judges-search"
+- inputText: "Alder"
+- extendedWaitUntil:
+    visible: "Fixture A. Alder"
+    timeout: 30000
+- assertNotVisible: "Fixture D. Ash"
+# One match, so the pager is gone entirely rather than stranded.
+- assertNotVisible:
+    id: "judges-page-2"
+- takeScreenshot: judges-searched

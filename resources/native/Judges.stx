@@ -177,6 +177,7 @@ onMount(() => {
       <View class="mt-2" :class="ui.search">
         <Icon name="search" class="h-4 w-4 text-[#8e8e93]" />
         <TextInput
+          id="judges-search"
           class="flex-1 text-[17px] text-black dark:text-white border-0"
           :value="term()"
           @input="typed($event.text)"
@@ -255,7 +256,7 @@ onMount(() => {
 
         <View :for="item in pages()" :key="item.label + '-' + item.n">
           <Text :if="item.gap" :class="ui.caption" text="…" />
-          <Pressable :if="!item.gap" :id="'judges-page-' + item.label" @press="goToPage(item.n)" class="items-center justify-center px-3 min-h-[44px] rounded-[8px]" :class="item.active ? 'bg-[#2563eb]' : ''" accessibilityRole="button" :accessibilityLabel="'Page ' + item.label" :testID="'judges-page-' + item.label">
+          <Pressable :if="!item.gap" :id="'judges-page-' + item.label" @press="goToPage(item.n)" class="items-center justify-center px-3 min-h-[44px] rounded-[8px]" :class="item.active ? 'bg-[#2563eb]' : ''" accessibilityRole="button" :accessibilityState="{ selected: item.active }" :accessibilityLabel="item.active ? 'Page ' + item.label + ', current page' : 'Page ' + item.label" :testID="'judges-page-' + item.label">
             <Text class="text-[17px]" :class="item.active ? 'font-semibold text-white' : ui.tint" :text="item.label" />
           </Pressable>
         </View>

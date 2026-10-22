@@ -67,6 +67,14 @@ tags:
           visible: "You are browsing as a guest"
           timeout: 30000
 
+# ⚠️ LET THE TAB SETTLE before moving on. The conditional above is SKIPPED
+# when the app is already signed out, so the next tab tap would otherwise
+# fire with no gap at all — and a tap that lands mid-transition is simply
+# lost, leaving the flow asserting against the Profile tab it was on. Flow
+# 02 failed exactly that way in a full run while passing on its own.
+- waitForAnimationToEnd:
+    timeout: 5000
+
 # Back to the feed to begin.
 - tapOn:
     point: "14%,92%"
@@ -85,7 +93,7 @@ tags:
 - tapOn:
     point: "32%,92%"
 - extendedWaitUntil:
-    visible: "(?i)25 judges"
+    visible: "(?i)27 judges"
     timeout: 30000
 - takeScreenshot: judges
 
@@ -116,7 +124,7 @@ tags:
 - tapOn:
     point: "6%,10%"
 - extendedWaitUntil:
-    visible: "(?i)25 judges"
+    visible: "(?i)27 judges"
     timeout: 30000
 - assertNotVisible: "Write a review"
 

@@ -1,0 +1,193 @@
+appId: ${APP_ID}
+name: Paging a long list
+tags:
+  - mobile
+  - smoke
+---
+# A THREE-page list, which is where the numbered pager earns its keep (#79).
+#
+# 11-paging-lists covers two-page lists, where "Prev / 1 2 / Next" is barely
+# more than Prev and Next. Judge 1 has 63 opinions at 25 a page, so this is
+# the only list in the fixture where jumping past a page is possible and
+# where the two bounds are distinct from each other.
+#
+# It is also the only paged screen reached by PUSH rather than by a tab, so
+# it exercises paging on a screen that carries route params.
+#
+# Tabs are tapped by position, not by their word: see 02-navigation for why.
+# Feed 14%, Judges 32%, Courthouses 50%, Write 68%, Profile 86%, at 92% down.
+
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: "Ran a tight, fair calendar"
+    timeout: 90000
+
+# ⚠️ START FROM SIGNED OUT, and do not assume it — see 02-navigation.
+- tapOn:
+    point: "86%,92%"
+- waitForAnimationToEnd:
+    timeout: 6000
+- runFlow:
+    when:
+      visible: "Sign out"
+    commands:
+      - tapOn:
+          id: "profile-signout"
+      - extendedWaitUntil:
+          visible: "You are browsing as a guest"
+          timeout: 30000
+
+# ⚠️ LET THE TAB SETTLE before moving on. The conditional above is SKIPPED
+# when the app is already signed out, so the next tab tap would otherwise
+# fire with no gap at all — and a tap that lands mid-transition is simply
+# lost, leaving the flow asserting against the Profile tab it was on. Flow
+# 02 failed exactly that way in a full run while passing on its own.
+- waitForAnimationToEnd:
+    timeout: 5000
+
+- tapOn:
+    point: "32%,92%"
+- extendedWaitUntil:
+    visible: "(?i)27 judges"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn: "Fixture A. Alder"
+- extendedWaitUntil:
+    visible: "Write a review"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "judge-opinions"
+- extendedWaitUntil:
+    visible: "(?i)63 opinions"
+    timeout: 30000
+
+# ⚠️ THE PAGER IS BELOW TWENTY-FIVE OPINIONS, so it has to be scrolled to.
+# Plain swipes rather than `scrollUntilVisible`, which could not travel that
+# far here — see 11-paging-lists.
+#
+# Everything after this is asserted WITHOUT scrolling back, because paging
+# does not reset the scroll position: the new page's LAST row lands right
+# above the pager, where the old page's last row was. So each page is
+# identified by its final opinion rather than its first, and the whole flow
+# costs one scroll instead of six.
+- assertVisible: "Fixture v. Example 1"
+- repeat:
+    times: 11
+    commands:
+      - swipe:
+          start: "50%, 80%"
+          end: "50%, 18%"
+
+# THREE PAGES, so the pager shows all three numbers and no gap: buildPages
+# only elides when the window cannot reach both ends.
+- assertVisible:
+    id: "opinions-page-1"
+- assertVisible:
+    id: "opinions-page-2"
+- assertVisible:
+    id: "opinions-page-3"
+- takeScreenshot: opinions-pager
+
+# ⚠️ JUMP STRAIGHT TO THE LAST PAGE. A two-page list cannot tell a jump from
+# a Next, because they are the same move. 63 opinions at 25 a page put rows
+# 51-63 on page three, so landing on "Example 63" proves the number was used
+# as a PAGE rather than as a step.
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "opinions-page-3"
+- extendedWaitUntil:
+    visible: "Fixture v. Example 63"
+    timeout: 30000
+# ⚠️ AND THE PAGER SAYS WHICH PAGE IT IS ON, out loud. The active page used
+# to be marked by a blue fill and nothing else — colour-only state, the same
+# class of defect bench-review#58 was raised about, and invisible to
+# VoiceOver. It carries `accessibilityState: { selected }` and says "current
+# page" now, which is also the only way to assert the page without scrolling
+# to a row: pages are different LENGTHS here, so the scroll offset after a
+# change lands somewhere unpredictable.
+- assertVisible:
+    id: "opinions-page-3"
+    selected: true
+- assertVisible:
+    id: "opinions-page-1"
+    selected: false
+- takeScreenshot: opinions-page-3
+
+# NEXT AT THE END DOES NOT RUN OFF. The control stays on screen — it reads as
+# disabled rather than disappearing — so tapping it has to be a no-op rather
+# than a fourth page of nothing.
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "opinions-next"
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible:
+    id: "opinions-page-3"
+    selected: true
+
+# BACK ONE, to the MIDDLE page — a page that only exists on a list this long,
+# and the one a two-page flow can never reach.
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "opinions-prev"
+- waitForAnimationToEnd:
+    timeout: 5000
+# ⚠️ RE-FIND THE PAGER. Pages here are different LENGTHS — page three holds
+# 13 opinions and page two holds 25 — so switching to a longer page pushes
+# the pager back below the fold at the same scroll offset.
+- repeat:
+    times: 5
+    commands:
+      - swipe:
+          start: "50%, 80%"
+          end: "50%, 18%"
+- assertVisible:
+    id: "opinions-page-2"
+    selected: true
+- assertNotVisible: "Fixture v. Example 63"
+
+# AND PREV AT THE START DOES NOT RUN OFF EITHER.
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "opinions-page-1"
+- waitForAnimationToEnd:
+    timeout: 5000
+- repeat:
+    times: 5
+    commands:
+      - swipe:
+          start: "50%, 80%"
+          end: "50%, 18%"
+- assertVisible:
+    id: "opinions-page-1"
+    selected: true
+- tapOn:
+    id: "opinions-prev"
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible:
+    id: "opinions-page-1"
+    selected: true
+
+# THE COUNT NEVER MOVED. It counts the whole list rather than the page, so
+# after three page changes it still reads 63 — asserted back at the TOP,
+# because that is where `opinions-count` lives and every assertion above was
+# made from the bottom of the list.
+- repeat:
+    times: 11
+    commands:
+      - swipe:
+          start: "50%, 20%"
+          end: "50%, 82%"
+- assertVisible: "(?i)63 opinions"
+- assertVisible: "Fixture v. Example 1"

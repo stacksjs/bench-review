@@ -318,7 +318,7 @@ onMount(() => {
         </Pressable>
         <View :for="item in pages()" :key="item.label + '-' + item.n">
           <Text :if="item.gap" class="px-2" :class="ui.caption" text="…" />
-          <Pressable :if="!item.gap" :id="'comments-page-' + item.label" @press="goToPage(item.n)" class="items-center justify-center px-3 min-h-[44px] rounded-[8px]" :class="item.active ? 'bg-[#2563eb]' : ''" accessibilityRole="button" :accessibilityLabel="'Page ' + item.label" :testID="'comments-page-' + item.label">
+          <Pressable :if="!item.gap" :id="'comments-page-' + item.label" @press="goToPage(item.n)" class="items-center justify-center px-3 min-h-[44px] rounded-[8px]" :class="item.active ? 'bg-[#2563eb]' : ''" accessibilityRole="button" :accessibilityState="{ selected: item.active }" :accessibilityLabel="item.active ? 'Page ' + item.label + ', current page' : 'Page ' + item.label" :testID="'comments-page-' + item.label">
             <Text :class="item.active ? 'text-white text-[15px]' : ui.tint" :text="item.label" />
           </Pressable>
         </View>

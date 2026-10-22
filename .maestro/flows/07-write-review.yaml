@@ -45,6 +45,14 @@ tags:
           visible: "You are browsing as a guest"
           timeout: 30000
 
+# ⚠️ LET THE TAB SETTLE before moving on. The conditional above is SKIPPED
+# when the app is already signed out, so the next tab tap would otherwise
+# fire with no gap at all — and a tap that lands mid-transition is simply
+# lost, leaving the flow asserting against the Profile tab it was on. Flow
+# 02 failed exactly that way in a full run while passing on its own.
+- waitForAnimationToEnd:
+    timeout: 5000
+
 # WRITING IS GATED, AND SAYS WHY. Reading is open to everyone; a review names
 # a real judge, so it is tied to an account. The gate has to explain itself
 # rather than present an empty form that fails on submit.
@@ -92,7 +100,7 @@ tags:
     timeout: 30000
 - takeScreenshot: write-picker
 
-# SEARCH NARROWS THE DIRECTORY. 25 judges is already more than a list someone
+# SEARCH NARROWS THE DIRECTORY. 27 judges is already more than a list someone
 # scrolls, and the picker is the one place a wrong pick is unrecoverable.
 - tapOn:
     id: "review-search"

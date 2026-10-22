@@ -133,6 +133,25 @@ describe('the e2e fixture api', () => {
     expect((await get('/judges/2/education').body).education).toEqual([])
   })
 
+  test('the fixture spills onto a SECOND page everywhere a pager exists', async () => {
+    // `buildPages` returns an empty list for a single page, so a fixture that
+    // fits on one renders NO pager and every paging control is unreachable
+    // from a flow. The directory sat at exactly 25 against a 25-per-page
+    // client slice — the one count that hides the control completely.
+    const judges = await get('/judges').body as any[]
+    expect(judges.length).toBeGreaterThan(25)
+
+    // The feed is server-paged at 20.
+    const feed = await get('/reviews').body
+    expect(feed.total).toBeGreaterThan(20)
+    expect(feed.last_page).toBeGreaterThan(1)
+
+    // Judge 1's opinions are the only three-page list, which is what makes
+    // the numbered buttons worth asserting rather than just Prev/Next.
+    const opinions = await get('/judges/1/opinions?page=1&per_page=25').body
+    expect(opinions.last_page).toBeGreaterThanOrEqual(3)
+  })
+
   test('a GUEST owns nothing and has liked nothing', async () => {
     // Both fields are computed per request from the caller's session on the
     // real server, and answer false without one. A fixture that ignored auth
