@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { DEFAULT_PORT } from './mobile-e2e-api'
+import { run as patchTabBar } from './patch-ios-tabbar'
 import { resolveMobileServer, serverArgument } from './mobile-target'
 
 /**
@@ -205,6 +206,21 @@ function buildAndInstall(deviceId: string, server: string): string {
   run(['./buddy', 'build:ios'], { env: { MOBILE_URL: `${server}${START_PATH}` } })
   if (!existsSync(project))
     throw new Error(`${project} was not generated.`)
+
+  // ⚠️ PATCH THE GENERATED SWIFT BEFORE IT IS COMPILED, not after.
+  //
+  // `bun run build:ios` runs this as its last step, but THIS function does not
+  // go through that script — it spawns `./buddy build:ios` directly and then
+  // compiles with xcodebuild below. So the patch never ran on the path that
+  // actually installs the app, and every build the suite put on a simulator
+  // carried craft's stock capsule. The squared highlight was committed, its
+  // unit tests passed, and none of it had ever been on screen: the tests cover
+  // the transform, and nothing covered whether the transform was reached.
+  //
+  // Calling it here rather than fixing the order in package.json is deliberate
+  // — it is the one point both paths pass through, so a third caller cannot
+  // reintroduce this by forgetting a step.
+  patchTabBar(projectRoot)
 
   const derivedData = join(resultsRoot, 'derived-data')
   mkdirSync(derivedData, { recursive: true })

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, test } from 'bun:test'
 import { CORNER_RADIUS, patchTabBarHighlight } from '../../scripts/patch-ios-tabbar'
 
@@ -97,5 +99,38 @@ describe('squaring the selection highlight', () => {
     // refactored, the build should say so.
     const moved = GENERATED.replace('.fill(Color.primary.opacity(0.09))', '.fill(Color.accentColor.opacity(0.12))')
     expect(() => patchTabBarHighlight(moved)).toThrow(/craft#386|expected shape/i)
+  })
+})
+
+describe('the build the suite installs', () => {
+  const runner = readFileSync(join(import.meta.dir, '../../scripts/run-mobile-e2e.ts'), 'utf8')
+
+  // ⚠️ THE DEFECT THIS EXISTS FOR. The tab bar patch rewrites generated Swift,
+  // and the runner spawns `./buddy build:ios` directly rather than going
+  // through the `build:ios` npm script that chains the patch on. So the patch
+  // ran on nobody's machine for the path that actually installs the app: the
+  // squared highlight was committed and unit-tested, and the simulator kept
+  // showing craft's capsule through three rounds of reporting it.
+  //
+  // Testing the transform is not testing the delivery. This tests delivery.
+  // ⚠️ MATCH RUNNING CODE, NOT TEXT. The first version of this searched the
+  // whole file for the call and passed against a COMMENTED-OUT one — exactly
+  // the vacuous-assertion trap the flow linter exists for, reproduced here
+  // while falsifying it. Comment lines are dropped before anything is matched.
+  const live = runner.split('\n').filter(l => !l.trim().startsWith('//') && !l.trim().startsWith('*'))
+  const lineOf = (needle: string): number => live.findIndex(l => l.includes(needle))
+
+  test('patches the generated swift before compiling it', () => {
+    const generate = lineOf('\'build:ios\'')
+    const patch = lineOf('patchTabBar(projectRoot)')
+    const compile = lineOf('\'xcodebuild\'')
+
+    expect(generate).toBeGreaterThan(-1)
+    expect(patch).toBeGreaterThan(-1)
+    expect(compile).toBeGreaterThan(-1)
+    // Generation writes the file, the patch rewrites it, xcodebuild reads it.
+    // Any other order compiles the stock shape.
+    expect(patch).toBeGreaterThan(generate)
+    expect(compile).toBeGreaterThan(patch)
   })
 })
