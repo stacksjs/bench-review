@@ -1,0 +1,148 @@
+appId: ${APP_ID}
+name: A judge's record, present and absent
+tags:
+  - mobile
+  - smoke
+---
+# THE LAST NATIVE SCREEN NO FLOW VISITED. Eleven of the twelve screens in
+# `nativeScreens` were reached by some flow; JudgeEducation was reached by
+# none, so nothing would have reported it blank, crashing, or gone.
+#
+# Both of its states are covered, because the EMPTY one is the common one:
+# about half the directory has no CourtListener record, and the site shows
+# nothing rather than inventing a degree. A flow that only visited judge 1
+# would pass while every real judge rendered an error.
+#
+# The two states are reached by DIFFERENT routes on purpose:
+#
+#   - judge 1 by pushing from the judge screen, which is how a person gets
+#     here and the only path that carries the handoff;
+#   - judge 2 by deep link, which arrives with no handoff at all and has to
+#     resolve `/judges/:id/education` on its own. `CraftHybridRoutes` sorts
+#     more fixed segments first, so this URL must reach Education and not
+#     Judge with a stray `education` id — the one ordering bug that would
+#     make every deep link to a sub-screen land on its parent.
+#
+# Tabs are tapped by position, not by their word: see 02-navigation for why.
+# Feed 14%, Judges 32%, Courthouses 50%, Write 68%, Profile 86%, at 92% down.
+
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: "Ran a tight, fair calendar"
+    timeout: 90000
+
+# ⚠️ START FROM SIGNED OUT, and do not assume it — see 02-navigation.
+- tapOn:
+    point: "86%,92%"
+- waitForAnimationToEnd:
+    timeout: 6000
+- runFlow:
+    when:
+      visible: "Sign out"
+    commands:
+      - tapOn:
+          id: "profile-signout"
+      - extendedWaitUntil:
+          visible: "You are browsing as a guest"
+          timeout: 30000
+
+# ⚠️ LET THE TAB SETTLE before moving on. The conditional above is SKIPPED
+# when the app is already signed out, so the next tab tap would otherwise
+# fire with no gap at all — and a tap that lands mid-transition is simply
+# lost, leaving the flow asserting against the Profile tab it was on. Flow
+# 02 failed exactly that way in a full run while passing on its own.
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# RECORDED: pushed from the judge, which is the path a person takes.
+- tapOn:
+    point: "32%,92%"
+- extendedWaitUntil:
+    visible: "(?i)27 judges"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn: "Fixture A. Alder"
+- extendedWaitUntil:
+    visible: "Write a review"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "judge-education"
+- extendedWaitUntil:
+    visible: "(?i)2 entries"
+    timeout: 30000
+
+# Both entries, and the fields that make up a row. The degree heads the row
+# and the school sits under it; asserting only the degree would pass against
+# a row that lost its school entirely.
+# Dots escaped: a selector is a REGEX, and an unescaped `B.A.` would match
+# any four characters shaped like one.
+- assertVisible: 'B\.A\.'
+- assertVisible: "Fixture State University"
+- assertVisible: 'J\.D\.'
+- assertVisible: "Fixture School of Law"
+- assertVisible: "1979"
+# A judge WITH a record must not be offered the empty state's advice.
+- assertNotVisible: "No education history is recorded for this judge."
+- takeScreenshot: education-recorded
+
+# NOT RECORDED: judge 2, deliberately empty in the fixture, reached cold.
+- stopApp
+- openLink: benchreview://judges/2/education
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- extendedWaitUntil:
+    visible: "No education history is recorded for this judge."
+    timeout: 90000
+
+# ⚠️ AN EMPTY HISTORY IS NOT A FAILURE, and the screen has to say so with
+# more than its wording. `nothing()` is true for an empty list AND for a
+# failed load, and only the failure offers "Try again" — so a judge with no
+# record must not be told to retry something that worked. Collapsing those
+# two states is the obvious way to break this screen, and this is the only
+# assertion that would notice.
+- assertNotVisible:
+    id: "education-retry"
+- assertNotVisible: "The education history could not be loaded."
+# No count line above an empty list.
+- assertNotVisible: "(?i)1 entry"
+- assertNotVisible: "(?i)2 entries"
+- takeScreenshot: education-empty
+
+# THE DEEP LINK REACHED EDUCATION, NOT THE JUDGE. `/judges/2` draws the
+# judge screen, whose own Education row would still be on screen if the
+# matcher had taken this URL for `/judges/:id`.
+- assertNotVisible:
+    id: "judge-education"
+- assertNotVisible: "Write a review"
+
+# ⚠️ THE OPINIONS EMPTY STATE IS THE PRODUCTION STATE. 12-paging-deep covers
+# judge 1's 63 opinions, which is the rare case by a wide margin: the
+# fixture's own note says `judge_opinions` has no rows in development, so
+# what every real judge shows today is this screen, and no flow had ever
+# seen it. The same empty-is-not-failed distinction applies — an absent
+# record must not be dressed as an outage with a retry button.
+- stopApp
+- openLink: benchreview://judges/2/opinions
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- extendedWaitUntil:
+    visible: "No opinions have been recorded for this judge yet."
+    timeout: 90000
+- assertNotVisible:
+    id: "opinions-retry"
+- assertNotVisible: "The opinions could not be loaded. This is a problem on our side."
+- assertNotVisible:
+    id: "opinions-next"
+- takeScreenshot: opinions-empty
