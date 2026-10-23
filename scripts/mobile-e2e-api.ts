@@ -298,6 +298,65 @@ function paged(rows: any[], page: number, perPage: number) {
   }
 }
 
+/**
+ * Refusing each endpoint's FIRST request, so a flow can watch a screen fail
+ * and then recover (bench-review#81).
+ *
+ * Nine screens draw a "Try again" button when a load fails and not one flow
+ * had ever made one appear. 04-offline comes closest: it asserts the words
+ * "Try again" are on the feed with the server stopped — one screen, by text,
+ * and it never taps it. So what no flow could answer is the question that
+ * matters: does the button DO anything? A retry that renders but never
+ * re-fetches, or that re-fetches but never clears the failed flag, strands
+ * someone on an error screen, and it only happens during an outage, which is
+ * when nobody is looking.
+ *
+ * Stopping the server cannot test this — there would be nothing for the retry
+ * to succeed against. The server has to be down and then up WITHIN one flow,
+ * and the honest way to arrange that is to fail by count rather than by
+ * clock: the first GET to each path is refused, every later one is served.
+ * No sleeps, no window to race, and the recovery is the flow's own tap rather
+ * than something that would have happened anyway.
+ *
+ * 503 rather than a dropped connection on purpose. `getJson` reports an
+ * unreachable server as status 0 and a bad answer as its status, and the
+ * screens word the two differently — 04-offline covers status 0, and this is
+ * the only cover the "problem on our side" branch has.
+ */
+const refusedOnce = new Set<string>()
+
+/** Each flow gets a fresh fixture process, so this is for tests. */
+export function resetFailFirst(): void {
+  refusedOnce.clear()
+}
+
+export function failFirstEnabled(): boolean {
+  return process.env.MOBILE_E2E_FAIL_FIRST === '1'
+}
+
+/**
+ * Whether this request is the one to refuse.
+ *
+ * Keyed on the PATH alone, so `?page=2` is not a second chance at the same
+ * screen: one refusal per endpoint, which is one per screen that reads it.
+ *
+ * `__probe=1` is exempt. The runner's readiness check curls `/api/judges`
+ * before handing the port to a flow, and without this the fixture would
+ * refuse its own probe and never be declared up.
+ */
+export function shouldRefuse(url: URL, method: string, enabled: boolean): boolean {
+  if (!enabled || method !== 'GET')
+    return false
+  if (!url.pathname.startsWith('/api/'))
+    return false
+  if (url.searchParams.has('__probe'))
+    return false
+  if (refusedOnce.has(url.pathname))
+    return false
+  refusedOnce.add(url.pathname)
+  return true
+}
+
 export function handle(request: Request): Response {
   const url = new URL(request.url)
   const path = url.pathname
@@ -488,6 +547,12 @@ export async function handleAsync(request: Request): Promise<Response> {
   const url = new URL(request.url)
   const json = (value: unknown, status = 200): Response =>
     Response.json(value, { status, headers: { 'Access-Control-Allow-Origin': '*' } })
+
+  // Before anything else: under MOBILE_E2E_FAIL_FIRST this is the one request
+  // per endpoint that gets refused, so the screen reading it shows its failed
+  // state and its retry. See `shouldRefuse`.
+  if (shouldRefuse(url, request.method, failFirstEnabled()))
+    return json({ error: 'Refused deliberately — the first request to each endpoint under MOBILE_E2E_FAIL_FIRST.' }, 503)
 
   if (url.pathname === '/api/auth/login' && request.method === 'POST') {
     const body = await request.json().catch(() => ({})) as Record<string, any>

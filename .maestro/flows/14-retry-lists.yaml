@@ -1,0 +1,162 @@
+appId: ${APP_ID}
+name: Recovering a list from a bad answer
+tags:
+  - mobile
+  - flaky
+---
+# NINE SCREENS DRAW A RETRY AND NO FLOW HAD EVER MADE ONE APPEAR.
+#
+# 04-offline comes closest: with the server stopped it asserts the words
+# "Try again" are on the feed. One screen, matched by text, and it never taps
+# it. So the question that matters was unanswered everywhere — does the
+# button DO anything? A retry that renders but never re-fetches, or that
+# re-fetches but never clears the failed flag, leaves someone stuck on an
+# error screen, and that only happens during an outage, which is when nobody
+# is looking.
+#
+# ⚠️ `tags: flaky` is load-bearing. The runner reads it and starts the fixture
+# with MOBILE_E2E_FAIL_FIRST=1, which refuses the FIRST request to each
+# endpoint with a 503 and serves every later one. Stopping the server the way
+# 04-offline does cannot test this: there would be nothing for the retry to
+# succeed against. Failing by count rather than by clock means no sleeps and
+# no window to race, and the recovery is this flow's own tap rather than
+# something that would have happened anyway.
+#
+# It also covers a branch nothing else reaches. `getJson` reports an
+# unreachable server as status 0 and a bad answer as its status, and the
+# screens word those differently; 04-offline covers status 0, and these flows
+# are the only cover the "problem on our side" branch has.
+#
+# ## Why every screen is reached COLD
+#
+# The first version of this walked the app — tab, tap, push, tab back — and
+# two things went wrong that are worth not repeating:
+#
+#   - a tab tap while a pushed screen was showing popped the stack, and the
+#     tap after it was swallowed by that transition, so the flow carried on
+#     asserting against the list it had never left. Same lost-tap-mid-
+#     transition as 02-navigation, with a pop in place of a tab change.
+#   - walking in order HEALS endpoints as it goes, so screens further down
+#     the walk could never be made to fail at all.
+#
+# Each block below relaunches and arrives by deep link instead. No block
+# depends on where the one above it finished, no endpoint is healed by a
+# screen that is not testing it, and a failure names exactly one screen.
+#
+# 15-retry-detail covers the judge, their sub-screens, and the review stack.
+
+# THE FEED, which is the start path, so a plain launch is already a cold
+# arrival on it.
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: "The feed could not be loaded. This is a problem on our side."
+    timeout: 90000
+# ⚠️ NOT the offline wording. The server answered — badly, but it answered —
+# and telling someone to check their connection sends them to fix a thing
+# that is not broken.
+- assertNotVisible: "The feed needs a connection. Reconnect and try again."
+# Nor the empty state, which would be a claim about the CONTENT: that nobody
+# has published anything, said at a moment when we simply do not know.
+- assertNotVisible: "No reviews have been published yet. The first one could be yours."
+- assertVisible:
+    id: "reviews-retry"
+- takeScreenshot: retry-feed-failed
+
+# THE TAP IS THE POINT. Everything above only proves the error state renders.
+- tapOn:
+    id: "reviews-retry"
+- extendedWaitUntil:
+    visible: "Ran a tight, fair calendar"
+    timeout: 30000
+# Recovered COMPLETELY: the error is gone, not merely pushed off screen by
+# content drawn underneath it.
+- assertNotVisible: "The feed could not be loaded. This is a problem on our side."
+- assertNotVisible:
+    id: "reviews-retry"
+- assertVisible:
+    text: "(?i)32 reviews"
+- takeScreenshot: retry-feed-recovered
+
+# THE DIRECTORY. Each screen owns its own copy of this logic, so one of them
+# getting it wrong is invisible from the others — the same reason 04-offline
+# walks every tab instead of trusting the first.
+- stopApp
+- openLink: benchreview://judges
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- extendedWaitUntil:
+    visible: "The directory could not be loaded. This is a problem on our side."
+    timeout: 90000
+- assertNotVisible: "Could not reach Bench Review. The directory will load when you are back online."
+- assertNotVisible: "No judges yet."
+- assertVisible:
+    id: "judges-retry"
+- tapOn:
+    id: "judges-retry"
+- extendedWaitUntil:
+    visible: "(?i)27 judges"
+    timeout: 30000
+- assertVisible: "Fixture A. Alder"
+- assertNotVisible: "The directory could not be loaded. This is a problem on our side."
+- assertNotVisible:
+    id: "judges-retry"
+
+# THE COURTHOUSES.
+- stopApp
+- openLink: benchreview://court-houses
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- extendedWaitUntil:
+    visible: "The courthouses could not be loaded."
+    timeout: 90000
+- assertNotVisible: "Could not reach Bench Review. Courthouses will load when you are back online."
+- assertNotVisible: "No courthouses yet."
+- assertVisible:
+    id: "courts-retry"
+- tapOn:
+    id: "courts-retry"
+- extendedWaitUntil:
+    visible: "(?i)3 courthouses"
+    timeout: 30000
+- assertVisible: "Fixture County Courthouse"
+- assertNotVisible: "The courthouses could not be loaded."
+- assertNotVisible:
+    id: "courts-retry"
+
+# ONE COURTHOUSE, on its own endpoint. Nothing about the list above
+# recovering says the detail behind it will: they are separate fetches with
+# separate failed flags, and this is the screen a person lands on from a
+# shared link.
+- stopApp
+- openLink: benchreview://court-houses/1
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- extendedWaitUntil:
+    visible: "The bench could not be loaded. This is a problem on our side."
+    timeout: 90000
+- assertNotVisible: "The bench needs a connection. Reconnect and try again."
+- assertNotVisible: "No judges are listed at this courthouse yet."
+- assertVisible:
+    id: "court-retry"
+- tapOn:
+    id: "court-retry"
+- extendedWaitUntil:
+    visible: "THE BENCH"
+    timeout: 30000
+- assertVisible: "Fixture A. Alder"
+- assertNotVisible: "The bench could not be loaded. This is a problem on our side."
+- assertNotVisible:
+    id: "court-retry"
+- takeScreenshot: retry-courthouse-recovered

@@ -1,0 +1,169 @@
+appId: ${APP_ID}
+name: Recovering a detail screen from a bad answer
+tags:
+  - mobile
+  - flaky
+---
+# The other five retries. 14-retry-lists has the whole argument for why this
+# exists and why `tags: flaky` is load-bearing; this is its second half,
+# split so a failure names one screen rather than a long walk.
+#
+# ⚠️ THE REVIEW AND THE THREAD USE DIFFERENT REVIEWS, and that is the whole
+# reason both can be tested. ReviewDetail reads `/api/reviews/:id` AND
+# `/api/reviews/:id/comments` together, so a detail screen on review 1000
+# would HEAL the thread endpoint the comments screen needs to see fail.
+# Review 1002 for the detail, review 1000 for the thread — 1000 is the one
+# the fixture seeds with comments, so its recovery has something to show.
+#
+# Every block relaunches and arrives by deep link, so no block depends on
+# where the one above it finished and no endpoint is healed by a screen that
+# is not testing it.
+
+# A JUDGE.
+#
+# ⚠️ BOTH OF THIS SCREEN'S ENDPOINTS FAIL HERE, not just one. The judge and
+# their reviews are fetched independently and only the reviews decide the
+# failed state, so the screen is built to keep a good judge when the list
+# under them fails. That partial case is real, but it is NOT what fail-first
+# produces on a first visit, which refuses both — so nothing here asserts a
+# header this setup never promised. Covering the partial failure needs a
+# fixture that refuses one endpoint while serving its sibling.
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- stopApp
+- openLink: benchreview://judges/1
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- extendedWaitUntil:
+    visible: "The reviews could not be loaded."
+    timeout: 90000
+- assertNotVisible: "Could not reach Bench Review. Reviews will load when you are back online."
+- assertNotVisible: "No reviews of this judge yet."
+- assertVisible:
+    id: "judge-retry"
+- tapOn:
+    id: "judge-retry"
+- extendedWaitUntil:
+    visible: "Ran a tight, fair calendar"
+    timeout: 30000
+- assertNotVisible: "The reviews could not be loaded."
+- assertNotVisible:
+    id: "judge-retry"
+- takeScreenshot: retry-judge-recovered
+
+# THEIR OPINIONS.
+- stopApp
+- openLink: benchreview://judges/1/opinions
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- extendedWaitUntil:
+    visible: "The opinions could not be loaded. This is a problem on our side."
+    timeout: 90000
+- assertNotVisible: "Opinions need a connection. Reconnect and try again."
+- assertNotVisible: "No opinions have been recorded for this judge yet."
+- assertVisible:
+    id: "opinions-retry"
+- tapOn:
+    id: "opinions-retry"
+- extendedWaitUntil:
+    visible: "(?i)63 opinions"
+    timeout: 30000
+- assertNotVisible: "The opinions could not be loaded. This is a problem on our side."
+- assertNotVisible:
+    id: "opinions-retry"
+
+# THEIR EDUCATION.
+- stopApp
+- openLink: benchreview://judges/1/education
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- extendedWaitUntil:
+    visible: "The education history could not be loaded."
+    timeout: 90000
+- assertNotVisible: "Education needs a connection. Reconnect and try again."
+- assertNotVisible: "No education history is recorded for this judge."
+- assertVisible:
+    id: "education-retry"
+- tapOn:
+    id: "education-retry"
+- extendedWaitUntil:
+    visible: "(?i)2 entries"
+    timeout: 30000
+- assertVisible: "Fixture School of Law"
+- assertNotVisible: "The education history could not be loaded."
+- assertNotVisible:
+    id: "education-retry"
+
+# ONE REVIEW IN FULL, on review 1002 so the thread block below still has a
+# cold `/comments` endpoint to fail on.
+#
+# ⚠️ THIS SCREEN HAD NO SERVER-ERROR BRANCH AT ALL until this flow was
+# written. `reason` was `offline() ? … : 'This review is no longer
+# published.'`, so every 500 and 503 told the reader the review had been
+# taken down — a claim about the CONTENT, made when the only thing that
+# happened was our server answering badly. It is the same false report
+# 04-offline exists to prevent on the feed, and this was the one screen of
+# nine that still made it. A 404 is the single failure that really is about
+# the content, and it keeps the old sentence.
+- stopApp
+- openLink: benchreview://reviews/1002
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- extendedWaitUntil:
+    visible: "The review could not be loaded. This is a problem on our side."
+    timeout: 90000
+- assertNotVisible: "Could not reach Bench Review. This review will load when you are back online."
+# The regression this screen is one commit away from at all times.
+- assertNotVisible: "This review is no longer published."
+- assertVisible:
+    id: "review-detail-retry"
+- takeScreenshot: retry-review-failed
+- tapOn:
+    id: "review-detail-retry"
+- extendedWaitUntil:
+    visible: "Rulings explained from the bench #2"
+    timeout: 30000
+- assertNotVisible: "The review could not be loaded. This is a problem on our side."
+- assertNotVisible:
+    id: "review-detail-retry"
+
+# THE THREAD, on review 1000 — the one the fixture seeds with comments, so
+# the recovery has rows to show rather than an empty state that would look
+# the same as a thread that never loaded.
+- stopApp
+- openLink: benchreview://reviews/1000/comments
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- extendedWaitUntil:
+    visible: "The comments could not be loaded. This is a problem on our side."
+    timeout: 90000
+- assertNotVisible: "Comments need a connection. Reconnect and try again."
+- assertNotVisible: "No comments on this review yet."
+- assertVisible:
+    id: "comments-retry"
+- tapOn:
+    id: "comments-retry"
+- extendedWaitUntil:
+    visible: "Appeared before them twice this year and this matches both times."
+    timeout: 30000
+- assertNotVisible: "The comments could not be loaded. This is a problem on our side."
+- assertNotVisible:
+    id: "comments-retry"
+- takeScreenshot: retry-comments-recovered

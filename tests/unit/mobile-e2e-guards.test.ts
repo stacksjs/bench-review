@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, test } from 'bun:test'
-import { handle, handleAsync } from '../../scripts/mobile-e2e-api'
+import { handle, handleAsync, resetFailFirst, shouldRefuse } from '../../scripts/mobile-e2e-api'
+import { flowTags, wantsFailFirstServer, wantsOfflineServer } from '../../scripts/run-mobile-e2e'
 import { isLoopback, resolveMobileServer, serverArgument } from '../../scripts/mobile-target'
 import { junitSummary, wantsOfflineServer } from '../../scripts/run-mobile-e2e'
 
@@ -299,5 +300,122 @@ describe('the e2e fixture api', () => {
     expect(handle(new Request('http://localhost/api/judges/1/follow', { method: 'POST' })).status).toBe(401)
     // A judge who is not listed, distinct from a silent success.
     expect(handle(new Request('http://localhost/api/judges/9999/follow', { method: 'POST', headers: auth })).status).toBe(404)
+  })
+})
+
+describe('refusing the first request, so a retry has something to recover from', () => {
+  const url = (path: string): URL => new URL(`http://localhost:4399${path}`)
+
+  test('refuses a path once and then serves it', () => {
+    resetFailFirst()
+    expect(shouldRefuse(url('/api/judges'), 'GET', true)).toBe(true)
+    expect(shouldRefuse(url('/api/judges'), 'GET', true)).toBe(false)
+    expect(shouldRefuse(url('/api/judges'), 'GET', true)).toBe(false)
+  })
+
+  test('keys on the path, so a second page is not a second refusal', () => {
+    resetFailFirst()
+    // The screen reads page 1, is refused, retries, then pages onward. If the
+    // query counted, every page turn would fail and the pager would look
+    // broken rather than the first load.
+    expect(shouldRefuse(url('/api/judges?page=1'), 'GET', true)).toBe(true)
+    expect(shouldRefuse(url('/api/judges?page=2'), 'GET', true)).toBe(false)
+  })
+
+  test('refuses each endpoint separately', () => {
+    resetFailFirst()
+    // Each screen owns its own failed state; one screen recovering must not
+    // heal another that has not been visited yet.
+    expect(shouldRefuse(url('/api/judges'), 'GET', true)).toBe(true)
+    expect(shouldRefuse(url('/api/court-houses'), 'GET', true)).toBe(true)
+    expect(shouldRefuse(url('/api/judges/1/education'), 'GET', true)).toBe(true)
+  })
+
+  test('leaves the readiness probe alone', () => {
+    resetFailFirst()
+    // The runner curls this to decide the fixture is up. Refusing it would
+    // make a fail-first fixture look like one that never started.
+    expect(shouldRefuse(url('/api/judges?__probe=1'), 'GET', true)).toBe(false)
+    // And the probe must not consume the refusal the flow is waiting for.
+    expect(shouldRefuse(url('/api/judges'), 'GET', true)).toBe(true)
+  })
+
+  test('refuses nothing when it is not armed', () => {
+    resetFailFirst()
+    expect(shouldRefuse(url('/api/judges'), 'GET', false)).toBe(false)
+  })
+
+  test('refuses only reads', () => {
+    resetFailFirst()
+    // A refused POST would test the write path's error handling, which is
+    // 07-write-review's job and is asserted against the real refusals.
+    expect(shouldRefuse(url('/api/reviews'), 'POST', true)).toBe(false)
+    expect(shouldRefuse(url('/api/judges/1/follow'), 'DELETE', true)).toBe(false)
+  })
+
+  test('leaves anything that is not the api alone', () => {
+    resetFailFirst()
+    expect(shouldRefuse(url('/healthz'), 'GET', true)).toBe(false)
+  })
+})
+
+describe('which server a flow asks for', () => {
+  const frontMatter = (tags: string[]): string =>
+    `appId: x\nname: y\ntags:\n${tags.map(t => `  - ${t}`).join('\n')}\n---\n- launchApp\n`
+
+  test('reads the flaky tag', () => {
+    expect(wantsFailFirstServer(frontMatter(['mobile', 'flaky']))).toBe(true)
+    expect(wantsFailFirstServer(frontMatter(['mobile', 'smoke']))).toBe(false)
+  })
+
+  test('offline and flaky are different requests', () => {
+    // One wants no server at all; the other wants a server that answers
+    // badly once. A flow asking for both would be asking for a retry that
+    // can never succeed.
+    expect(wantsOfflineServer(frontMatter(['offline']))).toBe(true)
+    expect(wantsFailFirstServer(frontMatter(['offline']))).toBe(false)
+  })
+
+  test('a flow with no tags asks for neither', () => {
+    expect(wantsFailFirstServer('appId: x\n---\n- launchApp\n')).toBe(false)
+    expect(wantsOfflineServer('appId: x\n---\n- launchApp\n')).toBe(false)
+  })
+
+  test('the tag list stops at the end of the block', () => {
+    // `flaky` appearing later in the file, in a comment or a step, is not a
+    // declaration.
+    const source = 'appId: x\ntags:\n  - mobile\nname: flaky\n---\n# flaky\n- launchApp\n'
+    expect(flowTags(source)).toEqual(['mobile'])
+    expect(wantsFailFirstServer(source)).toBe(false)
+  })
+})
+
+describe('the refusal reaches the wire', () => {
+  // `shouldRefuse` being right proves nothing if nothing calls it. This is
+  // the same delivery-versus-transform distinction that let the squared tab
+  // bar ship for three weeks without ever being compiled in.
+  test('answers 503 once, then the real body', async () => {
+    resetFailFirst()
+    process.env.MOBILE_E2E_FAIL_FIRST = '1'
+    try {
+      const first = await handleAsync(new Request('http://localhost:4399/api/judges'))
+      expect(first.status).toBe(503)
+
+      const second = await handleAsync(new Request('http://localhost:4399/api/judges'))
+      expect(second.status).toBe(200)
+      // A bare array of judges, which is what the directory reads.
+      expect((await second.json() as any).length).toBe(27)
+    }
+    finally {
+      delete process.env.MOBILE_E2E_FAIL_FIRST
+      resetFailFirst()
+    }
+  })
+
+  test('serves normally when the fixture is not armed', async () => {
+    resetFailFirst()
+    delete process.env.MOBILE_E2E_FAIL_FIRST
+    const response = await handleAsync(new Request('http://localhost:4399/api/judges'))
+    expect(response.status).toBe(200)
   })
 })

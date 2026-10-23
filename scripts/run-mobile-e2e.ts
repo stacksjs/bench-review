@@ -147,21 +147,40 @@ export function assertUsableNativeBundle(): void {
  * so a flow carries its own requirement and renaming one cannot quietly turn
  * the offline test into an online one that passes.
  */
-export function wantsOfflineServer(flowSource: string): boolean {
+export function flowTags(flowSource: string): string[] {
   // Front matter only — everything before the `---` that opens the steps.
   const frontMatter = flowSource.split(/^---\s*$/m)[0] ?? ''
   const lines = frontMatter.split('\n')
   const start = lines.findIndex(line => /^tags:\s*$/.test(line))
   if (start === -1)
-    return false
+    return []
+  const tags: string[] = []
   for (const line of lines.slice(start + 1)) {
     // The list ends at the first line that is not one of its items.
-    if (!/^\s+-\s*\S/.test(line))
-      return false
-    if (/^\s+-\s*offline\s*$/.test(line))
-      return true
+    const item = line.match(/^\s+-\s*(\S+)\s*$/)
+    if (!item)
+      break
+    tags.push(item[1])
   }
-  return false
+  return tags
+}
+
+export function wantsOfflineServer(flowSource: string): boolean {
+  return flowTags(flowSource).includes('offline')
+}
+
+/**
+ * Whether a flow asks for a server that refuses each endpoint's first
+ * request, so it can exercise a screen's failed state and its retry.
+ *
+ * Declared by the flow for the same reason `offline` is: the requirement
+ * belongs with the test that has it, and a flow renamed or reordered keeps
+ * the server it needs. A `flaky` flow run against a healthy server would
+ * assert a failed state that never arrives rather than passing quietly, but
+ * the tag is what makes that impossible in the first place.
+ */
+export function wantsFailFirstServer(flowSource: string): boolean {
+  return flowTags(flowSource).includes('flaky')
 }
 
 function bootedSimulator(preferred?: string): string {
@@ -337,10 +356,13 @@ if (import.meta.main) {
 
   const reachable = (): boolean => Bun.spawnSync([
     'curl', '--silent', '--fail', '--max-time', '1', '--output', '/dev/null',
-    `http://localhost:${DEFAULT_PORT}/api/judges`,
+    // `__probe=1` so a fail-first fixture does not refuse the check that
+    // decides whether it is up. A foreign server ignores the unknown
+    // parameter, so the "someone else is on this port" guard is unchanged.
+    `http://localhost:${DEFAULT_PORT}/api/judges?__probe=1`,
   ]).success
 
-  const startFixture = (): void => {
+  const startFixture = (options: { failFirst?: boolean } = {}): void => {
     if (!ownServer || fixture)
       return
     // Somebody else is already on the port. Carrying on would be worse than
@@ -353,20 +375,33 @@ if (import.meta.main) {
 
     fixture = Bun.spawn(['bun', join(projectRoot, 'scripts/mobile-e2e-api.ts')], {
       cwd: projectRoot,
-      env: { ...process.env, MOBILE_E2E_PORT: String(DEFAULT_PORT) } as Record<string, string>,
+      env: {
+        ...process.env,
+        MOBILE_E2E_PORT: String(DEFAULT_PORT),
+        // Armed per flow, from the flow's own `flaky` tag.
+        ...(options.failFirst ? { MOBILE_E2E_FAIL_FIRST: '1' } : {}),
+      } as Record<string, string>,
       stdout: 'ignore',
       stderr: 'inherit',
     })
     // Ready before anything depends on it. A flow starts within seconds of the
     // install and the app fetches on its first frame.
-    for (let attempt = 0; attempt < 50; attempt++) {
+    //
+    // ⚠️ 20 SECONDS, NOT 5. A cold `bun` start of the fixture measured 3-5s on
+    // this machine, and the old 5s budget lost the race whenever anything
+    // else was loading the box — an xcodebuild in the same run was enough.
+    // The cost of waiting longer is nothing, because this returns on the
+    // first successful probe; the cost of being too tight is a run that dies
+    // at startup with a message that reads like the fixture is broken.
+    const budgetMs = 20_000
+    for (let waited = 0; waited < budgetMs; waited += 100) {
       if (reachable())
         return
       if (fixture.exitCode !== null)
         throw new Error(`The fixture API exited immediately (code ${fixture.exitCode}). Its error is above.`)
       Bun.sleepSync(100)
     }
-    throw new Error(`The fixture API did not come up on port ${DEFAULT_PORT}.`)
+    throw new Error(`The fixture API did not answer on port ${DEFAULT_PORT} within ${budgetMs / 1000}s. It is still running, so this is slowness or a wedged port, not a crash.`)
   }
 
   const stopFixture = (): void => {
@@ -404,7 +439,9 @@ if (import.meta.main) {
       throw new Error(`No flow matched "${only}". Available: ${flows.join(', ')}`)
 
     for (const flow of selected) {
-      const offline = wantsOfflineServer(readFileSync(join(flowRoot, flow), 'utf8'))
+      const source = readFileSync(join(flowRoot, flow), 'utf8')
+      const offline = wantsOfflineServer(source)
+      const failFirst = wantsFailFirstServer(source)
       if (offline && !ownServer) {
         // Someone else's server. Stopping it is not ours to do, and running
         // the flow with it up would assert an offline state that never comes.
@@ -428,7 +465,11 @@ if (import.meta.main) {
         // `stopFixture` already waits for the port to go quiet, so this
         // cannot race the new one onto a port the old one still holds.
         stopFixture()
-        startFixture()
+        // A `flaky` flow gets a fixture that refuses each endpoint's first
+        // request, so the screens it visits fail once and can be recovered
+        // by their own retry buttons. Fresh per flow like any other, which
+        // is what resets the refusal set.
+        startFixture({ failFirst })
       }
       runFlow(deviceId, flow)
     }
