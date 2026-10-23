@@ -175,7 +175,11 @@ export default {
     version: envVars.IOS_APP_VERSION ?? '1.0.0',
     buildNumber: envVars.IOS_BUILD_NUMBER ?? '1',
     deploymentTarget: '16.0',
-    teamId: envVars.APPLE_TEAM_ID,
+    // The Apple Developer team bench ships under — the same one as the other
+    // HQ apps. Committed rather than left to an env var so `./buddy
+    // release:ios` can sign from any checkout; APPLE_TEAM_ID still wins when
+    // it is set, which is what a fork or a personal-team sideload needs.
+    teamId: envVars.APPLE_TEAM_ID || '3JJRNQW6B7',
     ...mobileContent,
 
     trustedOrigins: ['https://benchreview.org'],
