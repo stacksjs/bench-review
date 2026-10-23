@@ -3,7 +3,7 @@ import type { BuddyBotConfig } from 'buddy-bot'
 export default {
   repository: {
     owner: 'stacksjs',
-    name: 'stacks',
+    name: 'bench-review',
     provider: 'github',
     // token: process.env.BUDDY_BOT_TOKEN,
   },
