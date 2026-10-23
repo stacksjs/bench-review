@@ -56,6 +56,8 @@ const comments = state<Comment[]>([])
 const commentTotal = state<number>(Number(handoff?.comments ?? 0) || 0)
 const loading = state(true)
 const failed = state(false)
+/** The status behind `failed`, so the screen can tell 404 from 503. */
+const failStatus = state<number>(0)
 const offline = state(false)
 /** Optimistic like, as on every other screen that shows this chip. */
 const pending = state<{ liked: boolean, likes: number } | null>(null)
@@ -95,9 +97,20 @@ const more = derived<number>(() => Math.max(0, commentTotal() - previewRows().le
 const moreText = derived<string>(() => more() === 1 ? 'View 1 more comment' : 'View all ' + commentTotal() + ' comments')
 const noComments = derived<boolean>(() => !loading() && commentTotal() === 0)
 
-const reason = derived<string>(() => offline()
-  ? 'Could not reach Bench Review. This review will load when you are back online.'
-  : 'This review is no longer published.')
+// ⚠️ THREE outcomes, not two. This read `offline() ? … : 'no longer
+// published'`, so every 500 and 503 told the reader the review had been
+// taken down — a claim about the CONTENT, made when the only thing that
+// actually happened was our server answering badly. It is the same false
+// report 04-offline exists to prevent on the feed, and this screen was the
+// one of nine that still made it. A 404 is the single failure that really is
+// about the content.
+const reason = derived<string>(() => {
+  if (offline())
+    return 'Could not reach Bench Review. This review will load when you are back online.'
+  if (failStatus() === 404)
+    return 'This review is no longer published.'
+  return 'The review could not be loaded. This is a problem on our side.'
+})
 
 effect(() => craft?.navigation?.setOptions({ title: 'Review' }))
 
@@ -109,6 +122,7 @@ async function load(): Promise<void> {
     return
   }
   failed.set(false)
+  failStatus.set(0)
   offline.set(false)
   try {
     // Both together: the review and its comments are independent, and
@@ -131,7 +145,9 @@ async function load(): Promise<void> {
     }
     else {
       failed.set(true)
-      offline.set(one.reason instanceof ApiError && one.reason.status === 0)
+      const status = one.reason instanceof ApiError ? one.reason.status : 0
+      failStatus.set(status)
+      offline.set(status === 0)
     }
 
     if (thread.status === 'fulfilled') {
@@ -143,7 +159,9 @@ async function load(): Promise<void> {
     if (!alive)
       return
     failed.set(true)
-    offline.set(err instanceof ApiError && err.status === 0)
+    const status = err instanceof ApiError ? err.status : 0
+    failStatus.set(status)
+    offline.set(status === 0)
   }
   finally {
     if (alive)
