@@ -147,8 +147,17 @@ loads; `typeof globalThis.Judge === 'object'` after `injectGlobalAutoImports()`.
 
 ### Stage A4 — Boot + smoke (no dev-server restart — use a separate probe)
 1. Foreground boot probe (separate port/instance, not the user's 4000/4008):
-   `NODE_PATH=$PWD/pantry? bun dev/api.ts` in foreground to surface real errors (the 4008
+   `PORT_API=4108 ./buddy dev --api` in foreground to surface real errors (the 4008
    silent-fail pattern). Confirm `/api/judges` 200, model globals defined.
+
+   > This step used to read `NODE_PATH=$PWD/pantry? bun dev/api.ts`, which cannot
+   > work: there is no `dev/` directory in this repository and never has been.
+   > `./buddy dev --api` is the API-only development server, and `PORT_API` is
+   > read by [`config/ports.ts`](../config/ports.ts) (`env.PORT_API ?? 3008`), so
+   > overriding it is what keeps the probe off the user's running 4008, which
+   > this stage requires and which a bare `./buddy dev --api` would collide with.
+   > The `NODE_PATH` prefix is dropped: bench resolves from `node_modules` since
+   > the 2026-08-03 migration, and retiring pantry is what A3 above is doing.
 2. `bun x tsc --noEmit` — expect ~619 baseline (the faker debt), not a regression.
 3. `bun pantry/pickier/dist/bin/cli.js lint` (or node_modules pickier if pantry retired) → 0 new.
 4. SPA-nav smoke via the standards' probe harness (bench-adjusted ports): `/ → /reviews`

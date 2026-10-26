@@ -14,7 +14,31 @@ Two artifacts, deployed independently:
 | Artifact | Produced by | What it is |
 |---|---|---|
 | `dist/` | `bun run build` | Pre-rendered static HTML, one file per route, plus hashed assets, `sitemap.xml` and `robots.txt` |
-| the API | `bun dev/api.ts` (or your process manager) | bun-router serving `/api/*` — auth, reviews, moderation, uploads |
+| the API | `bun app/ProductionApi.ts` | bun-router serving `/api/*` — auth, reviews, moderation, uploads |
+
+> **Why there is a dedicated production entry.** This table used to name
+> `bun dev/api.ts`, which never existed — there is no `dev/` directory here.
+> Neither of the two things that do exist is a production server:
+>
+> - `storage/framework/api/dev.ts` is a real, working bun-router server, but it
+>   calls `watchFolders()`, setting recursive `fs.watch` on
+>   `storage/framework/core`, `routes/`, `app/Actions`, `app/Controllers`,
+>   `app/Middleware` and the model paths and re-running codegen on change. That
+>   is gated on `globalThis.counter === 1` — a hot-reload counter, not an
+>   environment check — so the watchers fire in production too.
+> - `./buddy serve` **proxies** `/api` rather than hosting it, so it
+>   presupposes an API process instead of replacing one. It also renders stx at
+>   runtime, which is a different architecture from this project's build-time
+>   SSG.
+>
+> [`app/ProductionApi.ts`](app/ProductionApi.ts) is the dev server minus the
+> watchers, plus two things a supervised process needs: routes imported
+> **eagerly**, so a broken registry fails at boot rather than on the first
+> request (the router otherwise loads them lazily — the silent-`:4008` pattern),
+> and **`SIGTERM` handled**, so systemd can stop it cleanly instead of
+> `SIGKILL`ing it mid-request on every deploy.
+>
+> In development the API still comes up as part of `./buddy dev`, on `:4008`.
 
 stx is a **build-time** templating engine here: every page in `dist/` is
 already rendered HTML. There is no Node render server for the frontend and
