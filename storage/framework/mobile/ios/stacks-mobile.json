@@ -1,0 +1,163 @@
+{
+  "schemaVersion": "1.0.0",
+  "platform": "ios",
+  "sourceRevision": "cbd50476b5816737168ede0f4954e9bc0765d1f0",
+  "source": {
+    "kind": "native",
+    "site": "https://benchreview.org/reviews"
+  },
+  "capabilities": {
+    "camera": true,
+    "filePicker": true,
+    "share": true,
+    "deepLinks": true,
+    "secureStorage": true
+  },
+  "builder": {
+    "package": "craft-native",
+    "source": "package"
+  },
+  "craft": {
+    "renderer": "native",
+    "version": "1.0.0",
+    "buildNumber": "1",
+    "darkMode": false,
+    "backgroundColor": "#ffffff",
+    "enableSpeechRecognition": false,
+    "enableHaptics": false,
+    "enableShare": true,
+    "enableCamera": true,
+    "enableBiometric": false,
+    "enablePushNotifications": false,
+    "enableSecureStorage": true,
+    "enableGeolocation": false,
+    "enableClipboard": false,
+    "enableContacts": false,
+    "enableCalendar": false,
+    "enableLocalNotifications": false,
+    "enableInAppPurchase": false,
+    "enableKeepAwake": false,
+    "enableOrientationLock": false,
+    "enableDeepLinks": true,
+    "enableQRScanner": false,
+    "enableLocalNetwork": false,
+    "enableFilePicker": true,
+    "enableFileDownload": false,
+    "enableSocialAuth": false,
+    "enablePasskeys": false,
+    "enableAudioRecording": false,
+    "enableVideoRecording": false,
+    "enableMotionSensors": false,
+    "enableLocalDatabase": false,
+    "enableBluetooth": false,
+    "enableNFC": false,
+    "enableHealthKit": false,
+    "enableLiveActivities": false,
+    "enableWatchApp": false,
+    "enableBackgroundLocation": false,
+    "enableBackgroundTasks": false,
+    "enableScreenCapture": false,
+    "enablePDFViewer": false,
+    "enableAR": false,
+    "enableMLKit": false,
+    "enableAppleMusic": false,
+    "enableHeartRate": false,
+    "enableScheduledWorkouts": false,
+    "iosVersion": "16.0",
+    "watchosVersion": "9.0",
+    "teamId": "3JJRNQW6B7",
+    "trustedOrigins": [
+      "https://benchreview.org"
+    ],
+    "associatedDomains": [
+      "applinks:benchreview.org"
+    ],
+    "appGroups": [],
+    "orientations": [
+      "portrait"
+    ],
+    "deviceFamilies": [
+      "iphone"
+    ],
+    "appName": "Bench Review",
+    "bundleId": "org.benchreview.app",
+    "swipeNavigation": false,
+    "devServerURL": "https://benchreview.org/reviews",
+    "urlSchemes": [
+      "benchreview"
+    ],
+    "nativeScreens": {
+      "/judges": "Judges",
+      "/judges/:id": "Judge",
+      "/judges/:id/opinions": "JudgeOpinions",
+      "/judges/:id/education": "JudgeEducation",
+      "/court-houses": "CourtHouses",
+      "/court-houses/:id": "CourtHouse",
+      "/review": "Review",
+      "/review/:id": "Review",
+      "/reviews": "Reviews",
+      "/reviews/:id": "ReviewDetail",
+      "/reviews/:id/comments": "ReviewComments",
+      "/profile": "Profile",
+      "/login": "Login"
+    },
+    "tabs": [
+      {
+        "id": "/reviews",
+        "title": "Feed",
+        "symbol": "text.bubble"
+      },
+      {
+        "id": "/judges",
+        "title": "Judges",
+        "symbol": "person.text.rectangle"
+      },
+      {
+        "id": "/court-houses",
+        "title": "Courthouses",
+        "symbol": "building.columns"
+      },
+      {
+        "id": "/review",
+        "title": "Write",
+        "symbol": "square.and.pencil"
+      },
+      {
+        "id": "/profile",
+        "title": "Profile",
+        "symbol": "person.crop.circle"
+      }
+    ],
+    "appIconPath": "../../../../public/images/app/bench-review-app-icon.png",
+    "privacy": {
+      "tracking": false,
+      "collectedDataTypes": [
+        {
+          "type": "NSPrivacyCollectedDataTypeEmailAddress",
+          "linked": true,
+          "tracking": false,
+          "purposes": [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+          ]
+        },
+        {
+          "type": "NSPrivacyCollectedDataTypeOtherUserContent",
+          "linked": true,
+          "tracking": false,
+          "purposes": [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+          ]
+        },
+        {
+          "type": "NSPrivacyCollectedDataTypePhotosorVideos",
+          "linked": true,
+          "tracking": false,
+          "purposes": [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+          ]
+        }
+      ]
+    },
+    "nativeBundle": "native-screens.js"
+  }
+}

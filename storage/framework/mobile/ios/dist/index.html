@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="color-scheme" content="light dark">
+  <title>Bench Review</title>
+  <style>
+    :root { --background: #ffffff; --text: #0f172a; }
+    @media (prefers-color-scheme: dark) {
+      :root { --background: #ffffff; --text: #0f172a; }
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      font: -apple-system-body;
+      font-family: -apple-system, system-ui, sans-serif;
+      background: var(--background);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: calc(env(safe-area-inset-top) + 24px) calc(env(safe-area-inset-right) + 32px) calc(env(safe-area-inset-bottom) + 24px) calc(env(safe-area-inset-left) + 32px);
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    main { max-width: 22rem; }
+    .app { font: -apple-system-subheadline; font-weight: 600; opacity: 0.6; margin-bottom: 0.5rem; }
+    h1 { font: -apple-system-title1; font-weight: 700; margin-bottom: 0.75rem; }
+    p { opacity: 0.72; line-height: 1.4; }
+    button {
+      font: -apple-system-headline;
+      margin-top: 1.75rem;
+      min-width: 9rem;
+      min-height: 44px;
+      padding: 0.75rem 1.75rem;
+      border: 0;
+      border-radius: 999px;
+      background: var(--text);
+      color: var(--background);
+      cursor: pointer;
+    }
+    button:active { opacity: 0.7; }
+    button:disabled { opacity: 0.5; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="app">Bench Review</div>
+    <h1>You're offline</h1>
+    <p>Bench Review could not reach the internet. Check your connection, then try again.</p>
+    <button id="retry" type="button">Retry</button>
+  </main>
+  <script>
+    (function () {
+      var button = document.getElementById('retry');
+      function retry() {
+        button.disabled = true;
+        button.textContent = 'Retrying';
+        var handler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.craft;
+        if (handler) handler.postMessage({ action: 'retryRemote' });
+        else location.reload();
+        // Still here a while later means the page is still out of reach.
+        setTimeout(function () { button.disabled = false; button.textContent = 'Retry'; }, 12000);
+      }
+      button.addEventListener('click', retry);
+    })();
+  </script>
+</body>
+</html>

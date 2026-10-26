@@ -1,20 +1,2 @@
-# What NOT to commit from the generated iOS project.
-#
-# The tree is tracked so Xcode Cloud has a project to build (it builds from
-# the repository, not from the machine that generated it) — but most of what
-# `./buddy build:ios` writes here is reproducible and does not belong in git.
-
-# Swift is restored on the build machine from the locked Craft package by
-# ci_scripts/ci_post_clone.sh, so committing it would pin a copy that the
-# next framework bump silently contradicts.
-#
-# ⚠️ scripts/patch-ios-tabbar.ts REWRITES THESE FILES, and an Xcode Cloud
-# build regenerates them after the checkout — so the squared tab-bar
-# highlight does NOT survive that path. It is applied for local and e2e
-# builds, where the runner patches between generation and compile. Retire
-# both when craft-native/craft#386 ships a real option.
+# Native sources are restored from the locked Craft package.
 *.swift
-
-# The compiler's copy of the screens; dist/ carries the one that ships.
-/native-screens.js
-/native-screens/
