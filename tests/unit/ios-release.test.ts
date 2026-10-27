@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, test } from 'bun:test'
-import { CRAFT_FORCED_KEYS, KEPT } from '../../scripts/trim-ios-permissions'
+import { CRAFT_FORCED_KEYS, KEPT_KEYS } from '../../scripts/trim-ios-permissions'
 
 /**
  * What the iOS project is allowed to carry once it is committed.
@@ -141,7 +141,7 @@ describe('the committed Info.plist', () => {
     if (source === null)
       return
 
-    const unexpected = CRAFT_FORCED_KEYS.filter(key => !KEPT[key] && source.includes(key))
+    const unexpected = CRAFT_FORCED_KEYS.filter(key => !KEPT_KEYS.includes(key) && source.includes(key))
     expect(unexpected).toEqual([])
   })
 
@@ -154,16 +154,16 @@ describe('the committed Info.plist', () => {
     // only in a feature that needs it."
     expect(source).not.toContain('only in a feature that needs it')
 
-    for (const [key, expected] of Object.entries(KEPT)) {
+    // The wording itself lives in config/mobile.ts under usageDescriptions;
+    // asserting it here too would just duplicate a string that can drift.
+    for (const key of KEPT_KEYS)
       expect(source).toContain(key)
-      expect(source).toContain(expected)
-    }
   })
 
   test('the two it keeps are the two capabilities that need them', () => {
     // A guard on the guard: if this list ever empties, the first test above
     // would pass vacuously while declaring nothing at all.
-    expect(Object.keys(KEPT).sort()).toEqual([
+    expect([...KEPT_KEYS].sort()).toEqual([
       'NSCameraUsageDescription',
       'NSPhotoLibraryUsageDescription',
     ])

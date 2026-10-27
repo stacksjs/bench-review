@@ -242,6 +242,32 @@ export default {
       secureStorage: true,
     },
 
+      /**
+       * What iOS says at the permission prompt, for the two permissions this
+       * app actually asks for. They correspond to `camera` and `filePicker`
+       * above.
+       *
+       * Craft writes a generic sentence otherwise - "Bench Review asks for
+       * the camera only in a feature that needs it." - which explains nothing
+       * to the person being asked.
+       *
+       * This IS forwarded: @stacksjs/actions/dist/build/ios-config.ts maps it
+       * through as `usageDescriptions: config.usageDescriptions`. (An earlier
+       * note here claimed it was dropped; that came from grepping ios.ts,
+       * which spreads the config into the mapper rather than listing keys.)
+       *
+       * ⚠️ IT CANNOT REMOVE A PERMISSION, only reword one. Craft emits all
+       * eleven of its LINKED_PURPOSES keys whatever the capabilities say
+       * (craft-native/craft#424), so the nine this app does not use are
+       * stripped after generation by scripts/trim-ios-permissions.ts.
+       */
+      usageDescriptions: {
+        NSCameraUsageDescription:
+          'Bench Review uses the camera so you can attach a photo to a review you are writing.',
+        NSPhotoLibraryUsageDescription:
+          'Bench Review opens your photo library so you can attach an existing photo to a review.',
+      },
+
     /**
      * App Store privacy manifest.
      *
