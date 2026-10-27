@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, test } from 'bun:test'
+import { CRAFT_FORCED_KEYS, KEPT } from '../../scripts/trim-ios-permissions'
 
 /**
  * What the iOS project is allowed to carry once it is committed.
@@ -107,5 +108,64 @@ describe('the committed iOS project', () => {
     if (!tracked.length)
       return
     expect(tracked.filter(isScannable).length).toBeGreaterThan(0)
+  })
+})
+
+describe('the committed Info.plist', () => {
+  const tracked = trackedIosFiles()
+  const plistPath = `${iosRoot}/Info.plist`
+
+  function plist(): string | null {
+    if (!tracked.includes(plistPath))
+      return null
+    try {
+      return readFileSync(join(projectRoot, plistPath), 'utf8')
+    }
+    catch {
+      return null
+    }
+  }
+
+  test('declares no permission the app does not use', () => {
+    // Craft forces all eleven NS*UsageDescription keys into every generated
+    // project regardless of the declared capabilities, because its
+    // LINKED_PURPOSES fallback emits a placeholder rather than omitting the
+    // key. scripts/trim-ios-permissions.ts removes the ones bench does not
+    // use; this fails if a regeneration lands without that step, which is the
+    // only way the list comes back.
+    //
+    // Permissions an app does not use, with vague purpose strings, are a
+    // documented App Review rejection reason — and the strings are what iOS
+    // shows a person at the prompt, so they are a claim we have to mean.
+    const source = plist()
+    if (source === null)
+      return
+
+    const unexpected = CRAFT_FORCED_KEYS.filter(key => !KEPT[key] && source.includes(key))
+    expect(unexpected).toEqual([])
+  })
+
+  test('keeps a real purpose string for each permission it does declare', () => {
+    const source = plist()
+    if (source === null)
+      return
+
+    // The generator's placeholder explains nothing: "… asks for the camera
+    // only in a feature that needs it."
+    expect(source).not.toContain('only in a feature that needs it')
+
+    for (const [key, expected] of Object.entries(KEPT)) {
+      expect(source).toContain(key)
+      expect(source).toContain(expected)
+    }
+  })
+
+  test('the two it keeps are the two capabilities that need them', () => {
+    // A guard on the guard: if this list ever empties, the first test above
+    // would pass vacuously while declaring nothing at all.
+    expect(Object.keys(KEPT).sort()).toEqual([
+      'NSCameraUsageDescription',
+      'NSPhotoLibraryUsageDescription',
+    ])
   })
 })

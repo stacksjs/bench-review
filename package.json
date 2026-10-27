@@ -9,7 +9,7 @@
     "build": "bun build.ts",
     "build:stacks": "./buddy build",
     "build:offline-bundle": "bun scripts/build-offline-bundle.ts",
-    "build:ios": "bun run build && bun run build:offline-bundle && ./buddy build:ios && bun scripts/patch-ios-tabbar.ts",
+    "build:ios": "bun run build && bun run build:offline-bundle && ./buddy build:ios && bun scripts/patch-ios-tabbar.ts && bun scripts/trim-ios-permissions.ts",
     "preview": "bun preview.ts",
     "start": "bun preview.ts",
     "lint": "bunx --bun pickier .",
@@ -25,9 +25,9 @@
     "deployment:smoke": "bun scripts/smoke-deployment.ts",
     "test:e2e:ios": "bun scripts/run-mobile-e2e.ts",
     "mobile:fixture-api": "bun scripts/mobile-e2e-api.ts",
-    "preview:ios": "MOBILE_URL=http://localhost:4399/reviews ./buddy build:ios",
-    "preview:ios:local": "MOBILE_URL=http://localhost:4000/reviews ./buddy build:ios",
-    "preview:ios:production": "MOBILE_URL=https://benchreview.org/reviews ./buddy build:ios",
+    "preview:ios": "MOBILE_URL=http://localhost:4399/reviews ./buddy build:ios && bun scripts/trim-ios-permissions.ts",
+    "preview:ios:local": "MOBILE_URL=http://localhost:4000/reviews ./buddy build:ios && bun scripts/trim-ios-permissions.ts",
+    "preview:ios:production": "MOBILE_URL=https://benchreview.org/reviews ./buddy build:ios && bun scripts/trim-ios-permissions.ts",
     "lint:flows": "bun scripts/lint-maestro-flows.ts"
   },
   "dependencies": {
